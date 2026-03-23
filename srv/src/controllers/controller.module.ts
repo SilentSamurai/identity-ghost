@@ -25,6 +25,8 @@ import {RegisterController} from "./registration.controller";
 import {AppController} from "./app.controller";
 import {App} from "../entity/app.entity"
 import {TenantBitsController} from "./tenant-bits.controller";
+import {ClientController} from "./client.controller";
+import {Client} from "../entity/client.entity";
 
 @Module(
     {
@@ -35,7 +37,7 @@ import {TenantBitsController} from "./tenant-bits.controller";
                 MailModule,
                 CaslModule,
                 ServiceModule,
-                TypeOrmModule.forFeature([User, Tenant, Role, TenantMember, Group, App])
+                TypeOrmModule.forFeature([User, Tenant, Role, TenantMember, Group, App, Client])
             ],
         controllers: [
             UsersController,
@@ -51,7 +53,8 @@ import {TenantBitsController} from "./tenant-bits.controller";
             RoleControllerV2,
             RegisterController,
             AppController,
-            TenantBitsController
+            TenantBitsController,
+            ClientController
         ],
         providers: [],
         exports: []

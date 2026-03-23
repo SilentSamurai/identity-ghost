@@ -119,3 +119,5 @@ nginx/temp
 
 .qodo
 /ui/cypress/screenshots
+.vscode/settings.json
+.kiro/specs/

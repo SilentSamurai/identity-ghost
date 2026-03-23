@@ -22,17 +22,19 @@ import {TenantBits} from "../entity/tenant-bits.entity";
 import {TenantBitsService} from "./tenant-bits.service";
 import {AuthModule} from "../auth/auth.module";
 import {AppSubscriptionService} from "./app-subscription.service";
+import {Client} from "../entity/client.entity";
+import {ClientService} from "./client.service";
 
 @Module(
     {
         imports: [
-            TypeOrmModule.forFeature([Tenant, User, TenantMember, Role, UserRole, AuthCode, Group, GroupRole, GroupUser, App, Subscription, TenantBits]),
+            TypeOrmModule.forFeature([Tenant, User, TenantMember, Role, UserRole, AuthCode, Group, GroupRole, GroupUser, App, Subscription, TenantBits, Client]),
             CaslModule,
             forwardRef(() => AuthModule),
         ],
         controllers: [],
-        providers: [UsersService, GroupService, TenantService, RoleService, SubscriptionService, AppService, TenantBitsService, AppSubscriptionService],
-        exports: [UsersService, GroupService, TenantService, RoleService, SubscriptionService, AppService, TenantBitsService, AppSubscriptionService]
+        providers: [UsersService, GroupService, TenantService, RoleService, SubscriptionService, AppService, TenantBitsService, AppSubscriptionService, ClientService],
+        exports: [UsersService, GroupService, TenantService, RoleService, SubscriptionService, AppService, TenantBitsService, AppSubscriptionService, ClientService]
     })
 export class ServiceModule {
 }

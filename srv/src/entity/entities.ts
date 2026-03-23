@@ -11,6 +11,7 @@ import {Policy} from "./authorization.entity";
 import {App} from "./app.entity";
 import {Subscription} from "./subscription.entity";
 import {TenantBits} from "./tenant-bits.entity";
+import {Client} from "./client.entity";
 
 export const entities = [
     Tenant,
@@ -25,5 +26,6 @@ export const entities = [
     Policy,
     App,
     Subscription,
-    TenantBits
+    TenantBits,
+    Client
 ];

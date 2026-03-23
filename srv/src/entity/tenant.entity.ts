@@ -5,6 +5,7 @@ import {User} from "./user.entity";
 import {Group} from "./group.entity";
 import {App} from "./app.entity";
 import {Subscription} from "./subscription.entity";
+import {Client} from "./client.entity";
 
 @Entity({name: "tenants"})
 export class Tenant {
@@ -73,5 +74,8 @@ export class Tenant {
 
     @OneToMany(() => Subscription, subscription => subscription.subscriber)
     appSubscriptions: Subscription[];
+
+    @OneToMany(() => Client, client => client.tenant)
+    clients: Client[];
 
 }
