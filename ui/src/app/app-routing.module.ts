@@ -24,6 +24,8 @@ import {UserAuthGuard} from './shared/user-auth-guard.service';
 import {HttpErrorComponent} from './error-pages/HttpError.component';
 import {TenantAccessAuthGuard} from './shared/tenant-auth-guard.service';
 import {AP01Component} from './secure/apps/AP01.component';
+import {CL01Component} from './secure/clients/CL01.component';
+import {CL02Component} from './secure/clients/CL02.component';
 import {AuthorizeLoginComponent} from "./open-pages/authorize-login.component";
 import {TenantSelectionComponent} from './open-pages/tenant-selection.component';
 import {ForgotPasswordComponent} from './open-pages/forgot-password.component';
@@ -63,6 +65,16 @@ const routes: Routes = [
             {
                 path: 'RL02/:tenantId/:roleId',
                 component: RL02Component,
+                canActivate: [TenantAccessAuthGuard],
+            },
+            {
+                path: 'CL01/:tenantId',
+                component: CL01Component,
+                canActivate: [TenantAccessAuthGuard],
+            },
+            {
+                path: 'CL02/:tenantId/:clientId',
+                component: CL02Component,
                 canActivate: [TenantAccessAuthGuard],
             },
         ],

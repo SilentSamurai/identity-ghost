@@ -77,6 +77,15 @@ export class HomeComponent implements OnInit {
                         });
                     },
                 },
+                {
+                    title: 'Clients',
+                    subtitle: 'Manage OAuth Clients',
+                    icon: 'fa-key',
+                    command: async () => {
+                        const tenant_id = this.user.tenant.id;
+                        await this.router.navigate(['/CL01', tenant_id]);
+                    },
+                },
             ],
         },
         {

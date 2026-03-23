@@ -46,6 +46,10 @@ import {CreateAppComponent} from "./apps/dialogs/create-app.component";
 import {UpdateAppComponent} from "./apps/dialogs/update-app.component";
 import {CreateSubscriptionComponent} from "./tenants/dialogs/create-subscription.component";
 import {ChangePasswordModalComponent} from "./users/dialogs/change-password.modal.component";
+import {CL01Component} from './clients/CL01.component';
+import {CL02Component} from './clients/CL02.component';
+import {CreateClientComponent} from './clients/dialogs/create-client.component';
+import {SecretDisplayComponent} from './clients/dialogs/secret-display.component';
 
 @NgModule({
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
@@ -80,7 +84,11 @@ import {ChangePasswordModalComponent} from "./users/dialogs/change-password.moda
         CreateAppComponent,
         UpdateAppComponent,
         CreateSubscriptionComponent,
-        ChangePasswordModalComponent
+        ChangePasswordModalComponent,
+        CL01Component,
+        CL02Component,
+        CreateClientComponent,
+        SecretDisplayComponent
     ],
     imports: [
         TableModule,

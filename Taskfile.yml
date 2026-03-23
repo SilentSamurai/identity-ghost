@@ -1,0 +1,154 @@
+version: '3'
+
+set: [pipefail]
+
+tasks:
+  default:
+    desc: Show available tasks
+    cmds:
+      - task --list
+
+  # ─── Top-level orchestration ───
+
+  build:
+    desc: Build both UI and server components
+    cmds:
+      - task: build-ui
+      - task: build-srv
+
+  serve:
+    desc: Start UI and server concurrently
+    deps:
+      - serve-ui
+      - serve-srv
+
+  test:
+    desc: Run all tests
+    cmds:
+      - task: test-srv
+      - task: test-ui
+
+  install:
+    desc: Install
+    cmds:
+      - echo "install"
+
+  release:
+    desc: Build, test, and install
+    cmds:
+      - task: build
+      - task: test
+      - task: install
+
+  dev-external-start:
+    desc: Start the external user application (dev mode)
+    dir: ./external-user-app
+    cmds:
+      - node server.js
+
+  # ─── Backend (srv) ───
+
+  serve-srv:
+    desc: Start backend server in development/debug mode
+    dir: ./srv
+    cmds:
+      - npm run start:debug
+
+  build-srv:
+    desc: Install dependencies and build the backend server
+    dir: ./srv
+    cmds:
+      - npm i
+      - npm run build
+
+  release-srv:
+    desc: Run backend release routine (build + package + test)
+    dir: ./srv
+    cmds:
+      - npm run release
+
+  test-srv:
+    desc: Run backend tests
+    dir: ./srv
+    cmds:
+      - npm run test
+
+  prod-start-srv:
+    desc: Start backend server in production mode
+    dir: ./srv
+    cmds:
+      - npm run start:prod
+
+  # ─── UI ───
+
+  serve-ui:
+    desc: Start frontend dev server with live-reload
+    dir: ./ui
+    cmds:
+      - npm run UI:SERVE:WATCH
+
+  build-ui:
+    desc: Install dependencies and build the production UI
+    dir: ./ui
+    cmds:
+      - npm i
+      - npm run build
+
+  test-ui:
+    desc: Run UI tests and e2e tests
+    dir: ./ui
+    cmds:
+      - npm test
+      - npm run e2e:test
+
+  # ─── Kubernetes ───
+
+  download-and-import-image:
+    desc: Download latest release and import images into k3s
+    cmds:
+      - |
+        set -e
+        command_exists() {
+            command -v "$1" >/dev/null 2>&1
+        }
+
+        echo "🧹 Removing old tar files..."
+        rm -f *.tar || true
+
+        for cmd in curl jq xargs sed find; do
+            if ! command_exists "$cmd"; then
+                echo "❌ Missing required command: $cmd"
+                exit 1
+            fi
+        done
+
+        SUDO=''
+        if [ "$(id -u)" -ne 0 ]; then
+          SUDO='sudo'
+        fi
+
+        echo "📦 Downloading latest release tarball from GitHub..."
+        curl -s https://api.github.com/repos/SilentSamurai/auth-server/releases/latest \
+        | jq -r '.assets[].browser_download_url' \
+        | xargs -L1 curl -O -L -#
+
+        echo "🧼 Removing previous auth-server images from k3s..."
+        $SUDO k3s ctr images ls | grep auth-server | awk '{print $1}' | xargs -r -L1 $SUDO k3s ctr images rm || true
+
+        echo "📥 Importing downloaded tarballs into k3s..."
+        find . -name '*.tar' | xargs -r -L1 $SUDO k3s ctr images import
+
+        echo "✅ Current k3s auth-server images:"
+        $SUDO k3s ctr images ls | grep auth-server || echo "No images found"
+
+  deploy-auth-server:
+    desc: Deploy auth-server via Helm to Kubernetes
+    dir: ./helm
+    cmds:
+      - helm upgrade --install auth-server ./auth-server --namespace auth-server --create-namespace
+
+  dry-run-auth-server:
+    desc: Helm dry-run deployment with debug output
+    dir: ./helm
+    cmds:
+      - helm upgrade --install auth-server ./auth-server --namespace auth-server --create-namespace --dry-run --debug
