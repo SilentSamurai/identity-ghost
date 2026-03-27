@@ -33,15 +33,8 @@ import {AuthUserService} from "../casl/authUser.service";
 import {SecurityService} from "../casl/security.service";
 import {SubscriptionService} from "../services/subscription.service";
 import {TokenIssuanceService} from "../auth/token-issuance.service";
-import * as yup from "yup";
 
 const logger = new Logger("AuthController");
-
-const UpdateSubscriberTenantHintSchema = yup.object().shape({
-    auth_code: yup.string().required("auth_code is required"),
-    client_id: yup.string().required("client_id is required"),
-    subscriber_tenant_hint: yup.string().required("subscriber_tenant_hint is required"),
-});
 
 @Controller("api/oauth")
 @UseInterceptors(ClassSerializerInterceptor)
@@ -69,6 +62,7 @@ export class AuthController {
             email: string;
             code_challenge_method: string;
             code_challenge: string;
+            subscriber_tenant_hint?: string;
         },
     ) {
         const user: User = await this.authService.validate(
@@ -91,13 +85,23 @@ export class AuthController {
             throw new BadRequestException("domain || client_id is required");
         }
 
-        await this.tokenIssuanceService.verifyAccess(user, tenant);
+        const result = await this.tokenIssuanceService.resolveLoginAccess(
+            user, tenant, body.subscriber_tenant_hint,
+        );
+
+        if (!result.granted) {
+            return {
+                requires_tenant_selection: true,
+                tenants: result.ambiguousTenants,
+            };
+        }
 
         const auth_code = await this.authCodeService.createAuthToken(
             user,
             tenant,
             body.code_challenge,
             body.code_challenge_method,
+            result.resolvedHint,
         );
         return {
             authentication_code: auth_code,
@@ -301,81 +305,6 @@ export class AuthController {
             const link = `${baseUrl}/profile?emailChanged=${confirmed}`;
             response.redirect(link);
         }
-    }
-
-    @Post("/check-tenant-ambiguity")
-    async checkTenantAmbiguity(
-        @Body(new ValidationPipe(ValidationSchema.VerifyAuthCodeSchema))
-            body: { auth_code: string, client_id: string }
-    ) {
-        //TODO verify authcode
-        const authCodeObj = await this.authCodeService.findByCode(body.auth_code);
-
-        // Find tenant by client_id
-        let tenant = null;
-        if (await this.authUserService.tenantExistsByDomain(body.client_id)) {
-            tenant = await this.authUserService.findTenantByDomain(body.client_id);
-        } else if (await this.authUserService.tenantExistsByClientId(body.client_id)) {
-            tenant = await this.authUserService.findTenantByClientId(body.client_id);
-        } else {
-            throw new BadRequestException("Invalid client_id");
-        }
-
-        // Check if auth code belongs to this tenant
-        if (authCodeObj.tenantId !== tenant.id) {
-            throw new ForbiddenException("auth_code does not belong to the provided client_id");
-        }
-
-        const user = await this.authUserService.findUserById(authCodeObj.userId);
-        const adminContext = await this.securityService.getAdminContextForInternalUse();
-
-        // Check if user is subscribed through multiple tenants
-        const ambiguityResult = await this.subscriptionService
-            .resolveSubscriptionTenantAmbiguity(adminContext, user, tenant, null);
-
-        if (ambiguityResult.ambiguousTenants) {
-            return {
-                hasAmbiguity: true,
-                tenants: ambiguityResult.ambiguousTenants.map(t => {
-                    return {id: t.id, domain: t.domain, name: t.name};
-                }),
-            };
-        }
-
-        return {
-            hasAmbiguity: false
-        };
-    }
-
-
-    @Post("/update-subscriber-tenant-hint")
-    async updateSubscriberTenantHint(
-        @Body(new ValidationPipe(UpdateSubscriberTenantHintSchema))
-            body: { auth_code: string, client_id: string, subscriber_tenant_hint: string }
-    ) {
-        /// TODO Validate auth code
-        const authCodeObj = await this.authCodeService.findByCode(body.auth_code);
-        // Find tenant by client_id
-        let tenant = null;
-        if (await this.authUserService.tenantExistsByDomain(body.client_id)) {
-            tenant = await this.authUserService.findTenantByDomain(body.client_id);
-        } else if (await this.authUserService.tenantExistsByClientId(body.client_id)) {
-            tenant = await this.authUserService.findTenantByClientId(body.client_id);
-        } else {
-            throw new BadRequestException("Invalid client_id");
-        }
-        // Check if auth code belongs to this tenant
-        if (authCodeObj.tenantId !== tenant.id) {
-            throw new ForbiddenException("auth_code does not belong to the provided client_id");
-        }
-
-        // Update the subscriber tenant hint
-        await this.authCodeService.updateAuthCode(authCodeObj, body.subscriber_tenant_hint);
-
-        return {
-            status: true,
-            message: "Subscriber tenant hint updated successfully"
-        };
     }
 
     private async handleCodeGrant(body: any): Promise<any> {

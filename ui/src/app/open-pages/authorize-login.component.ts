@@ -3,7 +3,6 @@ import {AuthService} from '../_services/auth.service';
 import {SessionService} from '../_services/session.service';
 import {ActivatedRoute, Router} from '@angular/router';
 import {FormBuilder, FormGroup, Validators} from '@angular/forms';
-import {lastValueFrom} from 'rxjs';
 import {MessageService} from 'primeng/api';
 
 @Component({
@@ -301,7 +300,7 @@ export class AuthorizeLoginComponent implements OnInit {
 
     // redirection to home page might not work sometime,
     // check if internally anything is nav-ing to login page again
-    async onSubmit(): Promise<void> {
+    async onSubmit(subscriberTenantHint?: string): Promise<void> {
         this.loading = true;
         const {username, password, client_id} = this.loginForm.value;
         try {
@@ -311,51 +310,37 @@ export class AuthorizeLoginComponent implements OnInit {
                 client_id,
                 this.code_challenge,
                 this.code_challenge_method,
+                subscriberTenantHint,
             );
+
+            if (data.requires_tenant_selection) {
+                // Ambiguity detected — navigate to tenant selection
+                this.router.navigate(['/tenant-selection'], {
+                    state: {
+                        tenants: data.tenants,
+                        loginParams: {
+                            username, password, client_id,
+                            code_challenge: this.code_challenge,
+                            code_challenge_method: this.code_challenge_method,
+                        },
+                        redirectUri: this.redirectUri,
+                        state: this.state,
+                    }
+                });
+                return;
+            }
+
             let authenticationCode = data.authentication_code;
             this.isLoginFailed = false;
             this.isLoggedIn = true;
             this.tokenStorage.saveAuthCode(authenticationCode);
-            await this.onLoginSuccess(authenticationCode);
+            this.redirectToClient(authenticationCode);
         } catch (err: any) {
             console.error(err);
             this.errorMessage = err.error.message;
             this.isLoginFailed = true;
         } finally {
             this.loading = false;
-        }
-    }
-
-    async onLoginSuccess(authCode: string) {
-        try {
-            // Check for tenant ambiguity
-            const ambiguityCheck = await lastValueFrom(
-                this.authService.checkTenantAmbiguity(authCode, this.clientId)
-            );
-
-            if (ambiguityCheck.hasAmbiguity) {
-                // Navigate to tenant selection with necessary data
-                this.router.navigate(['/tenant-selection'], {
-                    state: {
-                        authCode: authCode,
-                        clientId: this.clientId,
-                        tenants: ambiguityCheck.tenants,
-                        redirectUri: this.redirectUri,
-                        state: this.state
-                    }
-                });
-            } else {
-                // No ambiguity, proceed with normal flow
-                this.redirectToClient(authCode);
-            }
-        } catch (error) {
-            console.error('Error checking tenant ambiguity:', error);
-            this.messageService.add({
-                severity: 'error',
-                summary: 'Error',
-                detail: 'Failed to process authorization. Please try again.',
-                life: 5000
-            });
         }
     }
 

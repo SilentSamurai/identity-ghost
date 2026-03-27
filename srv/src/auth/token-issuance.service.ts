@@ -58,10 +58,15 @@ export class TokenIssuanceService {
     }
 
     /**
-     * Checks membership/subscription without issuing a token.
-     * Used by the login endpoint which only needs to verify access, not create tokens.
+     * Checks membership/subscription and resolves subscription ambiguity during login.
+     * Returns null if access is granted (no ambiguity or direct member).
+     * Returns the list of ambiguous tenants if the user needs to pick one.
      */
-    async verifyAccess(user: User, tenant: Tenant): Promise<void> {
+    async resolveLoginAccess(user: User, tenant: Tenant, subscriberTenantHint?: string): Promise<{
+        granted: boolean;
+        ambiguousTenants?: any[];
+        resolvedHint?: string;
+    }> {
         const adminContext = await this.securityService.getAdminContextForInternalUse();
 
         const isMember = await this.tenantService.isMember(adminContext, tenant.id, user);
@@ -70,6 +75,30 @@ export class TokenIssuanceService {
         if (!isMember && !isSubscribed) {
             throw new ForbiddenException("User is not a member of the tenant and does not have a valid app subscription");
         }
+
+        // Direct member — no ambiguity possible
+        if (!isSubscribed) {
+            return {granted: true};
+        }
+
+        // Subscribed user — check for ambiguity
+        const ambiguityResult = await this.subscriptionService
+            .resolveSubscriptionTenantAmbiguity(adminContext, user, tenant, subscriberTenantHint || null);
+
+        if (ambiguityResult.ambiguousTenants) {
+            return {
+                granted: false,
+                ambiguousTenants: ambiguityResult.ambiguousTenants.map(t => ({
+                    id: t.id, domain: t.domain, name: t.name,
+                })),
+            };
+        }
+
+        // Resolved — return the hint to bake into the auth code
+        return {
+            granted: true,
+            resolvedHint: ambiguityResult.resolvedTenant?.domain,
+        };
     }
 
     private async issueSubscribedToken(

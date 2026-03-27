@@ -3,7 +3,6 @@ import {Router} from '@angular/router';
 import {AuthService} from '../_services/auth.service';
 import {SessionService} from '../_services/session.service';
 import {MessageService} from 'primeng/api';
-import {lastValueFrom} from 'rxjs';
 
 @Component({
     selector: 'app-tenant-selection',
@@ -47,8 +46,7 @@ import {lastValueFrom} from 'rxjs';
 })
 export class TenantSelectionComponent implements OnInit {
     tenants: any[] = [];
-    private authCode: string = '';
-    private clientId: string = '';
+    private loginParams: any = {};
     private redirectUri: string = '';
     private state: string = '';
 
@@ -60,11 +58,9 @@ export class TenantSelectionComponent implements OnInit {
     ) {}
 
     ngOnInit() {
-        // Get the auth code and client ID from the URL or state
         const state = history.state;
-        if (state?.authCode && state?.clientId && state?.tenants && state?.redirectUri) {
-            this.authCode = state.authCode;
-            this.clientId = state.clientId;
+        if (state?.loginParams && state?.tenants && state?.redirectUri) {
+            this.loginParams = state.loginParams;
             this.tenants = state.tenants;
             this.redirectUri = state.redirectUri;
             this.state = state.state || '';
@@ -75,17 +71,20 @@ export class TenantSelectionComponent implements OnInit {
 
     async selectTenant(tenant: any) {
         try {
-            // Update the subscriber tenant hint
-            await this.authService.updateSubscriberTenantHint(
-                this.authCode,
-                this.clientId,
-                tenant.domain || tenant.clientId
+            // Re-call /login with the selected tenant hint
+            const data = await this.authService.login(
+                this.loginParams.username,
+                this.loginParams.password,
+                this.loginParams.client_id,
+                this.loginParams.code_challenge,
+                this.loginParams.code_challenge_method,
+                tenant.domain,
             );
 
-            // Redirect back to the client application with the auth code and subscriber_tenant_hint
+            // Now we have the auth code — save and redirect
+            this.tokenStorage.saveAuthCode(data.authentication_code);
             const redirectUrl = new URL(this.redirectUri);
-            redirectUrl.searchParams.append('code', this.authCode);
-            redirectUrl.searchParams.append('subscriber_tenant_hint', tenant.domain || tenant.clientId);
+            redirectUrl.searchParams.append('code', data.authentication_code);
             if (this.state) {
                 redirectUrl.searchParams.append('state', this.state);
             }

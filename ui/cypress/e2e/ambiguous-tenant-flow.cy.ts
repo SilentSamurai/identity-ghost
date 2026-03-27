@@ -54,10 +54,8 @@ describe('Ambiguous Tenant Flow', () => {
     it('should handle ambiguous tenant selection flow', () => {
         cy.visit(`/authorize?client_id=${TENANTS.mordor.domain}&code_challenge=test&redirect_uri=https://example.com`);
 
-        // 1. Login with ambiguous user
+        // 1. Login with ambiguous user — /login now returns requires_tenant_selection
         cy.intercept('POST', '**/api/oauth/login*').as('login');
-        cy.intercept('POST', '**/api/oauth/check-tenant-ambiguity*').as('checkAmbiguity');
-        cy.intercept('POST', '**/api/oauth/update-subscriber-tenant-hint*').as('updateHint');
 
         cy.get('#username').type(AMBIGUOUS_USER.email)
         cy.get('#password').type(AMBIGUOUS_USER.password)
@@ -67,27 +65,25 @@ describe('Ambiguous Tenant Flow', () => {
         cy.wait('@login').should(({response}) => {
             expect(response, 'response').to.exist;
             expect(response!.statusCode).to.be.oneOf([201, 200]);
-            expect(response!.body).to.have.property('authentication_code');
-        });
-
-        cy.wait('@checkAmbiguity').should(({response}) => {
-            expect(response, 'response').to.exist;
-            expect(response!.statusCode).to.be.oneOf([201, 200]);
-            expect(response!.body.hasAmbiguity).to.be.true;
+            expect(response!.body.requires_tenant_selection).to.be.true;
             expect(response!.body.tenants).to.be.an('array');
             expect(response!.body.tenants.length).to.equal(2);
         });
 
-        // 3. Verify tenant selection page
+        // 2. Verify tenant selection page
         cy.url().should('include', '/tenant-selection');
+
+        // 3. Intercept the second /login call (with hint) when user picks a tenant
+        cy.intercept('POST', '**/api/oauth/login*').as('loginWithHint');
 
         // 4. Select tenant and complete flow
         cy.get('button').contains(TENANTS.gondor.domain).click();
 
-        // 5. Verify the hint update API was called
-        cy.wait('@updateHint').should(({request, response}) => {
+        // 5. Verify the login-with-hint call returns an auth code
+        cy.wait('@loginWithHint').should(({request, response}) => {
             expect(response, 'response').to.exist;
             expect(response!.statusCode).to.be.oneOf([201, 200]);
+            expect(response!.body).to.have.property('authentication_code');
             expect(request.body).to.have.property('subscriber_tenant_hint', TENANTS.gondor.domain);
         });
 

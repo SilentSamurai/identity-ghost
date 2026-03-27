@@ -186,6 +186,7 @@ const LoginSchema = yup.object().shape({
         .matches(/^(plain|S256|OWH32)$/, "method is required")
         .default("plain"),
     code_challenge: yup.string().required("code_challenge is required"),
+    subscriber_tenant_hint: yup.string().optional().nullable(),
 });
 
 const PasswordGrantSchema = yup.object().shape({

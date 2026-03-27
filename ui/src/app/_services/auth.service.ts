@@ -21,17 +21,22 @@ export class AuthService {
         client_id: string,
         code_challenge: string,
         method: string,
+        subscriber_tenant_hint?: string,
     ): Promise<any> {
+        const body: any = {
+            code_challenge: code_challenge,
+            code_challenge_method: method,
+            client_id,
+            email,
+            password,
+        };
+        if (subscriber_tenant_hint) {
+            body.subscriber_tenant_hint = subscriber_tenant_hint;
+        }
         return await lastValueFrom(
             this.http.post(
                 `${AUTH_API}/login`,
-                {
-                    code_challenge: code_challenge,
-                    code_challenge_method: method,
-                    client_id,
-                    email,
-                    password,
-                },
+                body,
                 httpOptions,
             ),
         );
@@ -67,20 +72,6 @@ export class AuthService {
                 {
                     auth_code: authCode,
                     client_id: clientId,
-                },
-                httpOptions,
-            ),
-        );
-    }
-
-    updateSubscriberTenantHint(authCode: string, clientId: string, subscriberTenantHint: string): Promise<any> {
-        return lastValueFrom(
-            this.http.post(
-                `${AUTH_API}/update-subscriber-tenant-hint`,
-                {
-                    auth_code: authCode,
-                    client_id: clientId,
-                    subscriber_tenant_hint: subscriberTenantHint,
                 },
                 httpOptions,
             ),
@@ -129,14 +120,4 @@ export class AuthService {
         );
     }
 
-    checkTenantAmbiguity(authCode: string, clientId: string): Observable<any> {
-        return this.http.post(
-            `${AUTH_API}/check-tenant-ambiguity`,
-            {
-                auth_code: authCode,
-                client_id: clientId
-            },
-            httpOptions
-        );
-    }
 }

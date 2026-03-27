@@ -39,11 +39,6 @@ export class AuthCodeService {
         return session;
     }
 
-    async updateAuthCode(authCode: AuthCode, subscriberTenantHint: string): Promise<AuthCode> {
-        authCode.subscriberTenantHint = subscriberTenantHint;
-        return this.authCodeRepository.save(authCode);
-    }
-
     async hasAuthCodeWithHint(code: string): Promise<boolean> {
         return this.authCodeRepository.exists({
             where: {
@@ -61,6 +56,7 @@ export class AuthCodeService {
         tenant: Tenant,
         code_challenge: string,
         method: string,
+        subscriberTenantHint?: string,
     ): Promise<string> {
         let roles = await this.authUserService.getMemberRoles(tenant, user);
 
@@ -76,6 +72,7 @@ export class AuthCodeService {
             method: method,
             tenantId: tenant.id,
             userId: user.id,
+            subscriberTenantHint: subscriberTenantHint || null,
         });
 
         session = await this.authCodeRepository.save(session);
