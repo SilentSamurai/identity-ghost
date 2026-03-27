@@ -16,6 +16,7 @@ import {ClientService} from '../services/client.service';
 import {SecurityService} from '../casl/security.service';
 import {AuthContext} from '../casl/contexts';
 import {schemaPipe} from '../validation/validation.pipe';
+import {CurrentTenantId} from '../auth/current-tenant.decorator';
 import * as yup from 'yup';
 
 const CreateClientSchema = yup.object().shape({
@@ -79,6 +80,17 @@ export class ClientController {
         };
     }
 
+    // ─── New token-derived route ───
+
+    @Get('/my/clients')
+    @UseGuards(JwtAuthGuard)
+    async getMyClients(
+        @Request() request: AuthContext,
+        @CurrentTenantId() tenantId: string,
+    ) {
+        return this.clientService.findByTenantId(tenantId);
+    }
+
     @Get('/:clientId')
     @UseGuards(JwtAuthGuard)
     async getClient(
@@ -88,6 +100,9 @@ export class ClientController {
         return this.clientService.findByClientId(clientId);
     }
 
+    // ─── Deprecated route ───
+
+    /** @deprecated Use GET /api/clients/my/clients instead */
     @Get('/tenant/:tenantId')
     @UseGuards(JwtAuthGuard)
     async getClientsByTenant(

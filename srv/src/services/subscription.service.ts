@@ -8,7 +8,6 @@ import {User} from "../entity/user.entity";
 import {AuthContext} from "../casl/contexts";
 import {TenantService} from "./tenant.service";
 import {AppSubscriptionService} from './app-subscription.service';
-import {AuthCodeService} from "../auth/auth-code.service";
 
 const logger = new Logger("SubscriptionService");
 
@@ -35,7 +34,6 @@ export class SubscriptionService {
         private readonly appRepo: Repository<App>,
         private readonly tenantService: TenantService,
         private readonly appSubscriptionService: AppSubscriptionService,
-        private readonly authCodeService: AuthCodeService,
     ) {
     }
 

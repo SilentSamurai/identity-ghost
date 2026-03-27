@@ -21,6 +21,7 @@ import {schemaPipe} from "../validation/validation.pipe";
 import * as yup from "yup";
 import {JwtAuthGuard} from "../auth/jwt-auth.guard";
 import {SecurityService} from "../casl/security.service";
+import {CurrentTenantId} from "../auth/current-tenant.decorator";
 
 @Controller('/api/apps')
 @UseInterceptors(ClassSerializerInterceptor)
@@ -42,14 +43,10 @@ export class AppController {
         @Body('appUrl', schemaPipe(yup.string().required('app url is required').max(2048))) appUrl: string,
         @Body('description', schemaPipe(yup.string().max(128))) description: string
     ) {
-        // Here you fetch the tenant, then create a new app referencing the tenant
         const app = await this.appService.createApp(request, tenantId, name, appUrl, description);
         return app;
     }
 
-    /**
-     * Update an app by its ID
-     */
     @Patch('/:appId')
     @UseGuards(JwtAuthGuard)
     async updateApp(
@@ -63,9 +60,6 @@ export class AppController {
         return app;
     }
 
-    /**
-     * Delete an app by its ID
-     */
     @Delete('/:appId')
     @UseGuards(JwtAuthGuard)
     async deleteApp(
@@ -76,6 +70,58 @@ export class AppController {
         return {status: 'success'};
     }
 
+    // ─── New token-derived routes (no :tenantId in URL) ───
+
+    @Post('/:appId/my/subscribe')
+    @UseGuards(JwtAuthGuard)
+    async subscribeMyTenantToApp(
+        @Request() request: AuthContext,
+        @Param('appId', ParseUUIDPipe) appId: string,
+        @CurrentTenantId() tenantId: string,
+    ) {
+        return this._subscribeToApp(request, appId, tenantId);
+    }
+
+    @Post('/:appId/my/unsubscribe')
+    @UseGuards(JwtAuthGuard)
+    async unsubscribeMyTenantFromApp(
+        @Request() request: AuthContext,
+        @Param('appId', ParseUUIDPipe) appId: string,
+        @CurrentTenantId() tenantId: string,
+    ) {
+        return this._unsubscribeFromApp(request, appId, tenantId);
+    }
+
+    @Get('/my/subscriptions')
+    @UseGuards(JwtAuthGuard)
+    async getMyTenantSubscriptions(
+        @Request() request: AuthContext,
+        @CurrentTenantId() tenantId: string,
+    ) {
+        return this.subscriptionService.findByTenantId(tenantId);
+    }
+
+    @Get('/my/created')
+    @UseGuards(JwtAuthGuard)
+    async getMyAppsCreated(
+        @Request() request: AuthContext,
+        @CurrentTenantId() tenantId: string,
+    ) {
+        return this.appService.findByTenantId(tenantId);
+    }
+
+    @Get('/my/available')
+    @UseGuards(JwtAuthGuard)
+    async getMyAvailableApps(
+        @Request() request: AuthContext,
+        @CurrentTenantId() tenantId: string,
+    ) {
+        return this.appService.findAllApps(tenantId);
+    }
+
+    // ─── Deprecated routes (kept for backward compatibility) ───
+
+    /** @deprecated Use POST /api/apps/:appId/my/subscribe instead */
     @Post('/:appId/subscribe/:tenantId')
     @UseGuards(JwtAuthGuard)
     async subscribeToApp(
@@ -83,14 +129,10 @@ export class AppController {
         @Param('appId', ParseUUIDPipe) appId: string,
         @Param('tenantId', ParseUUIDPipe) tenantId: string
     ) {
-        // Retrieve the subscriber tenant & the app, then subscribe
-        const promise = await this.subscriptionService.subscribeApp(
-            await this.tenantService.findById(request, tenantId),
-            await this.appService.getAppById(appId)
-        );
-        return {status: "success"}
+        return this._subscribeToApp(request, appId, tenantId);
     }
 
+    /** @deprecated Use POST /api/apps/:appId/my/unsubscribe instead */
     @Post('/:appId/unsubscribe/:tenantId')
     @UseGuards(JwtAuthGuard)
     async unsubscribeFromApp(
@@ -98,12 +140,7 @@ export class AppController {
         @Param('appId', ParseUUIDPipe) appId: string,
         @Param('tenantId', ParseUUIDPipe) tenantId: string
     ) {
-        // Retrieve the subscriber tenant & the app, then unsubscribe
-        const promise = await this.subscriptionService.unsubscribe(
-            await this.tenantService.findById(request, tenantId),
-            await this.appService.getAppById(appId)
-        );
-        return {status: "success"}
+        return this._unsubscribeFromApp(request, appId, tenantId);
     }
 
     @Get('/subscriptions/:appId')
@@ -114,9 +151,7 @@ export class AppController {
         return this.subscriptionService.findAllByAppId(appId);
     }
 
-    /**
-     * get all app the tenant has subscription to
-     */
+    /** @deprecated Use GET /api/apps/my/subscriptions instead */
     @Get('/subscribed-by/:tenantId')
     @UseGuards(JwtAuthGuard)
     async getTenantSubscriptions(
@@ -126,9 +161,7 @@ export class AppController {
         return this.subscriptionService.findByTenantId(tenantId);
     }
 
-    /**
-     * Get all apps created by a tenant
-     */
+    /** @deprecated Use GET /api/apps/my/created instead */
     @Get('/created-by/:tenantId')
     @UseGuards(JwtAuthGuard)
     async getAppsCreatedByTenant(
@@ -138,22 +171,16 @@ export class AppController {
         return this.appService.findByTenantId(tenantId);
     }
 
-    /**
-     * Get all apps available for subscription
-     */
+    /** @deprecated Use GET /api/apps/my/available instead */
     @Get('/available-for/:tenantId')
     @UseGuards(JwtAuthGuard)
     async getAllSubscribableApps(
         @Request() request: AuthContext,
         @Param('tenantId', ParseUUIDPipe) tenantId: string
     ) {
-        const allApps = await this.appService.findAllApps(tenantId);
-        return allApps;
+        return this.appService.findAllApps(tenantId);
     }
 
-    /**
-     * Publish an app (make it visible to other tenants)
-     */
     @Patch('/:appId/publish')
     @UseGuards(JwtAuthGuard)
     async publishApp(
@@ -164,4 +191,21 @@ export class AppController {
         return app;
     }
 
+    // ─── Shared implementation methods ───
+
+    private async _subscribeToApp(request: AuthContext, appId: string, tenantId: string) {
+        await this.subscriptionService.subscribeApp(
+            await this.tenantService.findById(request, tenantId),
+            await this.appService.getAppById(appId)
+        );
+        return {status: "success"};
+    }
+
+    private async _unsubscribeFromApp(request: AuthContext, appId: string, tenantId: string) {
+        await this.subscriptionService.unsubscribe(
+            await this.tenantService.findById(request, tenantId),
+            await this.appService.getAppById(appId)
+        );
+        return {status: "success"};
+    }
 }

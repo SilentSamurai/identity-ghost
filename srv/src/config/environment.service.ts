@@ -21,9 +21,11 @@ export class Environment {
             path: envPath,
         });
 
+        const SENSITIVE_KEYS = ["PASSWORD", "SECRET", "PRIVATE_KEY", "KEY"];
         console.log("Environment variables:");
         Object.keys(process.env).forEach(function (key) {
-            console.log(key + "=" + process.env[key]);
+            const isSensitive = SENSITIVE_KEYS.some(s => key.toUpperCase().includes(s));
+            console.log(key + "=" + (isSensitive ? "****" : process.env[key]));
         });
     }
 

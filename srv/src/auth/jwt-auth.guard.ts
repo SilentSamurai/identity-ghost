@@ -2,7 +2,7 @@ import {CanActivate, ExecutionContext, Injectable, Logger, UnauthorizedException
 import {ExtractJwt} from "passport-jwt";
 import {AuthService} from "./auth.service";
 import {CaslAbilityFactory} from "../casl/casl-ability.factory";
-import {GRANT_TYPES, TechnicalToken, Token} from "../casl/contexts";
+import {GRANT_TYPES, TechnicalToken, TenantToken, Token} from "../casl/contexts";
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
@@ -75,6 +75,17 @@ export class JwtAuthGuard implements CanActivate {
         const ability = await this.caslAbilityFactory.createForSecurityContext(payload);
         request["SECURITY_CONTEXT"] = payload;
         request["SCOPE_ABILITIES"] = ability;
+
+        // Tenant resolution: derive tenant from token so controllers can use @CurrentTenantId()
+        if (payload.isTenantToken()) {
+            const tenantToken = payload as TenantToken;
+            request["RESOLVED_TENANT_ID"] = tenantToken.tenant.id;
+            request["RESOLVED_USER_TENANT_ID"] = tenantToken.userTenant.id;
+        } else if (payload.isTechnicalToken()) {
+            const technicalToken = payload as TechnicalToken;
+            request["RESOLVED_TENANT_ID"] = technicalToken.tenant.id;
+        }
+
         return payload;
     }
 

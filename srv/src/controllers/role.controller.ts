@@ -19,6 +19,7 @@ import {Action} from "../casl/actions.enum";
 import {subject} from "@casl/ability";
 import {SubjectEnum} from "../entity/subjectEnum";
 import {UsersService} from "../services/users.service";
+import {CurrentTenantId} from "../auth/current-tenant.decorator";
 
 @Controller("api/tenant")
 @UseInterceptors(ClassSerializerInterceptor)
@@ -32,6 +33,50 @@ export class RoleController {
     ) {
     }
 
+    // ─── New token-derived routes (no :tenantId in URL) ───
+
+    @Post("/my/role/:name")
+    @UseGuards(JwtAuthGuard)
+    async createMyRole(
+        @Request() request,
+        @CurrentTenantId() tenantId: string,
+        @Param("name") name: string,
+    ): Promise<Role> {
+        return this._createRole(request, tenantId, name);
+    }
+
+    @Delete("/my/role/:name")
+    @UseGuards(JwtAuthGuard)
+    async deleteMyRole(
+        @Request() request,
+        @CurrentTenantId() tenantId: string,
+        @Param("name") name: string,
+    ): Promise<Role> {
+        return this._deleteRole(request, tenantId, name);
+    }
+
+    @Get("/my/roles")
+    @UseGuards(JwtAuthGuard)
+    async getMyTenantRoles(
+        @Request() request,
+        @CurrentTenantId() tenantId: string,
+    ): Promise<Role[]> {
+        return this._getTenantRoles(request, tenantId);
+    }
+
+    @Get("/my/role/:name")
+    @UseGuards(JwtAuthGuard)
+    async getMyRole(
+        @Request() request,
+        @CurrentTenantId() tenantId: string,
+        @Param("name") name: string,
+    ): Promise<any> {
+        return this._getRole(request, tenantId, name);
+    }
+
+    // ─── Deprecated routes (kept for backward compatibility) ───
+
+    /** @deprecated Use POST /api/tenant/my/role/:name instead */
     @Post("/:tenantId/role/:name")
     @UseGuards(JwtAuthGuard)
     async createRole(
@@ -39,6 +84,44 @@ export class RoleController {
         @Param("tenantId") tenantId: string,
         @Param("name") name: string,
     ): Promise<Role> {
+        return this._createRole(request, tenantId, name);
+    }
+
+    /** @deprecated Use DELETE /api/tenant/my/role/:name instead */
+    @Delete("/:tenantId/role/:name")
+    @UseGuards(JwtAuthGuard)
+    async deleteRole(
+        @Request() request,
+        @Param("tenantId") tenantId: string,
+        @Param("name") name: string,
+    ): Promise<Role> {
+        return this._deleteRole(request, tenantId, name);
+    }
+
+    /** @deprecated Use GET /api/tenant/my/roles instead */
+    @Get("/:tenantId/roles")
+    @UseGuards(JwtAuthGuard)
+    async getTenantRoles(
+        @Request() request,
+        @Param("tenantId") tenantId: string,
+    ): Promise<Role[]> {
+        return this._getTenantRoles(request, tenantId);
+    }
+
+    /** @deprecated Use GET /api/tenant/my/role/:name instead */
+    @Get("/:tenantId/role/:name")
+    @UseGuards(JwtAuthGuard)
+    async getRole(
+        @Request() request,
+        @Param("tenantId") tenantId: string,
+        @Param("name") name: string,
+    ): Promise<any> {
+        return this._getRole(request, tenantId, name);
+    }
+
+    // ─── Shared implementation methods ───
+
+    private async _createRole(request: any, tenantId: string, name: string): Promise<Role> {
         let tenant = await this.tenantService.findById(request, tenantId);
         this.securityService.check(
             request,
@@ -48,13 +131,7 @@ export class RoleController {
         return this.roleService.create(request, name, tenant);
     }
 
-    @Delete("/:tenantId/role/:name")
-    @UseGuards(JwtAuthGuard)
-    async deleteRole(
-        @Request() request,
-        @Param("tenantId") tenantId: string,
-        @Param("name") name: string,
-    ): Promise<Role> {
+    private async _deleteRole(request: any, tenantId: string, name: string): Promise<Role> {
         let tenant = await this.tenantService.findById(request, tenantId);
         this.securityService.check(
             request,
@@ -69,23 +146,12 @@ export class RoleController {
         return await this.roleService.deleteById(request, roles.id);
     }
 
-    @Get("/:tenantId/roles")
-    @UseGuards(JwtAuthGuard)
-    async getTenantRoles(
-        @Request() request,
-        @Param("tenantId") tenantId: string,
-    ): Promise<Role[]> {
+    private async _getTenantRoles(request: any, tenantId: string): Promise<Role[]> {
         const tenant = await this.tenantService.findById(request, tenantId);
         return this.tenantService.getTenantRoles(request, tenant);
     }
 
-    @Get("/:tenantId/role/:name")
-    @UseGuards(JwtAuthGuard)
-    async getRole(
-        @Request() request,
-        @Param("tenantId") tenantId: string,
-        @Param("name") name: string,
-    ): Promise<any> {
+    private async _getRole(request: any, tenantId: string, name: string): Promise<any> {
         const tenant = await this.tenantService.findById(request, tenantId);
         this.securityService.check(
             request,

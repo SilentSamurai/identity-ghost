@@ -5,7 +5,7 @@ import {Subscription, SubscriptionStatus} from '../entity/subscription.entity';
 import {Tenant} from '../entity/tenant.entity';
 import {Role} from '../entity/role.entity';
 import {App} from '../entity/app.entity';
-import {AuthService} from '../auth/auth.service';
+import {TechnicalTokenService} from '../core/technical-token.service';
 
 const logger = new Logger("AppSubscriptionService");
 
@@ -32,7 +32,7 @@ export class AppSubscriptionService {
         private readonly roleRepo: Repository<Role>,
         @InjectRepository(App)
         private readonly appRepo: Repository<App>,
-        private readonly authService: AuthService,
+        private readonly technicalTokenService: TechnicalTokenService,
     ) {
     }
 
@@ -253,8 +253,8 @@ export class AppSubscriptionService {
         const endpoint = `${app.appUrl.replace(/\/+$/, '')}/api/onboard/tenant`;
         logger.log(`Making request to endpoint: ${endpoint}`);
         logger.log(`Request payload:`, {tenantId: tenant.id});
-        // Get technical token using AuthService (use app owner's tenant)
-        const token = await this.authService.createTechnicalAccessToken(app.owner, []);
+        // Get technical token (use app owner's tenant)
+        const token = await this.technicalTokenService.createTechnicalAccessToken(app.owner, []);
         logger.log(`Request headers:`, {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
@@ -270,7 +270,6 @@ export class AppSubscriptionService {
         });
 
         if (!response.ok) {
-            // Something went wrong with the request
             const errorMsg = `Onboarding request failed for app "${app.name}": ${response.status} ${response.statusText}`;
             logger.warn(errorMsg);
             throw new Error(errorMsg);
@@ -317,8 +316,8 @@ export class AppSubscriptionService {
         const endpoint = `${app.appUrl.replace(/\/+$/, '')}/api/offboard/tenant`;
         logger.log(`Making request to endpoint: ${endpoint}`);
         logger.log(`Request payload:`, {tenantId: tenant.id});
-        // Get technical token using AuthService (use app owner's tenant)
-        const token = await this.authService.createTechnicalAccessToken(app.owner, []);
+        // Get technical token (use app owner's tenant)
+        const token = await this.technicalTokenService.createTechnicalAccessToken(app.owner, []);
         logger.log(`Request headers:`, {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
