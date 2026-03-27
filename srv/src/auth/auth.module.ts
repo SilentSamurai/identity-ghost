@@ -9,6 +9,7 @@ import {AuthCodeService} from "./auth-code.service";
 import {CaslModule} from "../casl/casl.module";
 import {User} from "../entity/user.entity";
 import {JwtServiceHS256, JwtServiceRS256} from "./jwt.service";
+import {TokenIssuanceService} from "./token-issuance.service";
 
 @Module({
     imports: [
@@ -18,8 +19,8 @@ import {JwtServiceHS256, JwtServiceRS256} from "./jwt.service";
         TypeOrmModule.forFeature([AuthCode, User]),
     ],
     controllers: [],
-    providers: [JwtAuthGuard, AuthService, AuthCodeService, JwtServiceHS256, JwtServiceRS256],
-    exports: [JwtAuthGuard, AuthService, AuthCodeService, JwtServiceHS256, JwtServiceRS256],
+    providers: [JwtAuthGuard, AuthService, AuthCodeService, JwtServiceHS256, JwtServiceRS256, TokenIssuanceService],
+    exports: [JwtAuthGuard, AuthService, AuthCodeService, JwtServiceHS256, JwtServiceRS256, TokenIssuanceService],
 })
 export class AuthModule {
 }

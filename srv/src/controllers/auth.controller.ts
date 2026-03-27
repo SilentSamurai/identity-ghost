@@ -32,6 +32,7 @@ import {GRANT_TYPES, Token} from "../casl/contexts";
 import {AuthUserService} from "../casl/authUser.service";
 import {SecurityService} from "../casl/security.service";
 import {SubscriptionService} from "../services/subscription.service";
+import {TokenIssuanceService} from "../auth/token-issuance.service";
 import * as yup from "yup";
 
 const logger = new Logger("AuthController");
@@ -55,6 +56,7 @@ export class AuthController {
         private readonly authUserService: AuthUserService,
         private readonly securityService: SecurityService,
         private readonly subscriptionService: SubscriptionService,
+        private readonly tokenIssuanceService: TokenIssuanceService,
     ) {
     }
 
@@ -89,12 +91,7 @@ export class AuthController {
             throw new BadRequestException("domain || client_id is required");
         }
 
-        let adminContext = await this.securityService.getAdminContextForInternalUse();
-        let isMember = await this.tenantService.isMember(adminContext, tenant.id, user);
-        let isSubscribed = await this.subscriptionService.isUserSubscribedToTenant(adminContext, user, tenant);
-        if (!isMember && !isSubscribed) {
-            throw new ForbiddenException("User is not a member of the tenant and does not have a valid app subscription");
-        }
+        await this.tokenIssuanceService.verifyAccess(user, tenant);
 
         const auth_code = await this.authCodeService.createAuthToken(
             user,
@@ -401,59 +398,10 @@ export class AuthController {
             }
         }
 
-        const adminContext = await this.securityService.getAdminContextForInternalUse();
-
-        let isMember = await this.tenantService.isMember(adminContext, tenant.id, user);
-        let isSubscribed = await this.subscriptionService.isUserSubscribedToTenant(adminContext, user, tenant);
-        if (!isMember && !isSubscribed) {
-            throw new BadRequestException("User is not a member of the tenant and does not have a valid app subscription");
-        }
-        let additionalScopes = [];
-        if (isSubscribed) {
-
-            // if hint is there add it
-            if (!body.subscriber_tenant_hint && await this.authCodeService.hasAuthCodeWithHint(body.code)) {
-                const authCode = await this.authCodeService.findByCode(body.code);
-                if (authCode?.subscriberTenantHint) {
-                    body.subscriber_tenant_hint = authCode.subscriberTenantHint;
-                }
-            }
-
-            // Use service to resolve subscription tenant ambiguity
-            const ambiguityResult = await this.subscriptionService
-                .resolveSubscriptionTenantAmbiguity(adminContext, user, tenant, body.subscriber_tenant_hint);
-            if (ambiguityResult.ambiguousTenants) {
-                throw new BadRequestException("Multiple subscription tenants found. Please specify a subscriber_tenant_hint.");
-            }
-            const subscribingTenant = ambiguityResult.resolvedTenant!;
-
-            additionalScopes = await this.tenantService.getMemberRoles(adminContext, subscribingTenant.id, user);
-            additionalScopes = additionalScopes.map(r => r.name);
-
-            const {accessToken, refreshToken, scopes} =
-                await this.authService.createSubscribedUserAccessToken(user, tenant, subscribingTenant, additionalScopes);
-            return {
-                access_token: accessToken,
-                expires_in: this.configService.get(
-                    "TOKEN_EXPIRATION_TIME_IN_SECONDS",
-                ),
-                token_type: "Bearer",
-                refresh_token: refreshToken,
-                ...(scopes && scopes.length ? {scope: scopes.join(" ")} : {}),
-            };
-        }
-
-        const {accessToken, refreshToken, scopes} =
-            await this.authService.createUserAccessToken(user, tenant, additionalScopes);
-        return {
-            access_token: accessToken,
-            expires_in: this.configService.get(
-                "TOKEN_EXPIRATION_TIME_IN_SECONDS",
-            ),
-            token_type: "Bearer",
-            refresh_token: refreshToken,
-            ...(scopes && scopes.length ? {scope: scopes.join(" ")} : {}),
-        };
+        return this.tokenIssuanceService.issueToken(user, tenant, {
+            subscriberTenantHint: body.subscriber_tenant_hint,
+            authCode: body.code,
+        });
     }
 
     private async handlePasswordGrant(body: any): Promise<any> {
@@ -474,48 +422,9 @@ export class AuthController {
             throw new BadRequestException("client_id is required");
         }
 
-        let adminContext = await this.securityService.getAdminContextForInternalUse();
-        let isMember = await this.tenantService.isMember(adminContext, tenant.id, user);
-        let isSubscribed = await this.subscriptionService.isUserSubscribedToTenant(adminContext, user, tenant);
-        if (!isMember && !isSubscribed) {
-            throw new BadRequestException("User is not a member of the tenant and does not have a valid app subscription");
-        }
-        let additionalScopes = [];
-        if (isSubscribed) {
-            // Use service to resolve subscription tenant ambiguity
-            const ambiguityResult = await this.subscriptionService
-                .resolveSubscriptionTenantAmbiguity(adminContext, user, tenant, body.subscriber_tenant_hint);
-            if (ambiguityResult.ambiguousTenants) {
-                throw new BadRequestException("Multiple subscription tenants found. Please specify a subscriber_tenant_hint.");
-            }
-            const subscribingTenant = ambiguityResult.resolvedTenant!;
-            additionalScopes = await this.tenantService.getMemberRoles(adminContext, subscribingTenant.id, user);
-            additionalScopes = additionalScopes.map(r => r.name);
-
-            const {accessToken, refreshToken, scopes} =
-                await this.authService.createSubscribedUserAccessToken(user, tenant, subscribingTenant, additionalScopes);
-            return {
-                access_token: accessToken,
-                expires_in: this.configService.get(
-                    "TOKEN_EXPIRATION_TIME_IN_SECONDS",
-                ),
-                token_type: "Bearer",
-                refresh_token: refreshToken,
-                ...(scopes && scopes.length ? {scope: scopes.join(" ")} : {}),
-            };
-        }
-
-        const {accessToken, refreshToken, scopes} =
-            await this.authService.createUserAccessToken(user, tenant, additionalScopes);
-        return {
-            access_token: accessToken,
-            expires_in: this.configService.get(
-                "TOKEN_EXPIRATION_TIME_IN_SECONDS",
-            ),
-            token_type: "Bearer",
-            refresh_token: refreshToken,
-            ...(scopes && scopes.length ? {scope: scopes.join(" ")} : {}),
-        };
+        return this.tokenIssuanceService.issueToken(user, tenant, {
+            subscriberTenantHint: body.subscriber_tenant_hint,
+        });
     }
 
     private async handleClientCredentialsGrant(body: any): Promise<any> {
@@ -554,48 +463,9 @@ export class AuthController {
                 body.refresh_token,
             );
 
-        let adminContext = await this.securityService.getAdminContextForInternalUse();
-        let isMember = await this.tenantService.isMember(adminContext, tenant.id, user);
-        let isSubscribed = await this.subscriptionService.isUserSubscribedToTenant(adminContext, user, tenant);
-        if (!isMember && !isSubscribed) {
-            throw new BadRequestException("User is not a member of the tenant and does not have a valid app subscription");
-        }
-        let additionalScopes = [];
-        if (isSubscribed) {
-            // Use service to resolve subscription tenant ambiguity
-            const ambiguityResult = await this.subscriptionService
-                .resolveSubscriptionTenantAmbiguity(adminContext, user, tenant, body.subscriber_tenant_hint);
-            if (ambiguityResult.ambiguousTenants) {
-                throw new BadRequestException("Multiple subscription tenants found. Please specify a subscriber_tenant_hint.");
-            }
-            const subscribingTenant = ambiguityResult.resolvedTenant!;
-            additionalScopes = await this.tenantService.getMemberRoles(adminContext, subscribingTenant.id, user);
-            additionalScopes = additionalScopes.map(r => r.name);
-
-            const {accessToken, refreshToken, scopes} =
-                await this.authService.createSubscribedUserAccessToken(user, tenant, subscribingTenant, additionalScopes);
-            return {
-                access_token: accessToken,
-                expires_in: this.configService.get(
-                    "TOKEN_EXPIRATION_TIME_IN_SECONDS",
-                ),
-                token_type: "Bearer",
-                refresh_token: refreshToken,
-                ...(scopes && scopes.length ? {scope: scopes.join(" ")} : {}),
-            };
-        }
-
-        const {accessToken, refreshToken, scopes} =
-            await this.authService.createUserAccessToken(user, tenant, additionalScopes);
-        return {
-            access_token: accessToken,
-            expires_in: this.configService.get(
-                "TOKEN_EXPIRATION_TIME_IN_SECONDS",
-            ),
-            token_type: "Bearer",
-            refresh_token: refreshToken,
-            ...(scopes && scopes.length ? {scope: scopes.join(" ")} : {}),
-        };
+        return this.tokenIssuanceService.issueToken(user, tenant, {
+            subscriberTenantHint: body.subscriber_tenant_hint,
+        });
     }
 
 
