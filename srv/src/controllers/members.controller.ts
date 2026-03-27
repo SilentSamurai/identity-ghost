@@ -96,7 +96,7 @@ export class MemberController {
             Action.Update,
             subject(SubjectEnum.TENANT, tenant),
         );
-        const adminContext = await this.securityService.getAdminContextForInternalUse();
+        const adminContext = await this.securityService.getContextForMemberManagement(tenantId);
         for (const email of body.emails) {
             const isPresent = await this.usersService.existByEmail(
                 adminContext,

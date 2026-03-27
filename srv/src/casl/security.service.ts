@@ -4,10 +4,12 @@ import {RoleEnum} from "../entity/roleEnum";
 import {Environment} from "../config/environment.service";
 import {CaslAbilityFactory} from "./casl-ability.factory";
 import {AnyAbility} from "@casl/ability/dist/types/PureAbility";
+import {AbilityBuilder, createMongoAbility} from "@casl/ability";
 import {Action} from "./actions.enum";
 import {subject} from "@casl/ability";
 import {AuthUserService} from "./authUser.service";
-import {AuthContext, GRANT_TYPES, TechnicalToken, TenantToken,} from "./contexts";
+import {AuthContext, GRANT_TYPES, InternalToken, TechnicalToken, TenantToken,} from "./contexts";
+import {SubjectEnum} from "../entity/subjectEnum";
 
 @Injectable()
 export class SecurityService implements OnModuleInit {
@@ -91,32 +93,69 @@ export class SecurityService implements OnModuleInit {
         );
     }
 
-    async getAdminContextForInternalUse(): Promise<AuthContext> {
-        const authContext: AuthContext = {
-            SECURITY_CONTEXT: TenantToken.create({
-                email: "",
-                sub: "",
-                userId: "",
-                name: "",
-                tenant: {
-                    id: "",
-                    name: "",
-                    domain: this.configService.get("SUPER_TENANT_DOMAIN"),
-                },
-                scopes: ["SUPER_ADMIN"],
-                grant_type: GRANT_TYPES.PASSWORD,
-                userTenant: {
-                    id: "",
-                    name: "",
-                    domain: this.configService.get("SUPER_TENANT_DOMAIN"),
-                }
-            }),
-            SCOPE_ABILITIES: null,
+    /**
+     * For login/token issuance: can read membership, subscription status, and roles across tenants.
+     * Needs broad Read on TENANT because findByMembership checks Read TENANT without conditions.
+     * Needs broad Read on ROLE because getMemberRoles may operate on the subscribing tenant.
+     */
+    async getContextForTokenIssuance(tenantId: string): Promise<AuthContext> {
+        const {can, build} = new AbilityBuilder(createMongoAbility);
+        can(Action.Read, SubjectEnum.TENANT);
+        can(Action.Read, SubjectEnum.MEMBER);
+        can(Action.Read, SubjectEnum.ROLE);
+        return {
+            SECURITY_CONTEXT: InternalToken.create({purpose: "token-issuance", scopedTenantId: tenantId}),
+            SCOPE_ABILITIES: build(),
         };
-        authContext.SCOPE_ABILITIES = await this.caslAbilityFactory.createForSecurityContext(
-            authContext.SECURITY_CONTEXT as TenantToken,
-        );
-        return authContext;
+    }
+
+    /**
+     * For adding members: can read/create users and read tenant membership.
+     */
+    async getContextForMemberManagement(tenantId: string): Promise<AuthContext> {
+        const {can, build} = new AbilityBuilder(createMongoAbility);
+        can(Action.Read, SubjectEnum.TENANT, {id: tenantId});
+        can(Action.Read, SubjectEnum.MEMBER, {tenantId});
+        can(Action.Read, SubjectEnum.USER);
+        can(Action.Create, SubjectEnum.USER);
+        return {
+            SECURITY_CONTEXT: InternalToken.create({purpose: "member-management", scopedTenantId: tenantId}),
+            SCOPE_ABILITIES: build(),
+        };
+    }
+
+    /**
+     * For registration: can check domain existence, create tenants/users, manage roles,
+     * add members, and update user verification status.
+     */
+    async getContextForRegistration(): Promise<AuthContext> {
+        const {can, build} = new AbilityBuilder(createMongoAbility);
+        can(Action.Read, SubjectEnum.TENANT);
+        can(Action.Create, SubjectEnum.TENANT);
+        can(Action.Update, SubjectEnum.TENANT);
+        can(Action.Read, SubjectEnum.USER);
+        can(Action.Create, SubjectEnum.USER);
+        can(Action.Update, SubjectEnum.USER);
+        can(Action.Read, SubjectEnum.MEMBER);
+        can(Action.Create, SubjectEnum.ROLE);
+        can(Action.Read, SubjectEnum.ROLE);
+        can(Action.Update, SubjectEnum.ROLE);
+        return {
+            SECURITY_CONTEXT: InternalToken.create({purpose: "registration"}),
+            SCOPE_ABILITIES: build(),
+        };
+    }
+
+    /**
+     * For startup seed data: full access (this is the only legitimate use of broad permissions).
+     */
+    async getContextForStartup(): Promise<AuthContext> {
+        const {can, build} = new AbilityBuilder(createMongoAbility);
+        can(Action.Manage, "all");
+        return {
+            SECURITY_CONTEXT: InternalToken.create({purpose: "startup-seed"}),
+            SCOPE_ABILITIES: build(),
+        };
     }
 
     async getUserAuthContext(email: string): Promise<AuthContext> {

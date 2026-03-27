@@ -98,7 +98,7 @@ export class RegisterController {
         }
 
         let adminContext =
-            await this.securityService.getAdminContextForInternalUse();
+            await this.securityService.getContextForRegistration();
 
         const isPresent = await this.tenantService.existByDomain(
             adminContext,
@@ -148,7 +148,7 @@ export class RegisterController {
         },
     ): Promise<{ success: boolean }> {
         let adminContext =
-            await this.securityService.getAdminContextForInternalUse();
+            await this.securityService.getContextForRegistration();
         const tenant = await this.tenantService.findByClientIdOrDomain(
             adminContext,
             body.client_id,

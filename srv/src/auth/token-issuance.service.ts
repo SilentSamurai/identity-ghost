@@ -38,7 +38,7 @@ export class TokenIssuanceService {
      * membership check → subscription resolution → scope building → token creation → response formatting.
      */
     async issueToken(user: User, tenant: Tenant, options?: IssueTokenOptions): Promise<TokenResponse> {
-        const adminContext = await this.securityService.getAdminContextForInternalUse();
+        const adminContext = await this.securityService.getContextForTokenIssuance(tenant.id);
 
         const isMember = await this.tenantService.isMember(adminContext, tenant.id, user);
         const isSubscribed = await this.subscriptionService.isUserSubscribedToTenant(adminContext, user, tenant);
@@ -67,7 +67,7 @@ export class TokenIssuanceService {
         ambiguousTenants?: any[];
         resolvedHint?: string;
     }> {
-        const adminContext = await this.securityService.getAdminContextForInternalUse();
+        const adminContext = await this.securityService.getContextForTokenIssuance(tenant.id);
 
         const isMember = await this.tenantService.isMember(adminContext, tenant.id, user);
         const isSubscribed = await this.subscriptionService.isUserSubscribedToTenant(adminContext, user, tenant);

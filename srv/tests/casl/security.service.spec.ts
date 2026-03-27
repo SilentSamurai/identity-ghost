@@ -3,11 +3,11 @@ import { SecurityService } from '../../src/casl/security.service';
 import { Environment } from '../../src/config/environment.service';
 import { AuthUserService } from '../../src/casl/authUser.service';
 import { CaslAbilityFactory } from '../../src/casl/casl-ability.factory';
-import { AuthContext, GRANT_TYPES, TechnicalToken, TenantToken } from '../../src/casl/contexts';
+import { AuthContext, GRANT_TYPES, InternalToken, TechnicalToken, TenantToken } from '../../src/casl/contexts';
 import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { RoleEnum } from '../../src/entity/roleEnum';
 import { Action } from '../../src/casl/actions.enum';
-import { PureAbility, AbilityBuilder, MongoAbility } from '@casl/ability';
+import { PureAbility, AbilityBuilder, MongoAbility, subject } from '@casl/ability';
 
 describe('SecurityService', () => {
     let service: SecurityService;
@@ -214,16 +214,64 @@ describe('SecurityService', () => {
         });
     });
 
-    describe('getAdminContextForInternalUse', () => {
-        it('should create admin context with super admin role', async () => {
-            const mockAbilities = createMockAbility();
-            jest.spyOn(caslAbilityFactory, 'createForSecurityContext').mockResolvedValue(mockAbilities);
+    describe('getContextForTokenIssuance', () => {
+        it('should create scoped context for token issuance with read access to tenants/members/roles', async () => {
+            const result = await service.getContextForTokenIssuance('tenant-123');
 
-            const result = await service.getAdminContextForInternalUse();
+            expect(result.SECURITY_CONTEXT.isInternalToken()).toBe(true);
+            expect((result.SECURITY_CONTEXT as InternalToken).purpose).toBe('token-issuance');
+            expect((result.SECURITY_CONTEXT as InternalToken).scopedTenantId).toBe('tenant-123');
+            expect(result.SCOPE_ABILITIES).toBeDefined();
+            expect(result.SCOPE_ABILITIES.can(Action.Read, 'Tenant')).toBe(true);
+            expect(result.SCOPE_ABILITIES.can(Action.Read, 'TenantMember')).toBe(true);
+            expect(result.SCOPE_ABILITIES.can(Action.Read, 'Role')).toBe(true);
+            // Should NOT be able to create or update
+            expect(result.SCOPE_ABILITIES.can(Action.Create, 'User')).toBe(false);
+            expect(result.SCOPE_ABILITIES.can(Action.Update, 'Tenant')).toBe(false);
+        });
+    });
 
-            expect(result.SECURITY_CONTEXT.asTenantToken().scopes).toContain(RoleEnum.SUPER_ADMIN);
-            expect(result.SECURITY_CONTEXT.asTenantToken().tenant.domain).toBe('super.com');
-            expect(result.SCOPE_ABILITIES).toBe(mockAbilities);
+    describe('getContextForMemberManagement', () => {
+        it('should create scoped context for member management with user read/create access', async () => {
+            const result = await service.getContextForMemberManagement('tenant-456');
+
+            expect(result.SECURITY_CONTEXT.isInternalToken()).toBe(true);
+            expect((result.SECURITY_CONTEXT as InternalToken).purpose).toBe('member-management');
+            expect((result.SECURITY_CONTEXT as InternalToken).scopedTenantId).toBe('tenant-456');
+            expect(result.SCOPE_ABILITIES.can(Action.Read, 'User')).toBe(true);
+            expect(result.SCOPE_ABILITIES.can(Action.Create, 'User')).toBe(true);
+            expect(result.SCOPE_ABILITIES.can(Action.Read, 'TenantMember')).toBe(true);
+            // Should NOT have manage-all
+            expect(result.SCOPE_ABILITIES.can(Action.Delete, 'Tenant')).toBe(false);
+        });
+    });
+
+    describe('getContextForRegistration', () => {
+        it('should create scoped context for registration with tenant/user/role management access', async () => {
+            const result = await service.getContextForRegistration();
+
+            expect(result.SECURITY_CONTEXT.isInternalToken()).toBe(true);
+            expect((result.SECURITY_CONTEXT as InternalToken).purpose).toBe('registration');
+            expect(result.SCOPE_ABILITIES.can(Action.Read, 'Tenant')).toBe(true);
+            expect(result.SCOPE_ABILITIES.can(Action.Create, 'Tenant')).toBe(true);
+            expect(result.SCOPE_ABILITIES.can(Action.Update, 'Tenant')).toBe(true);
+            expect(result.SCOPE_ABILITIES.can(Action.Read, 'User')).toBe(true);
+            expect(result.SCOPE_ABILITIES.can(Action.Create, 'User')).toBe(true);
+            expect(result.SCOPE_ABILITIES.can(Action.Update, 'User')).toBe(true);
+            expect(result.SCOPE_ABILITIES.can(Action.Create, 'Role')).toBe(true);
+            // Should NOT have delete or manage-all
+            expect(result.SCOPE_ABILITIES.can(Action.Delete, 'Tenant')).toBe(false);
+            expect(result.SCOPE_ABILITIES.can(Action.Manage, 'all')).toBe(false);
+        });
+    });
+
+    describe('getContextForStartup', () => {
+        it('should create full-access context for startup seed operations', async () => {
+            const result = await service.getContextForStartup();
+
+            expect(result.SECURITY_CONTEXT.isInternalToken()).toBe(true);
+            expect((result.SECURITY_CONTEXT as InternalToken).purpose).toBe('startup-seed');
+            expect(result.SCOPE_ABILITIES.can(Action.Manage, 'all')).toBe(true);
         });
     });
 

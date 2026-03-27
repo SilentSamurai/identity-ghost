@@ -36,6 +36,8 @@ export interface Token {
 
     isTechnicalToken(): boolean;
 
+    isInternalToken(): boolean;
+
     asTenantToken(): TenantToken;
 
     asTechnicalToken(): TechnicalToken;
@@ -68,6 +70,28 @@ export interface TechnicalTokenParams {
     scopes: string[];
 }
 
+export class InternalToken implements Token {
+    sub: string;
+    scopes: string[] = [];
+    grant_type: GRANT_TYPES = GRANT_TYPES.CLIENT_CREDENTIALS;
+    purpose: string;
+    scopedTenantId?: string;
+
+    static create(params: { purpose: string; scopedTenantId?: string }): InternalToken {
+        const token = new InternalToken();
+        token.purpose = params.purpose;
+        token.scopedTenantId = params.scopedTenantId;
+        token.sub = `internal:${params.purpose}`;
+        return token;
+    }
+
+    isTenantToken(): boolean { return false; }
+    isTechnicalToken(): boolean { return false; }
+    isInternalToken(): boolean { return true; }
+    asTenantToken(): TenantToken { throw new Error("Internal token cannot be cast to TenantToken"); }
+    asTechnicalToken(): TechnicalToken { throw new Error("Internal token cannot be cast to TechnicalToken"); }
+}
+
 export class TenantToken implements Token {
     sub: string;
     scopes: string[];
@@ -97,6 +121,10 @@ export class TenantToken implements Token {
 
     isTenantToken(): boolean {
         return true;
+    }
+
+    isInternalToken(): boolean {
+        return false;
     }
 
     asPlainObject(): Record<string, any> {
@@ -144,6 +172,10 @@ export class TechnicalToken implements Token {
     }
 
     isTenantToken(): boolean {
+        return false;
+    }
+
+    isInternalToken(): boolean {
         return false;
     }
 

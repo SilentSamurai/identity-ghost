@@ -39,7 +39,7 @@ export class StartUpService implements OnModuleInit {
     async createAdminUser() {
         try {
             let adminContext =
-                await this.securityService.getAdminContextForInternalUse();
+                await this.securityService.getContextForStartup();
             if (
                 !(await this.usersService.existByEmail(
                     adminContext,
@@ -90,7 +90,7 @@ export class StartUpService implements OnModuleInit {
         try {
             // 1) Get admin context for creating data
             const adminContext =
-                await this.securityService.getAdminContextForInternalUse();
+                await this.securityService.getContextForStartup();
 
             // 3) Define a list of dummy tenants to create
             const dummyTenants = [
@@ -162,7 +162,7 @@ export class StartUpService implements OnModuleInit {
         try {
             const data: string = await readFile("./users.json", "utf8");
             const adminContext =
-                await this.securityService.getAdminContextForInternalUse();
+                await this.securityService.getContextForStartup();
             const users = JSON.parse(data);
 
             for (const record of users.records) {
@@ -196,7 +196,7 @@ export class StartUpService implements OnModuleInit {
     async populateGlobalTenant() {
         try {
             let adminContext =
-                await this.securityService.getAdminContextForInternalUse();
+                await this.securityService.getContextForStartup();
             let globalTenantExists = await this.tenantService.existByDomain(
                 adminContext,
                 this.configService.get("SUPER_TENANT_DOMAIN"),
