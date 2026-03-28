@@ -8,14 +8,14 @@
  *   - Owner isolation: different owners writing to the same tenant cannot see each other's keys
  *   - Auth enforcement: user (password grant) tokens are rejected with 403
  */
-import {TestAppFixture} from '../test-app.fixture';
+import {SharedTestFixture} from '../shared-test.fixture';
 import {TenantClient} from '../api-client/tenant-client';
 import {AdminTenantClient} from '../api-client/admin-tenant-client';
 import {TokenFixture} from '../token.fixture';
 import {TenantBitsClient} from "../api-client/tenant-bits-client";
 
 describe('TenantBits API', () => {
-    let app: TestAppFixture;
+    let app: SharedTestFixture;
     let tenantClient: TenantClient;
     let adminTenantClient: AdminTenantClient;
     let bitsClient: TenantBitsClient;
@@ -28,7 +28,7 @@ describe('TenantBits API', () => {
     let bitsClient2: TenantBitsClient;
 
     beforeAll(async () => {
-        app = await new TestAppFixture().init();
+        app = new SharedTestFixture();
         const tokenFixture = new TokenFixture(app);
         // Create two tenants
         const adminResponse = await tokenFixture.fetchAccessToken(

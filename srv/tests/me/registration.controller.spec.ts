@@ -1,3 +1,7 @@
+// NOTE: This test suite uses TestAppFixture instead of SharedTestFixture because it requires
+// direct DI container access (app.nestApp.get()) to mock internal services (MailService, TenantService).
+// SharedTestFixture does not expose the NestJS app instance.
+
 import {TestAppFixture} from "../test-app.fixture";
 import {MailService} from "../../src/mail/mail.service";
 import {TenantService} from "../../src/services/tenant.service";

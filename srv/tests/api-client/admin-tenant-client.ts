@@ -1,5 +1,4 @@
-import {TestAppFixture} from "../test-app.fixture";
-import {expect2xx, HttpClient} from "./client";
+import {expect2xx, HttpClient, TestFixture} from "./client";
 
 /**
  * Test client for admin routes (api/admin/tenant/:tenantId/...).
@@ -7,7 +6,7 @@ import {expect2xx, HttpClient} from "./client";
  */
 export class AdminTenantClient extends HttpClient {
 
-    constructor(app: TestAppFixture, accessToken: string) {
+    constructor(app: TestFixture, accessToken: string) {
         super(app, accessToken);
     }
 

@@ -1,11 +1,10 @@
-import {TestAppFixture} from "./test-app.fixture";
-import {expect2xx} from "./api-client/client";
+import {TestFixture, expect2xx} from "./api-client/client";
 
 export class TokenFixture {
 
-    private readonly app: TestAppFixture;
+    private readonly app: TestFixture;
 
-    constructor(app: TestAppFixture) {
+    constructor(app: TestFixture) {
         this.app = app;
     }
 

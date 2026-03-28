@@ -1,12 +1,11 @@
 import {v4 as uuidv4} from 'uuid';
-import {TestAppFixture} from "../test-app.fixture";
+import {SharedTestFixture} from "../shared-test.fixture";
 import {UsersClient} from "../api-client/user-client";
 import {TokenFixture} from "../token.fixture";
-import {EmailSearchCriteria} from "../../src/mail/FakeSmtpServer";
 
 
 describe('UsersController (e2e)', () => {
-    let app: TestAppFixture;
+    let app: SharedTestFixture;
     let usersClient: UsersClient;
     let tokenFixture: TokenFixture;
     let accessToken: string;
@@ -25,7 +24,7 @@ describe('UsersController (e2e)', () => {
     beforeAll(async () => {
         console.log("Starting Test Stating");
         // Create and set up the test application
-        app = await new TestAppFixture().init();
+        app = new SharedTestFixture();
 
         // Get admin access token for authenticated requests
         tokenFixture = new TokenFixture(app);
@@ -56,10 +55,10 @@ describe('UsersController (e2e)', () => {
 
         it('should verify a new user via email link', async () => {
             // Find the verification email sent to our test user
-            const search: EmailSearchCriteria = {
+            const search = {
                 to: testUserEmail,
                 subject: /signing.*up.*Auth.*Server/i,
-            }
+            };
             const verificationEmail = await app.smtp.waitForEmail(search);
             // Verify we found the email
             expect(verificationEmail).toBeDefined();
@@ -126,10 +125,10 @@ describe('UsersController (e2e)', () => {
         });
 
         it('verify new email for change', async () => {
-            const search: EmailSearchCriteria = {
+            const search = {
                 to: updatedEmail,
                 subject: /.*Change.*email.*Auth.*Server.*/i,
-            }
+            };
             const verificationEmail = await app.smtp.waitForEmail(search);
             // Verify we found the email
             expect(verificationEmail).toBeDefined();

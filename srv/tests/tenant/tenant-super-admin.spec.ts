@@ -5,13 +5,13 @@
  * create/delete roles, add/remove members, update member roles, delete tenant,
  * and list all tenants. All operations use the admin API (cross-tenant).
  */
-import {TestAppFixture} from "../test-app.fixture";
+import {SharedTestFixture} from "../shared-test.fixture";
 import {TokenFixture} from "../token.fixture";
 import {TenantClient} from "../api-client/tenant-client";
 import {AdminTenantClient} from "../api-client/admin-tenant-client";
 
 describe("E2E Tenant Management", () => {
-    let app: TestAppFixture;
+    let app: SharedTestFixture;
     let tenant: any;
     let tenantClient: TenantClient;
     let adminClient: AdminTenantClient;
@@ -21,7 +21,7 @@ describe("E2E Tenant Management", () => {
         expect(item).toMatch(/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/);
 
     beforeAll(async () => {
-        app = await new TestAppFixture().init();
+        app = new SharedTestFixture();
         const tokenFixture = new TokenFixture(app);
         const response = await tokenFixture.fetchAccessToken(
             "admin@auth.server.com", "admin9000", "auth.server.com"

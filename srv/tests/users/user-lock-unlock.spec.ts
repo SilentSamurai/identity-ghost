@@ -1,4 +1,4 @@
-import {TestAppFixture} from "../test-app.fixture";
+import {SharedTestFixture} from "../shared-test.fixture";
 import {UsersClient} from "../api-client/user-client";
 import {TokenFixture} from "../token.fixture";
 
@@ -21,7 +21,7 @@ import {TokenFixture} from "../token.fixture";
  *    but hidden from the non-admin `/api/users/me` endpoint.
  */
 describe('e2e user lock/unlock', () => {
-    let app: TestAppFixture;
+    let app: SharedTestFixture;
     let adminAccessToken: string;
     let usersClient: UsersClient;
     let tokenFixture: TokenFixture;
@@ -33,7 +33,7 @@ describe('e2e user lock/unlock', () => {
     let testUserId: string;
 
     beforeAll(async () => {
-        app = await new TestAppFixture().init();
+        app = new SharedTestFixture();
         tokenFixture = new TokenFixture(app);
 
         // Authenticate as the super-admin so all subsequent requests have full privileges

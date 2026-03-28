@@ -1,15 +1,15 @@
-import {TestAppFixture} from "../test-app.fixture";
+import {SharedTestFixture} from "../shared-test.fixture";
 import {TokenFixture} from "../token.fixture";
 
 describe('e2e positive token flow', () => {
-    let app: TestAppFixture;
+    let app: SharedTestFixture;
     let refreshToken = "";
     let accessToken = "";
     let clientId = "";
     let clientSecret = "";
 
     beforeAll(async () => {
-        app = await new TestAppFixture().init();
+        app = new SharedTestFixture();
     });
 
     afterAll(async () => {

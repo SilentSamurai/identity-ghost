@@ -5,14 +5,14 @@
  * secret rotation (with 24h overlap window), field updates (including immutable fields
  * like isPublic/grantTypes that should be ignored), and deletion with 404 verification.
  */
-import {TestAppFixture} from "../test-app.fixture";
+import {SharedTestFixture} from "../shared-test.fixture";
 import {TokenFixture} from "../token.fixture";
 import {ClientEntityClient} from "../api-client/client-entity-client";
 import {TenantClient} from "../api-client/tenant-client";
 import {AdminTenantClient} from "../api-client/admin-tenant-client";
 
 describe("E2E Client Entity Management", () => {
-    let app: TestAppFixture;
+    let app: SharedTestFixture;
     let clientApi: ClientEntityClient;
     let tenantApi: TenantClient;
     let adminApi: AdminTenantClient;
@@ -20,7 +20,7 @@ describe("E2E Client Entity Management", () => {
     let testTenantId: string;
 
     beforeAll(async () => {
-        app = await new TestAppFixture().init();
+        app = new SharedTestFixture();
         const tokenFixture = new TokenFixture(app);
         const response = await tokenFixture.fetchAccessToken(
             "admin@auth.server.com",

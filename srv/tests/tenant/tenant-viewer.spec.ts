@@ -6,19 +6,21 @@
  *   - CAN: read tenant details, roles, members
  *   - CANNOT: read credentials, update tenant, create/delete roles, remove members, delete tenant, list all tenants
  */
-import {TestAppFixture} from "../test-app.fixture";
+import {SharedTestFixture} from "../shared-test.fixture";
 import {TokenFixture} from "../token.fixture";
 import {TenantClient} from "../api-client/tenant-client";
 import {AdminTenantClient} from "../api-client/admin-tenant-client";
 
 describe('e2e tenant viewer', () => {
-    let app: TestAppFixture;
+    let app: SharedTestFixture;
     let viewerClient: TenantClient;
     let tenant: any;
+    let tenantDomain: string;
 
     beforeAll(async () => {
-        app = await new TestAppFixture().init();
+        app = new SharedTestFixture();
         const tokenFixture = new TokenFixture(app);
+        const uniqueDomain = `viewer-${Date.now()}.com`;
 
         // Super admin: create tenant, add member, assign TENANT_VIEWER
         const superAdminResponse = await tokenFixture.fetchAccessToken(
@@ -27,7 +29,7 @@ describe('e2e tenant viewer', () => {
         const superAdmin = new AdminTenantClient(app, superAdminResponse.accessToken);
         const superAdminTenant = new TenantClient(app, superAdminResponse.accessToken);
 
-        tenant = await superAdminTenant.createTenant("tenant-1", "test-website.com");
+        tenant = await superAdminTenant.createTenant("tenant-1", uniqueDomain);
 
         const addResult = await superAdmin.addMembers(tenant.id, ["legolas@mail.com"]);
         const legolasId = addResult.members.find((m: any) => m.email === "legolas@mail.com").id;
@@ -35,9 +37,10 @@ describe('e2e tenant viewer', () => {
 
         // Log in as the tenant viewer
         const viewerResponse = await tokenFixture.fetchAccessToken(
-            "legolas@mail.com", "legolas9000", "test-website.com"
+            "legolas@mail.com", "legolas9000", uniqueDomain
         );
         viewerClient = new TenantClient(app, viewerResponse.accessToken);
+        tenantDomain = uniqueDomain;
     });
 
     afterAll(async () => {
@@ -49,7 +52,7 @@ describe('e2e tenant viewer', () => {
     it('should read tenant details', async () => {
         const details = await viewerClient.getTenantDetails(tenant.id);
         expect(details.name).toEqual("tenant-1");
-        expect(details.domain).toEqual("test-website.com");
+        expect(details.domain).toEqual(tenantDomain);
         expect(details.clientId).toBeDefined();
     });
 

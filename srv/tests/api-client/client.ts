@@ -1,5 +1,11 @@
-import {TestAppFixture} from "../test-app.fixture";
 import supertest from "supertest";
+import TestAgent from "supertest/lib/agent";
+import {JwtService} from "@nestjs/jwt";
+
+export interface TestFixture {
+    getHttpServer(): TestAgent<supertest.Test>;
+    jwtService(): JwtService;
+}
 
 export function is2xx(response: { status: number }) {
     return response.status >= 200 && response.status < 300;
@@ -15,10 +21,10 @@ export function expect2xx(response: { body: any; status: number }) {
 
 export class HttpClient {
 
-    protected readonly app: TestAppFixture;
+    protected readonly app: TestFixture;
     protected readonly accessToken: string;
 
-    constructor(app: TestAppFixture, accessToken: string) {
+    constructor(app: TestFixture, accessToken: string) {
         this.app = app;
         this.accessToken = accessToken;
     }

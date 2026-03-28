@@ -6,7 +6,7 @@
  * cache hit on repeated read, update (effect + action), delete, 404 on missing, and
  * fetching the current user's resolved permissions.
  */
-import {TestAppFixture} from "../test-app.fixture";
+import {SharedTestFixture} from "../shared-test.fixture";
 import {PolicyClient} from "../api-client/policy-client";
 import {TokenFixture} from "../token.fixture";
 import {TenantClient} from "../api-client/tenant-client";
@@ -14,14 +14,14 @@ import {SearchClient} from "../api-client/search-client";
 import {Action, Effect} from "../../src/casl/actions.enum";
 
 describe('PolicyController (e2e)', () => {
-    let app: TestAppFixture;
+    let app: SharedTestFixture;
     let accessToken: string;
     let authorizationId: string;
     let policyClient: PolicyClient;
     let role;
 
     beforeAll(async () => {
-        app = await new TestAppFixture().init();
+        app = new SharedTestFixture();
         const tokenFixture = new TokenFixture(app);
         const tokenResponse = await tokenFixture.fetchAccessToken(
             "admin@auth.server.com",

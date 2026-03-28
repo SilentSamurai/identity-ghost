@@ -1,3 +1,7 @@
+// NOTE: This test suite uses TestAppFixture instead of SharedTestFixture because it requires
+// direct DI container access (app.nestApp.get()) for MailService and UserRepository.
+// SharedTestFixture does not expose the NestJS app instance.
+
 import { Test, TestingModule } from '@nestjs/testing';
 import { MailService } from '../src/mail/mail.service';
 import { Environment } from '../src/config/environment.service';

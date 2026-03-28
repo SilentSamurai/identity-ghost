@@ -1,15 +1,15 @@
-import {TestAppFixture} from "../test-app.fixture";
+import {SharedTestFixture} from "../shared-test.fixture";
 import {UsersClient} from "../api-client/user-client";
 import {TokenFixture} from "../token.fixture";
 
 describe('e2e users', () => {
-    let app: TestAppFixture;
+    let app: SharedTestFixture;
     let refreshToken = "";
     let accessToken = "";
     let user = {email: "", id: ""};
 
     beforeAll(async () => {
-        app = await new TestAppFixture().init();
+        app = new SharedTestFixture();
     });
 
     afterAll(async () => {

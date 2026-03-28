@@ -1,8 +1,8 @@
-import {TestAppFixture} from "../test-app.fixture";
+import {SharedTestFixture} from "../shared-test.fixture";
 import {expect2xx} from "../api-client/client";
 
 describe('e2e positive auth code flow', () => {
-    let app: TestAppFixture;
+    let app: SharedTestFixture;
     let authentication_code = "";
     let accessToken = "";
     let clientId = "auth.server.com";
@@ -11,7 +11,7 @@ describe('e2e positive auth code flow', () => {
     const challenge = "challenge-ABCD";
 
     beforeAll(async () => {
-        app = await new TestAppFixture().init();
+        app = new SharedTestFixture();
     });
 
     afterAll(async () => {

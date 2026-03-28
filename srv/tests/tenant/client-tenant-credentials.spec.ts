@@ -1,9 +1,9 @@
-import {TestAppFixture} from "../test-app.fixture";
+import {SharedTestFixture} from "../shared-test.fixture";
 import {TokenFixture} from "../token.fixture";
 import {expect2xx} from "../api-client/client";
 
 describe('e2e tenant technical credential', () => {
-    let app: TestAppFixture;
+    let app: SharedTestFixture;
     let tenant = {
         id: "",
         clientId: "",
@@ -11,9 +11,10 @@ describe('e2e tenant technical credential', () => {
     };
     let technicalAccessToken = "";
     let adminAccessToken = "";
+    let tenantDomain = "";
 
     beforeAll(async () => {
-        app = await new TestAppFixture().init();
+        app = new SharedTestFixture();
     });
 
     afterAll(async () => {
@@ -31,11 +32,12 @@ describe('e2e tenant technical credential', () => {
     });
 
     it(`/POST Create Tenant`, async () => {
+        const uniqueDomain = `cli-cred-${Date.now()}.com`;
         const response = await app.getHttpServer()
             .post('/api/tenant/create')
             .send({
                 "name": "tenant-1",
-                "domain": "test-wesite.com"
+                "domain": uniqueDomain
             })
             .set('Authorization', `Bearer ${adminAccessToken}`)
             .set('Accept', 'application/json');
@@ -45,9 +47,10 @@ describe('e2e tenant technical credential', () => {
         expect(response.status).toEqual(201);
         expect(response.body.id).toBeDefined();
         expect(response.body.name).toEqual("tenant-1");
-        expect(response.body.domain).toEqual("test-wesite.com");
+        expect(response.body.domain).toEqual(uniqueDomain);
         expect(response.body.clientId).toBeDefined();
         tenant = response.body;
+        tenantDomain = uniqueDomain;
     });
 
     it(`/GET Tenant Credentials with admin token`, async () => {
@@ -126,7 +129,7 @@ describe('e2e tenant technical credential', () => {
 
         expect(response.body.id).toBeDefined();
         expect(response.body.name).toEqual("tenant-1");
-        expect(response.body.domain).toEqual("test-wesite.com");
+        expect(response.body.domain).toEqual(tenantDomain);
         expect(response.body.clientId).toBeDefined();
     });
 

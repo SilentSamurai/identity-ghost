@@ -1,10 +1,10 @@
-import {TestAppFixture} from "./test-app.fixture";
+import {SharedTestFixture} from "./shared-test.fixture";
 
 describe('e2e health-check', () => {
 
     it(`/GET Health Check`, async () => {
 
-        const app = await new TestAppFixture().init();
+        const app = new SharedTestFixture();
 
         const mvc = await app.getHttpServer()
             .get('/api/v1/health-check');

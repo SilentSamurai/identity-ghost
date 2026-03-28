@@ -10,16 +10,15 @@
  *   - Account deletion prevents further login
  */
 import {v4 as uuidv4} from 'uuid';
-import {TestAppFixture} from "../test-app.fixture";
+import {SharedTestFixture} from "../shared-test.fixture";
 import {UsersClient} from "../api-client/user-client";
 import {TokenFixture} from "../token.fixture";
-import {EmailSearchCriteria} from "../../src/mail/FakeSmtpServer";
 import {TenantClient} from "../api-client/tenant-client";
 import {SearchClient} from "../api-client/search-client";
 
 
 describe('UsersController (e2e)', () => {
-    let app: TestAppFixture;
+    let app: SharedTestFixture;
     let usersClient: UsersClient;
     let tenantClient: TenantClient;
     let searchClient: SearchClient;
@@ -42,7 +41,7 @@ describe('UsersController (e2e)', () => {
     beforeAll(async () => {
         console.log("Starting Test Stating");
         // Create and set up the test application
-        app = await new TestAppFixture().init();
+        app = new SharedTestFixture();
 
         // Get admin access token for authenticated requests
         tokenFixture = new TokenFixture(app);
@@ -74,10 +73,10 @@ describe('UsersController (e2e)', () => {
 
         it('should verify a new user via email link', async () => {
             // Find the verification email sent to our test user
-            const search: EmailSearchCriteria = {
+            const search = {
                 to: testUserEmail,
                 subject: /signing.*up.*Auth.*Server/i,
-            }
+            };
             const verificationEmail = await app.smtp.waitForEmail(search);
             // Verify we found the email
             expect(verificationEmail).toBeDefined();

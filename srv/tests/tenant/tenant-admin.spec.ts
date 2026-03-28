@@ -6,18 +6,18 @@
  *   - CAN: read tenant details/credentials/roles/members, update tenant, create/delete roles
  *   - CANNOT: remove members, delete tenant, list all tenants
  */
-import {TestAppFixture} from "../test-app.fixture";
+import {SharedTestFixture} from "../shared-test.fixture";
 import {TokenFixture} from "../token.fixture";
 import {TenantClient} from "../api-client/tenant-client";
 import {AdminTenantClient} from "../api-client/admin-tenant-client";
 
 describe('e2e tenant admin', () => {
-    let app: TestAppFixture;
+    let app: SharedTestFixture;
     let adminClient: TenantClient;
     let tenant: any;
 
     beforeAll(async () => {
-        app = await new TestAppFixture().init();
+        app = new SharedTestFixture();
         const tokenFixture = new TokenFixture(app);
 
         // Super admin: create tenant, add member, assign TENANT_ADMIN

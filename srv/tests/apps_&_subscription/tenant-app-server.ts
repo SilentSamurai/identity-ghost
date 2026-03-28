@@ -53,6 +53,7 @@ export class TenantAppServer {
     private onboardRequests: OnboardRequest[] = [];
     private offboardRequests: OffboardRequest[] = [];
     private lastDecodedToken: any = null; // Store last decoded JWT for test assertions
+    private decodedTokensByTenant: Map<string, any> = new Map(); // Keyed by tenantId for parallel-safe lookups
 
     /** Actual port after listen() — useful when configured with port 0. */
     public get boundPort(): number {
@@ -181,6 +182,9 @@ export class TenantAppServer {
                     try {
                         decoded = jwt.decode(token);
                         this.lastDecodedToken = decoded;
+                        if (tenantId) {
+                            this.decodedTokensByTenant.set(tenantId, decoded);
+                        }
                     } catch (e) {
                         this.lastDecodedToken = null;
                     }
@@ -212,6 +216,9 @@ export class TenantAppServer {
                 try {
                     decoded = jwt.decode(token);
                     this.lastDecodedToken = decoded;
+                    if (tenantId) {
+                        this.decodedTokensByTenant.set(tenantId, decoded);
+                    }
                 } catch (e) {
                     this.lastDecodedToken = null;
                 }
@@ -276,6 +283,17 @@ export class TenantAppServer {
         this.app.delete('/api/offboard/requests', (req, res) => {
             this.offboardRequests = [];
             res.json({message: 'Offboard requests cleared'});
+        });
+
+        // API to get the last decoded JWT token (for test assertions)
+        this.app.get('/api/last-decoded-token', (req, res) => {
+            res.json(this.lastDecodedToken || null);
+        });
+
+        // API to get a decoded JWT token by the tenantId it was used for (parallel-safe)
+        this.app.get('/api/decoded-token/:tenantId', (req, res) => {
+            const token = this.decodedTokensByTenant.get(req.params.tenantId);
+            res.json(token || null);
         });
 
         // Catch-all route for unknown endpoints

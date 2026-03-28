@@ -1,17 +1,18 @@
-import {TestAppFixture} from "../test-app.fixture";
+import {SharedTestFixture} from "../shared-test.fixture";
 import {TokenFixture} from "../token.fixture";
 
 describe('e2e token exchange flow', () => {
-    let app: TestAppFixture;
+    let app: SharedTestFixture;
     let superAdminToken = "";
     let clientId = "";
     let tenant = {
         id: ""
     };
     let clientSecret = "";
+    let tenantDomain = "";
 
     beforeAll(async () => {
-        app = await new TestAppFixture().init();
+        app = new SharedTestFixture();
     });
 
     afterAll(async () => {
@@ -32,11 +33,12 @@ describe('e2e token exchange flow', () => {
     });
 
     it(`/POST Create Tenant`, async () => {
+        const uniqueDomain = `tok-exch-${Date.now()}.com`;
         const response = await app.getHttpServer()
             .post('/api/tenant/create')
             .send({
                 "name": "tenant-1",
-                "domain": "test-wesite.com"
+                "domain": uniqueDomain
             })
             .set('Authorization', `Bearer ${superAdminToken}`)
             .set('Accept', 'application/json');
@@ -46,9 +48,10 @@ describe('e2e token exchange flow', () => {
 
         expect(response.body.id).toBeDefined();
         expect(response.body.name).toEqual("tenant-1");
-        expect(response.body.domain).toEqual("test-wesite.com");
+        expect(response.body.domain).toEqual(uniqueDomain);
         expect(response.body.clientId).toBeDefined();
         tenant = response.body;
+        tenantDomain = uniqueDomain;
     });
 
     it(`/GET Tenant Credentials`, async () => {
@@ -93,7 +96,7 @@ describe('e2e token exchange flow', () => {
         expect(decode.tenant.id).toBeDefined();
         expect(decode.tenant.name).toBeDefined();
         expect(decode.tenant.domain).toBeDefined();
-        expect(decode.tenant.domain).toEqual("test-wesite.com");
+        expect(decode.tenant.domain).toEqual(tenantDomain);
     });
 
     it(`/POST Token Wrong Exchange`, async () => {

@@ -1,25 +1,32 @@
-import { TestAppFixture } from "../test-app.fixture";
-import * as argon2 from "argon2";
+import { SharedTestFixture } from "../shared-test.fixture";
+import { TokenFixture } from "../token.fixture";
 
 describe("e2e forgot/reset password flow", () => {
-    let app: TestAppFixture;
+    let app: SharedTestFixture;
     const email = "forgot.reset@test.com";
     const originalPassword = "OrigPassw0rd";
     const newPassword = "NewPassw0rd";
     const clientId = "shire.local";
 
     beforeAll(async () => {
-        app = await new TestAppFixture().init();
+        app = new SharedTestFixture();
 
-        // Create user via public API using UsersClient, then set verified=true
+        // Create user via public signup API
         const { UsersClient } = await import("../api-client/user-client");
         const usersClient = new UsersClient(app, "");
         await usersClient.signup("Forgot Reset User", email, originalPassword, clientId);
-        // Mark verified for reset-password eligibility
-        const repo = app.nestApp.get("UserRepository");
-        const created = await repo.findOne({ where: { email } });
-        created.verified = true;
-        await repo.save(created);
+
+        // Verify the user via the admin HTTP API (replaces direct repository access)
+        const tokenFixture = new TokenFixture(app);
+        const { accessToken } = await tokenFixture.fetchAccessToken(
+            "admin@auth.server.com", "admin9000", "auth.server.com"
+        );
+        const verifyRes = await app.getHttpServer()
+            .put("/api/users/verify-user")
+            .set("Authorization", `Bearer ${accessToken}`)
+            .set("Accept", "application/json")
+            .send({ email, verify: true });
+        expect(verifyRes.status).toBe(200);
     });
 
     afterAll(async () => {

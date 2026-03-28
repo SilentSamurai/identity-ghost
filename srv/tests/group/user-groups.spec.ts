@@ -5,13 +5,13 @@
  * Verifies group-level operations (add/remove roles, add/remove users) and that
  * group membership correctly propagates roles to users.
  */
-import {TestAppFixture} from "../test-app.fixture";
+import {SharedTestFixture} from "../shared-test.fixture";
 import {TokenFixture} from "../token.fixture";
 import {HelperFixture} from "../helper.fixture";
 import {AdminTenantClient} from "../api-client/admin-tenant-client";
 
 describe('e2e Groups Check', () => {
-    let app: TestAppFixture;
+    let app: SharedTestFixture;
     let helper: HelperFixture;
     let adminClient: AdminTenantClient;
     let accessToken: string;
@@ -19,7 +19,7 @@ describe('e2e Groups Check', () => {
     let group: any;
 
     beforeAll(async () => {
-        app = await new TestAppFixture().init();
+        app = new SharedTestFixture();
         const tokenFixture = new TokenFixture(app);
         const response = await tokenFixture.fetchAccessToken(
             "admin@auth.server.com", "admin9000", "auth.server.com"

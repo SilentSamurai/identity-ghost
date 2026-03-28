@@ -113,3 +113,6 @@ static
 .env.dev
 
 deployments
+
+# Ephemeral port file written by Jest globalSetup for shared test infrastructure
+.test-ports.json
