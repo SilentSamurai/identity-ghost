@@ -42,6 +42,7 @@ import {SelectInputComponent, SelectOptionComponent,} from './inputs/select-inpu
 import {ObjectPageTabComponent} from './object-page/object-page-tab.component';
 import {ValueHelpButtonComponent} from './button/value-help-button.component';
 import {AppTableComponent} from './table/app-table.component';
+import {InfiniteScrollDirective} from './table/infinite-scroll.directive';
 import {ThemeToggleComponent} from './theme/theme-toggle.component';
 import {LoaderComponent} from "./loader/loader.component";
 import { PasswordInputComponent } from './inputs/password-input.component';
@@ -77,6 +78,7 @@ import { PasswordInputComponent } from './inputs/password-input.component';
         SelectOptionComponent,
         ValueHelpButtonComponent,
         AppTableComponent,
+        InfiniteScrollDirective,
         ThemeToggleComponent,
         LoaderComponent,
         PasswordInputComponent
@@ -127,6 +129,7 @@ import { PasswordInputComponent } from './inputs/password-input.component';
         ObjectPageTabComponent,
         ValueHelpButtonComponent,
         AppTableComponent,
+        InfiniteScrollDirective,
         ThemeToggleComponent,
         LoaderComponent,
         PasswordInputComponent

@@ -25,7 +25,7 @@ export interface DataSourceEvents {
 export interface ReturnedData<T> {
     data: T[];
     count?: number;
-    // isLastPage: boolean;
+    totalCount?: number;
 }
 
 export abstract class BaseDataSource<T> implements DataSource<T> {

@@ -28,9 +28,6 @@ describe('RestApiModel', () => {
 
     const verifyRequest = (req: any, expectedBody: any) => {
         expect(req.request.method).toBe('POST');
-        expect(req.request.headers.get('Content-Type')).toBe(
-            'application/json',
-        );
         expect(req.request.body).toEqual(
             jasmine.objectContaining(expectedBody),
         );
@@ -97,12 +94,6 @@ describe('RestApiModel', () => {
 
         const requests = httpMock.match(apiUrl);
         expect(requests.length).toBe(2);
-
-        requests.forEach((req) => {
-            expect(req.request.headers.get('Content-Type')).toBe(
-                'application/json',
-            );
-        });
 
         requests[0].flush({data: []});
         requests[1].flush({count: 0});

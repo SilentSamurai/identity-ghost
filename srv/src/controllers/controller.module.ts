@@ -9,7 +9,7 @@ import {MemberController} from "./members.controller";
 import {CaslModule} from "../casl/casl.module";
 import {RoleController} from "./role.controller";
 import {MainController} from "./main.controller";
-import {GenericSearchController} from "./generic-serach.controller";
+import {GenericSearchController} from "./generic-search.controller";
 import {TypeOrmModule} from "@nestjs/typeorm";
 import {User} from "../entity/user.entity";
 import {Tenant} from "../entity/tenant.entity";

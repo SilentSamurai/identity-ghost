@@ -113,7 +113,9 @@ export class DataModel<T> implements IDataModel<T> {
         if (this.queryCache.size >= this.maxCacheSize) {
             // Evict the oldest entry (Map preserves insertion order)
             const oldestKey = this.queryCache.keys().next().value;
-            this.queryCache.delete(oldestKey);
+            if (oldestKey !== undefined) {
+                this.queryCache.delete(oldestKey);
+            }
         }
         this.queryCache.set(queryKey, data);
     }
@@ -133,14 +135,16 @@ export class DataModel<T> implements IDataModel<T> {
         this.status.loading = true;
 
         try {
-            // Fetch total count only if it's unknown for the current filter context
-            if (this.totalCount == null || isNaN(this.totalCount)) {
-                this.totalCount = await this._dataSource.totalCount(query);
-            }
-
             // Fetch the actual data
             let rd = await this._dataSource.fetchData(query);
             let data = rd.data;
+
+            // Use totalCount from response if available, otherwise fall back to separate count query
+            if (rd.totalCount != null) {
+                this.totalCount = rd.totalCount;
+            } else if (this.totalCount == null || isNaN(this.totalCount)) {
+                this.totalCount = await this._dataSource.totalCount(query);
+            }
 
             // Determine if this is the last page based on fetched data and total count
             const isEmpty = data.length === 0;
