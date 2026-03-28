@@ -31,6 +31,7 @@ import {Role} from "../entity/role.entity";
 import {Action} from "../casl/actions.enum";
 import {SecurityService} from "../casl/security.service";
 import {JwtAuthGuard} from "../auth/jwt-auth.guard";
+import {SuperAdminGuard} from "../auth/super-admin.guard";
 import {escapeRegExp} from "typeorm/util/escapeRegExp";
 import {Group} from "../entity/group.entity";
 import {FindOperator} from "typeorm/find-options/FindOperator";
@@ -80,6 +81,7 @@ class QueryBody {
 
 @Controller("api/search")
 @UseInterceptors(ClassSerializerInterceptor)
+@UseGuards(JwtAuthGuard, SuperAdminGuard)
 export class GenericSearchController {
     private repos = {};
 
@@ -106,7 +108,6 @@ export class GenericSearchController {
     }
 
     @Post("/:entity")
-    @UseGuards(JwtAuthGuard)
     async search(
         @Request() request,
         @Param("entity") entity: string,

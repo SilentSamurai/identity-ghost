@@ -52,7 +52,7 @@ describe('e2e tenant technical credential', () => {
 
     it(`/GET Tenant Credentials with admin token`, async () => {
         const response = await app.getHttpServer()
-            .get(`/api/tenant/${tenant.id}/credentials`)
+            .get(`/api/admin/tenant/${tenant.id}/credentials`)
             .set('Authorization', `Bearer ${adminAccessToken}`)
             .set('Accept', 'application/json');
 
@@ -99,7 +99,7 @@ describe('e2e tenant technical credential', () => {
     it(`/GET Tenant Credentials`, async () => {
 
         const response = await app.getHttpServer()
-            .get(`/api/tenant/${tenant.id}/credentials`)
+            .get(`/api/tenant/my/credentials`)
             .set('Authorization', `Bearer ${technicalAccessToken}`)
             .set('Accept', 'application/json');
 
@@ -115,7 +115,7 @@ describe('e2e tenant technical credential', () => {
 
     it(`/GET Tenant Details`, async () => {
         const response = await app.getHttpServer()
-            .get(`/api/tenant/${tenant.id}`)
+            .get(`/api/tenant/my/info`)
             .set('Authorization', `Bearer ${technicalAccessToken}`)
             .set('Accept', 'application/json');
 
@@ -132,7 +132,7 @@ describe('e2e tenant technical credential', () => {
 
     it(`/GET Tenant Members`, async () => {
         const response = await app.getHttpServer()
-            .get(`/api/tenant/${tenant.id}/members`)
+            .get(`/api/tenant/my/members`)
             .set('Authorization', `Bearer ${technicalAccessToken}`)
             .set('Accept', 'application/json');
 
@@ -151,7 +151,7 @@ describe('e2e tenant technical credential', () => {
 
     it(`/GET Tenant Roles`, async () => {
         const response = await app.getHttpServer()
-            .get(`/api/tenant/${tenant.id}/roles`)
+            .get(`/api/tenant/my/roles`)
             .set('Authorization', `Bearer ${technicalAccessToken}`)
             .set('Accept', 'application/json');
 
@@ -170,7 +170,7 @@ describe('e2e tenant technical credential', () => {
 
     it(`/PATCH Update Tenant`, async () => {
         const response = await app.getHttpServer()
-            .patch(`/api/tenant/${tenant.id}`)
+            .patch(`/api/tenant/my`)
             .set('Authorization', `Bearer ${technicalAccessToken}`)
             .send({
                 domain: "updated-test-wesite.com",
@@ -185,7 +185,7 @@ describe('e2e tenant technical credential', () => {
     it(`/POST Create Role`, async () => {
         const name = "auditor";
         const response = await app.getHttpServer()
-            .post(`/api/tenant/${tenant.id}/role/${name}`)
+            .post(`/api/tenant/my/role/${name}`)
             .set('Authorization', `Bearer ${technicalAccessToken}`)
             .set('Accept', 'application/json');
 
@@ -195,7 +195,7 @@ describe('e2e tenant technical credential', () => {
 
     it(`/POST Add Members`, async () => {
         const response = await app.getHttpServer()
-            .post(`/api/tenant/${tenant.id}/members/add`)
+            .post(`/api/tenant/my/members/add`)
             .set('Authorization', `Bearer ${technicalAccessToken}`)
             .set('Accept', 'application/json')
             .send({
@@ -212,7 +212,7 @@ describe('e2e tenant technical credential', () => {
     it(`/PUT Update Member Role`, async () => {
         const email = "legolas@mail.com";
         const response = await app.getHttpServer()
-            .put(`/api/tenant/${tenant.id}/member/${email}/roles`)
+            .put(`/api/tenant/my/member/${email}/roles`)
             .set('Authorization', `Bearer ${technicalAccessToken}`)
             .send({
                 "roles": ["TENANT_VIEWER", "auditor"]
@@ -226,7 +226,7 @@ describe('e2e tenant technical credential', () => {
 
     it(`/DELETE Remove Members`, async () => {
         const response = await app.getHttpServer()
-            .delete(`/api/tenant/${tenant.id}/members/delete`)
+            .delete(`/api/tenant/my/members/delete`)
             .set('Authorization', `Bearer ${technicalAccessToken}`)
             .set('Accept', 'application/json')
             .send({
@@ -243,7 +243,7 @@ describe('e2e tenant technical credential', () => {
     it(`/DELETE Remove Role`, async () => {
         const name = "auditor";
         const response = await app.getHttpServer()
-            .delete(`/api/tenant/${tenant.id}/role/${name}`)
+            .delete(`/api/tenant/my/role/${name}`)
             .set('Authorization', `Bearer ${technicalAccessToken}`)
             .set('Accept', 'application/json');
 
@@ -254,7 +254,7 @@ describe('e2e tenant technical credential', () => {
 
     it(`/DELETE Remove Tenant`, async () => {
         const response = await app.getHttpServer()
-            .delete(`/api/tenant/${tenant.id}`)
+            .delete(`/api/tenant/my`)
             .set('Authorization', `Bearer ${technicalAccessToken}`)
             .set('Accept', 'application/json');
 

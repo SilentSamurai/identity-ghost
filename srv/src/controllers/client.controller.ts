@@ -109,18 +109,6 @@ export class ClientController {
         return this.clientService.findByClientId(clientId);
     }
 
-    // ─── Deprecated route ───
-
-    /** @deprecated Use GET /api/clients/my/clients instead */
-    @Get('/tenant/:tenantId')
-    @UseGuards(JwtAuthGuard)
-    async getClientsByTenant(
-        @Request() request: AuthContext,
-        @Param('tenantId', ParseUUIDPipe) tenantId: string,
-    ) {
-        return this.clientService.findByTenantId(tenantId);
-    }
-
     @Post('/:clientId/rotate-secret')
     @UseGuards(JwtAuthGuard)
     async rotateSecret(

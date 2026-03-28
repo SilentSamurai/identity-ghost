@@ -9,7 +9,7 @@ export class RoleClient extends HttpClient {
 
     public async createRole(name: string, tenantId: string) {
         const response = await this.app.getHttpServer()
-            .post(`/api/tenant/${tenantId}/role/${name}`)
+            .post(`/api/tenant/my/role/${name}`)
             .set('Authorization', `Bearer ${this.accessToken}`)
             .set('Accept', 'application/json');
 

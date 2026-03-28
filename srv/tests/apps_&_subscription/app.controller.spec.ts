@@ -1,3 +1,16 @@
+/**
+ * Tests the App marketplace lifecycle: creation, subscription, unsubscription, and visibility.
+ *
+ * Uses two pre-seeded tenants (shire.local as creator, bree.local as subscriber) with their
+ * own tokens to test the full flow from each tenant's perspective. A mock HTTP server
+ * simulates the app's onboard/offboard webhook endpoints. Covers:
+ *   - App creation and validation
+ *   - Subscribe/unsubscribe with webhook verification (onboard/offboard calls)
+ *   - Technical token in webhooks belongs to the app owner, not the subscriber
+ *   - Invalid app ID rejection
+ *   - Subscription scopes appear in the subscriber's JWT after subscribing
+ *   - App visibility: unpublished apps are hidden, published apps are discoverable
+ */
 import {TestAppFixture} from '../test-app.fixture';
 import {INestApplication} from '@nestjs/common';
 import {v4 as uuid} from 'uuid';
@@ -186,25 +199,12 @@ describe('AppController', () => {
 
             // This test needs to be done with direct HTTP request since the client validates inputs
             const response = await fixture.getHttpServer()
-                .post(`/api/apps/${invalidAppId}/subscribe/${subscriberTenantId}`)
+                .post(`/api/apps/${invalidAppId}/my/subscribe`)
                 .send({})
                 .set('Authorization', `Bearer ${subscriberAccessToken}`)
                 .set('Accept', 'application/json');
 
             console.log(response.body)
-
-            expect(response.status).toBe(400);
-        });
-
-        it('should fail when subscribing with invalid tenant ID', async () => {
-            const invalidTenantId = 'invalid-uuid';
-
-            // This test needs to be done with direct HTTP request since the client validates inputs
-            const response = await fixture.getHttpServer()
-                .post(`/api/apps/${testAppId}/subscribe/${invalidTenantId}`)
-                .send({})
-                .set('Authorization', `Bearer ${subscriberAccessToken}`)
-                .set('Accept', 'application/json');
 
             expect(response.status).toBe(400);
         });

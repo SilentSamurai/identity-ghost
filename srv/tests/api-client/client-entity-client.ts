@@ -34,7 +34,7 @@ export class ClientEntityClient extends HttpClient {
     }
 
     public async getClientsByTenant(tenantId: string) {
-        const response = await this.get(`/api/clients/tenant/${tenantId}`);
+        const response = await this.get(`/api/clients/my/clients`);
         console.log("Get Clients By Tenant Response:", response.body);
         expect2xx(response);
         return response.body;

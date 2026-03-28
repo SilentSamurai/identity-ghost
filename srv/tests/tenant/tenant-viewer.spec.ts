@@ -1,127 +1,107 @@
+/**
+ * Tests the TENANT_VIEWER role permissions.
+ *
+ * Setup: super admin creates a tenant, adds a member (legolas), assigns TENANT_VIEWER.
+ * Tests verify the viewer's restricted access:
+ *   - CAN: read tenant details, roles, members
+ *   - CANNOT: read credentials, update tenant, create/delete roles, remove members, delete tenant, list all tenants
+ */
 import {TestAppFixture} from "../test-app.fixture";
 import {TokenFixture} from "../token.fixture";
 import {TenantClient} from "../api-client/tenant-client";
+import {AdminTenantClient} from "../api-client/admin-tenant-client";
 
-describe('e2e tenant', () => {
+describe('e2e tenant viewer', () => {
     let app: TestAppFixture;
-    let tenant = {
-        id: "",
-        clientId: "",
-        name: ""
-    };
-    let superAdminToken = "";
-    let tenantViewerAccessToken = "";
+    let viewerClient: TenantClient;
+    let tenant: any;
 
     beforeAll(async () => {
         app = await new TestAppFixture().init();
+        const tokenFixture = new TokenFixture(app);
+
+        // Super admin: create tenant, add member, assign TENANT_VIEWER
+        const superAdminResponse = await tokenFixture.fetchAccessToken(
+            "admin@auth.server.com", "admin9000", "auth.server.com"
+        );
+        const superAdmin = new AdminTenantClient(app, superAdminResponse.accessToken);
+        const superAdminTenant = new TenantClient(app, superAdminResponse.accessToken);
+
+        tenant = await superAdminTenant.createTenant("tenant-1", "test-website.com");
+
+        const addResult = await superAdmin.addMembers(tenant.id, ["legolas@mail.com"]);
+        const legolasId = addResult.members.find((m: any) => m.email === "legolas@mail.com").id;
+        await superAdmin.updateMemberRoles(tenant.id, legolasId, ["TENANT_VIEWER"]);
+
+        // Log in as the tenant viewer
+        const viewerResponse = await tokenFixture.fetchAccessToken(
+            "legolas@mail.com", "legolas9000", "test-website.com"
+        );
+        viewerClient = new TenantClient(app, viewerResponse.accessToken);
     });
 
     afterAll(async () => {
         await app.close();
     });
 
-    it('should handle tenant lifecycle correctly', async () => {
-        // Step 1: Fetch access token for Super Admin
-        const tokenFixture = new TokenFixture(app);
-        const response = await tokenFixture.fetchAccessToken(
-            "admin@auth.server.com",
-            "admin9000",
-            "auth.server.com"
-        );
-        superAdminToken = response.accessToken;
-        expect(superAdminToken).toBeDefined();
+    // ─── Allowed operations ───
 
-        const tenantClient = new TenantClient(app, superAdminToken);
+    it('should read tenant details', async () => {
+        const details = await viewerClient.getTenantDetails(tenant.id);
+        expect(details.name).toEqual("tenant-1");
+        expect(details.domain).toEqual("test-website.com");
+        expect(details.clientId).toBeDefined();
+    });
 
-        // Step 2: Create a new tenant using TenantClient
-        tenant = await tenantClient.createTenant("tenant-1", "test-website.com");
+    it('should read tenant roles', async () => {
+        const roles = await viewerClient.getTenantRoles(tenant.id);
+        expect(Array.isArray(roles)).toBe(true);
+        expect(roles.length).toBeGreaterThanOrEqual(2);
+    });
 
-        // Step 3: Add a member
-        const email = "legolas@mail.com";
-        const addMemberResponse = await tenantClient.addMembers(tenant.id, [email]);
-        const legolasId = addMemberResponse.members.filter(i => i.email === email)[0].id;
+    it('should read tenant members', async () => {
+        const members = await viewerClient.getTenantMembers(tenant.id);
+        expect(Array.isArray(members)).toBe(true);
+        expect(members.length).toBeGreaterThanOrEqual(1);
+    });
 
-        // Step 4: Assign a role to the member
-        const updateMemberRoleResponse = await tenantClient.updateMemberRoles(
-            tenant.id,
-            legolasId,
-            ["TENANT_VIEWER"]
-        );
-        expect(updateMemberRoleResponse).toBeDefined();
+    // ─── Forbidden operations ───
 
-        // Step 5: Fetch access token for the created user (tenant viewer)
-        const userTokenResponse = await tokenFixture.fetchAccessToken(
-            "legolas@mail.com",
-            "legolas9000",
-            "test-website.com"
-        );
-        tenantViewerAccessToken = userTokenResponse.accessToken;
-        const viewerClient = new TenantClient(app, tenantViewerAccessToken);
+    it('should be forbidden from reading credentials', async () => {
+        await expect(viewerClient.getTenantCredentials(tenant.id))
+            .rejects.toMatchObject({status: 403});
+    });
 
-        // Step 6: Get tenant details with the viewer token
-        const tenantDetailsResponse = await viewerClient.getTenantDetails(tenant.id);
+    it('should be forbidden from updating tenant', async () => {
+        await expect(viewerClient.updateTenant(tenant.id, "updated-tenant-1"))
+            .rejects.toMatchObject({status: 403});
+    });
 
-        // Step 7: Try accessing tenant credentials (should be forbidden for viewer)
-        try {
-            await viewerClient.getTenantCredentials(tenant.id);
-        } catch (e) {
-            // Our client methods typically expect a 200. If the request returns 403, an error is thrown.
-            // We check that the error’s response has status 403
-            expect(e.status).toBe(403);
-        }
+    it('should be forbidden from creating a role', async () => {
+        await expect(viewerClient.createRole(tenant.id, "auditor"))
+            .rejects.toMatchObject({status: 403});
+    });
 
+    it('should be forbidden from removing members', async () => {
+        await expect(viewerClient.removeMembers(tenant.id, ["legolas@mail.com"]))
+            .rejects.toMatchObject({status: 403});
+    });
 
-        // Step 8: Get tenant roles (should be accessible by viewer)
-        const tenantRolesResponse = await viewerClient.getTenantRoles(tenant.id);
-        expect(Array.isArray(tenantRolesResponse)).toBe(true);
-        expect(tenantRolesResponse.length).toBeGreaterThanOrEqual(2);
+    it('should be forbidden from deleting a role', async () => {
+        await expect(viewerClient.deleteRole(tenant.id, "auditor"))
+            .rejects.toMatchObject({status: 403});
+    });
 
-        // Step 9: Try updating tenant (should be forbidden for viewer)
-        try {
-            await viewerClient.updateTenant(tenant.id, "updated-tenant-1");
-        } catch (e) {
-            expect(e.status).toBe(403);
-        }
+    it('should be forbidden from deleting the tenant', async () => {
+        await expect(viewerClient.deleteTenant(tenant.id))
+            .rejects.toMatchObject({status: 403});
+    });
 
-        // Step 10: Try creating a new role (should be forbidden for viewer)
-        try {
-            await viewerClient.createRole(tenant.id, "auditor");
-        } catch (e) {
-            expect(e.status).toBe(403);
-        }
-
-        // Step 11: Get tenant members (should be accessible by viewer)
-        const tenantMembersResponse = await viewerClient.getTenantMembers(tenant.id);
-        expect(Array.isArray(tenantMembersResponse)).toBe(true);
-        expect(tenantMembersResponse.length).toBeGreaterThanOrEqual(1);
-
-        // Step 12: Try removing a member (should be forbidden for viewer)
-        try {
-            // The removeMembers call expects an array of emails
-            await viewerClient.removeMembers(tenant.id, [email]);
-        } catch (e) {
-            expect(e.status).toBe(403);
-        }
-
-        // Step 13: Try removing a role (should be forbidden for viewer)
-        try {
-            await viewerClient.deleteRole(tenant.id, "auditor");
-        } catch (e) {
-            expect(e.status).toBe(403);
-        }
-
-        // Step 14: Try removing the tenant (should be forbidden for viewer)
-        try {
-            await viewerClient.deleteTenant(tenant.id);
-        } catch (e) {
-            expect(e.status).toBe(403);
-        }
-
-        // Step 15: Get all tenants (should be forbidden for viewer)
-        try {
-            await viewerClient.getTenants();
-        } catch (e) {
-            expect(e.status).toBe(403);
-        }
+    it('should be forbidden from listing all tenants (admin route requires super admin)', async () => {
+        const response = await app.getHttpServer()
+            .get('/api/admin/tenant')
+            .set('Authorization', `Bearer ${viewerClient['accessToken']}`)
+            .set('Accept', 'application/json');
+        expect(response.status).toBe(403);
     });
 });

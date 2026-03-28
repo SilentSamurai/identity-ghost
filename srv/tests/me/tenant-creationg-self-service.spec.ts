@@ -1,3 +1,14 @@
+/**
+ * Tests the self-service tenant creation and user registration flow.
+ *
+ * A new user registers with a new tenant (org), receives a verification email,
+ * clicks the link to verify, then authenticates against their own tenant. Covers:
+ *   - Registration creates both user and tenant
+ *   - Email verification via SMTP link extraction
+ *   - User cannot log in to a different tenant they don't belong to
+ *   - Authenticated user can read their profile and tenant details (including members)
+ *   - Account deletion prevents further login
+ */
 import {v4 as uuidv4} from 'uuid';
 import {TestAppFixture} from "../test-app.fixture";
 import {UsersClient} from "../api-client/user-client";
@@ -131,12 +142,8 @@ describe('UsersController (e2e)', () => {
         });
 
         it('check tenant is created', async () => {
-
-            const tenant = await searchClient.findTenantBy({domain: tenantDomain});
-
-            let tenantDetails = await tenantClient.getTenantDetails(tenant.id);
+            let tenantDetails = await tenantClient.getTenantDetails(null);
             console.log("Get Tenant Details Response:", tenantDetails);
-            expect(tenantDetails.id).toEqual(tenant.id);
             expect(tenantDetails.name).toEqual(tenantName);
             expect(tenantDetails.domain).toEqual(tenantDomain);
             expect(tenantDetails.clientId).toBeDefined();

@@ -83,12 +83,6 @@ export class TenantController {
         return this.tenantService.deleteTenant(request, tenantId);
     }
 
-    @Get("")
-    @UseGuards(JwtAuthGuard)
-    async getTenants(@Request() request): Promise<Tenant[]> {
-        return await this.tenantService.getAllTenants(request);
-    }
-
     @Get("/my/credentials")
     @UseGuards(JwtAuthGuard)
     async getMyCredentials(@Request() request): Promise<any> {
@@ -116,61 +110,6 @@ export class TenantController {
     async getMyTenant(
         @Request() request,
         @CurrentTenantId() tenantId: string,
-    ): Promise<Tenant> {
-        return this._getTenant(request, tenantId);
-    }
-
-    // ─── Deprecated routes (kept for backward compatibility) ───
-
-    /** @deprecated Use PATCH /api/tenant/my instead */
-    @Patch("/:tenantId")
-    @UseGuards(JwtAuthGuard)
-    async updateTenant(
-        @Request() request,
-        @Param("tenantId") tenantId: string,
-        @Body(new ValidationPipe(TenantController.UpdateTenantSchema))
-            body: { name?: string; allowSignUp?: boolean },
-    ): Promise<Tenant> {
-        return this._updateTenant(request, tenantId, body);
-    }
-
-    /** @deprecated Use DELETE /api/tenant/my instead */
-    @Delete("/:tenantId")
-    @UseGuards(JwtAuthGuard)
-    async deleteTenant(
-        @Request() request,
-        @Param("tenantId") tenantId: string,
-    ): Promise<Tenant> {
-        return this.tenantService.deleteTenant(request, tenantId);
-    }
-
-    /** @deprecated Use GET /api/tenant/my/credentials instead (already exists above) */
-    @Get("/:tenantId/credentials")
-    @UseGuards(JwtAuthGuard)
-    async getTenantCredentials(
-        @Request() request,
-        @Param("tenantId") tenantId: string,
-    ): Promise<any> {
-        let tenant = await this.tenantService.findById(request, tenantId);
-        this.securityService.check(
-            request,
-            Action.ReadCredentials,
-            subject(SubjectEnum.TENANT, tenant),
-        );
-        return {
-            id: tenant.id,
-            clientId: tenant.clientId,
-            clientSecret: tenant.clientSecret,
-            publicKey: tenant.publicKey,
-        };
-    }
-
-    /** @deprecated Use GET /api/tenant/my/info instead */
-    @Get("/:tenantId")
-    @UseGuards(JwtAuthGuard)
-    async getTenant(
-        @Request() request,
-        @Param("tenantId") tenantId: string,
     ): Promise<Tenant> {
         return this._getTenant(request, tenantId);
     }

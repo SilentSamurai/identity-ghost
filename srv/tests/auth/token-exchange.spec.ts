@@ -53,7 +53,7 @@ describe('e2e token exchange flow', () => {
 
     it(`/GET Tenant Credentials`, async () => {
         const response = await app.getHttpServer()
-            .get(`/api/tenant/${tenant.id}/credentials`)
+            .get(`/api/admin/tenant/${tenant.id}/credentials`)
             .set('Authorization', `Bearer ${superAdminToken}`)
             .set('Accept', 'application/json');
 

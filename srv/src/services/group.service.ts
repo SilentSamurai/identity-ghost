@@ -41,6 +41,7 @@ export class GroupService {
             authContext,
             Action.Create,
             SubjectEnum.GROUP,
+            {tenantId: tenant.id},
         );
         let group: Group = this.groupRepository.create({
             name: name,

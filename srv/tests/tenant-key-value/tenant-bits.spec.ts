@@ -1,11 +1,23 @@
+/**
+ * Tests the TenantBits key-value store API.
+ *
+ * TenantBits allows technical clients (client_credentials grant) to store per-tenant
+ * key-value pairs scoped by owner. Covers:
+ *   - CRUD lifecycle (add, update, get, exists, delete)
+ *   - Cross-tenant isolation: same key on different tenants stays independent
+ *   - Owner isolation: different owners writing to the same tenant cannot see each other's keys
+ *   - Auth enforcement: user (password grant) tokens are rejected with 403
+ */
 import {TestAppFixture} from '../test-app.fixture';
 import {TenantClient} from '../api-client/tenant-client';
+import {AdminTenantClient} from '../api-client/admin-tenant-client';
 import {TokenFixture} from '../token.fixture';
 import {TenantBitsClient} from "../api-client/tenant-bits-client";
 
 describe('TenantBits API', () => {
     let app: TestAppFixture;
     let tenantClient: TenantClient;
+    let adminTenantClient: AdminTenantClient;
     let bitsClient: TenantBitsClient;
     let accessToken: string;
     let tenantId: string;
@@ -25,6 +37,7 @@ describe('TenantBits API', () => {
             'auth.server.com'
         );
         tenantClient = new TenantClient(app, adminResponse.accessToken);
+        adminTenantClient = new AdminTenantClient(app, adminResponse.accessToken);
         // Create tenants as admin
         const tenant = await tenantClient.createTenant('bits-test-tenant', 'bits-test-tenant-domain');
         tenantId = tenant.id;
@@ -32,7 +45,7 @@ describe('TenantBits API', () => {
         tenantId2 = tenant2.id;
 
         // Use client credentials for bitsClient (tenant 1)
-        const tenant1Creds = await tenantClient.getTenantCredentials(tenantId);
+        const tenant1Creds = await adminTenantClient.getTenantCredentials(tenantId);
         const response1 = await tokenFixture.fetchClientCredentialsToken(
             tenant1Creds.clientId,
             tenant1Creds.clientSecret
@@ -41,7 +54,7 @@ describe('TenantBits API', () => {
         bitsClient = new TenantBitsClient(app, accessToken);
 
         // Use client credentials for bitsClient2 (tenant 2)
-        const tenant2Creds = await tenantClient.getTenantCredentials(tenantId2);
+        const tenant2Creds = await adminTenantClient.getTenantCredentials(tenantId2);
         const response2 = await tokenFixture.fetchClientCredentialsToken(
             tenant2Creds.clientId,
             tenant2Creds.clientSecret

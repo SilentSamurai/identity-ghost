@@ -119,66 +119,12 @@ export class AppController {
         return this.appService.findAllApps(tenantId);
     }
 
-    // ─── Deprecated routes (kept for backward compatibility) ───
-
-    /** @deprecated Use POST /api/apps/:appId/my/subscribe instead */
-    @Post('/:appId/subscribe/:tenantId')
-    @UseGuards(JwtAuthGuard)
-    async subscribeToApp(
-        @Request() request: AuthContext,
-        @Param('appId', ParseUUIDPipe) appId: string,
-        @Param('tenantId', ParseUUIDPipe) tenantId: string
-    ) {
-        return this._subscribeToApp(request, appId, tenantId);
-    }
-
-    /** @deprecated Use POST /api/apps/:appId/my/unsubscribe instead */
-    @Post('/:appId/unsubscribe/:tenantId')
-    @UseGuards(JwtAuthGuard)
-    async unsubscribeFromApp(
-        @Request() request: AuthContext,
-        @Param('appId', ParseUUIDPipe) appId: string,
-        @Param('tenantId', ParseUUIDPipe) tenantId: string
-    ) {
-        return this._unsubscribeFromApp(request, appId, tenantId);
-    }
-
     @Get('/subscriptions/:appId')
     @UseGuards(JwtAuthGuard)
     async getAllSubscriptions(
         @Param('appId', ParseUUIDPipe) appId: string
     ) {
         return this.subscriptionService.findAllByAppId(appId);
-    }
-
-    /** @deprecated Use GET /api/apps/my/subscriptions instead */
-    @Get('/subscribed-by/:tenantId')
-    @UseGuards(JwtAuthGuard)
-    async getTenantSubscriptions(
-        @Request() request: AuthContext,
-        @Param('tenantId', ParseUUIDPipe) tenantId: string
-    ) {
-        return this.subscriptionService.findByTenantId(tenantId);
-    }
-
-    /** @deprecated Use GET /api/apps/my/created instead */
-    @Get('/created-by/:tenantId')
-    @UseGuards(JwtAuthGuard)
-    async getAppsCreatedByTenant(
-        @Request() request: AuthContext,
-        @Param('tenantId', ParseUUIDPipe) tenantId: string
-    ) {
-        return this.appService.findByTenantId(tenantId);
-    }
-
-    /** @deprecated Use GET /api/apps/my/available instead */
-    @Get('/available-for/:tenantId')
-    @UseGuards(JwtAuthGuard)
-    async getAllSubscribableApps(
-        @Request() request: AuthContext,
-        @Param('tenantId', ParseUUIDPipe) tenantId: string
-    ) {
-        return this.appService.findAllApps(tenantId);
     }
 
     @Patch('/:appId/publish')

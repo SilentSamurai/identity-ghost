@@ -1,3 +1,11 @@
+/**
+ * Tests CRUD operations on CASL authorization policies.
+ *
+ * Policies are rules (allow/deny) attached to roles that define what actions are permitted
+ * on which subjects, optionally with conditions. Covers: create, read by ID, read by role,
+ * cache hit on repeated read, update (effect + action), delete, 404 on missing, and
+ * fetching the current user's resolved permissions.
+ */
 import {TestAppFixture} from "../test-app.fixture";
 import {PolicyClient} from "../api-client/policy-client";
 import {TokenFixture} from "../token.fixture";

@@ -200,9 +200,8 @@ describe('UsersController (e2e)', () => {
     });
 
     describe('User Search', () => {
-        it('should find user by email', async () => {
-            // Test getUserByEmail method
-            const user = await usersClient.getUserByEmail(updatedEmail); // Use updated email
+        it('should find current user via profile endpoint', async () => {
+            const user = await usersClient.getMe();
 
             expect(user).toBeDefined();
             expect(user.email).toBe(updatedEmail);

@@ -41,19 +41,6 @@ export class GroupController {
         return await this.groupService.findByTenantId(request, tenant.id);
     }
 
-    // ─── Deprecated route ───
-
-    /** @deprecated Use GET /api/tenant/my/groups instead */
-    @Get("/tenant/:tenantId/groups")
-    @UseGuards(JwtAuthGuard)
-    async getGroupsInTenant(
-        @Request() request,
-        @Param("tenantId") tenantId: string,
-    ): Promise<any> {
-        let tenant = await this.tenantService.findById(request, tenantId);
-        return await this.groupService.findByTenantId(request, tenant.id);
-    }
-
     // ─── Non-tenant routes (no migration needed) ───
 
     @Post("/group/create")

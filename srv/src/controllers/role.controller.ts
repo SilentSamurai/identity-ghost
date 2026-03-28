@@ -74,51 +74,6 @@ export class RoleController {
         return this._getRole(request, tenantId, name);
     }
 
-    // ─── Deprecated routes (kept for backward compatibility) ───
-
-    /** @deprecated Use POST /api/tenant/my/role/:name instead */
-    @Post("/:tenantId/role/:name")
-    @UseGuards(JwtAuthGuard)
-    async createRole(
-        @Request() request,
-        @Param("tenantId") tenantId: string,
-        @Param("name") name: string,
-    ): Promise<Role> {
-        return this._createRole(request, tenantId, name);
-    }
-
-    /** @deprecated Use DELETE /api/tenant/my/role/:name instead */
-    @Delete("/:tenantId/role/:name")
-    @UseGuards(JwtAuthGuard)
-    async deleteRole(
-        @Request() request,
-        @Param("tenantId") tenantId: string,
-        @Param("name") name: string,
-    ): Promise<Role> {
-        return this._deleteRole(request, tenantId, name);
-    }
-
-    /** @deprecated Use GET /api/tenant/my/roles instead */
-    @Get("/:tenantId/roles")
-    @UseGuards(JwtAuthGuard)
-    async getTenantRoles(
-        @Request() request,
-        @Param("tenantId") tenantId: string,
-    ): Promise<Role[]> {
-        return this._getTenantRoles(request, tenantId);
-    }
-
-    /** @deprecated Use GET /api/tenant/my/role/:name instead */
-    @Get("/:tenantId/role/:name")
-    @UseGuards(JwtAuthGuard)
-    async getRole(
-        @Request() request,
-        @Param("tenantId") tenantId: string,
-        @Param("name") name: string,
-    ): Promise<any> {
-        return this._getRole(request, tenantId, name);
-    }
-
     // ─── Shared implementation methods ───
 
     private async _createRole(request: any, tenantId: string, name: string): Promise<Role> {

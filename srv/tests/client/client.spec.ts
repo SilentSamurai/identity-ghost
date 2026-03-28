@@ -1,12 +1,21 @@
+/**
+ * Tests the OAuth Client entity lifecycle.
+ *
+ * Covers: creating confidential and public clients, fetching by clientId and by tenant,
+ * secret rotation (with 24h overlap window), field updates (including immutable fields
+ * like isPublic/grantTypes that should be ignored), and deletion with 404 verification.
+ */
 import {TestAppFixture} from "../test-app.fixture";
 import {TokenFixture} from "../token.fixture";
 import {ClientEntityClient} from "../api-client/client-entity-client";
 import {TenantClient} from "../api-client/tenant-client";
+import {AdminTenantClient} from "../api-client/admin-tenant-client";
 
 describe("E2E Client Entity Management", () => {
     let app: TestAppFixture;
     let clientApi: ClientEntityClient;
     let tenantApi: TenantClient;
+    let adminApi: AdminTenantClient;
     let accessToken: string;
     let testTenantId: string;
 
@@ -21,6 +30,7 @@ describe("E2E Client Entity Management", () => {
         accessToken = response.accessToken;
         clientApi = new ClientEntityClient(app, accessToken);
         tenantApi = new TenantClient(app, accessToken);
+        adminApi = new AdminTenantClient(app, accessToken);
 
         // Create a tenant to own the clients
         const tenant = await tenantApi.createTenant("client-test-tenant", "client-test.com");
@@ -59,8 +69,8 @@ describe("E2E Client Entity Management", () => {
         expect(fetched.tenant).toBeDefined();
         expect(fetched.tenant.id).toBe(testTenantId);
 
-        // 3) Get clients by tenant
-        const tenantClients = await clientApi.getClientsByTenant(testTenantId);
+        // 3) Get clients by tenant (cross-tenant, use admin route)
+        const tenantClients = await adminApi.getTenantClients(testTenantId);
         expect(Array.isArray(tenantClients)).toBe(true);
         expect(tenantClients.length).toBeGreaterThanOrEqual(1);
         expect(tenantClients.find((c: any) => c.clientId === clientId)).toBeDefined();

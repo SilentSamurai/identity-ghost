@@ -69,6 +69,11 @@ export class AdminTenantController {
 
     // ─── Tenant operations ───
 
+    @Get("")
+    async getAllTenants(@Request() request): Promise<Tenant[]> {
+        return this.tenantService.getAllTenants(request);
+    }
+
     @Get("/:tenantId")
     async getTenant(
         @Request() request,
@@ -271,5 +276,29 @@ export class AdminTenantController {
         @Param("tenantId", ParseUUIDPipe) tenantId: string,
     ) {
         return this.subscriptionService.findByTenantId(tenantId);
+    }
+
+    @Post("/:tenantId/apps/:appId/subscribe")
+    async subscribeToApp(
+        @Request() request,
+        @Param("tenantId", ParseUUIDPipe) tenantId: string,
+        @Param("appId", ParseUUIDPipe) appId: string,
+    ) {
+        const tenant = await this.tenantService.findById(request, tenantId);
+        const app = await this.appService.getAppById(appId);
+        await this.subscriptionService.subscribeApp(tenant, app);
+        return {status: "success"};
+    }
+
+    @Post("/:tenantId/apps/:appId/unsubscribe")
+    async unsubscribeFromApp(
+        @Request() request,
+        @Param("tenantId", ParseUUIDPipe) tenantId: string,
+        @Param("appId", ParseUUIDPipe) appId: string,
+    ) {
+        const tenant = await this.tenantService.findById(request, tenantId);
+        const app = await this.appService.getAppById(appId);
+        await this.subscriptionService.unsubscribe(tenant, app);
+        return {status: "success"};
     }
 }

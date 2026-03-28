@@ -1,3 +1,17 @@
+/**
+ * Tests tenant ambiguity resolution during token issuance for cross-tenant app subscriptions.
+ *
+ * When a user belongs to multiple tenants that are all subscribed to the same app,
+ * the server cannot determine which tenant context to issue the token for. Covers:
+ *   - Password grant returns 400 when multiple subscription tenants are ambiguous
+ *   - subscriber_tenant_hint resolves the ambiguity for password grant
+ *   - Login endpoint returns requires_tenant_selection with the list of candidate tenants
+ *   - Login with subscriber_tenant_hint returns an auth code directly
+ *   - Single subscription: no ambiguity, auth code issued immediately
+ *   - Own tenant login: no ambiguity
+ *   - No tenant membership: returns 403
+ *   - Full flow: hint → auth code → token exchange → verify JWT tenant claims
+ */
 import {TestAppFixture} from "../test-app.fixture";
 import {v4 as uuid} from 'uuid';
 import {AppClient} from '../api-client/app-client';
@@ -5,6 +19,7 @@ import {SearchClient} from '../api-client/search-client';
 import {TokenFixture} from '../token.fixture';
 import {UsersClient} from '../api-client/user-client';
 import {TenantClient} from '../api-client/tenant-client';
+import {AdminTenantClient} from '../api-client/admin-tenant-client';
 import {createTenantAppServer, TenantAppServer} from '../apps_&_subscription/tenant-app-server';
 
 describe('Ambiguous Subscription Tenant Flow', () => {
@@ -13,7 +28,7 @@ describe('Ambiguous Subscription Tenant Flow', () => {
     let searchClient: SearchClient;
     let tokenFixture: TokenFixture;
     let usersClient: UsersClient;
-    let tenantClient: TenantClient;
+    let adminTenantClient: AdminTenantClient;
     let superAdminToken: string;
     let mockServer: TenantAppServer;
     const MOCK_SERVER_PORT = 3000;
@@ -35,7 +50,7 @@ describe('Ambiguous Subscription Tenant Flow', () => {
         searchClient = new SearchClient(app, superAdminToken);
         appClient = new AppClient(app, superAdminToken);
         usersClient = new UsersClient(app, superAdminToken);
-        tenantClient = new TenantClient(app, superAdminToken);
+        adminTenantClient = new AdminTenantClient(app, superAdminToken);
     });
 
     afterAll(async () => {
@@ -68,12 +83,12 @@ describe('Ambiguous Subscription Tenant Flow', () => {
         expect(createdUser).toBeDefined();
         expect(createdUser.email).toBe(testUserEmail);
 
-        await tenantClient.addMembers(subscriber1.id, [testUserEmail]);
-        await tenantClient.addMembers(subscriber2.id, [testUserEmail]);
+        await adminTenantClient.addMembers(subscriber1.id, [testUserEmail]);
+        await adminTenantClient.addMembers(subscriber2.id, [testUserEmail]);
 
         // 4. Subscribe both subscriber1 and subscriber2 to the app
-        await appClient.subscribeApp(createdApp.id, subscriber1.id);
-        await appClient.subscribeApp(createdApp.id, subscriber2.id);
+        await adminTenantClient.subscribeToApp(subscriber1.id, createdApp.id);
+        await adminTenantClient.subscribeToApp(subscriber2.id, createdApp.id);
 
         // 5. Attempt password grant — should fail with ambiguity error
         try {
@@ -113,12 +128,12 @@ describe('Ambiguous Subscription Tenant Flow', () => {
         expect(createdUser).toBeDefined();
         expect(createdUser.email).toBe(testUserEmail);
 
-        await tenantClient.addMembers(subscriber1.id, [testUserEmail]);
-        await tenantClient.addMembers(subscriber2.id, [testUserEmail]);
+        await adminTenantClient.addMembers(subscriber1.id, [testUserEmail]);
+        await adminTenantClient.addMembers(subscriber2.id, [testUserEmail]);
 
         // 4. Subscribe both subscriber1 and subscriber2 to the app
-        await appClient.subscribeApp(createdApp.id, subscriber1.id);
-        await appClient.subscribeApp(createdApp.id, subscriber2.id);
+        await adminTenantClient.subscribeToApp(subscriber1.id, createdApp.id);
+        await adminTenantClient.subscribeToApp(subscriber2.id, createdApp.id);
 
         // 5. Password grant with subscriber_tenant_hint — should resolve
         const response = await app.getHttpServer()
@@ -163,12 +178,12 @@ describe('Ambiguous Subscription Tenant Flow', () => {
         expect(createdUser).toBeDefined();
         expect(createdUser.email).toBe(testUserEmail);
 
-        await tenantClient.addMembers(subscriber1.id, [testUserEmail]);
-        await tenantClient.addMembers(subscriber2.id, [testUserEmail]);
+        await adminTenantClient.addMembers(subscriber1.id, [testUserEmail]);
+        await adminTenantClient.addMembers(subscriber2.id, [testUserEmail]);
 
         // 4. Subscribe both subscriber1 and subscriber2 to the app
-        await appClient.subscribeApp(createdApp.id, subscriber1.id);
-        await appClient.subscribeApp(createdApp.id, subscriber2.id);
+        await adminTenantClient.subscribeToApp(subscriber1.id, createdApp.id);
+        await adminTenantClient.subscribeToApp(subscriber2.id, createdApp.id);
 
         // 5. Login without hint — should return ambiguity
         const loginResponse = await tokenFixture.login(
@@ -219,10 +234,10 @@ describe('Ambiguous Subscription Tenant Flow', () => {
         expect(createdUser).toBeDefined();
         expect(createdUser.email).toBe(testUserEmail);
 
-        await tenantClient.addMembers(subscriber.id, [testUserEmail]);
+        await adminTenantClient.addMembers(subscriber.id, [testUserEmail]);
 
         // 4. Subscribe subscriber to the app
-        await appClient.subscribeApp(createdApp.id, subscriber.id);
+        await adminTenantClient.subscribeToApp(subscriber.id, createdApp.id);
 
         // 5. Login — should succeed with auth code (no ambiguity)
         const loginResponse = await tokenFixture.login(
@@ -257,7 +272,7 @@ describe('Ambiguous Subscription Tenant Flow', () => {
         expect(createdUser).toBeDefined();
         expect(createdUser.email).toBe(testUserEmail);
 
-        await tenantClient.addMembers(appOwnerTenant.id, [testUserEmail]);
+        await adminTenantClient.addMembers(appOwnerTenant.id, [testUserEmail]);
 
         // 4. Login — should succeed with auth code
         const loginResponse = await tokenFixture.login(
@@ -320,12 +335,12 @@ describe('Ambiguous Subscription Tenant Flow', () => {
         expect(createdUser).toBeDefined();
         expect(createdUser.email).toBe(testUserEmail);
 
-        await tenantClient.addMembers(subscriber1.id, [testUserEmail]);
-        await tenantClient.addMembers(subscriber2.id, [testUserEmail]);
+        await adminTenantClient.addMembers(subscriber1.id, [testUserEmail]);
+        await adminTenantClient.addMembers(subscriber2.id, [testUserEmail]);
 
         // 4. Subscribe both subscribers to the app
-        await appClient.subscribeApp(createdApp.id, subscriber1.id);
-        await appClient.subscribeApp(createdApp.id, subscriber2.id);
+        await adminTenantClient.subscribeToApp(subscriber1.id, createdApp.id);
+        await adminTenantClient.subscribeToApp(subscriber2.id, createdApp.id);
 
         // 5. Login without hint — should return ambiguity
         const ambiguousResponse = await tokenFixture.login(
