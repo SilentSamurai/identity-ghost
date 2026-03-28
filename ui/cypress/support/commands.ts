@@ -44,11 +44,18 @@
 
 // @ts-ignore
 Cypress.Commands.add('adminLogin', (email: string, password: string) => {
+    // Clear all storage so the login page doesn't auto-redirect to /home.
+    // The app stores an auth code in sessionStorage that triggers an
+    // automatic token exchange on page load if present.
+    cy.clearCookies();
+    cy.clearLocalStorage();
+    cy.window().then((win) => win.sessionStorage.clear());
+
     // Log in through the regular login page with the auth server's own client_id
     cy.visit('/login?client_id=auth.server.com');
 
-    cy.get('#username').type(email);
-    cy.get('#password').type(password);
+    cy.get('#username').should('be.visible').type(email);
+    cy.get('#password').should('be.visible').type(password);
 
     cy.intercept('POST', '**/api/oauth/token*').as('authCode')
 
@@ -68,16 +75,16 @@ Cypress.Commands.add('adminLogin', (email: string, password: string) => {
 
 // @ts-ignore
 Cypress.Commands.add('login', (email: string, password: string, domain: string) => {
+    // Clear all storage to prevent auto-redirect from a stale auth code in sessionStorage
+    cy.clearCookies();
+    cy.clearLocalStorage();
+    cy.window().then((win) => win.sessionStorage.clear());
+
     // Ensure we land on the login page with client_id preset so username/password are visible
     cy.visit(`/login?client_id=${domain}`);
-    // cy.get('#domain-pre').type(tenant)
 
-    // After filtering, we can assert that there is only the one
-    // incomplete item in the list.
-    // cy.get('#continue-btn').click()
-
-    cy.get('#username').type(email)
-    cy.get('#password').type(password)
+    cy.get('#username').should('be.visible').type(email)
+    cy.get('#password').should('be.visible').type(password)
 
     cy.intercept('POST', '**/api/oauth/token*').as('authCode')
 

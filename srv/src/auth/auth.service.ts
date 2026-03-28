@@ -59,6 +59,9 @@ export class AuthService {
         if (!valid) {
             throw new UnauthorizedException('Invalid credentials');
         }
+        if (user.locked) {
+            throw new UnauthorizedException('Invalid credentials');
+        }
         return user;
     }
 
@@ -77,6 +80,9 @@ export class AuthService {
             payload.domain,
         );
         let user = await this.authUserService.findUserByEmail(payload.email);
+        if (user.locked) {
+            throw new UnauthorizedException('Invalid credentials');
+        }
         await this.jwtServiceRS256.verify(refreshToken, {
             publicKey: tenant.publicKey,
         });
@@ -106,6 +112,9 @@ export class AuthService {
                 let user = await this.authUserService.findUserByEmail(
                     (payload as TenantToken).email,
                 );
+                if (user.locked) {
+                    throw new UnauthorizedException('Invalid credentials');
+                }
             }
             return payload;
         } catch (e) {

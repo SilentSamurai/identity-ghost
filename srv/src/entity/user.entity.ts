@@ -38,4 +38,8 @@ export class User {
     @Column({name: "email_count_reset_at", nullable: true})
     @Exclude() // Exclude from responses.
     emailCountResetAt: Date;
+
+    @Column({default: false})
+    @Exclude() // Exclude from non-admin responses.
+    locked: boolean;
 }

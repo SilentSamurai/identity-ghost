@@ -113,6 +113,7 @@ export class UsersAdminController {
             email: user.email,
             createdAt: user.createdAt,
             verified: user.verified,
+            locked: user.locked,
         };
     }
 
@@ -161,6 +162,26 @@ export class UsersAdminController {
             user.id,
             body.verify,
         );
+    }
+
+    @Put(":userId/lock")
+    @UseGuards(JwtAuthGuard)
+    async lockUser(
+        @Request() request,
+        @Param("userId") userId: string,
+    ): Promise<any> {
+        const user = await this.usersService.lockUser(request, userId);
+        return { id: user.id, locked: user.locked };
+    }
+
+    @Put(":userId/unlock")
+    @UseGuards(JwtAuthGuard)
+    async unlockUser(
+        @Request() request,
+        @Param("userId") userId: string,
+    ): Promise<any> {
+        const user = await this.usersService.unlockUser(request, userId);
+        return { id: user.id, locked: user.locked };
     }
 
     @Put(":userId/password")

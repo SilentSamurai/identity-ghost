@@ -9,6 +9,7 @@ import {AddAppIsPublic1747000000000} from "./1747000000000-add-app-is-public";
 import {AddSubscriberTenantHintToAuthCode1710000000000} from "./1710000000000-AddSubscriberTenantHintToAuthCode";
 import {AddEmailRateLimitColumns1710000000000} from "./1710000000000-AddEmailRateLimitColumns";
 import {CreateClientsTable1748000000000} from "./1748000000000-create-clients-table";
+import {AddUserLocked1749000000000} from "./1749000000000-add-user-locked";
 
 export const migrations = [
     CreateInitialTables1681147242561,
@@ -21,5 +22,6 @@ export const migrations = [
     AddAppIsPublic1747000000000,
     AddSubscriberTenantHintToAuthCode1710000000000,
     AddEmailRateLimitColumns1710000000000,
-    CreateClientsTable1748000000000
+    CreateClientsTable1748000000000,
+    AddUserLocked1749000000000
 ];

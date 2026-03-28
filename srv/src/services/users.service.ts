@@ -1,5 +1,6 @@
 import {
     ConflictException,
+    ForbiddenException,
     Injectable,
     Logger,
     NotFoundException,
@@ -407,6 +408,29 @@ export class UsersService implements OnModuleInit {
 
         user.verified = verified;
         return await this.usersRepository.save(user);
+    }
+
+    /**
+     * Lock the user account.
+     */
+    async lockUser(authContext: AuthContext, id: string): Promise<User> {
+        const user = await this.findById(authContext, id);
+        this.securityService.isAuthorized(authContext, Action.Update, SubjectEnum.USER, {id});
+        if (user.email === this.configService.get("SUPER_ADMIN_EMAIL")) {
+            throw new ForbiddenException("Cannot lock the super-admin account");
+        }
+        user.locked = true;
+        return this.usersRepository.save(user);
+    }
+
+    /**
+     * Unlock the user account.
+     */
+    async unlockUser(authContext: AuthContext, id: string): Promise<User> {
+        const user = await this.findById(authContext, id);
+        this.securityService.isAuthorized(authContext, Action.Update, SubjectEnum.USER, {id});
+        user.locked = false;
+        return this.usersRepository.save(user);
     }
 
     /**

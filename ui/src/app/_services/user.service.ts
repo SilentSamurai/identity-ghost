@@ -114,4 +114,16 @@ export class UserService {
             ),
         );
     }
+
+    lockUser(userId: string) {
+        return lastValueFrom(
+            this.http.put(`${API_URL}/users/${userId}/lock`, {}, this.getHttpOptions()),
+        );
+    }
+
+    unlockUser(userId: string) {
+        return lastValueFrom(
+            this.http.put(`${API_URL}/users/${userId}/unlock`, {}, this.getHttpOptions()),
+        );
+    }
 }

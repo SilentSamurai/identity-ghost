@@ -39,7 +39,7 @@ import { ChangePasswordModalComponent } from './dialogs/change-password.modal.co
                             {{ user.createdAt | date }}
                         </app-attribute>
                         <app-attribute label="Lock Status">
-                            Unlocked
+                            {{ user.locked ? 'Locked' : 'Unlocked' }}
                         </app-attribute>
                     </div>
                 </div>
@@ -58,10 +58,10 @@ import { ChangePasswordModalComponent } from './dialogs/change-password.modal.co
                     Change Password
                 </button>
                 <button
-                    (click)="openUpdateModal()"
+                    (click)="onToggleLock()"
                     class="btn btn-sm  btn-primary mx-2"
                 >
-                    Lock / Unlock
+                    {{ user.locked ? 'Unlock' : 'Lock' }}
                 </button>
                 <button
                     (click)="onDelete()"
@@ -131,7 +131,6 @@ export class UR02AComponent implements OnInit {
     };
     tenants: any = [];
     tenantsDM = new StaticSource<any>(['id']);
-
     constructor(
         private userService: UserService,
         private actRoute: ActivatedRoute,
@@ -213,6 +212,36 @@ export class UR02AComponent implements OnInit {
                         severity: 'error',
                         summary: 'Error',
                         detail: 'User Verification Failed',
+                    });
+                }
+            },
+        });
+    }
+
+    async onToggleLock() {
+        const action = this.user.locked ? 'unlock' : 'lock';
+        await this.confirmationService.confirm({
+            message: `Are you sure you want to ${action} ${this.user.email}?`,
+            header: `${action === 'lock' ? 'Lock' : 'Unlock'} User`,
+            icon: 'pi pi-info-circle',
+            accept: async () => {
+                try {
+                    if (action === 'lock') {
+                        await this.userService.lockUser(this.user.id);
+                    } else {
+                        await this.userService.unlockUser(this.user.id);
+                    }
+                    this.messageService.add({
+                        severity: 'success',
+                        summary: 'Success',
+                        detail: `User ${action}ed`,
+                    });
+                    await this.ngOnInit();
+                } catch (e) {
+                    this.messageService.add({
+                        severity: 'error',
+                        summary: 'Error',
+                        detail: `Failed to ${action} user`,
                     });
                 }
             },
