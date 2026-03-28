@@ -6,10 +6,9 @@ import {DataSource} from '../../component/model/DataSource';
 import {AuthDefaultService} from '../../_services/auth.default.service';
 import {ConfirmationService} from '../../component/dialogs/confirmation.service';
 import {MessageService} from 'primeng/api';
-import {CreateAppComponent} from './dialogs/create-app.component';
+import {CreateAppAdminComponent} from './dialogs/create-app-admin.component';
 import {UpdateAppComponent} from './dialogs/update-app.component';
 import {ModalService} from "../../component/dialogs/modal.service";
-import {SessionService} from "../../_services/session.service";
 
 @Component({
     selector: 'app-AP01A',
@@ -93,7 +92,6 @@ export class AP01AComponent implements OnInit {
         private modalService: ModalService,
         private confirmationService: ConfirmationService,
         private messageService: MessageService,
-        private sessionService: SessionService,
     ) {
         this.dataSource = this.appService.createDataModel();
     }
@@ -112,18 +110,7 @@ export class AP01AComponent implements OnInit {
     }
 
     async openCreateModal() {
-        const tenantId = this.sessionService.userTenantId();
-        console.log('Opening create app modal with tenantId:', tenantId);
-        if (!tenantId) {
-            console.error('User tenant ID is not available');
-            alert('Error: Tenant information is not available. Please log in again.');
-            return;
-        }
-        const result = await this.modalService.open(CreateAppComponent, {
-            initData: {
-                tenantId: tenantId
-            }
-        });
+        const result = await this.modalService.open(CreateAppAdminComponent, {initData: {}});
         if (result.is_ok()) {
             await this.refreshData();
         }

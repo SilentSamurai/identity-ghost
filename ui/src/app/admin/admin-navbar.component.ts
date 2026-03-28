@@ -56,6 +56,9 @@ import {ProfileComponent} from '../open-pages/profile.component';
                         <li class="nav-item">
                             <a class="nav-link text-white" routerLink="/admin/AP01" routerLinkActive="active">Apps</a>
                         </li>
+                        <li class="nav-item">
+                            <a class="nav-link text-white" routerLink="/admin/CL01" routerLinkActive="active">Clients</a>
+                        </li>
                     </ul>
 
                     <ul class="navbar-nav ms-auto">

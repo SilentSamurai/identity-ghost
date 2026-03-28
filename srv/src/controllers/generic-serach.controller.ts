@@ -36,6 +36,7 @@ import {Group} from "../entity/group.entity";
 import {FindOperator} from "typeorm/find-options/FindOperator";
 import {SubjectEnum} from "../entity/subjectEnum";
 import {App} from "../entity/app.entity";
+import {Client} from "../entity/client.entity";
 
 const logger = new Logger("GenericSearchController");
 const RELATIONS = {
@@ -56,6 +57,9 @@ const RELATIONS = {
     Apps: {
         owner: "owner",
         roles: "roles"
+    },
+    Clients: {
+        tenant: "tenant",
     }
 };
 
@@ -87,6 +91,7 @@ export class GenericSearchController {
         @InjectRepository(Role) private roleRepository: Repository<Role>,
         @InjectRepository(Group) private groupRepository: Repository<Group>,
         @InjectRepository(App) private appRepository: Repository<App>,
+        @InjectRepository(Client) private clientRepository: Repository<Client>,
         private readonly securityService: SecurityService,
     ) {
         this.repos = {
@@ -95,7 +100,8 @@ export class GenericSearchController {
             TenantMembers: memberRepo,
             Roles: roleRepository,
             Groups: groupRepository,
-            Apps: appRepository
+            Apps: appRepository,
+            Clients: clientRepository
         };
     }
 

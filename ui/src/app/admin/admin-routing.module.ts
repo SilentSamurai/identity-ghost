@@ -16,6 +16,9 @@ import {UR01AComponent} from './users/UR01A.component';
 import {UR02ASelectionComponent} from './users/UR02A-selection.component';
 import {UR02AComponent} from './users/UR02A.component';
 import {AP01AComponent} from './apps/AP01A.component';
+import {CL01AComponent} from './clients/CL01A.component';
+import {CL02ASelectionComponent} from './clients/CL02A-selection.component';
+import {CL02AComponent} from './clients/CL02A.component';
 
 const adminRoutes: Routes = [
     {
@@ -37,6 +40,9 @@ const adminRoutes: Routes = [
             {path: 'UR02', component: UR02ASelectionComponent},
             {path: 'UR02/:userId', component: UR02AComponent},
             {path: 'AP01', component: AP01AComponent},
+            {path: 'CL01', component: CL01AComponent},
+            {path: 'CL02', component: CL02ASelectionComponent},
+            {path: 'CL02/:clientId', component: CL02AComponent},
         ],
     },
 ];

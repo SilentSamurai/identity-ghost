@@ -5,7 +5,7 @@
  * create, view, update, manage members, manage roles,
  * manage apps, and delete. All operations go through /admin/* routes.
  */
-describe('Tenant Flow', () => {
+describe('Super Admin — Tenant CRUD Flow', () => {
     const TENANT_NAME = 'Test Tenant';
     const TENANT_DOMAIN = "test-tenant.com"
     const TenantUpdateName = 'Test Updated Tenant';

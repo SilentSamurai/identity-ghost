@@ -1,6 +1,7 @@
 import {Component, OnInit} from '@angular/core';
 import {makeLaunchPad} from '../component/tile/models';
 import {Actions, PermissionService, Subjects} from '../_services/permission.service';
+import {AuthDefaultService} from '../_services/auth.default.service';
 
 @Component({
     selector: 'admin-home',
@@ -95,6 +96,27 @@ export class AdminHomeComponent implements OnInit {
             ],
         },
         {
+            name: 'Clients',
+            tiles: [
+                {
+                    title: 'CL01',
+                    subtitle: 'Manage Clients',
+                    icon: 'fa-key',
+                    link: ['/admin/CL01'],
+                    canActivate: (ps: PermissionService) =>
+                        ps.isAuthorized(Actions.Manage, Subjects.TENANT, 'all'),
+                },
+                {
+                    title: 'CL02',
+                    subtitle: 'Display Client',
+                    icon: 'fa-key',
+                    link: ['/admin/CL02'],
+                    canActivate: (ps: PermissionService) =>
+                        ps.isAuthorized(Actions.Manage, Subjects.TENANT, 'all'),
+                },
+            ],
+        },
+        {
             name: 'Groups',
             tiles: [
                 {
@@ -117,9 +139,11 @@ export class AdminHomeComponent implements OnInit {
         },
     ];
 
-    constructor(private ps: PermissionService) {
+    constructor(private ps: PermissionService, private authDefaultService: AuthDefaultService) {
         this.groups = makeLaunchPad(this.groups, this.ps);
     }
 
-    ngOnInit(): void {}
+    ngOnInit(): void {
+        this.authDefaultService.resetTitle();
+    }
 }

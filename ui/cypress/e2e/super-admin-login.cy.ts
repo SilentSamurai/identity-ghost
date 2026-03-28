@@ -5,7 +5,7 @@
  * through the regular /login page, and that unauthorized users
  * are rejected with 403.
  */
-describe('Admin Access', () => {
+describe('Super Admin — Admin Access', () => {
 
     // Logs in with the super-admin and verifies access to /admin
     it('Super Admin can access admin panel', () => {

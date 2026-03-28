@@ -5,7 +5,7 @@
  * create a user via /admin/UR01, look up and display the user
  * via the /admin/UR02 value help, and delete the user from the list.
  */
-describe('User Flow', () => {
+describe('Super Admin — User CRUD Flow', () => {
 
     const USER_NAME = "TEST USER"
     const USER_EMAIL = "test-user@mail.com"

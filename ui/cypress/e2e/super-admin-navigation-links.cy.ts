@@ -5,7 +5,7 @@
  * to the correct admin detail pages (TN02, RL02) instead of
  * accidentally routing to user-context pages.
  */
-describe('Admin /my API Fix', () => {
+describe('Super Admin — Admin Navigation Links', () => {
 
     beforeEach(() => {
         cy.adminLogin('admin@auth.server.com', 'admin9000');

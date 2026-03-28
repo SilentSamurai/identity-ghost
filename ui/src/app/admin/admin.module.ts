@@ -58,7 +58,15 @@ import {UpdateGroupComponent} from './group/dialogs/update-group.component';
 // Apps
 import {AP01AComponent} from './apps/AP01A.component';
 import {CreateAppComponent} from './apps/dialogs/create-app.component';
+import {CreateAppAdminComponent} from './apps/dialogs/create-app-admin.component';
 import {UpdateAppComponent} from './apps/dialogs/update-app.component';
+
+// Clients
+import {CL01AComponent} from './clients/CL01A.component';
+import {CL02ASelectionComponent} from './clients/CL02A-selection.component';
+import {CL02AComponent} from './clients/CL02A.component';
+import {CreateClientAdminComponent} from './clients/dialogs/create-client-admin.component';
+import {SecretDisplayAdminComponent} from './clients/dialogs/secret-display-admin.component';
 
 @NgModule({
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
@@ -99,7 +107,14 @@ import {UpdateAppComponent} from './apps/dialogs/update-app.component';
         // Apps
         AP01AComponent,
         CreateAppComponent,
+        CreateAppAdminComponent,
         UpdateAppComponent,
+        // Clients
+        CL01AComponent,
+        CL02ASelectionComponent,
+        CL02AComponent,
+        CreateClientAdminComponent,
+        SecretDisplayAdminComponent,
     ],
     imports: [
         AdminRoutingModule,

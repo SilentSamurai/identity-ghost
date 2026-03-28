@@ -43,3 +43,36 @@ An auth server must be explainable and traceable.
 - Every security-relevant action (login, token issue, permission change, failed auth) should produce a log entry.
 - Prefer explicit code over clever abstractions. Reviewers need to follow the security flow without guessing.
 - Keep authorization rules declarative and centralized (e.g., CASL policies) rather than scattered through handlers.
+
+# UI Conventions
+
+Concrete patterns for working in the Angular frontend (`ui/`).
+
+## Tenant Context
+
+- Normal user flows derive tenant from the JWT token via `SessionService.userTenantId()`. The user never picks a tenant.
+- Admin flows must always pass tenant IDs explicitly. Never fall back to the logged-in user's tenant — admin actions are cross-tenant by nature.
+- Backend user-scoped routes use `/tenant/my/...`. Admin-scoped routes use `/admin/tenant/{tenantId}/...`.
+
+## Dialogs
+
+- Dialogs are plain components. Data is passed in via `ModalService.open(Component, { initData: { key: value } })`, which sets properties directly on the component instance.
+- Do not share dialog components between the admin section and the tenant detail/user section. If both need a similar dialog, create separate copies (e.g., `create-app.component.ts` for tenant-scoped use, `create-app-admin.component.ts` for admin cross-tenant use). This follows the UI Section Isolation principle.
+- Dialog results use `activeModal.close(data)` for success and `activeModal.dismiss()` for cancellation/error.
+
+## Data Loading
+
+- List pages use the `DataSource` / `RestApiModel` pattern backed by `POST /api/search/{Entity}` with `{ pageNo, pageSize, where, orderBy, expand }`.
+- For simple one-off data fetches inside dialogs or components, use `HttpClient` directly with `lastValueFrom()` — no need to wire up a full `DataSource`.
+
+## Services
+
+- `TenantService` — user-scoped, operates on "my" tenant. Used in the secure/user section.
+- `AdminTenantService` — admin-scoped, takes explicit `tenantId` params. Used only in the admin section.
+- `AppService`, `UserService`, etc. — shared services are acceptable only when the backend endpoint is the same for both sections. If admin needs different endpoints, create an admin-specific service.
+
+## Authorization in the UI
+
+- CASL abilities are loaded from the backend and stored via `SessionService.savePermissions()`.
+- Use the `ablePure` pipe in templates for showing/hiding UI elements (e.g., `[disabled]="!('create' | ablePure: 'Tenant')"`).
+- UI authorization is cosmetic only — the backend always re-validates via `SecurityService`.

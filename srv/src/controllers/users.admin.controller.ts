@@ -19,6 +19,7 @@ import {UsersService} from "../services/users.service";
 import {AuthService} from "../auth/auth.service";
 import {MailService} from "../mail/mail.service";
 import {JwtAuthGuard} from "../auth/jwt-auth.guard";
+import {SuperAdminGuard} from "../auth/super-admin.guard";
 import {ValidationPipe} from "../validation/validation.pipe";
 import {PASSWORD_MESSAGE, PASSWORD_REGEXP, ValidationSchema} from "../validation/validation.schema";
 import {TenantService} from "../services/tenant.service";
@@ -43,6 +44,7 @@ const UpdateUserPasswordSchema = yup.object().shape({
 
 @Controller("api/users")
 @UseInterceptors(ClassSerializerInterceptor)
+@UseGuards(JwtAuthGuard, SuperAdminGuard)
 export class UsersAdminController {
 
     constructor(
