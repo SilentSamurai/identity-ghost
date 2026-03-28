@@ -4,7 +4,7 @@
  * Tests the full lifecycle of OAuth clients from the user-context client list (CL01/CL02):
  * creating a confidential client, viewing its details, rotating its secret,
  * and deleting it both from the detail page and from the list page.
- * Logs in as super-admin since client management requires elevated access.
+ * Logs in as a normal tenant admin (shire.local) — no super-admin privileges needed.
  */
 describe('Client Flow', () => {
 
@@ -13,7 +13,7 @@ describe('Client Flow', () => {
     const CLIENT_NAME_DELETE = `E2E-Del-Client-${uniqueSuffix}`;
 
     beforeEach(() => {
-        cy.adminLogin("admin@auth.server.com", "admin9000");
+        cy.login("admin@shire.local", "admin9000", "shire.local");
     });
 
     // Navigates to the client list page and verifies the table component renders

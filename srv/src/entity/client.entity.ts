@@ -45,6 +45,9 @@ export class Client {
     @CreateDateColumn({name: "created_at"})
     createdAt: Date;
 
+    @Column({name: "tenant_id"})
+    tenantId: string;
+
     @ManyToOne(() => Tenant, tenant => tenant.clients, {onDelete: "CASCADE"})
     @JoinColumn({name: "tenant_id"})
     tenant: Tenant;

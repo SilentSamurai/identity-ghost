@@ -113,6 +113,9 @@ export class CaslAbilityFactory {
                 can(Action.Manage, SubjectEnum.POLICY, {
                     tenantId: tenantToken.tenant.id,
                 });
+                can(Action.Manage, SubjectEnum.CLIENT, {
+                    tenantId: tenantToken.tenant.id,
+                });
             }
 
             if (

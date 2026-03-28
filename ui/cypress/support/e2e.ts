@@ -1,4 +1,4 @@
-/// <reference types="./commands.d.ts" />
+/// <reference path="./commands.d.ts" />
 
 // ***********************************************************
 // This example support/e2e.ts is processed and

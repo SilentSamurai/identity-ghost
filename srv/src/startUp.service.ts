@@ -5,6 +5,7 @@ import {RoleService} from "./services/role.service";
 import {TenantService} from "./services/tenant.service";
 import {GroupService} from "./services/group.service";
 import {AppService} from "./services/app.service";
+import {ClientService} from "./services/client.service";
 import {User} from "./entity/user.entity";
 import {readFile} from "fs/promises";
 import {Tenant} from "./entity/tenant.entity";
@@ -23,6 +24,7 @@ export class StartUpService implements OnModuleInit {
         private readonly roleService: RoleService,
         private readonly groupService: GroupService,
         private readonly appService: AppService,
+        private readonly clientService: ClientService,
         private readonly securityService: SecurityService,
         private dataSource: DataSource,
     ) {
@@ -275,6 +277,10 @@ export class StartUpService implements OnModuleInit {
                         {name: "Shire Portal", appUrl: "https://portal.shire.local", description: "Main portal for Shire residents"},
                         {name: "Harvest Tracker", appUrl: "https://harvest.shire.local", description: "Track crop yields"},
                     ],
+                    clients: [
+                        {name: "Shire Web App", redirectUris: ["https://portal.shire.local/callback"], allowedScopes: "openid profile email"},
+                        {name: "Shire Mobile", redirectUris: ["https://mobile.shire.local/callback"], allowedScopes: "openid profile", isPublic: true},
+                    ],
                 },
                 {
                     domain: "gondor.local",
@@ -285,6 +291,9 @@ export class StartUpService implements OnModuleInit {
                         {name: "Archive System", appUrl: "https://archive.gondor.local", description: "Historical records"},
                         {name: "Trade Ledger", appUrl: "https://trade.gondor.local", description: "Commerce tracking"},
                     ],
+                    clients: [
+                        {name: "Gondor Defense Client", redirectUris: ["https://defense.gondor.local/callback"], allowedScopes: "openid profile"},
+                    ],
                 },
                 {
                     domain: "rohan.local",
@@ -293,6 +302,7 @@ export class StartUpService implements OnModuleInit {
                     apps: [
                         {name: "Rohan Dispatch", appUrl: "https://dispatch.rohan.local", description: "Rider coordination"},
                     ],
+                    clients: [],
                 },
                 {
                     domain: "rivendell.local",
@@ -300,6 +310,9 @@ export class StartUpService implements OnModuleInit {
                     groups: ["Scholars", "Healers Guild"],
                     apps: [
                         {name: "Library of Imladris", appUrl: "https://library.rivendell.local", description: "Knowledge repository"},
+                    ],
+                    clients: [
+                        {name: "Rivendell Library Client", redirectUris: ["https://library.rivendell.local/callback"], allowedScopes: "openid profile"},
                     ],
                 },
             ];
@@ -340,6 +353,25 @@ export class StartUpService implements OnModuleInit {
                         this.logger.log(`Created app: ${app.name} in ${entry.domain}`);
                     } catch (e) {
                         this.logger.warn(`App ${app.name} in ${entry.domain} may already exist`);
+                    }
+                }
+
+                for (const client of entry.clients) {
+                    try {
+                        await this.clientService.createClient(
+                            adminContext,
+                            tenant.id,
+                            client.name,
+                            client.redirectUris,
+                            client.allowedScopes,
+                            undefined,
+                            undefined,
+                            undefined,
+                            client.isPublic,
+                        );
+                        this.logger.log(`Created client: ${client.name} in ${entry.domain}`);
+                    } catch (e) {
+                        this.logger.warn(`Client ${client.name} in ${entry.domain} may already exist`);
                     }
                 }
             }
