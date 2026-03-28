@@ -26,6 +26,7 @@ import {CreateSubscriptionComponent} from "./tenants/dialogs/create-subscription
 import {CL01Component} from './clients/CL01.component';
 import {CL02Component} from './clients/CL02.component';
 import {CreateClientComponent} from './clients/dialogs/create-client.component';
+import {EditClientComponent} from './clients/dialogs/edit-client.component';
 import {SecretDisplayComponent} from './clients/dialogs/secret-display.component';
 
 @NgModule({
@@ -42,6 +43,7 @@ import {SecretDisplayComponent} from './clients/dialogs/secret-display.component
         CL01Component,
         CL02Component,
         CreateClientComponent,
+        EditClientComponent,
         SecretDisplayComponent,
     ],
     imports: [

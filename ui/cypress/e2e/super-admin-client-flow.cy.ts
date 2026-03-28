@@ -11,6 +11,7 @@ describe('Super Admin — Client Cross-Tenant CRUD Flow', () => {
 
     const uniqueSuffix = Date.now();
     const SHIRE_CLIENT = `E2E-Shire-Client-${uniqueSuffix}`;
+    const SHIRE_CLIENT_EDITED = SHIRE_CLIENT + '-edited';
     const BREE_CLIENT = `E2E-Bree-Client-${uniqueSuffix}`;
     const TENANT_A = 'shire.local';
     const TENANT_B = 'bree.local';
@@ -109,11 +110,35 @@ describe('Super Admin — Client Cross-Tenant CRUD Flow', () => {
         cy.contains('Bree Tenant').should('exist');
     });
 
+
+    // Edit Tenant A's client name from the admin detail page
+    it('Edit Tenant A client name from admin CL02', function () {
+        cy.goToAdminPage('CL01');
+
+        cy.contains('td a', SHIRE_CLIENT).click();
+        cy.url().should('include', '/admin/CL02/');
+
+        cy.get('#EDIT_CLIENT_BTN').should('be.visible').click();
+
+        cy.get('#name').should('be.visible').clear().type(SHIRE_CLIENT_EDITED);
+
+        cy.intercept('PATCH', '**/api/clients/*').as('UpdateClient');
+
+        cy.get('.modal-footer').contains('button', 'Update').click();
+
+        cy.wait('@UpdateClient').should(({response}) => {
+            expect(response).to.exist;
+            expect(response!.statusCode).to.be.oneOf([200]);
+        });
+
+        cy.contains(SHIRE_CLIENT_EDITED).should('be.visible');
+    });
+
     // Rotate secret on Tenant A's client from the admin detail page
     it('Rotate secret on Tenant A client', function () {
         cy.goToAdminPage('CL01');
 
-        cy.contains('td a', SHIRE_CLIENT).click();
+        cy.contains('td a', SHIRE_CLIENT_EDITED).click();
         cy.url().should('include', '/admin/CL02/');
 
         cy.get('#ROTATE_SECRET_BTN').should('be.visible');
@@ -137,7 +162,7 @@ describe('Super Admin — Client Cross-Tenant CRUD Flow', () => {
     it('Delete Tenant A client from admin CL02 detail page', function () {
         cy.goToAdminPage('CL01');
 
-        cy.contains('td a', SHIRE_CLIENT).click();
+        cy.contains('td a', SHIRE_CLIENT_EDITED).click();
         cy.url().should('include', '/admin/CL02/');
 
         cy.intercept('DELETE', '**/api/clients/*').as('DeleteClient');
@@ -151,7 +176,7 @@ describe('Super Admin — Client Cross-Tenant CRUD Flow', () => {
         });
 
         cy.url().should('include', '/admin/CL01');
-        cy.contains('td', SHIRE_CLIENT).should('not.exist');
+        cy.contains('td', SHIRE_CLIENT_EDITED).should('not.exist');
     });
 
     // Delete Tenant B's client from the admin CL01 list via row action button

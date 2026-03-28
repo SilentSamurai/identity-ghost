@@ -34,7 +34,7 @@ export class ClientService {
         allowPasswordGrant?: boolean,
         allowRefreshToken?: boolean,
     ): Promise<{ client: Client; plainSecret: string | null }> {
-        this.securityService.isAuthorized(authContext, Action.Create, SubjectEnum.CLIENT);
+        this.securityService.isAuthorized(authContext, Action.Create, SubjectEnum.CLIENT, {tenantId});
 
         const tenant = await this.tenantService.findById(authContext, tenantId);
         const clientId = uuidv4();
@@ -139,9 +139,30 @@ export class ClientService {
         return {client: saved, plainSecret: generated.plainSecret};
     }
 
-    async deleteClient(authContext: AuthContext, clientId: string): Promise<void> {
-        this.securityService.isAuthorized(authContext, Action.Delete, SubjectEnum.CLIENT);
+    async updateClient(
+        authContext: AuthContext,
+        clientId: string,
+        updates: {
+            name?: string;
+            redirectUris?: string[];
+            requirePkce?: boolean;
+            allowPasswordGrant?: boolean;
+            allowRefreshToken?: boolean;
+        },
+    ): Promise<Client> {
         const client = await this.findByClientId(clientId);
+        this.securityService.isAuthorized(authContext, Action.Update, SubjectEnum.CLIENT, {tenantId: client.tenantId});
+        if (updates.name !== undefined) client.name = updates.name;
+        if (updates.redirectUris !== undefined) client.redirectUris = updates.redirectUris;
+        if (updates.requirePkce !== undefined) client.requirePkce = updates.requirePkce;
+        if (updates.allowPasswordGrant !== undefined) client.allowPasswordGrant = updates.allowPasswordGrant;
+        if (updates.allowRefreshToken !== undefined) client.allowRefreshToken = updates.allowRefreshToken;
+        return this.clientRepository.save(client);
+    }
+
+    async deleteClient(authContext: AuthContext, clientId: string): Promise<void> {
+        const client = await this.findByClientId(clientId);
+        this.securityService.isAuthorized(authContext, Action.Delete, SubjectEnum.CLIENT, {tenantId: client.tenantId});
         await this.clientRepository.remove(client);
     }
 

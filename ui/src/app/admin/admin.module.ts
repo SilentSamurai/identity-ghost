@@ -67,6 +67,7 @@ import {CL02ASelectionComponent} from './clients/CL02A-selection.component';
 import {CL02AComponent} from './clients/CL02A.component';
 import {CreateClientAdminComponent} from './clients/dialogs/create-client-admin.component';
 import {SecretDisplayAdminComponent} from './clients/dialogs/secret-display-admin.component';
+import {EditClientAdminComponent} from './clients/dialogs/edit-client-admin.component';
 
 @NgModule({
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
@@ -114,6 +115,7 @@ import {SecretDisplayAdminComponent} from './clients/dialogs/secret-display-admi
         CL02ASelectionComponent,
         CL02AComponent,
         CreateClientAdminComponent,
+        EditClientAdminComponent,
         SecretDisplayAdminComponent,
     ],
     imports: [

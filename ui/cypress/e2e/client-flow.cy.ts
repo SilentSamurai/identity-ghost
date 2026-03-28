@@ -10,6 +10,7 @@ describe('Client Flow', () => {
 
     const uniqueSuffix = Date.now();
     const CLIENT_NAME = `E2E-Client-${uniqueSuffix}`;
+    const CLIENT_NAME_EDITED = CLIENT_NAME + '-edited';
     const CLIENT_NAME_DELETE = `E2E-Del-Client-${uniqueSuffix}`;
 
     beforeEach(() => {
@@ -75,10 +76,35 @@ describe('Client Flow', () => {
 
     // Opens the client detail page, clicks "Rotate Secret", confirms the dialog,
     // and verifies a new secret is displayed
-    it('Rotate client secret on CL02 and verify new secret dialog', function () {
+
+    // Opens the client detail page, clicks "Edit", updates the name,
+    // and verifies the detail page reflects the change
+    it('Edit client on CL02 and verify updated name', function () {
         cy.userOpenClientList();
 
         cy.contains('td a', CLIENT_NAME).click();
+        cy.url().should('include', '/CL02/');
+
+        cy.get('#EDIT_CLIENT_BTN').should('be.visible').click();
+
+        cy.get('#name').should('be.visible').clear().type(CLIENT_NAME_EDITED);
+
+        cy.intercept('PATCH', '**/api/clients/*').as('UpdateClient');
+
+        cy.get('.modal-footer').contains('button', 'Update').click();
+
+        cy.wait('@UpdateClient').should(({response}) => {
+            expect(response).to.exist;
+            expect(response!.statusCode).to.be.oneOf([200]);
+        });
+
+        cy.contains(CLIENT_NAME_EDITED).should('be.visible');
+    });
+
+    it('Rotate client secret on CL02 and verify new secret dialog', function () {
+        cy.userOpenClientList();
+
+        cy.contains('td a', CLIENT_NAME_EDITED).click();
         cy.url().should('include', '/CL02/');
 
         cy.get('#ROTATE_SECRET_BTN').should('be.visible');
@@ -105,7 +131,7 @@ describe('Client Flow', () => {
     it('Delete client from CL02 and verify navigation back to CL01', function () {
         cy.userOpenClientList();
 
-        cy.contains('td a', CLIENT_NAME).click();
+        cy.contains('td a', CLIENT_NAME_EDITED).click();
         cy.url().should('include', '/CL02/');
 
         cy.intercept('DELETE', '**/api/clients/*').as('DeleteClient');
@@ -121,7 +147,7 @@ describe('Client Flow', () => {
 
         cy.url().should('include', '/CL01/');
 
-        cy.contains('td', CLIENT_NAME).should('not.exist');
+        cy.contains('td', CLIENT_NAME_EDITED).should('not.exist');
     });
 
     // Creates a client, then deletes it directly from the CL01 list using the

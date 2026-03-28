@@ -40,6 +40,14 @@ export interface CreateClientResponse {
     clientSecret: string | null;
 }
 
+export interface UpdateClientRequest {
+    name?: string;
+    redirectUris?: string[];
+    requirePkce?: boolean;
+    allowPasswordGrant?: boolean;
+    allowRefreshToken?: boolean;
+}
+
 export interface RotateSecretResponse {
     client: Client;
     clientSecret: string;
@@ -68,6 +76,12 @@ export class ClientService {
     async getClientsByTenant(): Promise<Client[]> {
         return lastValueFrom(
             this.http.get<Client[]>(`${API_URL}/clients/my/clients`)
+        );
+    }
+
+    async updateClient(clientId: string, body: UpdateClientRequest): Promise<Client> {
+        return lastValueFrom(
+            this.http.patch<Client>(`${API_URL}/clients/${clientId}`, body)
         );
     }
 

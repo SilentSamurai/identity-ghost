@@ -6,6 +6,7 @@ import {AuthDefaultService} from '../../_services/auth.default.service';
 import {ConfirmationService} from '../../component/dialogs/confirmation.service';
 import {ModalService} from '../../component/dialogs/modal.service';
 import {SecretDisplayAdminComponent} from './dialogs/secret-display-admin.component';
+import {EditClientAdminComponent} from './dialogs/edit-client-admin.component';
 
 @Component({
     selector: 'app-CL02A',
@@ -19,10 +20,17 @@ import {SecretDisplayAdminComponent} from './dialogs/secret-display-admin.compon
             </app-op-subtitle>
             <app-op-actions>
                 <button
+                    (click)="onEditClient()"
+                    id="EDIT_CLIENT_BTN"
+                    class="btn btn-primary btn-sm"
+                >
+                    Edit
+                </button>
+                <button
                     *ngIf="client && !client.isPublic"
                     (click)="onRotateSecret()"
                     id="ROTATE_SECRET_BTN"
-                    class="btn btn-primary btn-sm"
+                    class="btn btn-primary btn-sm ms-2"
                 >
                     Rotate Secret
                 </button>
@@ -113,6 +121,16 @@ export class CL02AComponent implements OnInit {
             });
         } finally {
             this.loading = false;
+        }
+    }
+
+    async onEditClient() {
+        if (!this.client) return;
+        const result = await this.modalService.open<Client>(EditClientAdminComponent, {
+            initData: {client: this.client},
+        });
+        if (result.is_ok() && result.data) {
+            this.client = result.data;
         }
     }
 

@@ -86,6 +86,75 @@ describe("E2E Client Entity Management", () => {
         expect(verifyResponse.status).toBe(404);
     });
 
+
+    it("should update client fields", async () => {
+        // Create a client to update
+        const created = await clientApi.createClient(testTenantId, "Update Test Client", {
+            redirectUris: ["https://original.example.com/callback"],
+            requirePkce: false,
+            allowPasswordGrant: false,
+            allowRefreshToken: true,
+        });
+        const clientId = created.client.clientId;
+
+        // Update name and redirectUris
+        const updated = await clientApi.updateClient(clientId, {
+            name: "Updated Client Name",
+            redirectUris: ["https://new.example.com/callback", "https://other.example.com/callback"],
+        });
+        expect(updated.name).toBe("Updated Client Name");
+        expect(updated.redirectUris).toEqual(["https://new.example.com/callback", "https://other.example.com/callback"]);
+        // Unchanged fields should remain the same
+        expect(updated.requirePkce).toBe(false);
+        expect(updated.allowPasswordGrant).toBe(false);
+        expect(updated.allowRefreshToken).toBe(true);
+
+        // Update boolean flags
+        const updated2 = await clientApi.updateClient(clientId, {
+            requirePkce: true,
+            allowPasswordGrant: true,
+            allowRefreshToken: false,
+        });
+        expect(updated2.requirePkce).toBe(true);
+        expect(updated2.allowPasswordGrant).toBe(true);
+        expect(updated2.allowRefreshToken).toBe(false);
+        // Name should remain from previous update
+        expect(updated2.name).toBe("Updated Client Name");
+
+        // Verify via GET
+        const fetched = await clientApi.getClient(clientId);
+        expect(fetched.name).toBe("Updated Client Name");
+        expect(fetched.requirePkce).toBe(true);
+        expect(fetched.allowPasswordGrant).toBe(true);
+        expect(fetched.allowRefreshToken).toBe(false);
+        expect(fetched.redirectUris).toEqual(["https://new.example.com/callback", "https://other.example.com/callback"]);
+
+        // Cleanup
+        await clientApi.deleteClient(clientId);
+    });
+
+    it("should not allow updating isPublic or grantTypes via update endpoint", async () => {
+        const created = await clientApi.createClient(testTenantId, "Immutable Fields Test", {
+            grantTypes: "authorization_code",
+            isPublic: false,
+        });
+        const clientId = created.client.clientId;
+
+        // Send fields that should be ignored by the update endpoint
+        const updated = await clientApi.updateClient(clientId, {
+            name: "Still Confidential",
+            isPublic: true,
+            grantTypes: "implicit",
+        } as any);
+        expect(updated.name).toBe("Still Confidential");
+        // isPublic and grantTypes should remain unchanged even if sent
+        expect(updated.isPublic).toBe(false);
+        expect(updated.grantTypes).toBe("authorization_code");
+
+        // Cleanup
+        await clientApi.deleteClient(clientId);
+    });
+
     it("should create a public client without a secret", async () => {
         const created = await clientApi.createClient(testTenantId, "Public SPA", {
             redirectUris: ["https://spa.example.com/callback"],

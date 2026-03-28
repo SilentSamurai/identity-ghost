@@ -6,6 +6,7 @@ import {
     Get,
     Param,
     ParseUUIDPipe,
+    Patch,
     Post,
     Request,
     UseGuards,
@@ -28,6 +29,14 @@ const CreateClientSchema = yup.object().shape({
     responseTypes: yup.string().max(256),
     tokenEndpointAuthMethod: yup.string().max(64),
     isPublic: yup.boolean(),
+    requirePkce: yup.boolean(),
+    allowPasswordGrant: yup.boolean(),
+    allowRefreshToken: yup.boolean(),
+});
+
+const UpdateClientSchema = yup.object().shape({
+    name: yup.string().max(128),
+    redirectUris: yup.array().of(yup.string().url('each redirectUri must be a valid URL')),
     requirePkce: yup.boolean(),
     allowPasswordGrant: yup.boolean(),
     allowRefreshToken: yup.boolean(),
@@ -123,6 +132,22 @@ export class ClientController {
             client: result.client,
             clientSecret: result.plainSecret,
         };
+    }
+
+    @Patch('/:clientId')
+    @UseGuards(JwtAuthGuard)
+    async updateClient(
+        @Request() request: AuthContext,
+        @Param('clientId') clientId: string,
+        @Body(schemaPipe(UpdateClientSchema)) body: {
+            name?: string;
+            redirectUris?: string[];
+            requirePkce?: boolean;
+            allowPasswordGrant?: boolean;
+            allowRefreshToken?: boolean;
+        },
+    ) {
+        return this.clientService.updateClient(request, clientId, body);
     }
 
     @Delete('/:clientId')

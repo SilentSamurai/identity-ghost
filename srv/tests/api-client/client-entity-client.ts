@@ -47,6 +47,18 @@ export class ClientEntityClient extends HttpClient {
         return response.body;
     }
 
+    public async updateClient(clientId: string, body: {
+        name?: string;
+        redirectUris?: string[];
+        requirePkce?: boolean;
+        allowPasswordGrant?: boolean;
+        allowRefreshToken?: boolean;
+    }) {
+        const response = await this.patch(`/api/clients/${clientId}`).send(body);
+        expect2xx(response);
+        return response.body;
+    }
+
     public async deleteClient(clientId: string) {
         const response = await this.app.getHttpServer()
             .delete(`/api/clients/${clientId}`)
