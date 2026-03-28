@@ -30,11 +30,10 @@ describe('AppController', () => {
     let creatorTenantId: string;
     let subscriberTenantId: string;
     let mockServer: TenantAppServer;
-    const MOCK_SERVER_PORT = 3000;
 
     beforeAll(async () => {
         // Start the mock server
-        mockServer = createTenantAppServer({port: MOCK_SERVER_PORT});
+        mockServer = createTenantAppServer({port: 0});
         await mockServer.listen();
 
         // Initialize the test app
@@ -92,7 +91,7 @@ describe('AppController', () => {
         it('should create a new app with valid data', async () => {
             const appData = {
                 name: `test-app-${uuid()}`,
-                appUrl: `http://localhost:${MOCK_SERVER_PORT}`,
+                appUrl: `http://localhost:${mockServer.boundPort}`,
                 description: 'Test application description'
             };
 
@@ -135,7 +134,7 @@ describe('AppController', () => {
             const app = await appClient.createApp(
                 creatorTenantId,
                 `test-app-${uuid()}`,
-                `http://localhost:${MOCK_SERVER_PORT}`,
+                `http://localhost:${mockServer.boundPort}`,
                 'Test app for subscription'
             );
             testAppId = app.id;
@@ -216,7 +215,7 @@ describe('AppController', () => {
         const app = await appClient.createApp(
             creatorTenantId,
             `test-app-scope-${uuid()}`,
-            `http://localhost:${MOCK_SERVER_PORT}`,
+            `http://localhost:${mockServer.boundPort}`,
             'Test app for scope validation'
         );
         // Publish the app so it can be subscribed to
@@ -249,7 +248,7 @@ describe('AppController', () => {
             const app = await appClient.createApp(
                 creatorTenantId,
                 testAppName,
-                `http://localhost:${MOCK_SERVER_PORT}`,
+                `http://localhost:${mockServer.boundPort}`,
                 'Test app for publish/visibility'
             );
             testAppId = app.id;

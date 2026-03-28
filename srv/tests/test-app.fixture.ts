@@ -39,8 +39,11 @@ export class TestAppFixture {
         Environment.setup();
 
 
-        this.smtpServer = createFakeSmtpServer();
+        this.smtpServer = createFakeSmtpServer({ port: 0, controlPort: 0 });
         await this.smtpServer.listen();
+
+        // Point the mail transport at the actual bound port
+        process.env.MAIL_PORT = String(this.smtpServer.boundPort);
 
         this.moduleRef = await Test.createTestingModule({
             imports: [AppModule],

@@ -36,6 +36,18 @@ export class FakeSmtpServer {
     private controlApp?: express.Express;
     private controlServer?: http.Server;
     private emailHandler?: (email: ParsedMail) => void;
+    private _boundPort: number = 0;
+    private _boundControlPort: number = 0;
+
+    /** Actual SMTP port after listen() — useful when configured with port 0. */
+    public get boundPort(): number {
+        return this._boundPort;
+    }
+
+    /** Actual control-server port after listen() — useful when configured with port 0. */
+    public get boundControlPort(): number {
+        return this._boundControlPort;
+    }
 
     constructor(config: ServerConfig = {}) {
         this.config = this.getFullConfig(config);
@@ -60,9 +72,13 @@ export class FakeSmtpServer {
 
             this.server.listen(this.config.port, this.config.host, () => {
                 this.server.removeListener('error', onError);
+                const addr = this.server.server.address();
+                if (addr && typeof addr === 'object') {
+                    this._boundPort = addr.port;
+                }
                 this.log(
                     "info",
-                    `SMTP Server listening on ${this.config.host}:${this.config.port}`,
+                    `SMTP Server listening on ${this.config.host}:${this._boundPort}`,
                 );
                 // Optionally start control HTTP server
                 if (this.config.controlEnabled) {
@@ -176,14 +192,14 @@ export class FakeSmtpServer {
      */
     private getFullConfig(config: ServerConfig): Required<ServerConfig> {
         return {
-            port: config.port || parseInt(process.env.MAIL_PORT || "587", 10),
+            port: config.port ?? parseInt(process.env.MAIL_PORT || "587", 10),
             host: config.host || process.env.MAIL_HOST || "127.0.0.1",
             logLevel:
                 config.logLevel ||
                 (process.env.SMTP_LOG_LEVEL as any) ||
                 "info",
             controlHost: config.controlHost || process.env.MAIL_CONTROL_HOST || "127.0.0.1",
-            controlPort: config.controlPort || parseInt(process.env.MAIL_CONTROL_PORT || "8899", 10),
+            controlPort: config.controlPort ?? parseInt(process.env.MAIL_CONTROL_PORT || "8899", 10),
             controlEnabled: config.controlEnabled !== undefined
                 ? config.controlEnabled
                 : (process.env.MAIL_CONTROL_ENABLE || "true").toLowerCase() === "true",
@@ -250,7 +266,11 @@ export class FakeSmtpServer {
 
         await new Promise<void>((resolve) => {
             this.controlServer = app.listen(this.config.controlPort, this.config.controlHost, () => {
-                this.log('info', `SMTP Control listening on http://${this.config.controlHost}:${this.config.controlPort}`);
+                const addr = this.controlServer.address();
+                if (addr && typeof addr === 'object') {
+                    this._boundControlPort = addr.port;
+                }
+                this.log('info', `SMTP Control listening on http://${this.config.controlHost}:${this._boundControlPort}`);
                 resolve();
             });
         });

@@ -31,11 +31,10 @@ describe('Ambiguous Subscription Tenant Flow', () => {
     let adminTenantClient: AdminTenantClient;
     let superAdminToken: string;
     let mockServer: TenantAppServer;
-    const MOCK_SERVER_PORT = 3000;
 
     beforeAll(async () => {
         // Start the mock server
-        mockServer = createTenantAppServer({port: MOCK_SERVER_PORT});
+        mockServer = createTenantAppServer({port: 0});
         await mockServer.listen();
 
         app = await new TestAppFixture().init();
@@ -70,7 +69,7 @@ describe('Ambiguous Subscription Tenant Flow', () => {
         // 2. Create a new app under appOwnerTenant
         const appData = {
             name: `ambiguous-app-${uuid()}`,
-            appUrl: `http://localhost:3000`,
+            appUrl: `http://localhost:${mockServer.boundPort}`,
             description: 'Ambiguous app for test'
         };
         const createdApp = await appClient.createApp(appOwnerTenant.id, appData.name, appData.appUrl, appData.description);
@@ -115,7 +114,7 @@ describe('Ambiguous Subscription Tenant Flow', () => {
         // 2. Create a new app under appOwnerTenant
         const appData = {
             name: `ambiguous-app-${uuid()}`,
-            appUrl: `http://localhost:3000`,
+            appUrl: `http://localhost:${mockServer.boundPort}`,
             description: 'Ambiguous app for test'
         };
         const createdApp = await appClient.createApp(appOwnerTenant.id, appData.name, appData.appUrl, appData.description);
@@ -165,7 +164,7 @@ describe('Ambiguous Subscription Tenant Flow', () => {
         // 2. Create a new app under appOwnerTenant
         const appData = {
             name: `ambiguous-app-${uuid()}`,
-            appUrl: `http://localhost:3000`,
+            appUrl: `http://localhost:${mockServer.boundPort}`,
             description: 'Ambiguous app for test'
         };
         const createdApp = await appClient.createApp(appOwnerTenant.id, appData.name, appData.appUrl, appData.description);
@@ -221,7 +220,7 @@ describe('Ambiguous Subscription Tenant Flow', () => {
         // 2. Create a new app under appOwnerTenant
         const appData = {
             name: `single-sub-app-${uuid()}`,
-            appUrl: `http://localhost:3000`,
+            appUrl: `http://localhost:${mockServer.boundPort}`,
             description: 'Single subscription app for test'
         };
         const createdApp = await appClient.createApp(appOwnerTenant.id, appData.name, appData.appUrl, appData.description);
@@ -259,7 +258,7 @@ describe('Ambiguous Subscription Tenant Flow', () => {
         // 2. Create a new app under appOwnerTenant
         const appData = {
             name: `own-tenant-app-${uuid()}`,
-            appUrl: `http://localhost:3000`,
+            appUrl: `http://localhost:${mockServer.boundPort}`,
             description: 'App for own tenant test'
         };
         const createdApp = await appClient.createApp(appOwnerTenant.id, appData.name, appData.appUrl, appData.description);
@@ -322,7 +321,7 @@ describe('Ambiguous Subscription Tenant Flow', () => {
         // 2. Create a new app under appOwnerTenant
         const appData = {
             name: `hint-test-app-${uuid()}`,
-            appUrl: `http://localhost:3000`,
+            appUrl: `http://localhost:${mockServer.boundPort}`,
             description: 'App for testing tenant hint'
         };
         const createdApp = await appClient.createApp(appOwnerTenant.id, appData.name, appData.appUrl, appData.description);

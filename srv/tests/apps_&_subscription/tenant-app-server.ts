@@ -47,11 +47,17 @@ export class TenantAppServer {
     private server: http.Server;
     private config: Required<ServerConfig>;
     private logger: Console;
+    private _boundPort: number = 0;
 
     // Track onboard and offboard requests
     private onboardRequests: OnboardRequest[] = [];
     private offboardRequests: OffboardRequest[] = [];
     private lastDecodedToken: any = null; // Store last decoded JWT for test assertions
+
+    /** Actual port after listen() — useful when configured with port 0. */
+    public get boundPort(): number {
+        return this._boundPort;
+    }
 
     constructor(config: ServerConfig = {}) {
         this.config = this.getFullConfig(config);
@@ -79,7 +85,11 @@ export class TenantAppServer {
     public async listen(): Promise<TenantAppServer> {
         return new Promise((resolve, reject) => {
             this.server.listen(this.config.port, this.config.host, () => {
-                this.log('info', `Mock Onboard Server listening on ${this.config.host}:${this.config.port}`);
+                const addr = this.server.address();
+                if (addr && typeof addr === 'object') {
+                    this._boundPort = addr.port;
+                }
+                this.log('info', `Mock Onboard Server listening on ${this.config.host}:${this._boundPort}`);
                 resolve(this);
             });
         });
@@ -280,7 +290,7 @@ export class TenantAppServer {
      */
     private getFullConfig(config: ServerConfig): Required<ServerConfig> {
         return {
-            port: config.port || 3000,
+            port: config.port ?? 3000,
             host: config.host || 'localhost',
             logLevel: config.logLevel || 'info'
         };

@@ -4,13 +4,13 @@ import {setupConsole} from "./helper.fixture";
 
 const nodemailer = require('nodemailer');
 
-const MAIL_PORT = 7890;
+const MAIL_PORT = 0; // OS assigns a free port — enables parallel test runs
 const MAIL_HOST = '127.0.0.1';
 
-async function sendTestEmail() {
+async function sendTestEmail(port: number) {
     const transporter = nodemailer.createTransport({
         host: MAIL_HOST,
-        port: MAIL_PORT,
+        port,
         secure: false,
         tls: {
             rejectUnauthorized: false
@@ -43,7 +43,7 @@ describe("Fake Smtp Server Test", () => {
     })
 
     it('should work', async () => {
-        await sendTestEmail();
+        await sendTestEmail(smtpServer.boundPort);
 
         const search: EmailSearchCriteria = {
             to: "recipient@example.com",
