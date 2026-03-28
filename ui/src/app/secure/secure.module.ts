@@ -28,6 +28,11 @@ import {CL02Component} from './clients/CL02.component';
 import {CreateClientComponent} from './clients/dialogs/create-client.component';
 import {EditClientComponent} from './clients/dialogs/edit-client.component';
 import {SecretDisplayComponent} from './clients/dialogs/secret-display.component';
+import {UpdateTenantComponent} from './tenants/dialogs/update-tenant.component';
+import {CreateAppComponent} from './apps/dialogs/create-app.component';
+import {UpdateAppComponent} from './apps/dialogs/update-app.component';
+import {CreatePolicyModalComponent} from './roles/create-policy-modal.component';
+import {UpdateRoleModalComponent} from './roles/update-role-modal.component';
 
 @NgModule({
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
@@ -45,6 +50,11 @@ import {SecretDisplayComponent} from './clients/dialogs/secret-display.component
         CreateClientComponent,
         EditClientComponent,
         SecretDisplayComponent,
+        UpdateTenantComponent,
+        CreateAppComponent,
+        UpdateAppComponent,
+        CreatePolicyModalComponent,
+        UpdateRoleModalComponent,
     ],
     imports: [
         TableModule,

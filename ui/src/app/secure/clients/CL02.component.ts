@@ -61,7 +61,7 @@ import {EditClientComponent} from './dialogs/edit-client.component';
                             <span *ngIf="!client.isPublic" class="badge bg-secondary">Confidential</span>
                         </app-attribute>
                         <app-attribute label="Redirect URIs">
-                            {{ client.redirectUris?.join(', ') }}
+                            {{ client.redirectUris.join(', ') }}
                         </app-attribute>
                         <app-attribute label="Allowed Scopes">
                             {{ client.allowedScopes }}
