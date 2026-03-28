@@ -1,16 +1,14 @@
 import {Component, OnInit} from '@angular/core';
 import {NgbModal} from '@ng-bootstrap/ng-bootstrap';
 import {ActivatedRoute, Router} from '@angular/router';
-import {TenantService} from '../../_services/tenant.service';
 import {MessageService} from 'primeng/api';
 import {AuthDefaultService} from '../../_services/auth.default.service';
 import {RoleService} from '../../_services/role.service';
 import {DataSource} from "../../component/model/DataSource";
 
 @Component({
-    selector: 'app-role-list',
+    selector: 'app-RL02A-sel',
     template: `
-        <nav-bar></nav-bar>
         <div class="container-fluid">
             <div class="row">
                 <div class="col-4">
@@ -73,7 +71,7 @@ import {DataSource} from "../../component/model/DataSource";
     `,
     styles: [``],
 })
-export class RL02SelectionComponent implements OnInit {
+export class RL02ASelectionComponent implements OnInit {
     roles = [];
     rolesDM: DataSource<any>;
     tenants: [] = [];
@@ -82,7 +80,6 @@ export class RL02SelectionComponent implements OnInit {
 
     constructor(
         private roleService: RoleService,
-        private tenantService: TenantService,
         private route: ActivatedRoute,
         private router: Router,
         private authDefaultService: AuthDefaultService,
@@ -102,7 +99,7 @@ export class RL02SelectionComponent implements OnInit {
         });
         if (this.selectedRole.length > 0) {
             await this.router.navigate([
-                '/RL02',
+                '/admin/RL02',
                 this.selectedRole[0].tenant.id,
                 this.selectedRole[0].id,
             ]);

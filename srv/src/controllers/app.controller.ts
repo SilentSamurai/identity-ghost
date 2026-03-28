@@ -187,7 +187,7 @@ export class AppController {
         @Request() request: AuthContext,
         @Param('appId', ParseUUIDPipe) appId: string
     ) {
-        const app = await this.appService.publishApp(appId);
+        const app = await this.appService.publishApp(request, appId);
         return app;
     }
 

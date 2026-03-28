@@ -1,24 +1,23 @@
-describe('Tenant Flow', () => {
+/**
+ * Admin User CRUD Flow Tests
+ *
+ * Tests user management from the admin panel:
+ * create a user via /admin/UR01, look up and display the user
+ * via the /admin/UR02 value help, and delete the user from the list.
+ */
+describe('User Flow', () => {
 
     const USER_NAME = "TEST USER"
     const USER_EMAIL = "test-user@mail.com"
     const USER_PASSWORD = "test9000"
 
     beforeEach(() => {
-        // Cypress starts out with a blank slate for each test
-        // so we must tell it to visit our website with the `cy.visit()` command.
-        // Since we want to visit the same URL at the start of all our tests,
-        // we include it in our beforeEach function so that it runs before each test
-
         cy.adminLogin("admin@auth.server.com", "admin9000");
     })
 
+    // Opens the admin user list (UR01), fills the create-user dialog, and submits
     it('Create User', function () {
-        cy.visit('/');
-
-        cy.url().should('include', '/home');
-        cy.get('#Users_HOME_NAV').click()
-        cy.get('a[href="/UR01"]').click()
+        cy.goToAdminPage('UR01');
         cy.get('#CREATE_USER_DIALOG_BTN').click()
 
         cy.get('#CREATE_USER_name_INPUT').type(USER_NAME);
@@ -38,11 +37,10 @@ describe('Tenant Flow', () => {
 
     })
 
+    // Opens the admin user detail selection (UR02), searches for the user by email
+    // via the value help dialog, selects them, and verifies the detail page shows the email
     it('Select and Display User in UR02 via Value Help', function () {
-        cy.visit('/');
-        cy.url().should('include', '/home');
-        cy.get('#Users_HOME_NAV').click();
-        cy.get('a[href="/UR02"]').click();
+        cy.goToAdminPage('UR02');
 
         // Assume value help button has a test id or selector, e.g., #USER_VALUE_HELP_BTN
         cy.get('#Email-vh-btn').click();
@@ -61,13 +59,10 @@ describe('Tenant Flow', () => {
         cy.contains('app-attribute', USER_EMAIL).should('exist');
     });
 
+    // Opens the admin user list (UR01), filters by email, and deletes the user
+    // via the row-level delete button
     it('Delete User', function () {
-        cy.visit('/');
-        cy.url().should('include', '/home');
-
-        cy.get('#Users_HOME_NAV')
-
-        cy.get('a[href="/UR01"]').click()
+        cy.goToAdminPage('UR01');
 
         cy.get('#FILTER_FIELD_email').type(USER_EMAIL);
 

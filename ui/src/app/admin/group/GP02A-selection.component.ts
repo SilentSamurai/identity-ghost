@@ -2,16 +2,14 @@ import {Component, OnInit} from '@angular/core';
 import {UserService} from '../../_services/user.service';
 import {NgbModal} from '@ng-bootstrap/ng-bootstrap';
 import {ActivatedRoute, Router} from '@angular/router';
-import {TenantService} from '../../_services/tenant.service';
 import {MessageService} from 'primeng/api';
 import {AuthDefaultService} from '../../_services/auth.default.service';
 import {GroupService} from '../../_services/group.service';
 import {DataSource} from '../../component/model/DataSource';
 
 @Component({
-    selector: 'app-group-sel',
+    selector: 'app-GP02A-sel',
     template: `
-        <nav-bar></nav-bar>
         <div class="container-fluid">
             <div class="row">
                 <div class="h4 py-2">Manage Roles</div>
@@ -69,14 +67,13 @@ import {DataSource} from '../../component/model/DataSource';
     `,
     styles: [``],
 })
-export class GP02SelectionComponent implements OnInit {
+export class GP02ASelectionComponent implements OnInit {
     groups: any[] = [];
     groupsDM!: DataSource<any>;
     selectedGroup: any[] = [];
 
     constructor(
         private userService: UserService,
-        private tenantService: TenantService,
         private groupService: GroupService,
         private route: ActivatedRoute,
         private router: Router,
@@ -96,7 +93,7 @@ export class GP02SelectionComponent implements OnInit {
             group: this.selectedGroup,
         });
         if (this.selectedGroup.length > 0) {
-            await this.router.navigate(['/GP02', this.selectedGroup[0].id]);
+            await this.router.navigate(['/admin/GP02', this.selectedGroup[0].id]);
         } else {
             this.messageService.add({
                 severity: 'error',
@@ -105,16 +102,4 @@ export class GP02SelectionComponent implements OnInit {
             });
         }
     }
-
-    // async groupDataProvider(event: TableAsyncLoadEvent) {
-    //     if (event.pageNo == 0) {
-    //         let response = await this.groupService.queryGroup({
-    //             pageNo: event.pageNo,
-    //             where: event.filters.filter(f => f.value != null && f.value.length > 0),
-    //             expand: ["Tenants"]
-    //         });
-    //         this.groups = response.data;
-    //         event.update(this.groups, response.hasNextPage);
-    //     }
-    // }
 }

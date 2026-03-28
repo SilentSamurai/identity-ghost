@@ -75,7 +75,6 @@ export class AddRoleComponent implements OnInit {
         try {
             const addedRoles = await this.tenantService.createRole(
                 this.form.name,
-                this.tenant.id,
             );
             this.messageService.add({
                 severity: 'success',

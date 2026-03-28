@@ -2,7 +2,7 @@ import {Component, OnInit, ViewChild} from '@angular/core';
 import {UserService} from '../../_services/user.service';
 import {NgbModal} from '@ng-bootstrap/ng-bootstrap';
 import {ActivatedRoute, Router} from '@angular/router';
-import {TenantService} from '../../_services/tenant.service';
+import {AdminTenantService} from '../../_services/admin-tenant.service';
 import {MessageService} from 'primeng/api';
 import {AuthDefaultService} from '../../_services/auth.default.service';
 import {AppTableComponent} from '../../component/table/app-table.component';
@@ -12,9 +12,8 @@ import {DataSource} from '../../component/model/DataSource';
 import {Filter} from '../../component/model/Filters';
 
 @Component({
-    selector: 'app-role-list',
+    selector: 'app-RL01A',
     template: `
-        <nav-bar></nav-bar>
         <app-page-view>
             <app-page-view-header>
                 <div class="d-flex justify-content-between">
@@ -57,7 +56,7 @@ import {Filter} from '../../component/model/Filters';
                         <td>
                             <a
                                 [routerLink]="[
-                                    '/RL02/',
+                                    '/admin/RL02/',
                                     role.tenant.id,
                                     role.id,
                                 ]"
@@ -67,7 +66,7 @@ import {Filter} from '../../component/model/Filters';
                         </td>
                         <td>
                             <a
-                                [routerLink]="['/TN02/', role.tenant.id]"
+                                [routerLink]="['/admin/TN02/', role.tenant.id]"
                                 href="javascript:void(0)"
                             >{{ role.tenant.domain }}</a
                             >
@@ -93,7 +92,7 @@ import {Filter} from '../../component/model/Filters';
     `,
     styles: [''],
 })
-export class RL01Component implements OnInit {
+export class RL01AComponent implements OnInit {
     @ViewChild(AppTableComponent)
     table!: AppTableComponent;
 
@@ -102,7 +101,7 @@ export class RL01Component implements OnInit {
 
     constructor(
         private userService: UserService,
-        private tenantService: TenantService,
+        private adminTenantService: AdminTenantService,
         private roleService: RoleService,
         private route: ActivatedRoute,
         private router: Router,
@@ -118,15 +117,6 @@ export class RL01Component implements OnInit {
         this.authDefaultService.setTitle('RL01: Role List');
     }
 
-    // async loadTable($event: TableAsyncLoadEvent) {
-    //     this.roles = await this.roleService.queryRoles({
-    //         pageNo: $event.pageNo,
-    //         where: $event.filters.filter(item => item.value != null && item.value.length > 0),
-    //         expand: ["Tenants"]
-    //     });
-    //     $event.update(this.roles.data, this.roles.hasNextPage);
-    // }
-
     onFilter(filters: Filter[]) {
         this.table.filter(filters);
     }
@@ -135,7 +125,7 @@ export class RL01Component implements OnInit {
         await this.confirmationService.confirm({
             message: 'Are you sure you want to continue ?',
             accept: async () => {
-                await this.tenantService.deleteRole(role.name, role.tenantId);
+                await this.adminTenantService.deleteRole(role.tenant.id, role.name);
                 this.messageService.add({
                     severity: 'success',
                     summary: 'Successful',

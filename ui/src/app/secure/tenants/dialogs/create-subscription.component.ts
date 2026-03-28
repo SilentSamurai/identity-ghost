@@ -91,7 +91,7 @@ export class CreateSubscriptionComponent implements AfterModalInit {
 
     async onModalInit() {
         // Get all available apps
-        const allApps: any[] = await this.appService.getAvailableApps(this.tenant.id);
+        const allApps: any[] = await this.appService.getAvailableApps();
         this.availableAppsDataModel.setData(allApps);
     }
 
@@ -101,7 +101,7 @@ export class CreateSubscriptionComponent implements AfterModalInit {
 
     async onSubscribe() {
         try {
-            await this.subscriptionService.subscribeToApp(this.selectedApp.id, this.tenant.id);
+            await this.subscriptionService.subscribeToApp(this.selectedApp.id);
             this.messageService.add({
                 severity: 'success',
                 summary: 'Success',

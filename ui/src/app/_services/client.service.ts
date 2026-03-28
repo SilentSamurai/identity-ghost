@@ -65,9 +65,9 @@ export class ClientService {
         );
     }
 
-    async getClientsByTenant(tenantId: string): Promise<Client[]> {
+    async getClientsByTenant(): Promise<Client[]> {
         return lastValueFrom(
-            this.http.get<Client[]>(`${API_URL}/clients/tenant/${tenantId}`)
+            this.http.get<Client[]>(`${API_URL}/clients/my/clients`)
         );
     }
 

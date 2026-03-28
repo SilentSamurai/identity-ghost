@@ -1,13 +1,18 @@
-describe('login', () => {
+/**
+ * External App OAuth Login Test
+ *
+ * Simulates a third-party app (running on localhost:3000) initiating an OAuth login.
+ * The user clicks "Login" on the external app, gets redirected to /authorize,
+ * enters credentials, and is redirected back with an authorization code.
+ * Verifies the decoded token contains the correct user email and tenant domain.
+ */
+describe('External Login', () => {
     beforeEach(() => {
-        // Cypress starts out with a blank slate for each test
-        // so we must tell it to visit our website with the `cy.visit()` command.
-        // Since we want to visit the same URL at the start of all our tests,
-        // we include it in our beforeEach function so that it runs before each test
         cy.visit('/')
     })
 
-
+    // Clicks login on the external app, authenticates via /authorize, and verifies
+    // the redirect back to the external app with a valid code and decoded token
     it('External Login', () => {
 
         cy.visit('http://localhost:3000/');

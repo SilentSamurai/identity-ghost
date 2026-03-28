@@ -30,7 +30,6 @@ import {Ability, createMongoAbility, PureAbility,} from '@casl/ability';
 import {AuthorizeLoginComponent} from "./open-pages/authorize-login.component";
 import {NgOptimizedImage} from "@angular/common";
 import {TenantSelectionComponent} from './open-pages/tenant-selection.component';
-import {AdminLoginComponent} from './open-pages/admin-login.component';
 import {WelcomeComponent} from './open-pages/welcome.component';
 import {SignUpComponent} from './open-pages/signup.component';
 import {OpenNavbarComponent} from './open-pages/open-navbar.component';
@@ -49,7 +48,6 @@ import {OpenNavbarComponent} from './open-pages/open-navbar.component';
         ForgotPasswordComponent,
         ResetPasswordComponent,
         CenteredCardComponent,
-        AdminLoginComponent,
         WelcomeComponent,
         SignUpComponent,
         OpenNavbarComponent

@@ -32,7 +32,6 @@ export class TenantService {
         return {
             headers: new HttpHeaders({
                 'Content-Type': 'application/json',
-                // 'Authorization': 'Bearer ' + this.sessionService.getToken()
             }),
         };
     }
@@ -49,14 +48,11 @@ export class TenantService {
     }
 
     editTenant(
-        tenantId: string,
         name: null | string,
         allowSignUp: null | boolean,
     ) {
-        // Create a request body object
         const requestBody: any = {};
 
-        // Only add non-null parameters to the request body
         if (name !== null) {
             requestBody.name = name;
         }
@@ -65,58 +61,57 @@ export class TenantService {
             requestBody.allowSignUp = allowSignUp;
         }
 
-        // If all values are null, throw a specific exception
         if (Object.keys(requestBody).length === 0) {
             throw new NoChangesException();
         }
 
         return this.http.patch(
-            `${API_URL}/tenant/${tenantId}`,
+            `${API_URL}/tenant/my`,
             requestBody,
             this.getHttpOptions(),
         );
     }
 
-    deleteTenant(tenantId: string) {
+    deleteTenant() {
         return lastValueFrom(
             this.http.delete(
-                `${API_URL}/tenant/${tenantId}`,
+                `${API_URL}/tenant/my`,
                 this.getHttpOptions(),
             ),
         );
     }
 
-    async getTenantDetails(tenantId: string) {
+    async getTenantDetails() {
         return lastValueFrom(
             this.http.get(
-                `${API_URL}/tenant/${tenantId}`,
+                `${API_URL}/tenant/my/info`,
                 this.getHttpOptions(),
             ),
         );
     }
 
-    async getTenantCredentials(tenantId: string) {
+    async getTenantCredentials() {
         return lastValueFrom(
             this.http.get(
-                `${API_URL}/tenant/${tenantId}/credentials`,
+                `${API_URL}/tenant/my/credentials`,
                 this.getHttpOptions(),
             ),
         );
     }
 
-    async getMembers(tenantId: string): Promise<any[]> {
+    async getMembers(): Promise<any[]> {
         return (await lastValueFrom(
             this.http.get(
-                `${API_URL}/tenant/${tenantId}/members`,
+                `${API_URL}/tenant/my/members`,
                 this.getHttpOptions(),
             ),
         )) as Promise<any[]>;
     }
 
-    async addMember(email: string, tenantId: string) {
+    async addMember(email: string) {
         return lastValueFrom(
             this.http.post(
-                `${API_URL}/tenant/${tenantId}/members/add`,
+                `${API_URL}/tenant/my/members/add`,
                 {
                     emails: [email],
                 },
@@ -125,19 +120,19 @@ export class TenantService {
         );
     }
 
-    async createRole(name: string, tenantId: string) {
+    async createRole(name: string) {
         return lastValueFrom(
             this.http.post(
-                `${API_URL}/tenant/${tenantId}/role/${name}`,
+                `${API_URL}/tenant/my/role/${name}`,
                 {},
                 this.getHttpOptions(),
             ),
         );
     }
 
-    async removeMember(email: string, tenantId: string) {
+    async removeMember(email: string) {
         return lastValueFrom(
-            this.http.delete(`${API_URL}/tenant/${tenantId}/members/delete`, {
+            this.http.delete(`${API_URL}/tenant/my/members/delete`, {
                 body: {
                     emails: [email],
                 },
@@ -145,28 +140,28 @@ export class TenantService {
         );
     }
 
-    async deleteRole(name: string, tenantId: string) {
+    async deleteRole(name: string) {
         return lastValueFrom(
             this.http.delete(
-                `${API_URL}/tenant/${tenantId}/role/${name}`,
+                `${API_URL}/tenant/my/role/${name}`,
                 this.getHttpOptions(),
             ),
         );
     }
 
-    async getMemberDetails(tenantId: string, userId: string) {
+    async getMemberDetails(userId: string) {
         return lastValueFrom(
             this.http.get(
-                `${API_URL}/tenant/${tenantId}/member/${userId}`,
+                `${API_URL}/tenant/my/member/${userId}`,
                 this.getHttpOptions(),
             ),
         );
     }
 
-    async getTenantRoles(tenantId: string): Promise<any> {
+    async getTenantRoles(): Promise<any> {
         return lastValueFrom(
             this.http.get(
-                `${API_URL}/tenant/${tenantId}/roles`,
+                `${API_URL}/tenant/my/roles`,
                 this.getHttpOptions(),
             ),
         );
@@ -182,11 +177,11 @@ export class TenantService {
         )) as any;
     }
 
-    async replaceRoles(selectedRoles: any[], tenantId: string, userId: string) {
+    async replaceRoles(selectedRoles: any[], userId: string) {
         const roles = selectedRoles.map((role) => role.name);
         return lastValueFrom(
             this.http.put(
-                `${API_URL}/tenant/${tenantId}/member/${userId}/roles`,
+                `${API_URL}/tenant/my/member/${userId}/roles`,
                 {
                     roles: roles,
                 },
@@ -197,13 +192,12 @@ export class TenantService {
 
     async addRolesToMember(
         selectedRoles: any[],
-        tenantId: string,
         userId: string,
     ) {
         const roles = selectedRoles.map((role) => role.name);
         return lastValueFrom(
             this.http.post(
-                `${API_URL}/tenant/${tenantId}/member/${userId}/roles/add`,
+                `${API_URL}/tenant/my/member/${userId}/roles/add`,
                 {
                     roles: roles,
                 },
@@ -214,13 +208,12 @@ export class TenantService {
 
     async removeRolesFromMember(
         selectedRoles: any[],
-        tenantId: string,
         userId: string,
     ) {
         const roles = selectedRoles.map((role) => role.name);
         return lastValueFrom(
             this.http.delete(
-                `${API_URL}/tenant/${tenantId}/member/${userId}/roles/remove`,
+                `${API_URL}/tenant/my/member/${userId}/roles/remove`,
                 {
                     body: {
                         roles: roles,

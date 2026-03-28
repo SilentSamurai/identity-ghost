@@ -1,5 +1,11 @@
+/**
+ * Admin Tenant CRUD Flow Tests
+ *
+ * Tests the full tenant lifecycle from the admin panel:
+ * create, view, update, manage members, manage roles,
+ * manage apps, and delete. All operations go through /admin/* routes.
+ */
 describe('Tenant Flow', () => {
-
     const TENANT_NAME = 'Test Tenant';
     const TENANT_DOMAIN = "test-tenant.com"
     const TenantUpdateName = 'Test Updated Tenant';
@@ -7,25 +13,23 @@ describe('Tenant Flow', () => {
     const ROLE_NAME = 'TEST_ROLE';
 
     beforeEach(() => {
-        // Cypress starts out with a blank slate for each test
-        // so we must tell it to visit our website with the `cy.visit()` command.
-        // Since we want to visit the same URL at the start of all our tests,
-        // we include it in our beforeEach function so that it runs before each test
-
         cy.adminLogin("admin@auth.server.com", "admin9000");
     })
 
+    // Creates a new tenant via the admin TN01 page
     it('Create Tenant', function () {
-        cy.createTenant(TENANT_NAME, TENANT_DOMAIN);
+        cy.adminCreateTenant(TENANT_NAME, TENANT_DOMAIN);
     })
 
+    // Navigates to the tenant object page via value help and verifies it loads
     it('GET Tenant', function () {
-        cy.goToTenantObjectPage(TENANT_DOMAIN);
+        cy.adminGoToTenantObjectPage(TENANT_DOMAIN);
     })
 
 
+    // Opens the tenant, clicks Update, changes the name, and saves
     it('Update Tenant', function () {
-        cy.goToTenantObjectPage(TENANT_DOMAIN);
+        cy.adminGoToTenantObjectPage(TENANT_DOMAIN);
 
         cy.get('#UPDATE_TENANT_BTN').click();
 
@@ -36,8 +40,9 @@ describe('Tenant Flow', () => {
 
     })
 
+    // Opens the tenant, navigates to Members tab, and adds a new member by email
     it('Add Member', function () {
-        cy.goToTenantObjectPage(TENANT_DOMAIN);
+        cy.adminGoToTenantObjectPage(TENANT_DOMAIN);
 
         // cy.get('#ADD_MEMBER_BTN').click();
         cy.get('#MEMBERS_SECTION_NAV').click();
@@ -48,15 +53,16 @@ describe('Tenant Flow', () => {
 
     })
 
+    // Opens the tenant, navigates to Members tab, removes the member, and verifies the API call
     it('Remove Member', function () {
-        cy.goToTenantObjectPage(TENANT_DOMAIN);
+        cy.adminGoToTenantObjectPage(TENANT_DOMAIN);
 
         // cy.get('#ADD_MEMBER_BTN').click();
         cy.get('#MEMBERS_SECTION_NAV').click();
 
         cy.get(`button[data-cy-id='${TENANT_MEMBER}']`).click()
 
-        cy.intercept('DELETE', '**/api/tenant/*/members/delete').as('RemoveMember')
+        cy.intercept('DELETE', '**/api/admin/tenant/*/members/delete').as('RemoveMember')
 
         cy.get('#CONFIRMATION_YES_BTN').click();
 
@@ -67,8 +73,9 @@ describe('Tenant Flow', () => {
 
     })
 
+    // Opens the tenant, navigates to Roles tab, and creates a new role
     it('Add Role', function () {
-        cy.goToTenantObjectPage(TENANT_DOMAIN);
+        cy.adminGoToTenantObjectPage(TENANT_DOMAIN);
 
         // cy.get('#ADD_MEMBER_BTN').click();
         cy.get('#ROLES_SECTION_NAV').click();
@@ -79,15 +86,16 @@ describe('Tenant Flow', () => {
 
     })
 
+    // Opens the tenant, navigates to Roles tab, removes the role, and verifies the API call
     it('Remove Role', function () {
-        cy.goToTenantObjectPage(TENANT_DOMAIN);
+        cy.adminGoToTenantObjectPage(TENANT_DOMAIN);
 
         // cy.get('#ADD_MEMBER_BTN').click();
         cy.get('#ROLES_SECTION_NAV').click();
 
         cy.get(`button[data-cy-id='${ROLE_NAME}']`).click()
 
-        cy.intercept('DELETE', '**/api/tenant/*/role/*').as('RemoveRole')
+        cy.intercept('DELETE', '**/api/admin/tenant/*/role/*').as('RemoveRole')
 
         cy.get('#CONFIRMATION_YES_BTN').click();
 
@@ -98,8 +106,9 @@ describe('Tenant Flow', () => {
 
     })
 
+    // Opens the tenant, navigates to Apps tab, creates a new app with name/URL/description
     it('Add App to Tenant', function () {
-        cy.goToTenantObjectPage(TENANT_DOMAIN);
+        cy.adminGoToTenantObjectPage(TENANT_DOMAIN);
 
         const appName = "Tenant Test App";
 
@@ -124,8 +133,9 @@ describe('Tenant Flow', () => {
 
     });
 
+    // Opens the tenant, navigates to Apps tab, deletes the app via the row delete button
     it('Delete App', () => {
-        cy.goToTenantObjectPage(TENANT_DOMAIN);
+        cy.adminGoToTenantObjectPage(TENANT_DOMAIN);
 
         const appName = "Tenant Test App";
 
@@ -147,7 +157,8 @@ describe('Tenant Flow', () => {
 
     })
 
+    // Deletes the entire tenant and verifies the API returns 200
     it('Delete Tenant', function () {
-        cy.deleteTenant(TENANT_DOMAIN);
+        cy.adminDeleteTenant(TENANT_DOMAIN);
     })
 })

@@ -12,9 +12,8 @@ import {ModalService} from "../../component/dialogs/modal.service";
 import {SessionService} from "../../_services/session.service";
 
 @Component({
-    selector: 'app-AP01',
+    selector: 'app-AP01A',
     template: `
-        <nav-bar></nav-bar>
         <app-page-view>
             <app-page-view-header>
                 <div class="">
@@ -82,7 +81,7 @@ import {SessionService} from "../../_services/session.service";
     `,
     styles: ['']
 })
-export class AP01Component implements OnInit {
+export class AP01AComponent implements OnInit {
     @ViewChild(AppTableComponent)
     table!: AppTableComponent;
 

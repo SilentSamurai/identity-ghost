@@ -1,4 +1,12 @@
-describe('Register', () => {
+/**
+ * External App Sign-Up Flow Test
+ *
+ * Simulates a new user signing up through a third-party app's OAuth flow.
+ * The user clicks "Login" on the external app, navigates to "Sign Up",
+ * fills in the registration form, verifies their email via the fake SMTP server,
+ * and then logs in successfully.
+ */
+describe('External Sign Up', () => {
     function uniqueEmail() {
         return `testuser_${Date.now()}@mail.com`;
     }
@@ -13,6 +21,8 @@ describe('Register', () => {
         cy.visit('/');
     });
 
+    // Signs up via the external app's OAuth flow, verifies email through the
+    // fake SMTP control API, then logs in with the new credentials
     it('Should create a new user via external flow and verify via email control API then login', () => {
 
         cy.visit('http://localhost:3000/');

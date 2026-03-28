@@ -128,13 +128,4 @@ export class CreateGroupComponent implements OnInit {
             });
         }
     }
-
-    // async onTenantLoad(event: TableAsyncLoadEvent) {
-    //     let response = await this.tenantService.queryTenant({
-    //         pageNo: event.pageNo,
-    //         where: event.filters.filter(f => f.value != null && f.value.length > 0),
-    //     });
-    //     this.tenants = response.data;
-    //     event.update(this.tenants, response.hasNextPage);
-    // }
 }

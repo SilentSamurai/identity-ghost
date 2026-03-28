@@ -14,9 +14,8 @@ import {DataSource} from '../../component/model/DataSource';
 import {Filter} from '../../component/model/Filters';
 
 @Component({
-    selector: 'app-board-user',
+    selector: 'app-GP01A',
     template: `
-        <nav-bar></nav-bar>
         <app-page-view>
             <app-page-view-header>
                 <app-fb (onFilter)="onFilter($event)">
@@ -55,14 +54,14 @@ import {Filter} from '../../component/model/Filters';
                     <ng-template #table_body let-group>
                         <td>
                             <a
-                                [routerLink]="['/GP02/', group.id]"
+                                [routerLink]="['/admin/GP02/', group.id]"
                                 href="javascript:void(0)"
                             >{{ group.name }}</a
                             >
                         </td>
                         <td>
                             <a
-                                [routerLink]="['/TN02/', group.tenantId]"
+                                [routerLink]="['/admin/TN02/', group.tenantId]"
                                 href="javascript:void(0)"
                             >{{ group.tenantId }}</a
                             >
@@ -94,7 +93,7 @@ import {Filter} from '../../component/model/Filters';
     `,
     styles: [''],
 })
-export class GP01Component implements OnInit {
+export class GP01AComponent implements OnInit {
     @ViewChild(AppTableComponent)
     table!: AppTableComponent;
 
@@ -117,9 +116,7 @@ export class GP01Component implements OnInit {
     }
 
     async ngOnInit(): Promise<void> {
-        // this.users = await this.userService.queryUser({});
         this.authDefaultService.setTitle('GP01: Manage Groups');
-        // this.tenantId = this.route.snapshot.params['tenantId'];
     }
 
     async openCreateModal() {
@@ -150,7 +147,6 @@ export class GP01Component implements OnInit {
                 });
             },
             reject: async () => {
-                // this.messageService.add({severity: 'info', summary: 'Successful', detail: 'Group removed'});
             },
         });
         this.ngOnInit();

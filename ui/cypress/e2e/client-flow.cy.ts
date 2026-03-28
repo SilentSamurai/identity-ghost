@@ -1,28 +1,31 @@
+/**
+ * Client (OAuth Client) CRUD Flow Tests
+ *
+ * Tests the full lifecycle of OAuth clients from the user-context client list (CL01/CL02):
+ * creating a confidential client, viewing its details, rotating its secret,
+ * and deleting it both from the detail page and from the list page.
+ * Logs in as super-admin since client management requires elevated access.
+ */
 describe('Client Flow', () => {
 
     const uniqueSuffix = Date.now();
     const CLIENT_NAME = `E2E-Client-${uniqueSuffix}`;
     const CLIENT_NAME_DELETE = `E2E-Del-Client-${uniqueSuffix}`;
 
-    function goToClientList() {
-        cy.visit('/home');
-        cy.url().should('include', '/home');
-        cy.get('#Home_HOME_NAV').click();
-        cy.contains('app-tile', 'Clients').click();
-        cy.url().should('include', '/CL01/');
-    }
-
     beforeEach(() => {
         cy.adminLogin("admin@auth.server.com", "admin9000");
     });
 
+    // Navigates to the client list page and verifies the table component renders
     it('Navigate to CL01 and verify table is visible', function () {
-        goToClientList();
+        cy.userOpenClientList();
         cy.get('app-table').should('be.visible');
     });
 
+    // Creates a new confidential client with name, redirect URI, and scopes,
+    // then verifies the client secret dialog appears with a non-empty secret
     it('Create confidential client and verify secret is displayed', function () {
-        goToClientList();
+        cy.userOpenClientList();
 
         cy.contains('button', 'Create Client').click();
 
@@ -47,8 +50,10 @@ describe('Client Flow', () => {
         cy.contains('td', CLIENT_NAME).should('exist');
     });
 
+    // Clicks a client name link in the CL01 list and verifies the CL02 detail page
+    // loads with all expected attribute fields (name, client ID, scopes, grant types, etc.)
     it('Click client name in list and verify CL02 detail page loads', function () {
-        goToClientList();
+        cy.userOpenClientList();
 
         cy.contains('td a', CLIENT_NAME).click();
 
@@ -68,8 +73,10 @@ describe('Client Flow', () => {
         cy.contains('Allow Refresh Token').should('exist');
     });
 
+    // Opens the client detail page, clicks "Rotate Secret", confirms the dialog,
+    // and verifies a new secret is displayed
     it('Rotate client secret on CL02 and verify new secret dialog', function () {
-        goToClientList();
+        cy.userOpenClientList();
 
         cy.contains('td a', CLIENT_NAME).click();
         cy.url().should('include', '/CL02/');
@@ -93,8 +100,10 @@ describe('Client Flow', () => {
         cy.get('.modal-footer').contains('button', 'Close').click();
     });
 
+    // Opens the client detail page, deletes the client via the detail page button,
+    // and verifies navigation back to CL01 with the client removed from the list
     it('Delete client from CL02 and verify navigation back to CL01', function () {
-        goToClientList();
+        cy.userOpenClientList();
 
         cy.contains('td a', CLIENT_NAME).click();
         cy.url().should('include', '/CL02/');
@@ -115,8 +124,10 @@ describe('Client Flow', () => {
         cy.contains('td', CLIENT_NAME).should('not.exist');
     });
 
+    // Creates a client, then deletes it directly from the CL01 list using the
+    // row-level delete button (without navigating to the detail page)
     it('Create and delete client from CL01 list via row action button', function () {
-        goToClientList();
+        cy.userOpenClientList();
 
         cy.contains('button', 'Create Client').click();
 

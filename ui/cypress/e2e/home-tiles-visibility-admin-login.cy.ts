@@ -48,7 +48,16 @@ function shouldMaybeSeeTiles(ids: string[]) {
   ids.forEach((id) => cy.contains(id, { matchCase: false }).should('exist'));
 }
 
+/**
+ * Home Tiles Visibility Test
+ *
+ * Verifies that a tenant admin (non-super-admin) logged in via /login
+ * does NOT see global admin tiles (TN01, UR01, RL01, etc.) on the /home page.
+ * These tiles should only be visible to super-admins.
+ * Requires ADMIN_EMAIL and ADMIN_PASSWORD Cypress env vars.
+ */
 describe('Home tiles visibility after real login (tenant admin should not see global tiles)', function () {
+  // Logs in as a tenant admin and asserts that all global-scope tiles are hidden
   it('logs in as admin@shire.local and hides global tiles', function () {
     const email = (Cypress.env('ADMIN_EMAIL') as string) || '';
     const password = (Cypress.env('ADMIN_PASSWORD') as string) || '';

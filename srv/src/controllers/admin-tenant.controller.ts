@@ -3,6 +3,7 @@ import {
     ClassSerializerInterceptor,
     Controller,
     Delete,
+    ForbiddenException,
     Get,
     Param,
     ParseUUIDPipe,
@@ -47,6 +48,10 @@ export class AdminTenantController {
     static UpdateTenantSchema = yup.object().shape({
         name: yup.string().max(128),
         allowSignUp: yup.boolean(),
+    });
+
+    static MemberOperationSchema = yup.object().shape({
+        emails: yup.array().of(yup.string().max(128)),
     });
 
     constructor(
@@ -156,6 +161,45 @@ export class AdminTenantController {
         const user = await this.usersService.findById(request, userId);
         await this.tenantService.findById(request, tenantId);
         return this.tenantService.updateRolesOfMember(request, body.roles, tenantId, user);
+    }
+
+    @Post("/:tenantId/members/add")
+    async addMembers(
+        @Request() request,
+        @Param("tenantId", ParseUUIDPipe) tenantId: string,
+        @Body(new ValidationPipe(AdminTenantController.MemberOperationSchema))
+            body: { emails: string[] },
+    ): Promise<Tenant> {
+        let tenant = await this.tenantService.findById(request, tenantId);
+        const adminContext = await this.securityService.getContextForMemberManagement(tenantId);
+        for (const email of body.emails) {
+            const isPresent = await this.usersService.existByEmail(adminContext, email);
+            if (!isPresent) {
+                await this.usersService.createShadowUser(adminContext, email, email);
+            }
+            const user = await this.usersService.findByEmail(adminContext, email);
+            await this.tenantService.addMember(request, tenant.id, user);
+        }
+        return this.tenantService.findById(request, tenantId);
+    }
+
+    @Delete("/:tenantId/members/delete")
+    async removeMembers(
+        @Request() request,
+        @Param("tenantId", ParseUUIDPipe) tenantId: string,
+        @Body(new ValidationPipe(AdminTenantController.MemberOperationSchema))
+            body: { emails: string[] },
+    ): Promise<Tenant> {
+        await this.tenantService.findById(request, tenantId);
+        for (const email of body.emails) {
+            const user = await this.usersService.findByEmail(request, email);
+            const securityContext = this.securityService.getToken(request);
+            if (securityContext.email === email) {
+                throw new ForbiddenException("cannot remove self");
+            }
+            await this.tenantService.removeMember(request, tenantId, user);
+        }
+        return this.tenantService.findById(request, tenantId);
     }
 
     // ─── Role operations ───

@@ -122,7 +122,6 @@ export class UpdateTenantComponent implements OnInit {
         try {
             let editedTenant = await lastValueFrom(
                 this.tenantService.editTenant(
-                    this.tenant.id,
                     this.tenant.name === this.form.name ? null : this.form.name,
                     this.tenant.allowSignUp === this.form.allowSignUp
                         ? null

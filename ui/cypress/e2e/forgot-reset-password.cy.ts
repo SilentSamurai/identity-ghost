@@ -25,7 +25,19 @@ function normalizeDevLink(link: string): string {
         return link;
     }
 }
+/**
+ * Forgot/Reset Password Flow Test
+ *
+ * End-to-end test for the password reset flow:
+ * 1. Creates a user via the signup API and verifies their email
+ * 2. Navigates to /forgot-password, submits the reset request
+ * 3. Fetches the reset email from the fake SMTP server
+ * 4. Visits the reset link, sets a new password
+ * 5. Verifies the success message
+ */
 describe("Forgot/Reset Password (UI)", () => {
+    // Full flow: create user → verify email → request reset → fetch reset email →
+    // set new password → verify success
     it("should allow a user to request reset and set a new password", () => {
         const unique = Date.now();
         const email = `ui-forgot-reset-${unique}@test.com`;

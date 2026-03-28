@@ -8,6 +8,7 @@ import {SubscriptionService} from "./subscription.service";
 import {SecurityService} from "../casl/security.service";
 import {Action} from "../casl/actions.enum";
 import {SubjectEnum} from '../entity/subjectEnum';
+import {subject} from "@casl/ability";
 
 @Injectable()
 export class AppService {
@@ -25,6 +26,11 @@ export class AppService {
      */
     async createApp(authContext: AuthContext, tenantId: string, name: string, appUrl: string, description?: string): Promise<App> {
         const tenant = await this.tenantService.findById(authContext, tenantId);
+        this.securityService.check(
+            authContext,
+            Action.Update,
+            subject(SubjectEnum.TENANT, tenant),
+        );
         const newApp = this.appRepository.create({
             name,
             description,
@@ -77,6 +83,11 @@ export class AppService {
      */
     async deleteApp(authContext: AuthContext, appId: string): Promise<void> {
         const app = await this.getAppById(appId);
+        this.securityService.check(
+            authContext,
+            Action.Update,
+            subject(SubjectEnum.TENANT, app.owner),
+        );
 
         // Get all subscriptions for this app
         const subscriptions = await this.subscriptionService.findAllByAppId(appId);
@@ -111,8 +122,13 @@ export class AppService {
         return this.appRepository.save(app);
     }
 
-    async publishApp(appId: string): Promise<App> {
+    async publishApp(authContext: AuthContext, appId: string): Promise<App> {
         const app = await this.getAppById(appId);
+        this.securityService.check(
+            authContext,
+            Action.Update,
+            subject(SubjectEnum.TENANT, app.owner),
+        );
         app.isPublic = true;
         return this.appRepository.save(app);
     }

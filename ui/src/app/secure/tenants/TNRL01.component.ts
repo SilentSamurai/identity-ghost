@@ -12,7 +12,7 @@ import {StaticSource} from "../../component/model/StaticSource";
 @Component({
     selector: 'app-TNRL01',
     template: `
-        <nav-bar></nav-bar>
+        <secure-nav-bar></secure-nav-bar>
         <app-object-page *ngIf="!loading">
             <app-op-title>
                 {{ user.email }}
@@ -160,7 +160,7 @@ export class TNRL01Component implements AfterContentInit {
             await this.router.navigate(['/home']);
         }
 
-        this.tenant = await this.tenantService.getTenantDetails(this.tenantId);
+        this.tenant = await this.tenantService.getTenantDetails();
         this.user = await lastValueFrom(this.userService.getUser(this.userId));
         try {
             await this.loadTable();
@@ -183,7 +183,6 @@ export class TNRL01Component implements AfterContentInit {
     async loadTable() {
         if (this.tenantId && this.userId) {
             this.member = await this.tenantService.getMemberDetails(
-                this.tenantId,
                 this.userId,
             );
             // $event.update(this.member, false);
@@ -201,7 +200,6 @@ export class TNRL01Component implements AfterContentInit {
         try {
             await this.tenantService.addRolesToMember(
                 valueHelpResult.selection,
-                this.tenantId,
                 this.userId,
             );
             this.messageService.add({
@@ -225,7 +223,6 @@ export class TNRL01Component implements AfterContentInit {
         try {
             await this.tenantService.removeRolesFromMember(
                 [role],
-                this.tenantId,
                 this.userId,
             );
             this.messageService.add({

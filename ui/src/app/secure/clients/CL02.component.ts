@@ -3,6 +3,7 @@ import {ActivatedRoute, Router} from '@angular/router';
 import {MessageService} from 'primeng/api';
 import {ClientService, Client} from '../../_services/client.service';
 import {AuthDefaultService} from '../../_services/auth.default.service';
+import {SessionService} from '../../_services/session.service';
 import {ConfirmationService} from '../../component/dialogs/confirmation.service';
 import {ModalService} from '../../component/dialogs/modal.service';
 import {SecretDisplayComponent} from './dialogs/secret-display.component';
@@ -10,7 +11,7 @@ import {SecretDisplayComponent} from './dialogs/secret-display.component';
 @Component({
     selector: 'app-CL02',
     template: `
-        <nav-bar></nav-bar>
+        <secure-nav-bar></secure-nav-bar>
         <app-object-page [loading]="loading">
             <app-op-title>
                 {{ client?.name }}
@@ -22,6 +23,7 @@ import {SecretDisplayComponent} from './dialogs/secret-display.component';
                 <button
                     *ngIf="client && !client.isPublic"
                     (click)="onRotateSecret()"
+                    [disabled]="!isTenantAdmin"
                     id="ROTATE_SECRET_BTN"
                     class="btn btn-primary btn-sm"
                 >
@@ -29,6 +31,7 @@ import {SecretDisplayComponent} from './dialogs/secret-display.component';
                 </button>
                 <button
                     (click)="onDeleteClient()"
+                    [disabled]="!isTenantAdmin"
                     id="DELETE_CLIENT_BTN"
                     class="btn btn-danger btn-sm ms-2"
                 >
@@ -85,6 +88,7 @@ export class CL02Component implements OnInit {
     loading: boolean = false;
     client: Client | null = null;
     tenantId: string = '';
+    isTenantAdmin = false;
 
     constructor(
         private clientService: ClientService,
@@ -93,6 +97,7 @@ export class CL02Component implements OnInit {
         private router: Router,
         private confirmationService: ConfirmationService,
         private authDefaultService: AuthDefaultService,
+        private sessionService: SessionService,
         private modalService: ModalService,
     ) {
     }
@@ -101,6 +106,7 @@ export class CL02Component implements OnInit {
         this.loading = true;
         try {
             this.tenantId = this.actRoute.snapshot.params['tenantId'];
+            this.isTenantAdmin = this.sessionService.isTenantAdmin();
             const clientId = this.actRoute.snapshot.params['clientId'];
             this.client = await this.clientService.getClient(clientId);
             this.authDefaultService.setTitle('CL02: ' + this.client.name);

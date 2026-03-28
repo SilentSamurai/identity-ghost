@@ -7,9 +7,9 @@ import {RoleService} from '../../_services/role.service';
 import {MessageService} from 'primeng/api';
 import {ConfirmationService} from '../../component/dialogs/confirmation.service';
 import {PolicyService} from '../../_services/policy.service';
-import {CreatePolicyModalComponent} from './create-policy-modal.component';
+import {CreatePolicyModalComponent} from '../../admin/roles/create-policy-modal.component';
 import {CloseType, ValueHelpResult,} from '../../component/value-help/value-help.component';
-import {UpdateRoleModalComponent} from './update-role-modal.component';
+import {UpdateRoleModalComponent} from '../../admin/roles/update-role-modal.component';
 import {ModalResult, ModalService} from '../../component/dialogs/modal.service';
 import {StaticSource} from "../../component/model/StaticSource";
 import {AppService} from '../../_services/app.service';
@@ -17,7 +17,7 @@ import {AppService} from '../../_services/app.service';
 @Component({
     selector: 'app-RL02',
     template: `
-        <nav-bar></nav-bar>
+        <secure-nav-bar></secure-nav-bar>
         <app-object-page *ngIf="!loading">
             <app-op-title>
                 {{ role.name }}
@@ -313,7 +313,6 @@ export class RL02Component implements OnInit {
             accept: async () => {
                 await this.tenantService.deleteRole(
                     this.role.name,
-                    this.role.tenantId,
                 );
                 this.messageService.add({
                     severity: 'info',
@@ -350,7 +349,6 @@ export class RL02Component implements OnInit {
             accept: async () => {
                 await this.tenantService.removeRolesFromMember(
                     [this.role],
-                    this.tenantId,
                     user.id,
                 );
                 this.messageService.add({
@@ -365,7 +363,7 @@ export class RL02Component implements OnInit {
 
     async onUserVhOpen() {
         try {
-            const members = await this.tenantService.getMembers(this.tenantId);
+            const members = await this.tenantService.getMembers();
             this.usersDM.setData(members);
         } catch (e) {
             this.messageService.add({
@@ -383,7 +381,6 @@ export class RL02Component implements OnInit {
                 for (let user of selectedUser) {
                     await this.tenantService.addRolesToMember(
                         [this.role],
-                        this.tenantId,
                         user.id,
                     );
                 }
@@ -493,7 +490,7 @@ export class RL02Component implements OnInit {
 
     async onAppVhOpen() {
         try {
-            const apps = await this.appService.getAppCreatedByTenantId(this.tenantId);
+            const apps = await this.appService.getAppCreatedByTenantId();
             this.appsDM.setData(apps);
         } catch (e) {
             this.messageService.add({

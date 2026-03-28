@@ -1,14 +1,24 @@
+/**
+ * User Sign-Up Tests
+ *
+ * Tests the /signup page where users join an existing tenant.
+ * Requires a client_id query param to identify the tenant.
+ * Verifies error when client_id is missing, successful signup,
+ * email verification via fake SMTP, and login after verification.
+ */
 describe('Sign Up', () => {
     function uniqueEmail() {
         return `testuser_${Date.now()}@mail.com`;
     }
 
+    // Visits /signup without a client_id and verifies an error alert is shown
     it('Should show an error when client_id is missing', () => {
         cy.visit('/signup');
         cy.contains('.alert.alert-danger', 'client_id').should('be.visible');
         cy.get('form').should('not.exist');
     });
 
+    // Signs up with a valid client_id, fills the form, and verifies the success message
     it('Should allow signup when client_id is provided via query', () => {
         const email = uniqueEmail();
         cy.visit('/signup?client_id=shire.local');
@@ -25,6 +35,8 @@ describe('Sign Up', () => {
         cy.contains('Sign up successful! Please verify your email, then try logging in again.').should('exist');
     });
 
+    // Full flow: signs up, fetches the verification email from fake SMTP,
+    // clicks the verification link, then logs in with the new credentials
     it('Should send verification email (via control API), verify, then login', () => {
         const SMTP_SERVER = 'http://127.0.0.1:8899/__test__/emails';
         const email = uniqueEmail();

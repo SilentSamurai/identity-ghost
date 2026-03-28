@@ -12,9 +12,8 @@ import { StaticSource } from "../../component/model/StaticSource";
 import { ChangePasswordModalComponent } from './dialogs/change-password.modal.component';
 
 @Component({
-    selector: 'tenant-details',
+    selector: 'app-UR02A',
     template: `
-        <nav-bar></nav-bar>
         <app-object-page>
             <app-op-title>
                 {{ user.email }}
@@ -99,7 +98,7 @@ import { ChangePasswordModalComponent } from './dialogs/change-password.modal.co
                                 <td>{{ tenant.name }}</td>
                                 <td>
                                     <a
-                                        [routerLink]="['/TN02/', tenant.id]"
+                                        [routerLink]="['/admin/TN02/', tenant.id]"
                                         href="javascript:void(0)"
                                     >{{ tenant.domain }}</a
                                     >
@@ -107,7 +106,7 @@ import { ChangePasswordModalComponent } from './dialogs/change-password.modal.co
                                 <td>
                                     <a
                                         [routerLink]="[
-                                            '/TNRL01/',
+                                            '/admin/TNRL01/',
                                             tenant.id,
                                             user.id,
                                         ]"
@@ -124,7 +123,7 @@ import { ChangePasswordModalComponent } from './dialogs/change-password.modal.co
     `,
     styles: [],
 })
-export class UR02Component implements OnInit {
+export class UR02AComponent implements OnInit {
     userId: string = '';
     user: any = {
         name: '',
@@ -219,9 +218,4 @@ export class UR02Component implements OnInit {
             },
         });
     }
-
-    // async onTenantLoad($event: TableAsyncLoadEvent) {
-    //     this.tenants = await lastValueFrom(this.userService.getUserTenants(this.userId));
-    //     $event.update(this.tenants, false);
-    // }
 }

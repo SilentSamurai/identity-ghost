@@ -5,12 +5,12 @@ import {ActivatedRoute, Router} from '@angular/router';
 import {AuthService} from '../_services/auth.service';
 import {AuthDefaultService} from '../_services/auth.default.service';
 import {makeLaunchPad} from '../component/tile/models';
-import {Actions, PermissionService, Subjects,} from '../_services/permission.service';
+import {PermissionService} from '../_services/permission.service';
 
 @Component({
     selector: 'app-home',
     template: `
-        <nav-bar *ngIf="!loading"></nav-bar>
+        <secure-nav-bar *ngIf="!loading"></secure-nav-bar>
         <app-launchpad [groups]="groups"></app-launchpad>
     `,
     styles: [``],
@@ -88,122 +88,6 @@ export class HomeComponent implements OnInit {
                 },
             ],
         },
-        {
-            name: 'Tenants',
-            tiles: [
-                {
-                    title: 'TN01',
-                    subtitle: 'Manage All Tenants',
-                    icon: 'fa-bars',
-                    link: ['/TN01'],
-                    canActivate: (ps: PermissionService) => {
-                        return ps.isAuthorized(Actions.Manage, Subjects.TENANT, 'all');
-                    },
-                },
-                {
-                    title: 'TN02',
-                    subtitle: 'Display Tenant',
-                    icon: 'fa-bars',
-                    link: ['/TN02'],
-                    canActivate: (ps: PermissionService) => {
-                        return ps.isAuthorized(Actions.Manage, Subjects.TENANT);
-                    },
-                },
-                {
-                    title: 'TNRL01',
-                    subtitle: 'Manage Role Assignments',
-                    icon: 'fa-magic',
-                    link: ['/TNRL01'],
-                    canActivate: (ps: PermissionService) => {
-                        return ps.isAuthorized(Actions.Manage, Subjects.TENANT, 'all');
-                    },
-                },
-            ],
-        },
-        {
-            name: 'Users',
-            tiles: [
-                {
-                    title: 'UR01',
-                    subtitle: 'Manage Users',
-                    icon: 'fa-users',
-                    link: ['/UR01'],
-                    canActivate: (ps: PermissionService) => {
-                        return ps.isAuthorized(Actions.Manage, Subjects.USER, 'all');
-                    },
-                },
-                {
-                    title: 'UR02',
-                    subtitle: 'Display User',
-                    icon: 'fa-users',
-                    link: ['/UR02'],
-                    canActivate: (ps: PermissionService) => {
-                        return ps.isAuthorized(Actions.Manage, Subjects.USER, 'all');
-                    },
-                },
-            ],
-        },
-        {
-            name: 'Roles',
-            tiles: [
-                {
-                    title: 'RL01',
-                    subtitle: 'Manage Roles',
-                    icon: 'fa-casl',
-                    link: ['/RL01'],
-                    canActivate: (ps: PermissionService) => {
-                        return ps.isAuthorized(Actions.Manage, Subjects.ROLE, 'all');
-                    },
-                },
-                {
-                    title: 'RL02',
-                    subtitle: 'Display Role',
-                    icon: 'fa-role',
-                    link: ['/RL02'],
-                    canActivate: (ps: PermissionService) => {
-                        return ps.isAuthorized(Actions.Manage, Subjects.ROLE, 'all');
-                    },
-                },
-            ],
-        },
-        {
-            name: 'Apps',
-            tiles: [
-                {
-                    title: 'AP01',
-                    subtitle: 'Manage Apps',
-                    icon: 'fa-app',
-                    link: ['/AP01'],
-                    canActivate: (ps: PermissionService) => {
-                        return ps.isAuthorized(Actions.Manage, Subjects.APPS, 'all');
-                    },
-                },
-            ],
-        },
-        {
-            name: 'Groups',
-            tiles: [
-                {
-                    title: 'GP01',
-                    subtitle: 'Manage Groups',
-                    icon: 'fa-group',
-                    link: ['/GP01'],
-                    canActivate: (ps: PermissionService) => {
-                        return ps.isAuthorized(Actions.Manage, Subjects.GROUP, 'all');
-                    },
-                },
-                {
-                    title: 'GP02',
-                    subtitle: 'Display Group',
-                    icon: 'fa-group',
-                    link: ['/GP02'],
-                    canActivate: (ps: PermissionService) => {
-                        return ps.isAuthorized(Actions.Manage, Subjects.GROUP, 'all');
-                    },
-                },
-            ],
-        },
-
     ];
 
     constructor(

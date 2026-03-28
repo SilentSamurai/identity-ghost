@@ -1,7 +1,7 @@
 import {Component, OnInit} from '@angular/core';
 import {ActivatedRoute, Router} from '@angular/router';
 import {NgbModal} from '@ng-bootstrap/ng-bootstrap';
-import {TenantService} from '../../_services/tenant.service';
+import {AdminTenantService} from '../../_services/admin-tenant.service';
 import {SessionService} from '../../_services/session.service';
 import {GroupService} from '../../_services/group.service';
 import {AuthDefaultService} from '../../_services/auth.default.service';
@@ -12,9 +12,8 @@ import {StaticSource} from '../../component/model/StaticSource';
 import {CloseType, ValueHelpResult,} from '../../component/value-help/value-help.component';
 
 @Component({
-    selector: 'app-group-object',
+    selector: 'app-GP02A',
     template: `
-        <nav-bar></nav-bar>
         <app-object-page *ngIf="!loading">
             <app-op-title>
                 {{ group.name }}
@@ -95,7 +94,7 @@ import {CloseType, ValueHelpResult,} from '../../component/value-help/value-help
                                     <td>
                                         <a
                                             [routerLink]="[
-                                                '/RL02',
+                                                '/admin/RL02',
                                                 group.tenant.id,
                                                 role.id,
                                             ]"
@@ -163,7 +162,7 @@ import {CloseType, ValueHelpResult,} from '../../component/value-help/value-help
                                     <td>{{ user.name }}</td>
                                     <td>
                                         <a
-                                            [routerLink]="['/UR02', user.email]"
+                                            [routerLink]="['/admin/UR02', user.email]"
                                             href="javascript:void(0)"
                                         >{{ user.email }}</a
                                         >
@@ -171,7 +170,7 @@ import {CloseType, ValueHelpResult,} from '../../component/value-help/value-help
                                     <td>
                                         <a
                                             [routerLink]="[
-                                                '/TNRL01',
+                                                '/admin/TNRL01',
                                                 group.tenant.id,
                                                 user.email,
                                             ]"
@@ -205,7 +204,7 @@ import {CloseType, ValueHelpResult,} from '../../component/value-help/value-help
     styles: [''],
     providers: [],
 })
-export class GP02Component implements OnInit {
+export class GP02AComponent implements OnInit {
     loading = true;
     group: any;
     users: any[] = [];
@@ -217,7 +216,7 @@ export class GP02Component implements OnInit {
     private group_id: any;
 
     constructor(
-        private tenantService: TenantService,
+        private adminTenantService: AdminTenantService,
         private tokenStorageService: SessionService,
         private messageService: MessageService,
         private groupService: GroupService,
@@ -233,7 +232,7 @@ export class GP02Component implements OnInit {
         this.loading = true;
         this.authDefaultService.setTitle('Group Details');
         if (!this.actRoute.snapshot.params.hasOwnProperty('groupId')) {
-            await this.router.navigate(['/GP02']);
+            await this.router.navigate(['/admin/GP02']);
         }
 
         this.group_id = this.actRoute.snapshot.params['groupId'];
@@ -243,11 +242,9 @@ export class GP02Component implements OnInit {
         this.group = response.group;
         this.users = response.users;
         this.roles = response.roles;
-        let members = await this.tenantService.getMembers(this.group.tenantId);
+        let members = await this.adminTenantService.getMembers(this.group.tenant.id);
         this.usersDM.setData(members);
-        let tenantRoles = await this.tenantService.getTenantRoles(
-            this.group.tenantId,
-        );
+        let tenantRoles = await this.adminTenantService.getTenantRoles(this.group.tenant.id);
         this.rolesDM.setData(tenantRoles);
 
         this.authDefaultService.setTitle('Group: ' + this.group.name);
@@ -276,7 +273,7 @@ export class GP02Component implements OnInit {
                     summary: 'Successful',
                     detail: 'Group removed',
                 });
-                await this.router.navigate(['/GP01']);
+                await this.router.navigate(['/admin/GP01']);
             },
         });
     }
@@ -310,16 +307,6 @@ export class GP02Component implements OnInit {
             }
         }
     }
-
-    // async provideUsers($event: TableAsyncLoadEvent) {
-    //     let members = await this.tenantService.getMembers(this.group.tenantId);
-    //     $event.update(members, false);
-    // }
-    //
-    // async provideRoles($event: TableAsyncLoadEvent) {
-    //     let roles = await this.tenantService.getTenantRoles(this.group.tenantId);
-    //     $event.update(roles, false);
-    // }
 
     async onAddRoles(result: ValueHelpResult) {
         if (result.closeType === CloseType.Confirm) {

@@ -175,4 +175,27 @@ export class AdminTenantService {
             ),
         ) as Promise<any[]>;
     }
+
+    // ─── Member mutations ───
+
+    async addMember(tenantId: string, emails: string[]) {
+        return lastValueFrom(
+            this.http.post(
+                `${API_URL}/admin/tenant/${tenantId}/members/add`,
+                {emails},
+                this.getHttpOptions(),
+            ),
+        );
+    }
+
+    async removeMember(tenantId: string, email: string) {
+        return lastValueFrom(
+            this.http.delete(
+                `${API_URL}/admin/tenant/${tenantId}/members/delete`,
+                {
+                    body: {emails: [email]},
+                },
+            ),
+        );
+    }
 }

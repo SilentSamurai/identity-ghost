@@ -3,6 +3,7 @@ import {NgbModal} from '@ng-bootstrap/ng-bootstrap';
 import {CreateTenantComponent} from './dialogs/create-tenant.component';
 import {UpdateTenantComponent} from './dialogs/update-tenant.component';
 import {TenantService} from '../../_services/tenant.service';
+import {AdminTenantService} from '../../_services/admin-tenant.service';
 import {SessionService} from '../../_services/session.service';
 import {AppTableComponent} from '../../component/table/app-table.component';
 import {AuthDefaultService} from '../../_services/auth.default.service';
@@ -13,9 +14,8 @@ import {Filter} from '../../component/model/Filters';
 import {DataSource} from "../../component/model/DataSource";
 
 @Component({
-    selector: 'app-TN01',
+    selector: 'app-TN01A',
     template: `
-        <nav-bar></nav-bar>
         <app-page-view>
             <app-page-view-header>
                 <div class="">
@@ -56,7 +56,7 @@ import {DataSource} from "../../component/model/DataSource";
                     <ng-template #table_body let-tenant>
                         <td>
                             <a
-                                [routerLink]="['/TN02/', tenant.id]"
+                                [routerLink]="['/admin/TN02/', tenant.id]"
                                 href="javascript:void(0)"
                             >{{ tenant.domain }}</a
                             >
@@ -87,7 +87,7 @@ import {DataSource} from "../../component/model/DataSource";
     `,
     styles: [''],
 })
-export class TN01Component implements OnInit {
+export class TN01AComponent implements OnInit {
     @ViewChild(AppTableComponent)
     table!: AppTableComponent;
 
@@ -100,6 +100,7 @@ export class TN01Component implements OnInit {
     constructor(
         private tokenStorageService: SessionService,
         private tenantService: TenantService,
+        private adminTenantService: AdminTenantService,
         private authDefaultService: AuthDefaultService,
         private confirmationService: ConfirmationService,
         private messageService: MessageService,
@@ -159,7 +160,7 @@ export class TN01Component implements OnInit {
             icon: 'pi pi-info-circle',
             accept: async () => {
                 try {
-                    let deletedTenant = await this.tenantService.deleteTenant(
+                    let deletedTenant = await this.adminTenantService.deleteTenant(
                         tenant.id,
                     );
                     this.messageService.add({

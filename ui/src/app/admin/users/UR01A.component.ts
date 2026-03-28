@@ -11,9 +11,8 @@ import {DataSource} from "../../component/model/DataSource";
 import {Filter} from "../../component/model/Filters";
 
 @Component({
-    selector: 'app-board-user',
+    selector: 'app-UR01A',
     template: `
-        <nav-bar></nav-bar>
         <app-page-view>
             <app-page-view-header>
                 <app-fb (onFilter)="onFilter($event)">
@@ -51,7 +50,7 @@ import {Filter} from "../../component/model/Filters";
                         <td>{{ user.name }} {{ user.surname }}</td>
                         <td>
                             <a
-                                [routerLink]="['/UR02/', user.id]"
+                                [routerLink]="['/admin/UR02/', user.id]"
                                 href="javascript:void(0)"
                             >{{ user.email }}</a
                             >
@@ -82,7 +81,7 @@ import {Filter} from "../../component/model/Filters";
     `,
     styles: [''],
 })
-export class UR01Component implements OnInit {
+export class UR01AComponent implements OnInit {
     @ViewChild(AppTableComponent)
     table!: AppTableComponent;
 

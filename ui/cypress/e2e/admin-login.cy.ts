@@ -1,94 +1,49 @@
-describe('login', () => {
-    beforeEach(() => {
-        // Cypress starts out with a blank slate for each test
-        // so we must tell it to visit our website with the `cy.visit()` command.
-        // Since we want to visit the same URL at the start of all our tests,
-        // we include it in our beforeEach function so that it runs before each test
-        cy.visit('/admin-login')
-    })
+/**
+ * Admin Access Tests
+ *
+ * Tests that super-admin users can access /admin after logging in
+ * through the regular /login page, and that unauthorized users
+ * are rejected with 403.
+ */
+describe('Admin Access', () => {
 
-    it('Normal Login', () => {
-        // We'll click on the "active" button in order to
-        // display only incomplete items
-        // cy.get('#domain-pre').type('dummy.com')
+    // Logs in with the super-admin and verifies access to /admin
+    it('Super Admin can access admin panel', () => {
+        cy.visit('/login?client_id=auth.server.com');
 
-        // After filtering, we can assert that there is only the one
-        // incomplete item in the list.
-        // cy.get('#continue-btn').click()
+        cy.get('#username').type('admin@auth.server.com');
+        cy.get('#password').type('admin9000');
 
-        cy.get('#username').type("admin@mail.com")
-        cy.get('#password').type("admin9000")
-
-        cy.intercept('POST', '**/api/oauth/login*').as('authCode')
+        cy.intercept('POST', '**/api/oauth/token*').as('authCode');
 
         cy.get('#login-btn').click();
 
         cy.wait('@authCode').should(({request, response}) => {
             expect(response, 'response').to.exist;
-            expect(response!.statusCode).to.be.oneOf([201]);
-            // expect(response && response.body).to.include('authentication_code')
+            expect(response!.statusCode).to.be.oneOf([201, 200]);
         });
 
         cy.url().should('include', '/home');
 
-        // Then assert the page title
-        cy.contains('Home');
-
-
+        cy.visit('/admin');
+        cy.url().should('include', '/admin');
     })
 
-    it('Admin Login', () => {
-        // We'll click on the "active" button in order to
-        // display only incomplete items
-        // cy.get('#domain-pre').type('auth.server.com')
+    // Logs in with a non-admin user and verifies /admin redirects to error
+    it('Non-admin user cannot access admin panel', () => {
+        cy.visit('/login?client_id=auth.server.com');
 
-        // After filtering, we can assert that there is only the one
-        // incomplete item in the list.
-        // cy.get('#continue-btn').click()
+        cy.get('#username').type('legolas@mail.com');
+        cy.get('#password').type('legolas9000');
 
-        cy.get('#username').type("admin@auth.server.com")
-        cy.get('#password').type("admin9000")
-
-        cy.intercept('POST', '**/api/oauth/login*').as('authCode')
+        cy.intercept('POST', '**/api/oauth/login*').as('login');
 
         cy.get('#login-btn').click();
 
-        cy.wait('@authCode').should(({request, response}) => {
+        cy.wait('@login').should(({request, response}) => {
             expect(response, 'response').to.exist;
-            expect(response!.statusCode).to.be.oneOf([201]);
-            // expect(response && response.body).to.include('authentication_code')
-        })
-
-
-        cy.url().should('include', '/home');
-
-        // Then assert the page title
-        cy.contains('Home');
-
-    })
-
-    it('Should fail Login user not available to tenant', () => {
-        // We'll click on the "active" button in order to
-        // display only incomplete items
-        // cy.get('#domain-pre').type('dummy.com')
-
-        // After filtering, we can assert that there is only the one
-        // incomplete item in the list.
-        // cy.get('#continue-btn').click()
-
-        cy.get('#username').type("legolas@mail.com")
-        cy.get('#password').type("legolas9000")
-
-        cy.intercept('POST', '**/api/oauth/login*').as('authCode')
-
-        cy.get('#login-btn').click();
-
-        cy.wait('@authCode').should(({request, response}) => {
-            expect(response, 'response').to.exist;
+            // User not in auth.server.com tenant — expect 403
             expect(response!.statusCode).to.be.oneOf([403]);
-            // expect(response && response.body).to.include('authentication_code')
         });
-
-
     })
 })

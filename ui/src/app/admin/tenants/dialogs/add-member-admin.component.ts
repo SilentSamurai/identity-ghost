@@ -1,10 +1,10 @@
 import {Component, EventEmitter, Input, OnInit, Output} from '@angular/core';
 import {NgbActiveModal} from '@ng-bootstrap/ng-bootstrap';
 import {MessageService} from 'primeng/api';
-import {TenantService} from '../../../_services/tenant.service';
+import {AdminTenantService} from '../../../_services/admin-tenant.service';
 
 @Component({
-    selector: 'app-add-member',
+    selector: 'app-add-member-admin',
     template: `
         <app-standard-dialog title="Add Member">
             <app-dialog-tab>
@@ -15,9 +15,7 @@ import {TenantService} from '../../../_services/tenant.service';
                     novalidate
                 >
                     <div class="mb-3 form-group">
-                        <label class="form-label" for="add.member.name"
-                        >Email</label
-                        >
+                        <label class="form-label" for="add.member.name">Email</label>
                         <input
                             #email="ngModel"
                             [(ngModel)]="form.email"
@@ -42,7 +40,7 @@ import {TenantService} from '../../../_services/tenant.service';
                     class="btn btn-primary"
                     type="submit"
                     id="ADD_TENANT_MEMBER_BTN"
-                    (click)="addMemberForm.onSubmit(krishna)"
+                    (click)="addMemberForm.onSubmit(submitRef)"
                 >
                     Add Member
                 </button>
@@ -51,17 +49,17 @@ import {TenantService} from '../../../_services/tenant.service';
     `,
     styles: [''],
 })
-export class AddMemberComponent implements OnInit {
+export class AddMemberAdminComponent implements OnInit {
     @Input() readonly tenant: any;
     @Output() passEntry: EventEmitter<any> = new EventEmitter();
 
     form = {
         email: '',
     };
-    krishna: any;
+    submitRef: any;
 
     constructor(
-        private tenantService: TenantService,
+        private adminTenantService: AdminTenantService,
         private messageService: MessageService,
         public activeModal: NgbActiveModal,
     ) {
@@ -72,16 +70,17 @@ export class AddMemberComponent implements OnInit {
 
     async onSubmit() {
         try {
-            const addedMember = await this.tenantService.addMember(
-                this.form.email,
+            const result = await this.adminTenantService.addMember(
+                this.tenant.id,
+                [this.form.email],
             );
             this.messageService.add({
                 severity: 'success',
                 summary: 'Success',
                 detail: 'Member Added',
             });
-            this.passEntry.emit(addedMember);
-            this.activeModal.close(addedMember);
+            this.passEntry.emit(result);
+            this.activeModal.close(result);
         } catch (e) {
             this.messageService.add({
                 severity: 'error',

@@ -1,38 +1,36 @@
 import {Component, EventEmitter, Input, OnInit, Output} from '@angular/core';
 import {NgbActiveModal} from '@ng-bootstrap/ng-bootstrap';
 import {MessageService} from 'primeng/api';
-import {TenantService} from '../../../_services/tenant.service';
+import {AdminTenantService} from '../../../_services/admin-tenant.service';
 
 @Component({
-    selector: 'app-add-member',
+    selector: 'app-add-role-admin',
     template: `
-        <app-standard-dialog title="Add Member">
+        <app-standard-dialog title="Add Role">
             <app-dialog-tab>
                 <form
-                    #addMemberForm="ngForm"
-                    (ngSubmit)="addMemberForm.form.valid && onSubmit()"
-                    name="addMemberForm"
+                    #addRoleForm="ngForm"
+                    (ngSubmit)="addRoleForm.form.valid && onSubmit()"
+                    name="addRoleForm"
                     novalidate
                 >
-                    <div class="mb-3 form-group">
-                        <label class="form-label" for="add.member.name"
-                        >Email</label
-                        >
+                    <div class="mb-3">
+                        <label class="form-label" for="add.role.name">Role Name</label>
                         <input
-                            #email="ngModel"
-                            [(ngModel)]="form.email"
+                            #name="ngModel"
+                            [(ngModel)]="form.name"
                             class="form-control"
-                            id="add.member.name"
-                            name="email"
+                            id="add.role.name"
+                            name="name"
                             required
-                            type="email"
+                            type="text"
                         />
                         <div
-                            *ngIf="email.errors && addMemberForm.submitted"
+                            *ngIf="name.errors && addRoleForm.submitted"
                             class="alert alert-danger"
                             role="alert"
                         >
-                            Email is required!
+                            Role Name is required!
                         </div>
                     </div>
                 </form>
@@ -41,27 +39,27 @@ import {TenantService} from '../../../_services/tenant.service';
                 <button
                     class="btn btn-primary"
                     type="submit"
-                    id="ADD_TENANT_MEMBER_BTN"
-                    (click)="addMemberForm.onSubmit(krishna)"
+                    (click)="addRoleForm.onSubmit(submitRef)"
+                    id="ADD_TENANT_ROLE_BTN"
                 >
-                    Add Member
+                    Create
                 </button>
             </app-dialog-footer>
         </app-standard-dialog>
     `,
     styles: [''],
 })
-export class AddMemberComponent implements OnInit {
+export class AddRoleAdminComponent implements OnInit {
     @Input() readonly tenant: any;
     @Output() passEntry: EventEmitter<any> = new EventEmitter();
 
     form = {
-        email: '',
+        name: '',
     };
-    krishna: any;
+    submitRef: any;
 
     constructor(
-        private tenantService: TenantService,
+        private adminTenantService: AdminTenantService,
         private messageService: MessageService,
         public activeModal: NgbActiveModal,
     ) {
@@ -72,21 +70,23 @@ export class AddMemberComponent implements OnInit {
 
     async onSubmit() {
         try {
-            const addedMember = await this.tenantService.addMember(
-                this.form.email,
+            const result = await this.adminTenantService.createRole(
+                this.tenant.id,
+                this.form.name,
             );
             this.messageService.add({
                 severity: 'success',
                 summary: 'Success',
-                detail: 'Member Added',
+                detail: 'Role Added',
             });
-            this.passEntry.emit(addedMember);
-            this.activeModal.close(addedMember);
+            this.passEntry.emit(result);
+            this.activeModal.close(result);
         } catch (e) {
+            console.error(e);
             this.messageService.add({
                 severity: 'error',
                 summary: 'Error',
-                detail: 'Failed to add member',
+                detail: 'Failed to add role',
             });
         }
     }

@@ -1,13 +1,12 @@
 import {Component, OnInit} from '@angular/core';
 import {Router} from '@angular/router';
-import {UserService} from '../_services/user.service';
 import {AuthDefaultService} from '../_services/auth.default.service';
 import {SessionService} from '../_services/session.service';
 import {NgbModal} from '@ng-bootstrap/ng-bootstrap';
 import {ProfileComponent} from '../open-pages/profile.component';
 
 @Component({
-    selector: 'secure-nav-bar',
+    selector: 'admin-nav-bar',
     template: `
         <nav
             class="navbar navbar-expand-lg navbar-dark"
@@ -16,7 +15,7 @@ import {ProfileComponent} from '../open-pages/profile.component';
             <div class="container-fluid">
                 <a
                     class="navbar-brand d-flex align-items-center"
-                    routerLink="/home"
+                    routerLink="/admin"
                 >
                     <img
                         alt="Logo"
@@ -41,11 +40,29 @@ import {ProfileComponent} from '../open-pages/profile.component';
                     [ngbCollapse]="isCollapsed"
                     class="collapse navbar-collapse"
                 >
+                    <ul class="navbar-nav me-auto">
+                        <li class="nav-item">
+                            <a class="nav-link text-white" routerLink="/admin/TN01" routerLinkActive="active">Tenants</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link text-white" routerLink="/admin/UR01" routerLinkActive="active">Users</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link text-white" routerLink="/admin/RL01" routerLinkActive="active">Roles</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link text-white" routerLink="/admin/GP01" routerLinkActive="active">Groups</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link text-white" routerLink="/admin/AP01" routerLinkActive="active">Apps</a>
+                        </li>
+                    </ul>
+
                     <ul class="navbar-nav ms-auto">
                         <li class="nav-item dropdown" ngbDropdown>
                             <a
                                 class="nav-link dropdown-toggle text-white"
-                                id="dropdownUser1"
+                                id="adminDropdownUser"
                                 ngbDropdownToggle
                                 role="button"
                             >
@@ -60,27 +77,22 @@ import {ProfileComponent} from '../open-pages/profile.component';
                                     class="dropdown-item"
                                     href="javascript:void(0)"
                                     (click)="openProfileModal()"
-                                >Profile</a
-                                >
+                                >Profile</a>
                                 <div class="dropdown-divider"></div>
                                 <a
                                     class="dropdown-item"
-                                    href="https://silentsamurai.github.io/auth-server"
-                                >API Docs</a
-                                >
+                                    routerLink="/home"
+                                >User Section</a>
                                 <a
-                                    *ngIf="isSuperAdmin"
                                     class="dropdown-item"
-                                    routerLink="/admin"
-                                >Admin Panel</a
-                                >
+                                    href="https://silentsamurai.github.io/auth-server"
+                                >API Docs</a>
                                 <div class="dropdown-divider"></div>
                                 <a
                                     class="dropdown-item"
                                     href="javascript:void(0)"
                                     (click)="logout()"
-                                >Sign Out</a
-                                >
+                                >Sign Out</a>
                             </div>
                         </li>
                     </ul>
@@ -96,40 +108,36 @@ import {ProfileComponent} from '../open-pages/profile.component';
         `,
     ],
 })
-export class SecureNavBarComponent implements OnInit {
+export class AdminNavBarComponent implements OnInit {
     isLoggedIn = false;
     email?: string;
-    isSuperAdmin = false;
     public isCollapsed = true;
 
     constructor(
-        private userService: UserService,
         private router: Router,
         private modalService: NgbModal,
         private authDefaultService: AuthDefaultService,
-        private tokenStorageService: SessionService,
+        private sessionService: SessionService,
     ) {
     }
 
     async ngOnInit(): Promise<void> {
-        this.isLoggedIn = !!this.tokenStorageService.getToken();
+        this.isLoggedIn = !!this.sessionService.getToken();
 
-        if (this.tokenStorageService.isLoggedIn()) {
-            const user = this.tokenStorageService.getUser()!;
+        if (this.sessionService.isLoggedIn()) {
+            const user = this.sessionService.getUser()!;
             this.email = user.email;
-            this.isSuperAdmin = this.tokenStorageService.isSuperAdmin();
         }
     }
 
     logout(): void {
-        this.authDefaultService.signOut('/home');
+        this.authDefaultService.signOut('/admin');
     }
 
     async openProfileModal() {
         const modalRef = this.modalService.open(ProfileComponent);
         const result = await modalRef.result;
         console.log('returned result', result);
-        // await this.ngOnInit();
     }
 
     getTitle() {

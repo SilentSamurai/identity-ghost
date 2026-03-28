@@ -476,6 +476,9 @@ export class TenantService implements OnModuleInit {
         );
 
         let tenant: Tenant = await this.findById(authContext, tenantId);
+        if (tenant.domain === this.configService.get("SUPER_TENANT_DOMAIN")) {
+            throw new ForbiddenException("Super tenant cannot be deleted");
+        }
         await this.roleService.deleteByTenant(authContext, tenant);
         return this.tenantRepository.remove(tenant);
     }

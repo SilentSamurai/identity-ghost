@@ -5,6 +5,7 @@ import {AppTableComponent} from '../../component/table/app-table.component';
 import {Filter} from '../../component/model/Filters';
 import {StaticSource} from '../../component/model/StaticSource';
 import {AuthDefaultService} from '../../_services/auth.default.service';
+import {SessionService} from '../../_services/session.service';
 import {ConfirmationService} from '../../component/dialogs/confirmation.service';
 import {MessageService} from 'primeng/api';
 import {ModalService} from '../../component/dialogs/modal.service';
@@ -14,7 +15,7 @@ import {SecretDisplayComponent} from './dialogs/secret-display.component';
 @Component({
     selector: 'app-CL01',
     template: `
-        <nav-bar></nav-bar>
+        <secure-nav-bar></secure-nav-bar>
         <app-page-view>
             <app-page-view-header>
                 <div class="">
@@ -26,6 +27,7 @@ import {SecretDisplayComponent} from './dialogs/secret-display.component';
                         <div></div>
                         <button
                             (click)="openCreateModal()"
+                            [disabled]="!isTenantAdmin"
                             class="btn btn-outline-success btn-sm"
                             type="button"
                         >
@@ -66,6 +68,7 @@ import {SecretDisplayComponent} from './dialogs/secret-display.component';
                         <td style="max-width: 100px">
                             <button
                                 (click)="openDeleteModal(client)"
+                                [disabled]="!isTenantAdmin"
                                 class="btn btn-sm btn-danger"
                                 type="button"
                             >
@@ -85,10 +88,12 @@ export class CL01Component implements OnInit {
 
     dataSource: StaticSource<Client>;
     tenantId: string = '';
+    isTenantAdmin = false;
 
     constructor(
         private clientService: ClientService,
         private authDefaultService: AuthDefaultService,
+        private sessionService: SessionService,
         private modalService: ModalService,
         private confirmationService: ConfirmationService,
         private messageService: MessageService,
@@ -99,12 +104,13 @@ export class CL01Component implements OnInit {
 
     async ngOnInit() {
         this.tenantId = this.actRoute.snapshot.params['tenantId'];
+        this.isTenantAdmin = this.sessionService.isTenantAdmin();
         this.authDefaultService.setTitle('CL01: Manage Clients');
         await this.refreshData();
     }
 
     async refreshData() {
-        const clients = await this.clientService.getClientsByTenant(this.tenantId);
+        const clients = await this.clientService.getClientsByTenant();
         this.dataSource.setData(Array.isArray(clients) ? clients : []);
     }
 

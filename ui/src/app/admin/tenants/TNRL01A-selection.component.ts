@@ -3,14 +3,14 @@ import {UserService} from '../../_services/user.service';
 import {NgbModal} from '@ng-bootstrap/ng-bootstrap';
 import {ActivatedRoute, Router} from '@angular/router';
 import {TenantService} from '../../_services/tenant.service';
+import {AdminTenantService} from '../../_services/admin-tenant.service';
 import {MessageService} from 'primeng/api';
 import {AuthDefaultService} from '../../_services/auth.default.service';
 import {DataSource} from "../../component/model/DataSource";
 
 @Component({
-    selector: 'app-TNRL01-SEL',
+    selector: 'app-TNRL01A-sel',
     template: `
-        <nav-bar></nav-bar>
         <div class="container-fluid">
             <div class="row">
                 <div class="h5 py-2">Select Tenant & User:</div>
@@ -94,7 +94,7 @@ import {DataSource} from "../../component/model/DataSource";
     `,
     styles: [``],
 })
-export class TNRL01SelectionComponent implements OnInit {
+export class TNRL01ASelectionComponent implements OnInit {
     tenantId: any | null = null;
     email: string | null = '';
     roles = [];
@@ -108,6 +108,7 @@ export class TNRL01SelectionComponent implements OnInit {
     constructor(
         private userService: UserService,
         private tenantService: TenantService,
+        private adminTenantService: AdminTenantService,
         private route: ActivatedRoute,
         private router: Router,
         private authDefaultService: AuthDefaultService,
@@ -133,7 +134,7 @@ export class TNRL01SelectionComponent implements OnInit {
             const isMem = await this.isMember();
             if (isMem) {
                 await this.router.navigate([
-                    '/TNRL01',
+                    '/admin/TNRL01',
                     this.selectedTenant[0].id,
                     this.selectedUser[0].id,
                 ]);
@@ -145,7 +146,7 @@ export class TNRL01SelectionComponent implements OnInit {
         const userId = this.selectedUser[0].id;
         const tenantId = this.selectedTenant[0].id;
         try {
-            await this.tenantService.getMemberDetails(tenantId, userId);
+            await this.adminTenantService.getMemberDetails(tenantId, userId);
         } catch (exception: any) {
             this.messageService.add({
                 severity: 'error',
@@ -156,22 +157,4 @@ export class TNRL01SelectionComponent implements OnInit {
         }
         return true;
     }
-
-    // async userDataProvider(event: TableAsyncLoadEvent) {
-    //     let response = await this.userService.queryUser({
-    //         pageNo: event.pageNo,
-    //         where: event.filters.filter(item => item.value != null && item.value.length > 0),
-    //     });
-    //     this.users = response.data;
-    //     event.update(this.users, response.hasNextPage);
-    // }
-    //
-    // async onTenantLoad(event: TableAsyncLoadEvent) {
-    //     let response = await this.tenantService.queryTenant({
-    //         pageNo: event.pageNo,
-    //         where: event.filters.filter(f => f.value != null && f.value.length > 0),
-    //     });
-    //     this.tenants = response.data;
-    //     event.update(this.tenants, response.hasNextPage);
-    // }
 }

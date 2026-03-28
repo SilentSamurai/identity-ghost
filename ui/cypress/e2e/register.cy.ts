@@ -1,3 +1,11 @@
+/**
+ * Tenant Registration Tests
+ *
+ * Tests the /register page where a new organization can sign up
+ * with a tenant name, domain, and initial admin user.
+ * Verifies form validation (empty fields, invalid email) and
+ * successful tenant creation via the register-domain API.
+ */
 describe('Register', () => {
     function uniqueEmail() {
         return `testuser_${Date.now()}@mail.com`;
@@ -10,6 +18,7 @@ describe('Register', () => {
         cy.visit('/register');
     });
 
+    // Submits the form with empty fields and verifies validation error messages appear
     it('Should show validation errors for empty fields', () => {
         // Try to submit with empty form
         cy.get('button.btn-primary').first().click();
@@ -17,6 +26,7 @@ describe('Register', () => {
         cy.contains('Domain is required').should('exist');
     });
 
+    // Fills in both steps (org info + user info) and submits, verifying the API returns 201/200
     it('Should register a new tenant successfully', () => {
         const orgName = 'Test Org';
         const domain = uniqueDomain();
@@ -43,6 +53,7 @@ describe('Register', () => {
         // cy.contains('Your registration is successful!').should('exist');
     });
 
+    // Enters an invalid email format and verifies the validation error appears
     it('Should show error for invalid email', () => {
         // Step 1
         cy.get('input#orgName').type('Test Org');
