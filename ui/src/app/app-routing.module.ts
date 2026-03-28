@@ -19,7 +19,7 @@ import {ForgotPasswordComponent} from './open-pages/forgot-password.component';
 import {ResetPasswordComponent} from './open-pages/reset-password.component';
 import {WelcomeComponent} from './open-pages/welcome.component';
 import {SignUpComponent} from './open-pages/signup.component';
-import {AdminGuard} from './admin/admin-guard.service';
+import {AdminGuard} from './super-admin/admin-guard.service';
 
 const routes: Routes = [
     {path: 'welcome', component: WelcomeComponent},
@@ -35,7 +35,7 @@ const routes: Routes = [
     {
         path: 'admin',
         canActivate: [AdminGuard],
-        loadChildren: () => import('./admin/admin.module').then(m => m.AdminModule),
+        loadChildren: () => import('./super-admin/admin.module').then(m => m.AdminModule),
     },
     {
         path: '',
