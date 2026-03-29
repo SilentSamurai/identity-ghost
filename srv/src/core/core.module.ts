@@ -17,8 +17,16 @@ import {AppSubscriptionService} from "../services/app-subscription.service";
 import {TechnicalTokenService} from "./technical-token.service";
 import {RS256TokenGenerator} from "./rs256-token-generator.service";
 import {HS256TokenGenerator} from "./hs256-token-generator.service";
+import {ES256TokenGenerator} from "./es256-token-generator.service";
+import {PS256TokenGenerator} from "./ps256-token-generator.service";
 import {RS256SigningKeyProvider} from "./rs256-signing-key-provider.service";
-import {HS256_TOKEN_GENERATOR, SIGNING_KEY_PROVIDER, RS256_TOKEN_GENERATOR} from "./token-abstraction";
+import {
+    HS256_TOKEN_GENERATOR,
+    SIGNING_KEY_PROVIDER,
+    RS256_TOKEN_GENERATOR,
+    ES256_TOKEN_GENERATOR,
+    PS256_TOKEN_GENERATOR
+} from "./token-abstraction";
 
 @Module({
     imports: [
@@ -34,6 +42,8 @@ import {HS256_TOKEN_GENERATOR, SIGNING_KEY_PROVIDER, RS256_TOKEN_GENERATOR} from
         AppSubscriptionService,
         RS256TokenGenerator,
         HS256TokenGenerator,
+        ES256TokenGenerator,
+        PS256TokenGenerator,
         RS256SigningKeyProvider,
         {
             provide: RS256_TOKEN_GENERATOR,
@@ -42,6 +52,14 @@ import {HS256_TOKEN_GENERATOR, SIGNING_KEY_PROVIDER, RS256_TOKEN_GENERATOR} from
         {
             provide: HS256_TOKEN_GENERATOR,
             useClass: HS256TokenGenerator,
+        },
+        {
+            provide: ES256_TOKEN_GENERATOR,
+            useClass: ES256TokenGenerator,
+        },
+        {
+            provide: PS256_TOKEN_GENERATOR,
+            useClass: PS256TokenGenerator,
         },
         {
             provide: SIGNING_KEY_PROVIDER,
@@ -57,6 +75,8 @@ import {HS256_TOKEN_GENERATOR, SIGNING_KEY_PROVIDER, RS256_TOKEN_GENERATOR} from
         AppSubscriptionService,
         RS256_TOKEN_GENERATOR,
         HS256_TOKEN_GENERATOR,
+        ES256_TOKEN_GENERATOR,
+        PS256_TOKEN_GENERATOR,
         SIGNING_KEY_PROVIDER,
         TechnicalTokenService,
         TypeOrmModule,

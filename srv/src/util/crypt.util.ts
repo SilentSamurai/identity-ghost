@@ -25,6 +25,20 @@ export class CryptUtil {
         });
     }
 
+    public static generateECKeyPair() {
+        return generateKeyPairSync("ec", {
+            namedCurve: "P-256",
+            publicKeyEncoding: {
+                type: "spki",
+                format: "pem",
+            },
+            privateKeyEncoding: {
+                type: "pkcs8",
+                format: "pem",
+            },
+        });
+    }
+
     public static generateClientIdAndSecret() {
         const clientId = this.generateClientId();
         const {clientSecret, salt} = this.generateClientSecret(clientId);

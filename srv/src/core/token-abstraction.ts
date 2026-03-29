@@ -9,6 +9,8 @@ export interface TokenGenerator {
 
 export const RS256_TOKEN_GENERATOR = Symbol("RS256_TOKEN_GENERATOR");
 export const HS256_TOKEN_GENERATOR = Symbol("HS256_TOKEN_GENERATOR");
+export const ES256_TOKEN_GENERATOR = Symbol("ES256_TOKEN_GENERATOR");
+export const PS256_TOKEN_GENERATOR = Symbol("PS256_TOKEN_GENERATOR");
 
 export interface SigningKeyProvider {
     generateKeyPair(): { privateKey: string; publicKey: string };
