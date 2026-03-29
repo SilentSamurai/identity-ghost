@@ -3,10 +3,10 @@ import {JwtService} from "@nestjs/jwt";
 import {Environment} from "../config/environment.service";
 import {JwtSignOptions} from "@nestjs/jwt/dist/interfaces/jwt-module-options.interface";
 import {JwtVerifyOptions} from "@nestjs/jwt/dist/interfaces";
-import {TokenGenerator} from "./token-abstraction";
+import {TokenService} from "./token-abstraction";
 
 @Injectable()
-export class HS256TokenGenerator implements TokenGenerator {
+export class HS256TokenGenerator implements TokenService {
     private readonly jwtService: JwtService;
 
     constructor(private readonly configService: Environment) {

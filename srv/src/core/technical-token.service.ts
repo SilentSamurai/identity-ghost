@@ -2,13 +2,13 @@ import {Inject, Injectable} from "@nestjs/common";
 import {Tenant} from "../entity/tenant.entity";
 import {TechnicalToken} from "../casl/contexts";
 import {RoleEnum} from "../entity/roleEnum";
-import {RS256_TOKEN_GENERATOR, TokenGenerator} from "./token-abstraction";
+import {RS256_TOKEN_GENERATOR, TokenService} from "./token-abstraction";
 
 @Injectable()
 export class TechnicalTokenService {
     constructor(
         @Inject(RS256_TOKEN_GENERATOR)
-        private readonly tokenGenerator: TokenGenerator,
+        private readonly tokenGenerator: TokenService,
     ) {
     }
 

@@ -1,7 +1,7 @@
 import {JwtSignOptions} from "@nestjs/jwt/dist/interfaces/jwt-module-options.interface";
 import {JwtVerifyOptions} from "@nestjs/jwt/dist/interfaces";
 
-export interface TokenGenerator {
+export interface TokenService {
     sign(payload: any, options: JwtSignOptions): Promise<string>;
     verify(token: string, options: JwtVerifyOptions): Promise<any>;
     decode(token: string): any;

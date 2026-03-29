@@ -8,12 +8,12 @@ import * as process from "node:process";
 import TestAgent from "supertest/lib/agent";
 import {createFakeSmtpServer, FakeSmtpServer} from "../src/mail/FakeSmtpServer";
 import {setupConsole} from "./helper.fixture";
-import {RS256_TOKEN_GENERATOR, TokenGenerator} from "../src/core/token-abstraction";
+import {RS256_TOKEN_GENERATOR, TokenService} from "../src/core/token-abstraction";
 
 export class TestAppFixture {
     private app: INestApplication;
     private moduleRef: TestingModule;
-    private _jwtService: TokenGenerator;
+    private _jwtService: TokenService;
     private smtpServer: FakeSmtpServer;
 
     constructor() {
@@ -28,7 +28,7 @@ export class TestAppFixture {
         return this.app;
     }
 
-    public jwtService(): TokenGenerator {
+    public jwtService(): TokenService {
         return this._jwtService;
     }
 
@@ -49,7 +49,7 @@ export class TestAppFixture {
             imports: [AppModule],
         }).compile()
         this.app = this.moduleRef.createNestApplication();
-        this._jwtService = this.app.get<TokenGenerator>(RS256_TOKEN_GENERATOR);
+        this._jwtService = this.app.get<TokenService>(RS256_TOKEN_GENERATOR);
         await this.app.init();
         this.app.useLogger(console);
 

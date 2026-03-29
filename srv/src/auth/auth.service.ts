@@ -22,7 +22,7 @@ import {AuthUserService} from "../casl/authUser.service";
 import * as yup from "yup";
 import {TechnicalTokenService} from "../core/technical-token.service";
 import {Inject} from "@nestjs/common";
-import {HS256_TOKEN_GENERATOR, RS256_TOKEN_GENERATOR, TokenGenerator} from "../core/token-abstraction";
+import {HS256_TOKEN_GENERATOR, RS256_TOKEN_GENERATOR, TokenService} from "../core/token-abstraction";
 
 const SecurityContextSchema = yup.object().shape({
     sub: yup.string().required("token is invalid"),
@@ -46,9 +46,9 @@ export class AuthService {
         private readonly userService: UsersService,
         private readonly technicalTokenService: TechnicalTokenService,
         @Inject(RS256_TOKEN_GENERATOR)
-        private readonly tokenGenerator: TokenGenerator,
+        private readonly tokenGenerator: TokenService,
         @Inject(HS256_TOKEN_GENERATOR)
-        private readonly hs256TokenGenerator: TokenGenerator,
+        private readonly hs256TokenGenerator: TokenService,
     ) {
         this.LOGGER = new Logger(AuthService.name);
     }
