@@ -14,9 +14,9 @@ import {AbilityBuilder, MongoAbility, PureAbility} from '@casl/ability';
  *
  * Covers authorization checks (getAbility, isAuthorized, check), token extraction
  * (getToken, getTechnicalToken), grant type detection (isClientCredentials),
- * the refactored isSuperAdmin check (now uses 'tenant.write' scope + super domain
- * instead of the old SUPER_ADMIN role name), and the various internal auth context
- * factories used during token issuance, member management, registration, and startup.
+ * the isSuperAdmin check (uses SUPER_ADMIN role + super domain),
+ * and the various internal auth context factories used during token issuance,
+ * member management, registration, and startup.
  */
 describe('SecurityService', () => {
     let service: SecurityService;
@@ -34,7 +34,8 @@ describe('SecurityService', () => {
             name: 'Test Tenant',
             domain: 'test.com',
         },
-        scopes: [RoleEnum.TENANT_ADMIN],
+        scopes: ['openid', 'profile', 'email'],
+        roles: [RoleEnum.TENANT_ADMIN],
         grant_type: GRANT_TYPES.PASSWORD,
         userTenant: {
             id: '1',
@@ -193,12 +194,11 @@ describe('SecurityService', () => {
         });
     });
 
-    // After the scope model refactoring, isSuperAdmin checks for the 'tenant.write'
-    // OAuth scope combined with the super tenant domain, instead of the old
-    // RoleEnum.SUPER_ADMIN role name.
+    // isSuperAdmin checks for SUPER_ADMIN in the roles field combined with the
+    // super tenant domain. Roles and scopes are separate concerns.
     describe('isSuperAdmin', () => {
-        // Super admin: has 'tenant.write' scope AND domain matches SUPER_TENANT_DOMAIN
-        it('should return true for super admin in super tenant', () => {
+        // Super admin: has SUPER_ADMIN role AND domain matches SUPER_TENANT_DOMAIN
+        it('should return true when roles contains SUPER_ADMIN and domain matches super tenant', () => {
             const superAdminToken = TenantToken.create({
                 email: 'test@example.com',
                 sub: 'test@example.com',
@@ -209,7 +209,8 @@ describe('SecurityService', () => {
                     name: 'Test Tenant',
                     domain: 'super.com',
                 },
-                scopes: ['tenant.write'],
+                scopes: ['openid', 'profile', 'email'],
+                roles: [RoleEnum.SUPER_ADMIN],
                 grant_type: GRANT_TYPES.PASSWORD,
                 userTenant: {
                     id: '1',
@@ -221,8 +222,57 @@ describe('SecurityService', () => {
             expect(result).toBe(true);
         });
 
-        // Not a super admin: mockTenantToken has domain 'test.com' (not 'super.com')
-        // and uses old role-based scopes, so isSuperAdmin should return false.
+        // Has SUPER_ADMIN role but wrong domain — not a super admin
+        it('should return false when roles contains SUPER_ADMIN but domain does not match', () => {
+            const wrongDomainToken = TenantToken.create({
+                email: 'test@example.com',
+                sub: 'test@example.com',
+                userId: '1',
+                name: 'Test User',
+                tenant: {
+                    id: '1',
+                    name: 'Test Tenant',
+                    domain: 'other.com',
+                },
+                scopes: ['openid', 'profile', 'email'],
+                roles: [RoleEnum.SUPER_ADMIN],
+                grant_type: GRANT_TYPES.PASSWORD,
+                userTenant: {
+                    id: '1',
+                    name: 'Test Tenant',
+                    domain: 'other.com',
+                },
+            });
+            const result = service.isSuperAdmin(wrongDomainToken);
+            expect(result).toBe(false);
+        });
+
+        // Has correct domain but no SUPER_ADMIN role — not a super admin
+        it('should return false when domain matches but roles does not contain SUPER_ADMIN', () => {
+            const noRoleToken = TenantToken.create({
+                email: 'test@example.com',
+                sub: 'test@example.com',
+                userId: '1',
+                name: 'Test User',
+                tenant: {
+                    id: '1',
+                    name: 'Test Tenant',
+                    domain: 'super.com',
+                },
+                scopes: ['openid', 'profile', 'email'],
+                roles: [RoleEnum.TENANT_ADMIN],
+                grant_type: GRANT_TYPES.PASSWORD,
+                userTenant: {
+                    id: '1',
+                    name: 'Test Tenant',
+                    domain: 'super.com',
+                },
+            });
+            const result = service.isSuperAdmin(noRoleToken);
+            expect(result).toBe(false);
+        });
+
+        // mockTenantToken has domain 'test.com' and TENANT_ADMIN role — not a super admin
         it('should return false for non-super admin', () => {
             const result = service.isSuperAdmin(mockTenantToken);
             expect(result).toBe(false);
@@ -334,7 +384,7 @@ describe('SecurityService', () => {
 
             expect(result.SECURITY_CONTEXT.asTenantToken().email).toBe(mockUser.email);
             expect(result.SECURITY_CONTEXT.asTenantToken().tenant.domain).toBe(mockTenant.domain);
-            expect(result.SECURITY_CONTEXT.asTenantToken().scopes).toContain(RoleEnum.TENANT_ADMIN);
+            expect(result.SECURITY_CONTEXT.asTenantToken().roles).toContain(RoleEnum.TENANT_ADMIN);
             expect(result.SCOPE_ABILITIES).toBe(mockAbilities);
         });
     });

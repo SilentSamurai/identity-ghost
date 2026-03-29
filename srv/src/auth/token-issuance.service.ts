@@ -63,14 +63,13 @@ export class TokenIssuanceService {
 
         const roles = await this.tenantService.getMemberRoles(adminContext, tenant.id, user);
         const roleNames = roles.map(r => r.name);
-        const grantedScopes = this.scopeResolverService.resolveUserScopes(
+        const grantedScopes = this.scopeResolverService.resolveScopes(
             options?.requestedScope ?? null,
             clientAllowedScopes,
-            roleNames,
         );
 
         const {accessToken, refreshToken, scopes} =
-            await this.authService.createUserAccessToken(user, tenant, grantedScopes, true);
+            await this.authService.createUserAccessToken(user, tenant, grantedScopes, roleNames);
 
         return this.formatResponse(accessToken, refreshToken, scopes);
     }
@@ -149,15 +148,14 @@ export class TokenIssuanceService {
         let additionalRoles = await this.tenantService.getMemberRoles(adminContext, subscribingTenant.id, user);
         const allRoleNames = additionalRoles.map(r => r.name);
 
-        const grantedScopes = this.scopeResolverService.resolveUserScopes(
+        const grantedScopes = this.scopeResolverService.resolveScopes(
             options?.requestedScope ?? null,
             clientAllowedScopes,
-            allRoleNames,
         );
 
         const {accessToken, refreshToken, scopes} =
             await this.authService.createSubscribedUserAccessToken(
-                user, tenant, subscribingTenant, grantedScopes, true,
+                user, tenant, subscribingTenant, grantedScopes, allRoleNames,
             );
 
         return this.formatResponse(accessToken, refreshToken, scopes);
@@ -182,6 +180,6 @@ export class TokenIssuanceService {
         } catch {
             // Fall through to default
         }
-        return 'openid profile email tenant.read tenant.write';
+        return 'openid profile email';
     }
 }

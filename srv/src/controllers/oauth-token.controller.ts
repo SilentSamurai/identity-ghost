@@ -159,15 +159,8 @@ export class OAuthTokenController {
         const tenant = await this.authUserService.findTenantByClientId(
             body.client_id,
         );
-        const {accessToken, refreshToken, scopes} =
-            await this.authService.createUserAccessToken(user, tenant);
-        return {
-            access_token: accessToken,
-            expires_in: this.configService.get("TOKEN_EXPIRATION_TIME"),
-            token_type: "Bearer",
-            refresh_token: refreshToken,
-            scope: ScopeNormalizer.format(scopes || []),
-        };
+
+        return this.tokenIssuanceService.issueToken(user, tenant);
     }
 
     private async handleCodeGrant(body: any): Promise<any> {
@@ -244,7 +237,7 @@ export class OAuthTokenController {
             );
 
         // Resolve scopes: intersection of requested ∩ client allowed
-        let clientAllowedScopes = 'openid profile email tenant.read';
+        let clientAllowedScopes = 'openid profile email';
         try {
             const clients = await this.clientService.findByTenantId(tenant.id);
             if (clients.length > 0 && clients[0].allowedScopes) {
@@ -254,7 +247,7 @@ export class OAuthTokenController {
             // Fall through to default
         }
 
-        const grantedScopes = this.scopeResolverService.resolveClientScopes(
+        const grantedScopes = this.scopeResolverService.resolveScopes(
             body.scope ?? null,
             clientAllowedScopes,
         );

@@ -3,6 +3,7 @@ import {Action} from "./actions.enum";
 import {Injectable} from "@nestjs/common";
 import {AnyAbility} from "@casl/ability/dist/types/PureAbility";
 import {SubjectEnum} from "../entity/subjectEnum";
+import {RoleEnum} from "../entity/roleEnum";
 import {Environment} from "../config/environment.service";
 import {TechnicalToken, TenantToken, Token} from "./contexts";
 import {CacheService} from "./cache.service";
@@ -65,7 +66,7 @@ export class CaslAbilityFactory {
             });
         } else if (token.isTenantToken()) {
             const tenantToken = token as TenantToken;
-            const scopes = tenantToken.scopes;
+            const roles = tenantToken.roles;
             // User Permissions
             cannot(Action.Manage, SubjectEnum.USER);
             can(Action.Manage, SubjectEnum.USER, {
@@ -75,7 +76,7 @@ export class CaslAbilityFactory {
                 id: tenantToken.userId,
             });
 
-            if (scopes.includes('tenant.read')) {
+            if (roles.includes(RoleEnum.TENANT_VIEWER)) {
                 can(Action.Read, SubjectEnum.TENANT, {
                     id: tenantToken.tenant.id,
                 });
@@ -92,7 +93,7 @@ export class CaslAbilityFactory {
                 cannot(Action.ReadCredentials, SubjectEnum.TENANT);
             }
 
-            if (scopes.includes('tenant.write')) {
+            if (roles.includes(RoleEnum.TENANT_ADMIN)) {
                 can(Action.ReadCredentials, SubjectEnum.TENANT, {
                     id: tenantToken.tenant.id,
                 });
@@ -117,7 +118,7 @@ export class CaslAbilityFactory {
             }
 
             if (
-                scopes.includes('tenant.write') &&
+                roles.includes(RoleEnum.SUPER_ADMIN) &&
                 tenantToken.tenant.domain ===
                 this.configService.get("SUPER_TENANT_DOMAIN")
             ) {
@@ -125,7 +126,7 @@ export class CaslAbilityFactory {
                 can(Action.ReadCredentials, "all");
             }
 
-            for (let name of scopes) {
+            for (let name of roles) {
                 let role = await this.findRole(name, tenantToken.tenant.id);
                 if (!role) continue;
 

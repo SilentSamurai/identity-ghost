@@ -3,23 +3,22 @@ import {CaslAbilityFactory} from '../../src/casl/casl-ability.factory';
 import {GRANT_TYPES, TenantToken} from '../../src/casl/contexts';
 import {Action} from '../../src/casl/actions.enum';
 import {SubjectEnum} from '../../src/entity/subjectEnum';
+import {RoleEnum} from '../../src/entity/roleEnum';
 import {Environment} from '../../src/config/environment.service';
 import {subject} from '@casl/ability';
 
 /**
- * Feature: scope-model-refactoring, Property 8: CASL abilities from OAuth scopes
+ * Feature: scope-model-refactoring, Property 7: CASL abilities from roles
  *
- * For any TenantToken with a given set of OAuth scopes, the CASL abilities
- * produced by CaslAbilityFactory.createForSecurityContext() shall be determined
- * solely by the OAuth scope values in token.scopes (not by role names).
+ * For any TenantToken, CASL abilities are determined by `token.roles`
+ * (not `token.scopes`).
+ * - TENANT_VIEWER grants Read on TENANT, MEMBER, ROLE, POLICY for token's tenant
+ * - TENANT_ADMIN grants ReadCredentials/Update on TENANT, Manage on MEMBER/ROLE/POLICY/CLIENT
+ * - SUPER_ADMIN + super domain grants Manage all + ReadCredentials all
  *
- * - tenant.read → Read on TENANT/MEMBER/ROLE/POLICY for token's tenant
- * - tenant.write → ReadCredentials/Update on TENANT, Manage on MEMBER/ROLE/POLICY/CLIENT for token's tenant
- * - tenant.write + super domain → Manage all + ReadCredentials all
- *
- * Validates: Requirements 6.1, 6.2, 6.3, 6.4
+ * **Validates: Requirements 6.1, 6.2, 6.3, 6.4**
  */
-describe('Property 8: CASL abilities from OAuth scopes', () => {
+describe('Property 7: CASL abilities from roles', () => {
     const SUPER_DOMAIN = 'super.example.com';
     const TENANT_ID = 'tid-test-1';
     const OTHER_TENANT_ID = 'tid-other-2';
@@ -34,7 +33,7 @@ describe('Property 8: CASL abilities from OAuth scopes', () => {
         set: () => true,
     };
 
-    // roleRepository.findOne always returns null — OAuth scopes won't match role names
+    // roleRepository.findOne always returns null — no custom policies in this test
     const mockRoleRepo = {findOne: async () => null};
     const mockPolicyRepo = {};
 
@@ -45,14 +44,17 @@ describe('Property 8: CASL abilities from OAuth scopes', () => {
         mockPolicyRepo as any,
     );
 
-    const oauthScopes = ['openid', 'profile', 'email', 'tenant.read', 'tenant.write'];
-    const scopeSubsetArb = fc.subarray(oauthScopes);
+    const allRoles = [RoleEnum.SUPER_ADMIN, RoleEnum.TENANT_ADMIN, RoleEnum.TENANT_VIEWER];
+    const roleSubsetArb = fc.subarray(allRoles);
     const domainArb = fc.oneof(
         fc.constantFrom(SUPER_DOMAIN),
         fc.string({minLength: 1, maxLength: 30}),
     );
 
-    function makeTenantToken(scopes: string[], domain: string): TenantToken {
+    // OIDC scopes — these should NOT affect CASL abilities
+    const oidcScopesArb = fc.subarray(['openid', 'profile', 'email']);
+
+    function makeTenantToken(roles: string[], domain: string, scopes: string[] = ['openid', 'profile', 'email']): TenantToken {
         return TenantToken.create({
             sub: 'user@test.com',
             email: 'user@test.com',
@@ -61,6 +63,7 @@ describe('Property 8: CASL abilities from OAuth scopes', () => {
             tenant: {id: TENANT_ID, name: 'Test Tenant', domain},
             userTenant: {id: TENANT_ID, name: 'Test Tenant', domain},
             scopes,
+            roles,
             grant_type: GRANT_TYPES.PASSWORD,
         });
     }
@@ -70,14 +73,14 @@ describe('Property 8: CASL abilities from OAuth scopes', () => {
         return subject(subjectType, {[tenantField]: tenantId} as any);
     }
 
-    it('tenant.read grants Read on TENANT/MEMBER/ROLE/POLICY for token tenant', async () => {
+    it('TENANT_VIEWER grants Read on TENANT/MEMBER/ROLE/POLICY for token tenant', async () => {
         await fc.assert(
-            fc.asyncProperty(scopeSubsetArb, domainArb, async (scopes, domain) => {
-                const token = makeTenantToken(scopes, domain);
+            fc.asyncProperty(roleSubsetArb, domainArb, async (roles, domain) => {
+                const token = makeTenantToken(roles, domain);
                 const ability = await factory.createForSecurityContext(token);
-                const hasTenantRead = scopes.includes('tenant.read');
+                const hasViewer = roles.includes(RoleEnum.TENANT_VIEWER);
 
-                if (hasTenantRead) {
+                if (hasViewer) {
                     expect(ability.can(Action.Read, subjectWith(SubjectEnum.TENANT, 'id', TENANT_ID))).toBe(true);
                     expect(ability.can(Action.Read, subjectWith(SubjectEnum.MEMBER, 'tenantId', TENANT_ID))).toBe(true);
                     expect(ability.can(Action.Read, subjectWith(SubjectEnum.ROLE, 'tenantId', TENANT_ID))).toBe(true);
@@ -88,12 +91,13 @@ describe('Property 8: CASL abilities from OAuth scopes', () => {
         );
     });
 
-    it('without tenant.read and without tenant.write, no Read on tenant resources', async () => {
+    it('without TENANT_VIEWER or TENANT_ADMIN, no Read on tenant resources', async () => {
+        // Use non-super domain to isolate from SUPER_ADMIN granting Manage all
+        const nonSuperDomain = fc.string({minLength: 1, maxLength: 30}).filter(d => d !== SUPER_DOMAIN);
+
         await fc.assert(
-            fc.asyncProperty(domainArb, async (domain) => {
-                // Scopes with neither tenant.read nor tenant.write
-                const scopes = fc.sample(fc.subarray(['openid', 'profile', 'email']), 1)[0];
-                const token = makeTenantToken(scopes, domain);
+            fc.asyncProperty(nonSuperDomain, async (domain) => {
+                const token = makeTenantToken([], domain);
                 const ability = await factory.createForSecurityContext(token);
 
                 expect(ability.can(Action.Read, subjectWith(SubjectEnum.TENANT, 'id', TENANT_ID))).toBe(false);
@@ -105,14 +109,14 @@ describe('Property 8: CASL abilities from OAuth scopes', () => {
         );
     });
 
-    it('tenant.write grants ReadCredentials/Update on TENANT and Manage on MEMBER/ROLE/POLICY/CLIENT', async () => {
+    it('TENANT_ADMIN grants ReadCredentials/Update on TENANT and Manage on MEMBER/ROLE/POLICY/CLIENT', async () => {
         await fc.assert(
-            fc.asyncProperty(scopeSubsetArb, domainArb, async (scopes, domain) => {
-                const token = makeTenantToken(scopes, domain);
+            fc.asyncProperty(roleSubsetArb, domainArb, async (roles, domain) => {
+                const token = makeTenantToken(roles, domain);
                 const ability = await factory.createForSecurityContext(token);
-                const hasTenantWrite = scopes.includes('tenant.write');
+                const hasAdmin = roles.includes(RoleEnum.TENANT_ADMIN);
 
-                if (hasTenantWrite) {
+                if (hasAdmin) {
                     expect(ability.can(Action.ReadCredentials, subjectWith(SubjectEnum.TENANT, 'id', TENANT_ID))).toBe(true);
                     expect(ability.can(Action.Update, subjectWith(SubjectEnum.TENANT, 'id', TENANT_ID))).toBe(true);
                     expect(ability.can(Action.Manage, subjectWith(SubjectEnum.MEMBER, 'tenantId', TENANT_ID))).toBe(true);
@@ -125,14 +129,13 @@ describe('Property 8: CASL abilities from OAuth scopes', () => {
         );
     });
 
-    it('without tenant.write, no write abilities on tenant resources', async () => {
-        const noWriteScopes = fc.subarray(['openid', 'profile', 'email', 'tenant.read']);
-        // Use a non-super domain to isolate the tenant.write check
+    it('without TENANT_ADMIN, no write abilities on tenant resources (non-super domain)', async () => {
+        const noAdminRoles = fc.subarray([RoleEnum.TENANT_VIEWER]);
         const nonSuperDomain = fc.string({minLength: 1, maxLength: 30}).filter(d => d !== SUPER_DOMAIN);
 
         await fc.assert(
-            fc.asyncProperty(noWriteScopes, nonSuperDomain, async (scopes, domain) => {
-                const token = makeTenantToken(scopes, domain);
+            fc.asyncProperty(noAdminRoles, nonSuperDomain, async (roles, domain) => {
+                const token = makeTenantToken(roles, domain);
                 const ability = await factory.createForSecurityContext(token);
 
                 expect(ability.can(Action.ReadCredentials, subjectWith(SubjectEnum.TENANT, 'id', TENANT_ID))).toBe(false);
@@ -145,14 +148,14 @@ describe('Property 8: CASL abilities from OAuth scopes', () => {
         );
     });
 
-    it('tenant.write + super domain grants Manage all and ReadCredentials all', async () => {
+    it('SUPER_ADMIN + super domain grants Manage all and ReadCredentials all', async () => {
         await fc.assert(
-            fc.asyncProperty(scopeSubsetArb, async (scopes) => {
-                const token = makeTenantToken(scopes, SUPER_DOMAIN);
+            fc.asyncProperty(roleSubsetArb, async (roles) => {
+                const token = makeTenantToken(roles, SUPER_DOMAIN);
                 const ability = await factory.createForSecurityContext(token);
-                const hasTenantWrite = scopes.includes('tenant.write');
+                const hasSuperAdmin = roles.includes(RoleEnum.SUPER_ADMIN);
 
-                if (hasTenantWrite) {
+                if (hasSuperAdmin) {
                     // Manage all — can manage any subject, including other tenants
                     expect(ability.can(Action.Manage, subjectWith(SubjectEnum.TENANT, 'id', OTHER_TENANT_ID))).toBe(true);
                     expect(ability.can(Action.Manage, subjectWith(SubjectEnum.MEMBER, 'tenantId', OTHER_TENANT_ID))).toBe(true);
@@ -164,13 +167,13 @@ describe('Property 8: CASL abilities from OAuth scopes', () => {
         );
     });
 
-    it('tenant.write without super domain does NOT grant cross-tenant access', async () => {
+    it('SUPER_ADMIN without super domain does NOT grant cross-tenant access', async () => {
         const nonSuperDomain = fc.string({minLength: 1, maxLength: 30}).filter(d => d !== SUPER_DOMAIN);
 
         await fc.assert(
             fc.asyncProperty(nonSuperDomain, async (domain) => {
-                const scopes = ['openid', 'profile', 'email', 'tenant.read', 'tenant.write'];
-                const token = makeTenantToken(scopes, domain);
+                const roles = [RoleEnum.SUPER_ADMIN, RoleEnum.TENANT_ADMIN, RoleEnum.TENANT_VIEWER];
+                const token = makeTenantToken(roles, domain);
                 const ability = await factory.createForSecurityContext(token);
 
                 // Should NOT have access to other tenants
@@ -182,17 +185,18 @@ describe('Property 8: CASL abilities from OAuth scopes', () => {
         );
     });
 
-    it('abilities are determined solely by OAuth scopes, not role names', async () => {
+    it('abilities are determined by roles, not by scopes — varying scopes does not change abilities', async () => {
         await fc.assert(
-            fc.asyncProperty(scopeSubsetArb, domainArb, async (scopes, domain) => {
-                const token = makeTenantToken(scopes, domain);
-                const ability = await factory.createForSecurityContext(token);
+            fc.asyncProperty(roleSubsetArb, domainArb, oidcScopesArb, async (roles, domain, scopes) => {
+                // Token with the given OIDC scopes
+                const token1 = makeTenantToken(roles, domain, scopes);
+                const ability1 = await factory.createForSecurityContext(token1);
 
-                // The same scope set should always produce the same abilities
-                const token2 = makeTenantToken([...scopes], domain);
+                // Token with different OIDC scopes but same roles
+                const token2 = makeTenantToken(roles, domain, ['openid']);
                 const ability2 = await factory.createForSecurityContext(token2);
 
-                // Verify key abilities match between identical scope sets
+                // Verify key abilities match — scopes should have no effect
                 const checks = [
                     [Action.Read, SubjectEnum.TENANT, 'id', TENANT_ID],
                     [Action.ReadCredentials, SubjectEnum.TENANT, 'id', TENANT_ID],
@@ -204,7 +208,7 @@ describe('Property 8: CASL abilities from OAuth scopes', () => {
                 ] as const;
 
                 for (const [action, subj, field, id] of checks) {
-                    expect(ability.can(action, subjectWith(subj, field, id)))
+                    expect(ability1.can(action, subjectWith(subj, field, id)))
                         .toBe(ability2.can(action, subjectWith(subj, field, id)));
                 }
             }),

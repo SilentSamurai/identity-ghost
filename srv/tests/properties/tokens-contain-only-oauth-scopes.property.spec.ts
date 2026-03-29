@@ -1,111 +1,96 @@
 import * as fc from 'fast-check';
+import {GRANT_TYPES, TenantToken, TechnicalToken} from '../../src/casl/contexts';
 import {RoleEnum} from '../../src/entity/roleEnum';
-import {getPermittedScopes} from '../../src/casl/role-scope-map';
 
 /**
- * Feature: scope-model-refactoring, Property 7: Tokens contain only OAuth scopes
+ * Feature: scope-model-refactoring, Property 6: Tokens contain only OAuth scopes
  *
- * For any token issued by the Auth Server (via createUserAccessToken or
- * createSubscribedUserAccessToken), the scopes field in the token payload shall
- * contain only valid OAuth scope values from the defined scope vocabulary
- * (openid, profile, email, tenant.read, tenant.write) and shall never contain
- * role enum names (SUPER_ADMIN, TENANT_ADMIN, TENANT_VIEWER).
+ * For any TenantToken, the `scopes` field contains only OIDC values and the
+ * `roles` field contains only role enum names.
+ * For any TechnicalToken, the `scopes` field contains only OIDC values and
+ * no `roles` field exists.
  *
- * Validates: Requirements 9.1, 9.2, 9.3
+ * **Validates: Requirements 5.1, 5.2, 5.4, 5.5, 9.4**
  */
-describe('Property 7: Tokens contain only OAuth scopes', () => {
-    const OAUTH_SCOPE_VOCABULARY = new Set([
-        'openid',
-        'profile',
-        'email',
-        'tenant.read',
-        'tenant.write',
-    ]);
+describe('Property 6: Tokens contain only OAuth scopes', () => {
+    const VALID_OIDC_SCOPES = ['openid', 'profile', 'email'];
+    const VALID_ROLES = [RoleEnum.SUPER_ADMIN, RoleEnum.TENANT_ADMIN, RoleEnum.TENANT_VIEWER];
 
-    const ROLE_ENUM_NAMES = new Set([
-        RoleEnum.SUPER_ADMIN,
-        RoleEnum.TENANT_ADMIN,
-        RoleEnum.TENANT_VIEWER,
-    ]);
+    const OIDC_SET = new Set(VALID_OIDC_SCOPES);
+    const ROLE_SET = new Set<string>(VALID_ROLES);
 
-    const allRoles = Object.values(RoleEnum);
+    const oidcScopesArb = fc.subarray(VALID_OIDC_SCOPES, {minLength: 0});
+    const rolesArb = fc.subarray(VALID_ROLES, {minLength: 0});
 
-    const roleSubsetArb = fc.subarray(allRoles, {minLength: 0, maxLength: allRoles.length});
+    function makeTenantToken(scopes: string[], roles: string[]): TenantToken {
+        return TenantToken.create({
+            sub: 'user@test.com',
+            email: 'user@test.com',
+            name: 'Test User',
+            userId: 'uid-1',
+            tenant: {id: 'tid-1', name: 'Test Tenant', domain: 'test.local'},
+            userTenant: {id: 'tid-1', name: 'Test Tenant', domain: 'test.local'},
+            scopes,
+            roles,
+            grant_type: GRANT_TYPES.PASSWORD,
+        });
+    }
 
-    it('getPermittedScopes returns only OAuth scope vocabulary values', () => {
-        fc.assert(
-            fc.property(roleSubsetArb, (roles) => {
-                const scopes = getPermittedScopes(roles);
+    function makeTechnicalToken(scopes: string[]): TechnicalToken {
+        return TechnicalToken.create({
+            sub: 'client:test.local',
+            tenant: {id: 'tid-1', name: 'Test Tenant', domain: 'test.local'},
+            scopes,
+        });
+    }
 
-                for (const scope of scopes) {
-                    expect(OAUTH_SCOPE_VOCABULARY.has(scope)).toBe(true);
-                }
-            }),
-            {numRuns: 200},
-        );
+    describe('TenantToken', () => {
+        it('scopes field contains only OIDC values', () => {
+            fc.assert(
+                fc.property(oidcScopesArb, rolesArb, (scopes, roles) => {
+                    const token = makeTenantToken(scopes, roles);
+                    for (const s of token.scopes) {
+                        expect(OIDC_SET.has(s)).toBe(true);
+                    }
+                }),
+                {numRuns: 200},
+            );
+        });
+
+        it('roles field contains only role enum names', () => {
+            fc.assert(
+                fc.property(oidcScopesArb, rolesArb, (scopes, roles) => {
+                    const token = makeTenantToken(scopes, roles);
+                    for (const r of token.roles) {
+                        expect(ROLE_SET.has(r)).toBe(true);
+                    }
+                }),
+                {numRuns: 200},
+            );
+        });
     });
 
-    it('getPermittedScopes never returns role enum names', () => {
-        fc.assert(
-            fc.property(roleSubsetArb, (roles) => {
-                const scopes = getPermittedScopes(roles);
+    describe('TechnicalToken', () => {
+        it('scopes field contains only OIDC values', () => {
+            fc.assert(
+                fc.property(oidcScopesArb, (scopes) => {
+                    const token = makeTechnicalToken(scopes);
+                    for (const s of token.scopes) {
+                        expect(OIDC_SET.has(s)).toBe(true);
+                    }
+                }),
+                {numRuns: 200},
+            );
+        });
 
-                for (const scope of scopes) {
-                    expect(ROLE_ENUM_NAMES.has(scope as RoleEnum)).toBe(false);
-                }
-            }),
-            {numRuns: 200},
-        );
-    });
-
-    it('result is non-empty when at least one valid role is provided', () => {
-        fc.assert(
-            fc.property(
-                fc.subarray(allRoles, {minLength: 1, maxLength: allRoles.length}),
-                (roles) => {
-                    const scopes = getPermittedScopes(roles);
-                    expect(scopes.length).toBeGreaterThan(0);
-                },
-            ),
-            {numRuns: 200},
-        );
-    });
-
-    it('result falls back to TENANT_VIEWER scopes for unknown role names', () => {
-        const protoKeys = new Set(['__proto__', 'constructor', 'toString', 'valueOf', 'hasOwnProperty']);
-        const unknownRoleArb = fc.array(
-            fc.string({minLength: 1, maxLength: 20}).filter(
-                (s) => !allRoles.includes(s as RoleEnum) && !protoKeys.has(s),
-            ),
-            {minLength: 1, maxLength: 5},
-        );
-
-        const TENANT_VIEWER_SCOPES = ['email', 'openid', 'profile', 'tenant.read'];
-
-        fc.assert(
-            fc.property(unknownRoleArb, (roles) => {
-                const scopes = getPermittedScopes(roles);
-                expect(scopes).toEqual(TENANT_VIEWER_SCOPES);
-            }),
-            {numRuns: 200},
-        );
-    });
-
-    it('simulated token creation produces only OAuth scopes, never role names', () => {
-        fc.assert(
-            fc.property(roleSubsetArb, (roles) => {
-                // Simulate what createUserAccessToken does:
-                // let oauthScopes = getPermittedScopes(roles.map(r => r.name));
-                // oauthScopes = [...new Set(oauthScopes)].sort();
-                const oauthScopes = getPermittedScopes(roles);
-                const finalScopes = [...new Set(oauthScopes)].sort();
-
-                for (const scope of finalScopes) {
-                    expect(OAUTH_SCOPE_VOCABULARY.has(scope)).toBe(true);
-                    expect(ROLE_ENUM_NAMES.has(scope as RoleEnum)).toBe(false);
-                }
-            }),
-            {numRuns: 200},
-        );
+        it('has no roles field', () => {
+            fc.assert(
+                fc.property(oidcScopesArb, (scopes) => {
+                    const token = makeTechnicalToken(scopes);
+                    expect((token as any).roles).toBeUndefined();
+                }),
+                {numRuns: 200},
+            );
+        });
     });
 });

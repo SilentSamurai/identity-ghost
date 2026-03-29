@@ -8,6 +8,7 @@ import {Action} from "./actions.enum";
 import {AuthUserService} from "./authUser.service";
 import {AuthContext, GRANT_TYPES, InternalToken, TechnicalToken, TenantToken,} from "./contexts";
 import {SubjectEnum} from "../entity/subjectEnum";
+import {RoleEnum} from "../entity/roleEnum";
 
 @Injectable()
 export class SecurityService implements OnModuleInit {
@@ -83,7 +84,7 @@ export class SecurityService implements OnModuleInit {
 
     isSuperAdmin(securityContext: TenantToken) {
         return (
-            securityContext.scopes.includes('tenant.write') &&
+            securityContext.roles.includes(RoleEnum.SUPER_ADMIN) &&
             securityContext.tenant.domain ===
             this.configService.get("SUPER_TENANT_DOMAIN")
         );
@@ -163,6 +164,7 @@ export class SecurityService implements OnModuleInit {
                 userId: user.id,
                 name: user.name,
                 scopes: [],
+                roles: [],
                 grant_type: GRANT_TYPES.REFRESH_TOKEN,
                 tenant: {
                     id: "",
@@ -188,6 +190,7 @@ export class SecurityService implements OnModuleInit {
         const user = await this.authUserService.findUserByEmail(email);
         const tenant = await this.authUserService.findTenantByDomain(domain);
         const roles = await this.authUserService.findMemberRoles(tenant, user);
+        const roleNames = roles.map((item) => item.name);
         const authContext: AuthContext = {
             SECURITY_CONTEXT: TenantToken.create({
                 email: user.email,
@@ -199,7 +202,8 @@ export class SecurityService implements OnModuleInit {
                     name: tenant.name,
                     domain: tenant.domain,
                 },
-                scopes: roles.map((item) => item.name),
+                scopes: [],
+                roles: roleNames,
                 grant_type: GRANT_TYPES.CODE,
                 userTenant: {
                     id: tenant.id,

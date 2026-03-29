@@ -57,6 +57,7 @@ export interface TenantTokenParams {
     tenant: TenantInfo;
     userTenant: TenantInfo;
     scopes: string[];
+    roles: string[];
     grant_type: GRANT_TYPES;
 }
 
@@ -109,6 +110,7 @@ export class InternalToken implements Token {
 export class TenantToken implements Token {
     sub: string;
     scopes: string[];
+    roles: string[];
     grant_type: GRANT_TYPES;
     email: string;
     name: string;
@@ -125,6 +127,7 @@ export class TenantToken implements Token {
         token.tenant = params.tenant;
         token.userTenant = params.userTenant;
         token.scopes = params.scopes;
+        token.roles = params.roles;
         token.grant_type = params.grant_type;
         return token;
     }
@@ -150,6 +153,7 @@ export class TenantToken implements Token {
             tenant: this.tenant,
             userTenant: this.userTenant,
             scopes: this.scopes,
+            roles: this.roles,
             grant_type: this.grant_type
         };
     }

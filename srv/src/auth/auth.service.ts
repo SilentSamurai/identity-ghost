@@ -22,7 +22,6 @@ import {AuthUserService} from "../casl/authUser.service";
 import * as yup from "yup";
 import {TechnicalTokenService} from "../core/technical-token.service";
 import {HS256_TOKEN_GENERATOR, RS256_TOKEN_GENERATOR, TokenService} from "../core/token-abstraction";
-import {getPermittedScopes} from "../casl/role-scope-map";
 
 const SecurityContextSchema = yup.object().shape({
     sub: yup.string().required("token is invalid"),
@@ -165,20 +164,10 @@ export class AuthService {
         user: User,
         tenant: Tenant,
         scopes: string[] = [],
-        useProvidedScopes: boolean = false,
+        roles: string[] = [],
     ): Promise<{ accessToken: string; refreshToken: string; scopes: string[] }> {
         if (!user.verified) {
             throw new UnauthorizedException('Email not verified');
-        }
-
-        let oauthScopes: string[];
-        if (useProvidedScopes && scopes.length > 0) {
-            oauthScopes = [...new Set(scopes)].sort();
-        } else {
-            let roles = await this.authUserService.getMemberRoles(tenant, user);
-            oauthScopes = getPermittedScopes(roles.map((role) => role.name));
-            oauthScopes.push(...scopes);
-            oauthScopes = [...new Set(oauthScopes)].sort();
         }
 
         const accessTokenPayload = TenantToken.create({
@@ -196,7 +185,8 @@ export class AuthService {
                 name: tenant.name,
                 domain: tenant.domain,
             },
-            scopes: oauthScopes,
+            scopes: [...new Set(scopes)].sort(),
+            roles: [...new Set(roles)].sort(),
             grant_type: GRANT_TYPES.PASSWORD,
         });
 
@@ -232,20 +222,10 @@ export class AuthService {
         issuingTenant: Tenant,
         userTenant: Tenant,
         scopes: string[] = [],
-        useProvidedScopes: boolean = false,
+        roles: string[] = [],
     ): Promise<{ accessToken: string; refreshToken: string; scopes: string[] }> {
         if (!user.verified) {
             throw new UnauthorizedException('Email not verified');
-        }
-
-        let oauthScopes: string[];
-        if (useProvidedScopes && scopes.length > 0) {
-            oauthScopes = [...new Set(scopes)].sort();
-        } else {
-            let roles = await this.authUserService.getMemberRoles(issuingTenant, user);
-            oauthScopes = getPermittedScopes(roles.map((role) => role.name));
-            oauthScopes.push(...scopes);
-            oauthScopes = [...new Set(oauthScopes)].sort();
         }
 
         const accessTokenPayload = TenantToken.create({
@@ -263,7 +243,8 @@ export class AuthService {
                 name: userTenant.name,
                 domain: userTenant.domain,
             },
-            scopes: oauthScopes,
+            scopes: [...new Set(scopes)].sort(),
+            roles: [...new Set(roles)].sort(),
             grant_type: GRANT_TYPES.PASSWORD,
         });
 

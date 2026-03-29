@@ -12,6 +12,7 @@ export interface JwtToken {
     userId: string;
     tenant: AuthTenant;
     scopes: string[];
+    roles: string[];
     grant_type: string;
     iat: number;
     exp: number;
@@ -25,6 +26,7 @@ export class DecodedToken implements JwtToken {
     userId: string;
     tenant: AuthTenant;
     scopes: string[];
+    roles: string[];
     grant_type: string;
     iat: number;
     exp: number;
@@ -42,6 +44,7 @@ export class DecodedToken implements JwtToken {
             client_id: '',
         };
         this.scopes = init?.scopes ?? [];
+        this.roles = init?.roles ?? [];
         this.grant_type = init?.grant_type ?? '';
         this.iat = init?.iat ?? 0;
         this.exp = init?.exp ?? 0;
@@ -49,16 +52,10 @@ export class DecodedToken implements JwtToken {
     }
 
     public isSuperAdmin(): boolean {
-        return (
-            this.scopes.find((scope: string) => scope === 'SUPER_ADMIN') !==
-            undefined
-        );
+        return this.roles.includes('SUPER_ADMIN');
     }
 
     public isTenantAdmin(): boolean {
-        return (
-            this.scopes.find((scope: string) => scope === 'TENANT_ADMIN') !==
-            undefined
-        );
+        return this.roles.includes('TENANT_ADMIN') || this.roles.includes('SUPER_ADMIN');
     }
 }

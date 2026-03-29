@@ -7,11 +7,11 @@ import {Environment} from '../../src/config/environment.service';
  * Feature: scope-model-refactoring, Property 5: Super-admin check equivalence
  *
  * For any TenantToken, isSuperAdmin shall return true if and only if
- * the token's scopes array contains 'tenant.write' AND the token's
+ * the token's roles array contains 'SUPER_ADMIN' AND the token's
  * tenant.domain equals the configured super tenant domain.
  * For all other combinations, it shall return false.
  *
- * Validates: Requirements 7.1, 7.2
+ * **Validates: Requirements 7.1, 7.2**
  */
 describe('Property 5: Super-admin check equivalence', () => {
     const SUPER_DOMAIN = 'super.example.com';
@@ -23,14 +23,14 @@ describe('Property 5: Super-admin check equivalence', () => {
     // but isSuperAdmin uses neither — safe to pass null for this pure-logic test.
     const service = new SecurityService(mockEnv, null as any, null as any);
 
-    const oauthScopes = ['openid', 'profile', 'email', 'tenant.read', 'tenant.write'];
-    const scopeSubsetArb = fc.subarray(oauthScopes);
+    const allRoles = ['SUPER_ADMIN', 'TENANT_ADMIN', 'TENANT_VIEWER'];
+    const roleSubsetArb = fc.subarray(allRoles);
     const domainArb = fc.oneof(
         fc.constantFrom(SUPER_DOMAIN),
         fc.string({minLength: 1, maxLength: 30}),
     );
 
-    function makeTenantToken(scopes: string[], domain: string): TenantToken {
+    function makeTenantToken(roles: string[], domain: string): TenantToken {
         return TenantToken.create({
             sub: 'user@test.com',
             email: 'user@test.com',
@@ -38,40 +38,41 @@ describe('Property 5: Super-admin check equivalence', () => {
             userId: 'uid-1',
             tenant: {id: 'tid-1', name: 'Test Tenant', domain},
             userTenant: {id: 'tid-1', name: 'Test Tenant', domain},
-            scopes,
+            scopes: ['openid', 'profile', 'email'],
+            roles,
             grant_type: GRANT_TYPES.PASSWORD,
         });
     }
 
-    it('returns true iff tenant.write ∈ scopes AND domain === super tenant domain', () => {
+    it('returns true iff SUPER_ADMIN ∈ roles AND domain === super tenant domain', () => {
         fc.assert(
-            fc.property(scopeSubsetArb, domainArb, (scopes, domain) => {
-                const token = makeTenantToken(scopes, domain);
+            fc.property(roleSubsetArb, domainArb, (roles, domain) => {
+                const token = makeTenantToken(roles, domain);
                 const result = service.isSuperAdmin(token);
-                const expected = scopes.includes('tenant.write') && domain === SUPER_DOMAIN;
+                const expected = roles.includes('SUPER_ADMIN') && domain === SUPER_DOMAIN;
                 expect(result).toBe(expected);
             }),
             {numRuns: 500},
         );
     });
 
-    it('always returns false when tenant.write is absent regardless of domain', () => {
-        const noWriteScopes = fc.subarray(['openid', 'profile', 'email', 'tenant.read']);
+    it('always returns false when SUPER_ADMIN is absent regardless of domain', () => {
+        const noSuperAdminRoles = fc.subarray(['TENANT_ADMIN', 'TENANT_VIEWER']);
         fc.assert(
-            fc.property(noWriteScopes, domainArb, (scopes, domain) => {
-                const token = makeTenantToken(scopes, domain);
+            fc.property(noSuperAdminRoles, domainArb, (roles, domain) => {
+                const token = makeTenantToken(roles, domain);
                 expect(service.isSuperAdmin(token)).toBe(false);
             }),
             {numRuns: 200},
         );
     });
 
-    it('always returns false when domain does not match regardless of scopes', () => {
+    it('always returns false when domain does not match regardless of roles', () => {
         // Generate domains that are guaranteed to differ from SUPER_DOMAIN
         const nonSuperDomain = fc.string({minLength: 1, maxLength: 30}).filter(d => d !== SUPER_DOMAIN);
         fc.assert(
-            fc.property(scopeSubsetArb, nonSuperDomain, (scopes, domain) => {
-                const token = makeTenantToken(scopes, domain);
+            fc.property(roleSubsetArb, nonSuperDomain, (roles, domain) => {
+                const token = makeTenantToken(roles, domain);
                 expect(service.isSuperAdmin(token)).toBe(false);
             }),
             {numRuns: 200},

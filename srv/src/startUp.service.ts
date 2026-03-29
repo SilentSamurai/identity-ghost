@@ -370,7 +370,7 @@ export class StartUpService implements OnModuleInit {
                 for (const roleName of entry.roles) {
                     try {
                         const exists = await this.roleService.findByNameAndTenant(adminContext, roleName, tenant);
-                        if (exists) ;
+                        if (exists) continue;
                     } catch {
                         await this.roleService.create(adminContext, roleName, tenant);
                         this.logger.log(`Created role: ${roleName} in ${entry.domain}`);

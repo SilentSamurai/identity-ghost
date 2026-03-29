@@ -133,15 +133,15 @@ export class SessionService {
 
     public isSuperAdmin(): boolean {
         const user = this.getUser();
-        return user !== null && user.scopes.includes('SUPER_ADMIN');
+        return user !== null && user.roles.includes('SUPER_ADMIN');
     }
 
     public isTenantAdmin(): boolean {
         const user = this.getUser();
         return (
             user !== null &&
-            (user.scopes.includes('TENANT_ADMIN') ||
-                user.scopes.includes('SUPER_ADMIN'))
+            (user.roles.includes('TENANT_ADMIN') ||
+                user.roles.includes('SUPER_ADMIN'))
         );
     }
 

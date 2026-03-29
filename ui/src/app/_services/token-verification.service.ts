@@ -30,6 +30,11 @@ export class TokenVerificationService {
                 return false;
             }
 
+            if (!this.verifyRoles(decodedToken.roles)) {
+                console.error('Invalid roles in token');
+                return false;
+            }
+
             return true;
         } catch (error) {
             console.error('Token verification failed:', error);
@@ -61,5 +66,9 @@ export class TokenVerificationService {
 
     private verifyScopes(scopes: string[]): boolean {
         return Array.isArray(scopes);
+    }
+
+    private verifyRoles(roles: string[]): boolean {
+        return Array.isArray(roles);
     }
 }
