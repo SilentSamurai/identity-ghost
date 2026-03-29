@@ -278,7 +278,7 @@ export class StartUpService implements OnModuleInit {
                         {name: "Harvest Tracker", appUrl: "https://harvest.shire.local", description: "Track crop yields"},
                     ],
                     clients: [
-                        {name: "Shire Web App", redirectUris: ["https://portal.shire.local/callback"], allowedScopes: "openid profile email"},
+                        {name: "Shire Web App", redirectUris: ["https://portal.shire.local/callback"], allowedScopes: "openid profile email tenant.read tenant.write"},
                         {name: "Shire Mobile", redirectUris: ["https://mobile.shire.local/callback"], allowedScopes: "openid profile", isPublic: true},
                     ],
                 },

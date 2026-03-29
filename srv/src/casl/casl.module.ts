@@ -16,6 +16,7 @@ import {GroupUser} from "../entity/group.users.entity";
 import {Policy} from "../entity/authorization.entity";
 import {PolicyService} from "./policy.service";
 import {CacheService} from "./cache.service";
+import {ScopeResolverService} from "./scope-resolver.service";
 
 @Module({
     imports: [
@@ -40,6 +41,7 @@ import {CacheService} from "./cache.service";
         AuthUserService,
         PolicyService,
         CacheService,
+        ScopeResolverService,
     ],
     exports: [
         SecurityService,
@@ -47,6 +49,7 @@ import {CacheService} from "./cache.service";
         AuthUserService,
         PolicyService,
         CacheService,
+        ScopeResolverService,
     ],
 })
 export class CaslModule {

@@ -187,6 +187,7 @@ const LoginSchema = yup.object().shape({
         .default("plain"),
     code_challenge: yup.string().required("code_challenge is required"),
     subscriber_tenant_hint: yup.string().optional().nullable(),
+    redirect_uri: yup.string().optional(),
 });
 
 const PasswordGrantSchema = yup.object().shape({
@@ -202,7 +203,7 @@ const PasswordGrantSchema = yup.object().shape({
         .max(128),
     client_id: yup.string().required("client_id is required"),
     subscriber_tenant_hint: yup.string().nullable(),
-    scopes: yup.array().of(yup.string().max(20)),
+    scope: yup.string().optional(),
 });
 
 const ClientCredentialGrantSchema = yup.object().shape({
@@ -214,7 +215,7 @@ const ClientCredentialGrantSchema = yup.object().shape({
         }),
     client_id: yup.string().required("client_id is required"),
     client_secret: yup.string().required("client_secret is required"),
-    scopes: yup.array().of(yup.string().max(20)),
+    scope: yup.string().optional(),
 });
 
 const RefreshTokenGrantSchema = yup.object().shape({
@@ -224,7 +225,7 @@ const RefreshTokenGrantSchema = yup.object().shape({
         .matches(/^refresh_token$/g, {message: "grant type not recognised"}),
     refresh_token: yup.string().required("refresh_token is required"),
     subscriber_tenant_hint: yup.string().nullable(),
-    scopes: yup.array().of(yup.string().max(20)),
+    scope: yup.string().optional(),
 });
 
 const CodeGrantSchema = yup.object().shape({
@@ -238,7 +239,8 @@ const CodeGrantSchema = yup.object().shape({
     code_verifier: yup.string().required("code_verifier is required"),
     client_id: yup.string().optional(),
     subscriber_tenant_hint: yup.string().nullable(),
-    scopes: yup.array().of(yup.string().max(20)),
+    scope: yup.string().optional(),
+    redirect_uri: yup.string().optional(),
 });
 
 const VerifyTokenSchema = yup.object().shape({

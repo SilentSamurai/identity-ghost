@@ -10,6 +10,7 @@ import {AddSubscriberTenantHintToAuthCode1710000000000} from "./1710000000000-Ad
 import {AddEmailRateLimitColumns1710000000000} from "./1710000000000-AddEmailRateLimitColumns";
 import {CreateClientsTable1748000000000} from "./1748000000000-create-clients-table";
 import {AddUserLocked1749000000000} from "./1749000000000-add-user-locked";
+import {AddRedirectUriToAuthCode1750000000000} from "./1750000000000-AddRedirectUriToAuthCode";
 
 export const migrations = [
     CreateInitialTables1681147242561,
@@ -23,5 +24,6 @@ export const migrations = [
     AddSubscriberTenantHintToAuthCode1710000000000,
     AddEmailRateLimitColumns1710000000000,
     CreateClientsTable1748000000000,
-    AddUserLocked1749000000000
+    AddUserLocked1749000000000,
+    AddRedirectUriToAuthCode1750000000000
 ];

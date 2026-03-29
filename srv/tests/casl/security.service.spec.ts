@@ -9,6 +9,15 @@ import { RoleEnum } from '../../src/entity/roleEnum';
 import { Action } from '../../src/casl/actions.enum';
 import { PureAbility, AbilityBuilder, MongoAbility, subject } from '@casl/ability';
 
+/**
+ * Unit tests for SecurityService.
+ *
+ * Covers authorization checks (getAbility, isAuthorized, check), token extraction
+ * (getToken, getTechnicalToken), grant type detection (isClientCredentials),
+ * the refactored isSuperAdmin check (now uses 'tenant.write' scope + super domain
+ * instead of the old SUPER_ADMIN role name), and the various internal auth context
+ * factories used during token issuance, member management, registration, and startup.
+ */
 describe('SecurityService', () => {
     let service: SecurityService;
     let authUserService: AuthUserService;
@@ -184,7 +193,11 @@ describe('SecurityService', () => {
         });
     });
 
+    // After the scope model refactoring, isSuperAdmin checks for the 'tenant.write'
+    // OAuth scope combined with the super tenant domain, instead of the old
+    // RoleEnum.SUPER_ADMIN role name.
     describe('isSuperAdmin', () => {
+        // Super admin: has 'tenant.write' scope AND domain matches SUPER_TENANT_DOMAIN
         it('should return true for super admin in super tenant', () => {
             const superAdminToken = TenantToken.create({
                 email: 'test@example.com',
@@ -196,7 +209,7 @@ describe('SecurityService', () => {
                     name: 'Test Tenant',
                     domain: 'super.com',
                 },
-                scopes: [RoleEnum.SUPER_ADMIN],
+                scopes: ['tenant.write'],
                 grant_type: GRANT_TYPES.PASSWORD,
                 userTenant: {
                     id: '1',
@@ -208,6 +221,8 @@ describe('SecurityService', () => {
             expect(result).toBe(true);
         });
 
+        // Not a super admin: mockTenantToken has domain 'test.com' (not 'super.com')
+        // and uses old role-based scopes, so isSuperAdmin should return false.
         it('should return false for non-super admin', () => {
             const result = service.isSuperAdmin(mockTenantToken);
             expect(result).toBe(false);

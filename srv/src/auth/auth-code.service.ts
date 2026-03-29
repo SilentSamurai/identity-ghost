@@ -57,6 +57,7 @@ export class AuthCodeService {
         code_challenge: string,
         method: string,
         subscriberTenantHint?: string,
+        redirectUri?: string,
     ): Promise<string> {
         let roles = await this.authUserService.getMemberRoles(tenant, user);
 
@@ -73,6 +74,7 @@ export class AuthCodeService {
             tenantId: tenant.id,
             userId: user.id,
             subscriberTenantHint: subscriberTenantHint || null,
+            redirectUri: redirectUri || null,
         });
 
         session = await this.authCodeRepository.save(session);

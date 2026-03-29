@@ -64,22 +64,33 @@ export class SmtpClientAdapter {
 
     /**
      * Mirrors FakeSmtpServer.waitForEmail() signature used in existing tests.
-     * Delegates to getLatestEmail with the appropriate params.
+     * Delegates to getLatestEmail with retries — if the server-side poll
+     * times out (404) the client retries the whole request, giving the
+     * NestJS app more time to process under heavy parallel load.
      */
     async waitForEmail(
         criteria: { to?: string; subject?: string | RegExp; containsLink?: boolean; sort?: string; limit?: number },
         timeoutMs = 10000,
         _pollInterval?: number,
+        maxRetries = 3,
     ): Promise<EmailResponse> {
         const subject = criteria.subject instanceof RegExp
             ? criteria.subject.source
             : criteria.subject;
 
-        return this.getLatestEmail({
-            to: criteria.to,
-            subject,
-            timeoutMs,
-        });
+        let lastError: Error | undefined;
+        for (let attempt = 0; attempt < maxRetries; attempt++) {
+            try {
+                return await this.getLatestEmail({
+                    to: criteria.to,
+                    subject,
+                    timeoutMs,
+                });
+            } catch (err: any) {
+                lastError = err;
+            }
+        }
+        throw lastError;
     }
 
     /** Build the full URL for a given path. */

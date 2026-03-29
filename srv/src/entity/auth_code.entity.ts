@@ -20,6 +20,9 @@ export class AuthCode {
     @Column({name: "subscriber_tenant_hint", nullable: true})
     subscriberTenantHint: string;
 
+    @Column({name: "redirect_uri", nullable: true})
+    redirectUri: string;
+
     @CreateDateColumn({name: "created_at"})
     createdAt: Date;
 }

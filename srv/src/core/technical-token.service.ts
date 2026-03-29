@@ -1,8 +1,10 @@
 import {Inject, Injectable} from "@nestjs/common";
 import {Tenant} from "../entity/tenant.entity";
 import {TechnicalToken} from "../casl/contexts";
-import {RoleEnum} from "../entity/roleEnum";
+import {ScopeNormalizer} from "../casl/scope-normalizer";
 import {RS256_TOKEN_GENERATOR, TokenService} from "./token-abstraction";
+
+const DEFAULT_TECHNICAL_SCOPES = ['openid', 'profile', 'email', 'tenant.read'];
 
 @Injectable()
 export class TechnicalTokenService {
@@ -14,6 +16,9 @@ export class TechnicalTokenService {
 
     createTechnicalToken(tenant: Tenant, roles: string[]): TechnicalToken {
         roles = roles instanceof Array ? roles : [];
+        const merged = ScopeNormalizer.parse(
+            ScopeNormalizer.format([...DEFAULT_TECHNICAL_SCOPES, ...roles])
+        );
         return TechnicalToken.create({
             sub: "oauth",
             tenant: {
@@ -21,7 +26,7 @@ export class TechnicalTokenService {
                 name: tenant.name,
                 domain: tenant.domain,
             },
-            scopes: [RoleEnum.TENANT_VIEWER, ...roles]
+            scopes: merged
         });
     }
 

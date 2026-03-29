@@ -11,11 +11,13 @@ import { TokenIssuanceService } from "./token-issuance.service";
 import { TenantResolutionGuard } from "./tenant-resolution.guard";
 import { SuperAdminGuard } from "./super-admin.guard";
 import { CoreModule } from "../core/core.module";
+import { ServiceModule } from "../services/service.module";
 
 @Module({
     imports: [
         CaslModule,
         CoreModule,
+        ServiceModule,
         PassportModule,
         TypeOrmModule.forFeature([AuthCode, User]),
     ],

@@ -1,7 +1,6 @@
 import {AbilityBuilder, createMongoAbility} from "@casl/ability";
 import {Action} from "./actions.enum";
 import {Injectable} from "@nestjs/common";
-import {RoleEnum} from "../entity/roleEnum";
 import {AnyAbility} from "@casl/ability/dist/types/PureAbility";
 import {SubjectEnum} from "../entity/subjectEnum";
 import {Environment} from "../config/environment.service";
@@ -49,8 +48,6 @@ export class CaslAbilityFactory {
     ): Promise<AnyAbility> {
         const {can, cannot, build} = new AbilityBuilder(createMongoAbility);
 
-        let roles = token.scopes;
-
         if (token.isTechnicalToken()) {
             const technicalToken = token as TechnicalToken;
             can(Action.Read, SubjectEnum.TENANT, {id: technicalToken.tenant.id});
@@ -68,6 +65,7 @@ export class CaslAbilityFactory {
             });
         } else if (token.isTenantToken()) {
             const tenantToken = token as TenantToken;
+            const scopes = tenantToken.scopes;
             // User Permissions
             cannot(Action.Manage, SubjectEnum.USER);
             can(Action.Manage, SubjectEnum.USER, {
@@ -77,7 +75,7 @@ export class CaslAbilityFactory {
                 id: tenantToken.userId,
             });
 
-            if (roles.includes(RoleEnum.TENANT_VIEWER)) {
+            if (scopes.includes('tenant.read')) {
                 can(Action.Read, SubjectEnum.TENANT, {
                     id: tenantToken.tenant.id,
                 });
@@ -94,7 +92,7 @@ export class CaslAbilityFactory {
                 cannot(Action.ReadCredentials, SubjectEnum.TENANT);
             }
 
-            if (roles.includes(RoleEnum.TENANT_ADMIN)) {
+            if (scopes.includes('tenant.write')) {
                 can(Action.ReadCredentials, SubjectEnum.TENANT, {
                     id: tenantToken.tenant.id,
                 });
@@ -119,7 +117,7 @@ export class CaslAbilityFactory {
             }
 
             if (
-                roles.includes(RoleEnum.SUPER_ADMIN) &&
+                scopes.includes('tenant.write') &&
                 tenantToken.tenant.domain ===
                 this.configService.get("SUPER_TENANT_DOMAIN")
             ) {
@@ -127,7 +125,7 @@ export class CaslAbilityFactory {
                 can(Action.ReadCredentials, "all");
             }
 
-            for (let name of roles) {
+            for (let name of scopes) {
                 let role = await this.findRole(name, tenantToken.tenant.id);
                 if (!role) continue;
 

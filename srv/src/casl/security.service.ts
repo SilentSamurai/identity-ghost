@@ -1,6 +1,5 @@
 import {ForbiddenException, forwardRef, Inject, Injectable, OnModuleInit, UnauthorizedException} from "@nestjs/common";
 
-import {RoleEnum} from "../entity/roleEnum";
 import {Environment} from "../config/environment.service";
 import {CaslAbilityFactory} from "./casl-ability.factory";
 import {AnyAbility} from "@casl/ability/dist/types/PureAbility";
@@ -85,9 +84,7 @@ export class SecurityService implements OnModuleInit {
 
     isSuperAdmin(securityContext: TenantToken) {
         return (
-            securityContext.scopes.some(
-                (scope) => scope === RoleEnum.SUPER_ADMIN,
-            ) &&
+            securityContext.scopes.includes('tenant.write') &&
             securityContext.tenant.domain ===
             this.configService.get("SUPER_TENANT_DOMAIN")
         );

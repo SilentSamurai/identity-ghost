@@ -23,6 +23,7 @@ import * as yup from "yup";
 import {TechnicalTokenService} from "../core/technical-token.service";
 import {Inject} from "@nestjs/common";
 import {HS256_TOKEN_GENERATOR, RS256_TOKEN_GENERATOR, TokenService} from "../core/token-abstraction";
+import {getPermittedScopes} from "../casl/role-scope-map";
 
 const SecurityContextSchema = yup.object().shape({
     sub: yup.string().required("token is invalid"),
@@ -165,14 +166,21 @@ export class AuthService {
         user: User,
         tenant: Tenant,
         scopes: string[] = [],
+        useProvidedScopes: boolean = false,
     ): Promise<{ accessToken: string; refreshToken: string; scopes: string[] }> {
         if (!user.verified) {
             throw new UnauthorizedException('Email not verified');
         }
 
-        let roles = await this.authUserService.getMemberRoles(tenant, user);
-        let scopesFromRoles = roles.map((role) => role.name);
-        scopesFromRoles.push(...scopes);
+        let oauthScopes: string[];
+        if (useProvidedScopes && scopes.length > 0) {
+            oauthScopes = [...new Set(scopes)].sort();
+        } else {
+            let roles = await this.authUserService.getMemberRoles(tenant, user);
+            oauthScopes = getPermittedScopes(roles.map((role) => role.name));
+            oauthScopes.push(...scopes);
+            oauthScopes = [...new Set(oauthScopes)].sort();
+        }
 
         const accessTokenPayload = TenantToken.create({
             sub: user.email,
@@ -189,7 +197,7 @@ export class AuthService {
                 name: tenant.name,
                 domain: tenant.domain,
             },
-            scopes: scopesFromRoles,
+            scopes: oauthScopes,
             grant_type: GRANT_TYPES.PASSWORD,
         });
 
@@ -225,14 +233,21 @@ export class AuthService {
         issuingTenant: Tenant,
         userTenant: Tenant,
         scopes: string[] = [],
+        useProvidedScopes: boolean = false,
     ): Promise<{ accessToken: string; refreshToken: string; scopes: string[] }> {
         if (!user.verified) {
             throw new UnauthorizedException('Email not verified');
         }
 
-        let roles = await this.authUserService.getMemberRoles(issuingTenant, user);
-        let scopesFromRoles = roles.map((role) => role.name);
-        scopesFromRoles.push(...scopes);
+        let oauthScopes: string[];
+        if (useProvidedScopes && scopes.length > 0) {
+            oauthScopes = [...new Set(scopes)].sort();
+        } else {
+            let roles = await this.authUserService.getMemberRoles(issuingTenant, user);
+            oauthScopes = getPermittedScopes(roles.map((role) => role.name));
+            oauthScopes.push(...scopes);
+            oauthScopes = [...new Set(oauthScopes)].sort();
+        }
 
         const accessTokenPayload = TenantToken.create({
             sub: user.email,
@@ -249,7 +264,7 @@ export class AuthService {
                 name: userTenant.name,
                 domain: userTenant.domain,
             },
-            scopes: scopesFromRoles,
+            scopes: oauthScopes,
             grant_type: GRANT_TYPES.PASSWORD,
         });
 

@@ -21,6 +21,9 @@ import {AuthCodeService} from "../auth/auth-code.service";
 import {GRANT_TYPES} from "../casl/contexts";
 import {AuthUserService} from "../casl/authUser.service";
 import {TokenIssuanceService} from "../auth/token-issuance.service";
+import {ScopeResolverService} from "../casl/scope-resolver.service";
+import {ClientService} from "../services/client.service";
+import {ScopeNormalizer} from "../casl/scope-normalizer";
 
 const logger = new Logger("OAuthTokenController");
 
@@ -33,6 +36,8 @@ export class OAuthTokenController {
         private readonly authCodeService: AuthCodeService,
         private readonly authUserService: AuthUserService,
         private readonly tokenIssuanceService: TokenIssuanceService,
+        private readonly scopeResolverService: ScopeResolverService,
+        private readonly clientService: ClientService,
     ) {
     }
 
@@ -46,6 +51,7 @@ export class OAuthTokenController {
             code_challenge_method: string;
             code_challenge: string;
             subscriber_tenant_hint?: string;
+            redirect_uri?: string;
         },
     ) {
         const user: User = await this.authService.validate(
@@ -85,6 +91,7 @@ export class OAuthTokenController {
             body.code_challenge,
             body.code_challenge_method,
             result.resolvedHint,
+            body.redirect_uri,
         );
         return {
             authentication_code: auth_code,
@@ -159,7 +166,7 @@ export class OAuthTokenController {
             expires_in: this.configService.get("TOKEN_EXPIRATION_TIME"),
             token_type: "Bearer",
             refresh_token: refreshToken,
-            ...(scopes && scopes.length ? {scope: scopes.join(" ")} : {}),
+            scope: ScopeNormalizer.format(scopes || []),
         };
     }
 
@@ -172,6 +179,17 @@ export class OAuthTokenController {
             body.code,
             body.code_verifier,
         );
+
+        // Validate redirect_uri binding (RFC 6749 §4.1.3)
+        const authCode = await this.authCodeService.findByCode(body.code);
+        if (authCode.redirectUri) {
+            if (!body.redirect_uri || body.redirect_uri !== authCode.redirectUri) {
+                throw new BadRequestException({
+                    error: "invalid_grant",
+                    error_description: "redirect_uri does not match",
+                });
+            }
+        }
 
         if (body.client_id) {
             if (tenant.clientId !== body.client_id && tenant.domain !== body.client_id) {
@@ -186,6 +204,7 @@ export class OAuthTokenController {
         return this.tokenIssuanceService.issueToken(user, tenant, {
             subscriberTenantHint: body.subscriber_tenant_hint,
             authCode: body.code,
+            requestedScope: body.scope,
         });
     }
 
@@ -209,6 +228,7 @@ export class OAuthTokenController {
 
         return this.tokenIssuanceService.issueToken(user, tenant, {
             subscriberTenantHint: body.subscriber_tenant_hint,
+            requestedScope: body.scope,
         });
     }
 
@@ -222,19 +242,35 @@ export class OAuthTokenController {
                 body.client_id,
                 body.client_secret,
             );
+
+        // Resolve scopes: intersection of requested ∩ client allowed
+        let clientAllowedScopes = 'openid profile email tenant.read';
+        try {
+            const clients = await this.clientService.findByTenantId(tenant.id);
+            if (clients.length > 0 && clients[0].allowedScopes) {
+                clientAllowedScopes = clients[0].allowedScopes;
+            }
+        } catch {
+            // Fall through to default
+        }
+
+        const grantedScopes = this.scopeResolverService.resolveClientScopes(
+            body.scope ?? null,
+            clientAllowedScopes,
+        );
+
         const token: string =
             await this.authService.createTechnicalAccessToken(
                 tenant,
-                body.scopes,
+                grantedScopes,
             );
-        const decoded: any = this.authService.decodeToken(token);
         return {
             access_token: token,
             expires_in: this.configService.get(
                 "TOKEN_EXPIRATION_TIME_IN_SECONDS",
             ),
             token_type: "Bearer",
-            ...(decoded && decoded.scopes ? {scope: decoded.scopes.join(" ")} : {}),
+            scope: ScopeNormalizer.format(grantedScopes),
         };
     }
 
@@ -250,6 +286,7 @@ export class OAuthTokenController {
 
         return this.tokenIssuanceService.issueToken(user, tenant, {
             subscriberTenantHint: body.subscriber_tenant_hint,
+            requestedScope: body.scope,
         });
     }
 }
