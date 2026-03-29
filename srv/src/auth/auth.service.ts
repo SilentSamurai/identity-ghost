@@ -20,8 +20,9 @@ import {
 } from "../casl/contexts";
 import {AuthUserService} from "../casl/authUser.service";
 import * as yup from "yup";
-import {JwtServiceHS256, JwtServiceRS256} from "./jwt.service";
 import {TechnicalTokenService} from "../core/technical-token.service";
+import {Inject} from "@nestjs/common";
+import {HS256_TOKEN_GENERATOR, RS256_TOKEN_GENERATOR, TokenGenerator} from "../core/token-abstraction";
 
 const SecurityContextSchema = yup.object().shape({
     sub: yup.string().required("token is invalid"),
@@ -44,8 +45,10 @@ export class AuthService {
         private readonly authUserService: AuthUserService,
         private readonly userService: UsersService,
         private readonly technicalTokenService: TechnicalTokenService,
-        private readonly jwtServiceRS256: JwtServiceRS256,
-        private readonly jwtServiceHS256: JwtServiceHS256,
+        @Inject(RS256_TOKEN_GENERATOR)
+        private readonly tokenGenerator: TokenGenerator,
+        @Inject(HS256_TOKEN_GENERATOR)
+        private readonly hs256TokenGenerator: TokenGenerator,
     ) {
         this.LOGGER = new Logger(AuthService.name);
     }
@@ -72,7 +75,7 @@ export class AuthService {
             ValidationSchema.RefreshTokenSchema,
         );
         let payload: RefreshToken = (await validationPipe.transform(
-            this.jwtServiceRS256.decode(refreshToken),
+            this.tokenGenerator.decode(refreshToken),
             null,
         )) as RefreshToken;
 
@@ -83,7 +86,7 @@ export class AuthService {
         if (user.locked) {
             throw new UnauthorizedException('Invalid credentials');
         }
-        await this.jwtServiceRS256.verify(refreshToken, {
+        await this.tokenGenerator.verify(refreshToken, {
             publicKey: tenant.publicKey,
         });
         return {tenant, user};
@@ -92,13 +95,13 @@ export class AuthService {
     async validateAccessToken(token: string): Promise<Token> {
         try {
             let decoded = await new ValidationPipe(SecurityContextSchema).transform(
-                this.jwtServiceRS256.decode(token),
+                this.tokenGenerator.decode(token),
                 null,
             );
             let tenant = await this.authUserService.findTenantByDomain(
                 decoded.tenant.domain,
             );
-            const verifiedToken = await this.jwtServiceRS256.verify(token, {
+            const verifiedToken = await this.tokenGenerator.verify(token, {
                 publicKey: tenant.publicKey,
             })
             const payload: Token = verifiedToken.isTechnical ? TechnicalToken.create(verifiedToken) : TenantToken.create(verifiedToken)
@@ -195,13 +198,13 @@ export class AuthService {
             domain: tenant.domain,
         };
 
-        const accessToken = await this.jwtServiceRS256.sign(accessTokenPayload.asPlainObject(), {
+        const accessToken = await this.tokenGenerator.sign(accessTokenPayload.asPlainObject(), {
                 privateKey: tenant.privateKey,
                 issuer: this.configService.get("SUPER_TENANT_DOMAIN"),
             },
         );
 
-        const refreshToken = await this.jwtServiceRS256.sign(refreshTokenPayload, {
+        const refreshToken = await this.tokenGenerator.sign(refreshTokenPayload, {
                 privateKey: tenant.privateKey,
                 expiresIn: this.configService.get(
                     "REFRESH_TOKEN_EXPIRATION_TIME",
@@ -255,13 +258,13 @@ export class AuthService {
             domain: issuingTenant.domain,
         };
 
-        const accessToken = await this.jwtServiceRS256.sign(accessTokenPayload.asPlainObject(), {
+        const accessToken = await this.tokenGenerator.sign(accessTokenPayload.asPlainObject(), {
                 privateKey: issuingTenant.privateKey,
                 issuer: this.configService.get("SUPER_TENANT_DOMAIN"),
             },
         );
 
-        const refreshToken = await this.jwtServiceRS256.sign(refreshTokenPayload, {
+        const refreshToken = await this.tokenGenerator.sign(refreshTokenPayload, {
                 privateKey: issuingTenant.privateKey,
                 expiresIn: this.configService.get(
                     "REFRESH_TOKEN_EXPIRATION_TIME",
@@ -280,7 +283,7 @@ export class AuthService {
         const payload: EmailVerificationToken = {
             sub: user.email,
         };
-        return this.jwtServiceHS256.sign(payload, {
+        return this.hs256TokenGenerator.sign(payload, {
             secret: user.password,
             expiresIn: this.configService.get("TOKEN_VERIFICATION_EXPIRATION_TIME"),
         });
@@ -292,12 +295,12 @@ export class AuthService {
     async verifyEmail(token: string): Promise<boolean> {
         let payload: EmailVerificationToken;
         try {
-            payload = this.jwtServiceHS256.decode(token) as EmailVerificationToken;
+            payload = this.hs256TokenGenerator.decode(token) as EmailVerificationToken;
             const user: User = await this.authUserService.findUserByEmail(payload.sub);
             if (!user) {
                 throw new NotFoundException("User not found");
             }
-            payload = await this.jwtServiceHS256.verify(token, {
+            payload = await this.hs256TokenGenerator.verify(token, {
                 secret: user.password
             }) as EmailVerificationToken;
         } catch (exception: any) {
@@ -331,7 +334,7 @@ export class AuthService {
 
         // Use the user's current password's hash for signing the token.
         // All tokens generated before a successful password change would get invalidated.
-        return this.jwtServiceHS256.sign(payload, {
+        return this.hs256TokenGenerator.sign(payload, {
             secret: user.password,
             expiresIn: this.configService.get('TOKEN_RESET_PASSWORD_EXPIRATION_TIME')
         });
@@ -342,7 +345,7 @@ export class AuthService {
      */
     async resetPassword(token: string, password: string): Promise<boolean> {
         // Get the user.
-        let payload: ResetPasswordToken = this.jwtServiceHS256.decode(
+        let payload: ResetPasswordToken = this.hs256TokenGenerator.decode(
             token,
         ) as ResetPasswordToken;
 
@@ -357,7 +360,7 @@ export class AuthService {
         // A successful password change will invalidate the token.
         payload = null;
         try {
-            payload = this.jwtServiceHS256.verify(token, {
+            payload = await this.hs256TokenGenerator.verify(token, {
                 secret: user.password,
             }) as ResetPasswordToken;
         } catch (exception: any) {
@@ -387,7 +390,7 @@ export class AuthService {
         };
         // Use the user's current email for signing the token.
         // All tokens generated before a successful email change would get invalidated.
-        return this.jwtServiceHS256.sign(payload, {
+        return this.hs256TokenGenerator.sign(payload, {
             secret: user.email,
             expiresIn: this.configService.get("TOKEN_CHANGE_EMAIL_EXPIRATION_TIME")
         });
@@ -398,7 +401,7 @@ export class AuthService {
      */
     async confirmEmailChange(token: string): Promise<boolean> {
         // Get the user.
-        let payload: ChangeEmailToken = this.jwtServiceRS256.decode(
+        let payload: ChangeEmailToken = this.hs256TokenGenerator.decode(
             token,
         ) as ChangeEmailToken;
 
@@ -413,7 +416,7 @@ export class AuthService {
         // A successful email change will invalidate the token.
         payload = null;
         try {
-            payload = await this.jwtServiceRS256.verify(token, {
+            payload = await this.hs256TokenGenerator.verify(token, {
                 secret: user.email,
             }) as ChangeEmailToken;
         } catch (exception: any) {
@@ -435,6 +438,6 @@ export class AuthService {
 
 
     public decodeToken(token: string): any {
-        return this.jwtServiceRS256.decode(token);
+        return this.tokenGenerator.decode(token);
     }
 }

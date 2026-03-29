@@ -1,4 +1,11 @@
-import {BadRequestException, ForbiddenException, Injectable, NotFoundException, OnModuleInit} from "@nestjs/common";
+import {
+    BadRequestException,
+    ForbiddenException,
+    Inject,
+    Injectable,
+    NotFoundException,
+    OnModuleInit
+} from "@nestjs/common";
 import {Environment} from "../config/environment.service";
 import {UsersService} from "./users.service";
 import {InjectRepository} from "@nestjs/typeorm";
@@ -14,6 +21,7 @@ import {AuthContext} from "../casl/contexts";
 import {SecurityService} from "../casl/security.service";
 import {Action} from "../casl/actions.enum";
 import {SubjectEnum} from "../entity/subjectEnum";
+import {SIGNING_KEY_PROVIDER, SigningKeyProvider} from "../core/token-abstraction";
 
 @Injectable()
 export class TenantService implements OnModuleInit {
@@ -22,6 +30,8 @@ export class TenantService implements OnModuleInit {
         private readonly usersService: UsersService,
         private readonly roleService: RoleService,
         private readonly securityService: SecurityService,
+        @Inject(SIGNING_KEY_PROVIDER)
+        private readonly signingKeyProvider: SigningKeyProvider,
         @InjectRepository(Tenant) private tenantRepository: Repository<Tenant>,
         @InjectRepository(TenantMember)
         private tenantMemberRepository: Repository<TenantMember>,
@@ -51,7 +61,7 @@ export class TenantService implements OnModuleInit {
             throw new BadRequestException("Domain already Taken");
         }
 
-        const {privateKey, publicKey} = CryptUtil.generateKeyPair();
+        const {privateKey, publicKey} = this.signingKeyProvider.generateKeyPair();
         const {clientId, clientSecret, salt} =
             CryptUtil.generateClientIdAndSecret();
 
@@ -113,7 +123,7 @@ export class TenantService implements OnModuleInit {
             throw new NotFoundException("tenant id not found");
         }
 
-        const {privateKey, publicKey} = CryptUtil.generateKeyPair();
+        const {privateKey, publicKey} = this.signingKeyProvider.generateKeyPair();
 
         tenant.publicKey = publicKey;
         tenant.privateKey = privateKey;

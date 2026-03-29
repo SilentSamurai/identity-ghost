@@ -1,13 +1,14 @@
-import {Injectable} from "@nestjs/common";
+import {Inject, Injectable} from "@nestjs/common";
 import {Tenant} from "../entity/tenant.entity";
 import {TechnicalToken} from "../casl/contexts";
 import {RoleEnum} from "../entity/roleEnum";
-import {JwtServiceRS256} from "../auth/jwt.service";
+import {RS256_TOKEN_GENERATOR, TokenGenerator} from "./token-abstraction";
 
 @Injectable()
 export class TechnicalTokenService {
     constructor(
-        private readonly jwtServiceRS256: JwtServiceRS256,
+        @Inject(RS256_TOKEN_GENERATOR)
+        private readonly tokenGenerator: TokenGenerator,
     ) {
     }
 
@@ -30,7 +31,7 @@ export class TechnicalTokenService {
     ): Promise<string> {
         roles = roles instanceof Array ? roles : [];
         const payload = this.createTechnicalToken(tenant, roles);
-        return this.jwtServiceRS256.sign(payload.asPlainObject(), {
+        return this.tokenGenerator.sign(payload.asPlainObject(), {
             privateKey: tenant.privateKey
         });
     }
