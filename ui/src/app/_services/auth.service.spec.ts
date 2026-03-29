@@ -83,7 +83,7 @@ describe('AuthService', () => {
 
         const permissionsPromise = service.fetchPermissions();
 
-        const req = httpMock.expectOne('/api/v1/my/permissions');
+        const req = httpMock.expectOne('/api/v1/my/internal-permissions');
         expect(req.request.method).toBe('GET');
 
         req.flush(mockPermissions);

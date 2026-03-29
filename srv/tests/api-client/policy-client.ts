@@ -94,6 +94,14 @@ export class PolicyClient extends HttpClient {
         return response.body;
     }
 
+    async getMyInternalPermissions() {
+        const response = await this.get("/api/v1/my/internal-permissions")
+
+        console.log("My Internal Permission Response:", response.body);
+        expect2xx(response);
+        return response.body;
+    }
+
     async getTenantPermissions(email: string) {
         const response = await this.post("/api/v1/tenant-user/permissions")
             .send({email})

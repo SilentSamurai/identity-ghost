@@ -27,22 +27,7 @@ describe('Property 7: CASL abilities from roles', () => {
         get: (key: string) => key === 'SUPER_TENANT_DOMAIN' ? SUPER_DOMAIN : null,
     } as unknown as Environment;
 
-    const mockCacheService = {
-        has: () => false,
-        get: () => undefined,
-        set: () => true,
-    };
-
-    // roleRepository.findOne always returns null — no custom policies in this test
-    const mockRoleRepo = {findOne: async () => null};
-    const mockPolicyRepo = {};
-
-    const factory = new CaslAbilityFactory(
-        mockEnv,
-        mockCacheService as any,
-        mockRoleRepo as any,
-        mockPolicyRepo as any,
-    );
+    const factory = new CaslAbilityFactory(mockEnv);
 
     const allRoles = [RoleEnum.SUPER_ADMIN, RoleEnum.TENANT_ADMIN, RoleEnum.TENANT_VIEWER];
     const roleSubsetArb = fc.subarray(allRoles);
@@ -73,11 +58,11 @@ describe('Property 7: CASL abilities from roles', () => {
         return subject(subjectType, {[tenantField]: tenantId} as any);
     }
 
-    it('TENANT_VIEWER grants Read on TENANT/MEMBER/ROLE/POLICY for token tenant', async () => {
-        await fc.assert(
-            fc.asyncProperty(roleSubsetArb, domainArb, async (roles, domain) => {
+    it('TENANT_VIEWER grants Read on TENANT/MEMBER/ROLE/POLICY for token tenant', () => {
+        fc.assert(
+            fc.property(roleSubsetArb, domainArb, (roles, domain) => {
                 const token = makeTenantToken(roles, domain);
-                const ability = await factory.createForSecurityContext(token);
+                const ability = factory.createForSecurityContext(token);
                 const hasViewer = roles.includes(RoleEnum.TENANT_VIEWER);
 
                 if (hasViewer) {
@@ -91,14 +76,14 @@ describe('Property 7: CASL abilities from roles', () => {
         );
     });
 
-    it('without TENANT_VIEWER or TENANT_ADMIN, no Read on tenant resources', async () => {
+    it('without TENANT_VIEWER or TENANT_ADMIN, no Read on tenant resources', () => {
         // Use non-super domain to isolate from SUPER_ADMIN granting Manage all
         const nonSuperDomain = fc.string({minLength: 1, maxLength: 30}).filter(d => d !== SUPER_DOMAIN);
 
-        await fc.assert(
-            fc.asyncProperty(nonSuperDomain, async (domain) => {
+        fc.assert(
+            fc.property(nonSuperDomain, (domain) => {
                 const token = makeTenantToken([], domain);
-                const ability = await factory.createForSecurityContext(token);
+                const ability = factory.createForSecurityContext(token);
 
                 expect(ability.can(Action.Read, subjectWith(SubjectEnum.TENANT, 'id', TENANT_ID))).toBe(false);
                 expect(ability.can(Action.Read, subjectWith(SubjectEnum.MEMBER, 'tenantId', TENANT_ID))).toBe(false);
@@ -109,11 +94,11 @@ describe('Property 7: CASL abilities from roles', () => {
         );
     });
 
-    it('TENANT_ADMIN grants ReadCredentials/Update on TENANT and Manage on MEMBER/ROLE/POLICY/CLIENT', async () => {
-        await fc.assert(
-            fc.asyncProperty(roleSubsetArb, domainArb, async (roles, domain) => {
+    it('TENANT_ADMIN grants ReadCredentials/Update on TENANT and Manage on MEMBER/ROLE/POLICY/CLIENT', () => {
+        fc.assert(
+            fc.property(roleSubsetArb, domainArb, (roles, domain) => {
                 const token = makeTenantToken(roles, domain);
-                const ability = await factory.createForSecurityContext(token);
+                const ability = factory.createForSecurityContext(token);
                 const hasAdmin = roles.includes(RoleEnum.TENANT_ADMIN);
 
                 if (hasAdmin) {
@@ -129,14 +114,14 @@ describe('Property 7: CASL abilities from roles', () => {
         );
     });
 
-    it('without TENANT_ADMIN, no write abilities on tenant resources (non-super domain)', async () => {
+    it('without TENANT_ADMIN, no write abilities on tenant resources (non-super domain)', () => {
         const noAdminRoles = fc.subarray([RoleEnum.TENANT_VIEWER]);
         const nonSuperDomain = fc.string({minLength: 1, maxLength: 30}).filter(d => d !== SUPER_DOMAIN);
 
-        await fc.assert(
-            fc.asyncProperty(noAdminRoles, nonSuperDomain, async (roles, domain) => {
+        fc.assert(
+            fc.property(noAdminRoles, nonSuperDomain, (roles, domain) => {
                 const token = makeTenantToken(roles, domain);
-                const ability = await factory.createForSecurityContext(token);
+                const ability = factory.createForSecurityContext(token);
 
                 expect(ability.can(Action.ReadCredentials, subjectWith(SubjectEnum.TENANT, 'id', TENANT_ID))).toBe(false);
                 expect(ability.can(Action.Update, subjectWith(SubjectEnum.TENANT, 'id', TENANT_ID))).toBe(false);
@@ -148,11 +133,11 @@ describe('Property 7: CASL abilities from roles', () => {
         );
     });
 
-    it('SUPER_ADMIN + super domain grants Manage all and ReadCredentials all', async () => {
-        await fc.assert(
-            fc.asyncProperty(roleSubsetArb, async (roles) => {
+    it('SUPER_ADMIN + super domain grants Manage all and ReadCredentials all', () => {
+        fc.assert(
+            fc.property(roleSubsetArb, (roles) => {
                 const token = makeTenantToken(roles, SUPER_DOMAIN);
-                const ability = await factory.createForSecurityContext(token);
+                const ability = factory.createForSecurityContext(token);
                 const hasSuperAdmin = roles.includes(RoleEnum.SUPER_ADMIN);
 
                 if (hasSuperAdmin) {
@@ -167,14 +152,14 @@ describe('Property 7: CASL abilities from roles', () => {
         );
     });
 
-    it('SUPER_ADMIN without super domain does NOT grant cross-tenant access', async () => {
+    it('SUPER_ADMIN without super domain does NOT grant cross-tenant access', () => {
         const nonSuperDomain = fc.string({minLength: 1, maxLength: 30}).filter(d => d !== SUPER_DOMAIN);
 
-        await fc.assert(
-            fc.asyncProperty(nonSuperDomain, async (domain) => {
+        fc.assert(
+            fc.property(nonSuperDomain, (domain) => {
                 const roles = [RoleEnum.SUPER_ADMIN, RoleEnum.TENANT_ADMIN, RoleEnum.TENANT_VIEWER];
                 const token = makeTenantToken(roles, domain);
-                const ability = await factory.createForSecurityContext(token);
+                const ability = factory.createForSecurityContext(token);
 
                 // Should NOT have access to other tenants
                 expect(ability.can(Action.Manage, subjectWith(SubjectEnum.TENANT, 'id', OTHER_TENANT_ID))).toBe(false);
@@ -185,16 +170,16 @@ describe('Property 7: CASL abilities from roles', () => {
         );
     });
 
-    it('abilities are determined by roles, not by scopes — varying scopes does not change abilities', async () => {
-        await fc.assert(
-            fc.asyncProperty(roleSubsetArb, domainArb, oidcScopesArb, async (roles, domain, scopes) => {
+    it('abilities are determined by roles, not by scopes — varying scopes does not change abilities', () => {
+        fc.assert(
+            fc.property(roleSubsetArb, domainArb, oidcScopesArb, (roles, domain, scopes) => {
                 // Token with the given OIDC scopes
                 const token1 = makeTenantToken(roles, domain, scopes);
-                const ability1 = await factory.createForSecurityContext(token1);
+                const ability1 = factory.createForSecurityContext(token1);
 
                 // Token with different OIDC scopes but same roles
                 const token2 = makeTenantToken(roles, domain, ['openid']);
-                const ability2 = await factory.createForSecurityContext(token2);
+                const ability2 = factory.createForSecurityContext(token2);
 
                 // Verify key abilities match — scopes should have no effect
                 const checks = [

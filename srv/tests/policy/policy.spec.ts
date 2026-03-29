@@ -129,8 +129,14 @@ describe('PolicyController (e2e)', () => {
         }
     });
 
-    it('get current user permissions', async () => {
+    it('get current user external permissions returns empty for internal-only roles', async () => {
         const permissions = await policyClient.getMyPermission();
+        expect(permissions).toBeInstanceOf(Array);
+        expect(permissions.length).toBe(0);
+    });
+
+    it('get current user internal permissions', async () => {
+        const permissions = await policyClient.getMyInternalPermissions();
         expect(permissions).toBeInstanceOf(Array);
         expect(permissions.length).toBeGreaterThan(0);
         for (let permission of permissions) {

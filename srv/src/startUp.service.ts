@@ -110,7 +110,8 @@ export class StartUpService implements OnModuleInit {
                 {name: "Lothlorien Tenant", domain: "lothlorien.local", signUp: false},
                 {name: "Mirkwood Tenant", domain: "mirkwood.local", signUp: true},
                 {name: "Erebor Tenant", domain: "erebor.local", signUp: false},
-                {name: "Isengard Tenant", domain: "isengard.local", signUp: false}
+                {name: "Isengard Tenant", domain: "isengard.local", signUp: false},
+                {name: "Perm Test Tenant", domain: "perm-test.local", signUp: false}
             ];
 
             // 4) Create each tenant and assign the existing user as owner
@@ -355,6 +356,13 @@ export class StartUpService implements OnModuleInit {
                             allowedScopes: "openid profile"
                         },
                     ],
+                },
+                {
+                    domain: "perm-test.local",
+                    roles: ["CustomTestRole"],
+                    groups: [],
+                    apps: [],
+                    clients: [],
                 },
             ];
 

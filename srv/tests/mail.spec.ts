@@ -34,7 +34,7 @@ describe("Fake Smtp Server Test", () => {
 
     beforeAll(async () => {
         setupConsole();
-        smtpServer = createFakeSmtpServer({port: MAIL_PORT, host: MAIL_HOST});
+        smtpServer = createFakeSmtpServer({port: MAIL_PORT, host: MAIL_HOST, controlEnabled: false});
         await smtpServer.listen();
     })
 

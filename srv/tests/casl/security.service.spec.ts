@@ -378,7 +378,7 @@ describe('SecurityService', () => {
             jest.spyOn(authUserService, 'findUserByEmail').mockResolvedValue(mockUser as any);
             jest.spyOn(authUserService, 'findTenantByDomain').mockResolvedValue(mockTenant as any);
             jest.spyOn(authUserService, 'findMemberRoles').mockResolvedValue(mockRoles as any);
-            jest.spyOn(caslAbilityFactory, 'createForSecurityContext').mockResolvedValue(mockAbilities);
+            jest.spyOn(caslAbilityFactory, 'createForSecurityContext').mockReturnValue(mockAbilities);
 
             const result = await service.getUserTenantAuthContext('test@example.com', 'test.com');
 
@@ -392,7 +392,7 @@ describe('SecurityService', () => {
     describe('getAuthContextFromSecurityContext', () => {
         it('should create auth context from security context', async () => {
             const mockAbilities = createMockAbility();
-            jest.spyOn(caslAbilityFactory, 'createForSecurityContext').mockResolvedValue(mockAbilities);
+            jest.spyOn(caslAbilityFactory, 'createForSecurityContext').mockReturnValue(mockAbilities);
 
             const result = await service.getAuthContextFromSecurityContext(mockTenantToken);
 

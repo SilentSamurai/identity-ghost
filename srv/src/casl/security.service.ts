@@ -213,7 +213,7 @@ export class SecurityService implements OnModuleInit {
             }),
             SCOPE_ABILITIES: null,
         };
-        authContext.SCOPE_ABILITIES = await this.caslAbilityFactory.createForSecurityContext(
+        authContext.SCOPE_ABILITIES = this.caslAbilityFactory.createForSecurityContext(
             authContext.SECURITY_CONTEXT,
         );
         return authContext;
@@ -226,7 +226,7 @@ export class SecurityService implements OnModuleInit {
             SECURITY_CONTEXT: securityContext,
             SCOPE_ABILITIES: null,
         };
-        authContext.SCOPE_ABILITIES = await this.caslAbilityFactory.createForSecurityContext(
+        authContext.SCOPE_ABILITIES = this.caslAbilityFactory.createForSecurityContext(
             securityContext,
         );
         return authContext;

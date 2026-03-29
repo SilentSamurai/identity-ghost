@@ -62,7 +62,7 @@ export class AuthService {
     }
 
     async fetchPermissions(): Promise<any> {
-        return await lastValueFrom(this.http.get('/api/v1/my/permissions'));
+        return await lastValueFrom(this.http.get('/api/v1/my/internal-permissions'));
     }
 
     validateAuthCode(authCode: string, clientId: string): Promise<any> {

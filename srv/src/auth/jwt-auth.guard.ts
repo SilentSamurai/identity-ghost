@@ -72,7 +72,7 @@ export class JwtAuthGuard implements CanActivate {
         if (payload.grant_type === GRANT_TYPES.PASSWORD) {
             request["user"] = payload;
         }
-        const ability = await this.caslAbilityFactory.createForSecurityContext(payload);
+        const ability = this.caslAbilityFactory.createForSecurityContext(payload);
         request["SECURITY_CONTEXT"] = payload;
         request["SCOPE_ABILITIES"] = ability;
 
