@@ -85,11 +85,25 @@ export class InternalToken implements Token {
         return token;
     }
 
-    isTenantToken(): boolean { return false; }
-    isTechnicalToken(): boolean { return false; }
-    isInternalToken(): boolean { return true; }
-    asTenantToken(): TenantToken { throw new Error("Internal token cannot be cast to TenantToken"); }
-    asTechnicalToken(): TechnicalToken { throw new Error("Internal token cannot be cast to TechnicalToken"); }
+    isTenantToken(): boolean {
+        return false;
+    }
+
+    isTechnicalToken(): boolean {
+        return false;
+    }
+
+    isInternalToken(): boolean {
+        return true;
+    }
+
+    asTenantToken(): TenantToken {
+        throw new Error("Internal token cannot be cast to TenantToken");
+    }
+
+    asTechnicalToken(): TechnicalToken {
+        throw new Error("Internal token cannot be cast to TechnicalToken");
+    }
 }
 
 export class TenantToken implements Token {

@@ -1,12 +1,4 @@
-import {
-    ClassSerializerInterceptor,
-    Controller,
-    Get,
-    Param,
-    Request,
-    Response,
-    UseInterceptors,
-} from "@nestjs/common";
+import {ClassSerializerInterceptor, Controller, Get, Param, Request, Response, UseInterceptors,} from "@nestjs/common";
 
 import {Environment} from "../config/environment.service";
 import {AuthService} from "../auth/auth.service";

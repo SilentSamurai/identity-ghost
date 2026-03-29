@@ -1,5 +1,5 @@
 import * as fc from 'fast-check';
-import { JwtService } from '@nestjs/jwt';
+import {JwtService} from '@nestjs/jwt';
 import * as jwt from 'jsonwebtoken';
 
 /**
@@ -17,13 +17,13 @@ describe('Property 5: JWT decode round-trip', () => {
 
     const tenantArbitrary = fc.record({
         id: fc.uuid(),
-        name: fc.string({ minLength: 1, maxLength: 50 }),
+        name: fc.string({minLength: 1, maxLength: 50}),
     });
 
     const payloadArbitrary = fc.record({
         sub: fc.uuid(),
         email: fc.emailAddress(),
-        name: fc.string({ minLength: 1, maxLength: 100 }),
+        name: fc.string({minLength: 1, maxLength: 100}),
         tenant: tenantArbitrary,
     });
 
@@ -39,7 +39,7 @@ describe('Property 5: JWT decode round-trip', () => {
                 expect(decoded.name).toBe(payload.name);
                 expect(decoded.tenant).toEqual(payload.tenant);
             }),
-            { numRuns: 100 },
+            {numRuns: 100},
         );
     });
 });

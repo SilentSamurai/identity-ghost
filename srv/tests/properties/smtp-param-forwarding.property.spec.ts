@@ -1,6 +1,6 @@
 import * as fc from 'fast-check';
 import * as http from 'http';
-import { SmtpClientAdapter } from '../smtp-client-adapter';
+import {SmtpClientAdapter} from '../smtp-client-adapter';
 
 /**
  * Feature: shared-test-infrastructure, Property 3: SMTP search parameter forwarding
@@ -19,10 +19,10 @@ describe('Property 3: SMTP search parameter forwarding', () => {
                 fc.record(
                     {
                         to: fc.emailAddress(),
-                        subject: fc.string({ minLength: 1, maxLength: 50 }),
-                        timeoutMs: fc.integer({ min: 0, max: 60000 }),
+                        subject: fc.string({minLength: 1, maxLength: 50}),
+                        timeoutMs: fc.integer({min: 0, max: 60000}),
                     },
-                    { requiredKeys: [] },
+                    {requiredKeys: []},
                 ),
                 async (params) => {
                     let capturedUrl = '';
@@ -30,7 +30,7 @@ describe('Property 3: SMTP search parameter forwarding', () => {
                     // Tiny HTTP server that captures the request URL
                     const server = http.createServer((req, res) => {
                         capturedUrl = req.url || '';
-                        res.writeHead(200, { 'Content-Type': 'application/json' });
+                        res.writeHead(200, {'Content-Type': 'application/json'});
                         res.end(JSON.stringify({
                             subject: 'test',
                             to: {},
@@ -89,7 +89,7 @@ describe('Property 3: SMTP search parameter forwarding', () => {
                     }
                 },
             ),
-            { numRuns: 100 },
+            {numRuns: 100},
         );
     });
 });

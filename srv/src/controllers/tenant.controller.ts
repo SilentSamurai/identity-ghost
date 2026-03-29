@@ -4,7 +4,6 @@ import {
     Controller,
     Delete,
     Get,
-    Param,
     Patch,
     Post,
     Request,
@@ -46,7 +45,7 @@ export class TenantController {
     async createTenant(
         @Request() request,
         @Body(new ValidationPipe(ValidationSchema.CreateTenantSchema))
-            body: any,
+        body: any,
     ): Promise<Tenant> {
         const user = await this.usersService.findByEmail(
             request,
@@ -69,7 +68,7 @@ export class TenantController {
         @Request() request,
         @CurrentTenantId() tenantId: string,
         @Body(new ValidationPipe(TenantController.UpdateTenantSchema))
-            body: { name?: string; allowSignUp?: boolean },
+        body: { name?: string; allowSignUp?: boolean },
     ): Promise<Tenant> {
         return this._updateTenant(request, tenantId, body);
     }
@@ -116,7 +115,10 @@ export class TenantController {
 
     // ─── Shared implementation methods ───
 
-    private async _updateTenant(request: any, tenantId: string, body: { name?: string; allowSignUp?: boolean }): Promise<Tenant> {
+    private async _updateTenant(request: any, tenantId: string, body: {
+        name?: string;
+        allowSignUp?: boolean
+    }): Promise<Tenant> {
         let tenant = await this.tenantService.findById(request, tenantId);
         this.securityService.check(
             request,

@@ -44,7 +44,7 @@ export class OAuthTokenController {
     @Post("/login")
     async login(
         @Body(new ValidationPipe(ValidationSchema.LoginSchema))
-            body: {
+        body: {
             client_id: string;
             password: string;
             email: string;
@@ -139,7 +139,7 @@ export class OAuthTokenController {
     @Post("/exchange")
     async exchangeAccessToken(
         @Body(new ValidationPipe(ValidationSchema.ExchangeTokenSchema))
-            body: {
+        body: {
             access_token: string;
             client_id: string;
             client_secret: string;

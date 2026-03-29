@@ -32,7 +32,7 @@ export class PasswordResetController {
     async forgotPassword(
         @Headers() headers,
         @Body(new ValidationPipe(ValidationSchema.ForgotPasswordSchema))
-            body: any,
+        body: any,
     ): Promise<object> {
         const user: User = await this.authUserService.findUserByEmail(
             body.email,
@@ -56,7 +56,7 @@ export class PasswordResetController {
     async resetPassword(
         @Param("token") token: string,
         @Body(new ValidationPipe(ValidationSchema.ResetPasswordSchema))
-            body: any,
+        body: any,
     ): Promise<object> {
         const reset: boolean = await this.authService.resetPassword(
             token,

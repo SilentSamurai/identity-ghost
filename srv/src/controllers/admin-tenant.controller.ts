@@ -26,9 +26,6 @@ import {AppService} from "../services/app.service";
 import {SubscriptionService} from "../services/subscription.service";
 import {ValidationPipe} from "../validation/validation.pipe";
 import {ValidationSchema} from "../validation/validation.schema";
-import {Action} from "../casl/actions.enum";
-import {subject} from "@casl/ability";
-import {SubjectEnum} from "../entity/subjectEnum";
 import {Tenant} from "../entity/tenant.entity";
 import {User} from "../entity/user.entity";
 import {Role} from "../entity/role.entity";
@@ -87,7 +84,7 @@ export class AdminTenantController {
         @Request() request,
         @Param("tenantId", ParseUUIDPipe) tenantId: string,
         @Body(new ValidationPipe(AdminTenantController.UpdateTenantSchema))
-            body: { name?: string; allowSignUp?: boolean },
+        body: { name?: string; allowSignUp?: boolean },
     ): Promise<Tenant> {
         return this.tenantService.updateTenant(request, tenantId, body);
     }
@@ -123,7 +120,7 @@ export class AdminTenantController {
     ): Promise<User[]> {
         let tenant = await this.tenantService.findById(request, tenantId);
         const members: User[] = await this.usersRepository.find({
-            where: { tenants: { id: tenant.id } },
+            where: {tenants: {id: tenant.id}},
         });
         for (const member of members) {
             member.roles = await this.roleService.getMemberRoles(request, tenant, member);
@@ -140,7 +137,7 @@ export class AdminTenantController {
         const user = await this.usersService.findById(request, userId);
         const tenant = await this.tenantService.findById(request, tenantId);
         let roles = await this.tenantService.getMemberRoles(request, tenantId, user);
-        return { tenantId: tenant.id, userId: user.id, roles };
+        return {tenantId: tenant.id, userId: user.id, roles};
     }
 
     @Get("/:tenantId/member/:userId/roles")
@@ -152,7 +149,7 @@ export class AdminTenantController {
         const user = await this.usersService.findById(request, userId);
         await this.tenantService.findById(request, tenantId);
         let roles = await this.tenantService.getMemberRoles(request, tenantId, user);
-        return { roles };
+        return {roles};
     }
 
     @Put("/:tenantId/member/:userId/roles")
@@ -161,7 +158,7 @@ export class AdminTenantController {
         @Param("tenantId", ParseUUIDPipe) tenantId: string,
         @Param("userId") userId: string,
         @Body(new ValidationPipe(ValidationSchema.OperatingRoleSchema))
-            body: { roles: string[] },
+        body: { roles: string[] },
     ): Promise<Role[]> {
         const user = await this.usersService.findById(request, userId);
         await this.tenantService.findById(request, tenantId);
@@ -173,7 +170,7 @@ export class AdminTenantController {
         @Request() request,
         @Param("tenantId", ParseUUIDPipe) tenantId: string,
         @Body(new ValidationPipe(AdminTenantController.MemberOperationSchema))
-            body: { emails: string[] },
+        body: { emails: string[] },
     ): Promise<Tenant> {
         let tenant = await this.tenantService.findById(request, tenantId);
         const adminContext = await this.securityService.getContextForMemberManagement(tenantId);
@@ -193,7 +190,7 @@ export class AdminTenantController {
         @Request() request,
         @Param("tenantId", ParseUUIDPipe) tenantId: string,
         @Body(new ValidationPipe(AdminTenantController.MemberOperationSchema))
-            body: { emails: string[] },
+        body: { emails: string[] },
     ): Promise<Tenant> {
         await this.tenantService.findById(request, tenantId);
         for (const email of body.emails) {

@@ -2,7 +2,7 @@ import * as fc from 'fast-check';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { readPortFile } from '../shared-test.fixture';
+import {readPortFile} from '../shared-test.fixture';
 
 /**
  * Feature: shared-test-infrastructure, Property 1: Port file round-trip
@@ -18,15 +18,15 @@ describe('Property 1: Port file round-trip', () => {
     it('readPortFile returns the exact port values that were written to JSON', () => {
         fc.assert(
             fc.property(
-                fc.integer({ min: 1, max: 65535 }),
-                fc.integer({ min: 1, max: 65535 }),
-                fc.integer({ min: 1, max: 65535 }),
-                fc.integer({ min: 1, max: 65535 }),
+                fc.integer({min: 1, max: 65535}),
+                fc.integer({min: 1, max: 65535}),
+                fc.integer({min: 1, max: 65535}),
+                fc.integer({min: 1, max: 65535}),
                 (appPort, smtpPort, smtpControlPort, webhookPort) => {
                     const tmpFile = path.join(tmpDir, `test-ports-${Date.now()}-${Math.random().toString(36).slice(2)}.json`);
 
                     try {
-                        const portData = { appPort, smtpPort, smtpControlPort, webhookPort };
+                        const portData = {appPort, smtpPort, smtpControlPort, webhookPort};
                         fs.writeFileSync(tmpFile, JSON.stringify(portData), 'utf-8');
 
                         const result = readPortFile(tmpFile);
@@ -42,7 +42,7 @@ describe('Property 1: Port file round-trip', () => {
                     }
                 },
             ),
-            { numRuns: 100 },
+            {numRuns: 100},
         );
     });
 });

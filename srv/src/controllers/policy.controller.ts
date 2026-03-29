@@ -102,7 +102,7 @@ export class PolicyController {
     async createPermission(
         @Request() request: Request,
         @Body(new ValidationPipe(PolicyController.CreateSchema))
-            body: {
+        body: {
             role: string;
             effect: Effect;
             action: Action;
@@ -155,7 +155,7 @@ export class PolicyController {
         @Request() request: Request,
         @Param("id") id: string,
         @Body(new ValidationPipe(PolicyController.UpdateSchema))
-            body: {
+        body: {
             effect?: Effect;
             action?: Action;
             subject?: string;

@@ -93,7 +93,7 @@ describe('Token Abstraction Flows', () => {
 
             expect(response.status).toEqual(201);
             expect(response.body.access_token).toBeDefined();
-            
+
             const decoded: any = jwtService.decode(response.body.access_token);
             expect(decoded.sub).toEqual("oauth");
             expect(decoded.tenant).toBeDefined();

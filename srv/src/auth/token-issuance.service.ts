@@ -37,7 +37,8 @@ export class TokenIssuanceService {
         private readonly authCodeService: AuthCodeService,
         private readonly scopeResolverService: ScopeResolverService,
         private readonly clientService: ClientService,
-    ) {}
+    ) {
+    }
 
     /**
      * Given a resolved user and tenant, handles the full pipeline:

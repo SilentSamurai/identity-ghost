@@ -66,7 +66,7 @@ export class MemberController {
         @Request() request,
         @CurrentTenantId() tenantId: string,
         @Body(new ValidationPipe(MemberOperationSchema))
-            body: { emails: string[] },
+        body: { emails: string[] },
     ): Promise<Tenant> {
         return this._addMember(request, tenantId, body);
     }
@@ -77,7 +77,7 @@ export class MemberController {
         @Request() request,
         @CurrentTenantId() tenantId: string,
         @Body(new ValidationPipe(MemberOperationSchema))
-            body: { emails: string[] },
+        body: { emails: string[] },
     ): Promise<Tenant> {
         return this._removeMember(request, tenantId, body);
     }
@@ -99,7 +99,7 @@ export class MemberController {
         @CurrentTenantId() tenantId: string,
         @Param("userId") userId: string,
         @Body(new ValidationPipe(ValidationSchema.OperatingRoleSchema))
-            body: { roles: string[] },
+        body: { roles: string[] },
     ): Promise<Role[]> {
         return this._setMemberRoles(request, tenantId, userId, body);
     }
@@ -111,7 +111,7 @@ export class MemberController {
         @CurrentTenantId() tenantId: string,
         @Param("userId") userId: string,
         @Body(new ValidationPipe(ValidationSchema.OperatingRoleSchema))
-            body: { roles: string[] },
+        body: { roles: string[] },
     ): Promise<Role[]> {
         return this._addRolesToMember(request, tenantId, userId, body);
     }
@@ -123,7 +123,7 @@ export class MemberController {
         @CurrentTenantId() tenantId: string,
         @Param("userId") userId: string,
         @Body(new ValidationPipe(ValidationSchema.OperatingRoleSchema))
-            body: { roles: string[] },
+        body: { roles: string[] },
     ): Promise<Role[]> {
         return this._removeRolesFromMember(request, tenantId, userId, body);
     }
@@ -229,7 +229,9 @@ export class MemberController {
         };
     }
 
-    private async _setMemberRoles(request: any, tenantId: string, userId: string, body: { roles: string[] }): Promise<Role[]> {
+    private async _setMemberRoles(request: any, tenantId: string, userId: string, body: {
+        roles: string[]
+    }): Promise<Role[]> {
         const user = await this.usersService.findById(request, userId);
         let tenant = await this.tenantService.findById(request, tenantId);
         this.securityService.check(
@@ -245,7 +247,9 @@ export class MemberController {
         );
     }
 
-    private async _addRolesToMember(request: any, tenantId: string, userId: string, body: { roles: string[] }): Promise<Role[]> {
+    private async _addRolesToMember(request: any, tenantId: string, userId: string, body: {
+        roles: string[]
+    }): Promise<Role[]> {
         const user = await this.usersService.findById(request, userId);
         const tenant = await this.tenantService.findById(request, tenantId);
         this.securityService.check(
@@ -257,7 +261,9 @@ export class MemberController {
         return this.roleService.getMemberRoles(request, tenant, user);
     }
 
-    private async _removeRolesFromMember(request: any, tenantId: string, userId: string, body: { roles: string[] }): Promise<Role[]> {
+    private async _removeRolesFromMember(request: any, tenantId: string, userId: string, body: {
+        roles: string[]
+    }): Promise<Role[]> {
         const user = await this.usersService.findById(request, userId);
         const tenant = await this.tenantService.findById(request, tenantId);
         this.securityService.check(

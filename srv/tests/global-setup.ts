@@ -1,12 +1,12 @@
 import * as process from 'node:process';
 import * as path from 'path';
 import * as fs from 'fs';
-import { INestApplication } from '@nestjs/common';
-import { Test } from '@nestjs/testing';
-import { Environment } from '../src/config/environment.service';
-import { AppModule } from '../src/app.module';
-import { createFakeSmtpServer, FakeSmtpServer } from '../src/mail/FakeSmtpServer';
-import { createTenantAppServer, TenantAppServer } from './apps_&_subscription/tenant-app-server';
+import {INestApplication} from '@nestjs/common';
+import {Test} from '@nestjs/testing';
+import {Environment} from '../src/config/environment.service';
+import {AppModule} from '../src/app.module';
+import {createFakeSmtpServer, FakeSmtpServer} from '../src/mail/FakeSmtpServer';
+import {createTenantAppServer, TenantAppServer} from './apps_&_subscription/tenant-app-server';
 
 declare global {
     var __SHARED_TEST_APP__: INestApplication | undefined;
@@ -26,14 +26,14 @@ export default async function globalSetup(): Promise<void> {
         Environment.setup();
 
         // 2. Start FakeSmtpServer on dynamic ports
-        smtpServer = createFakeSmtpServer({ port: 0, controlPort: 0 });
+        smtpServer = createFakeSmtpServer({port: 0, controlPort: 0});
         await smtpServer.listen();
 
         // Point the mail transport at the actual bound port
         process.env.MAIL_PORT = String(smtpServer.boundPort);
 
         // 3. Start TenantAppServer on a dynamic port
-        webhookServer = createTenantAppServer({ port: 0 });
+        webhookServer = createTenantAppServer({port: 0});
         await webhookServer.listen();
 
         // 4. Compile and start the NestJS app on a dynamic port
@@ -68,13 +68,25 @@ export default async function globalSetup(): Promise<void> {
 
         // Close any already-started servers before re-throwing
         if (app) {
-            try { await app.close(); } catch (e) { console.error('[globalSetup] Error closing app:', e); }
+            try {
+                await app.close();
+            } catch (e) {
+                console.error('[globalSetup] Error closing app:', e);
+            }
         }
         if (webhookServer) {
-            try { await webhookServer.close(); } catch (e) { console.error('[globalSetup] Error closing webhook server:', e); }
+            try {
+                await webhookServer.close();
+            } catch (e) {
+                console.error('[globalSetup] Error closing webhook server:', e);
+            }
         }
         if (smtpServer) {
-            try { await smtpServer.close(); } catch (e) { console.error('[globalSetup] Error closing SMTP server:', e); }
+            try {
+                await smtpServer.close();
+            } catch (e) {
+                console.error('[globalSetup] Error closing SMTP server:', e);
+            }
         }
 
         throw error;

@@ -29,7 +29,7 @@ export class OAuthVerificationController {
     @Post("/verify-auth-code")
     async authCode(
         @Body(new ValidationPipe(ValidationSchema.VerifyAuthCodeSchema))
-            body: { auth_code: string, client_id: string }
+        body: { auth_code: string, client_id: string }
     ) {
         if (!body.client_id) {
             throw new BadRequestException("client_id is required");
@@ -57,7 +57,7 @@ export class OAuthVerificationController {
     @Post("/verify")
     async verifyAccessToken(
         @Body(new ValidationPipe(ValidationSchema.VerifyTokenSchema))
-            body: {
+        body: {
             access_token: string;
             client_id: string;
             client_secret: string;

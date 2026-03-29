@@ -4,6 +4,7 @@ import {JwtService} from "@nestjs/jwt";
 
 export interface TestFixture {
     getHttpServer(): TestAgent<supertest.Test>;
+
     jwtService(): JwtService;
 }
 

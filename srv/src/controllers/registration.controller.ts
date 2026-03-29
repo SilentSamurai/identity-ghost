@@ -82,7 +82,7 @@ export class RegisterController {
         @Headers() headers,
         @Request() request,
         @Body(new ValidationPipe(RegisterController.RegisterDomainSchema))
-            body: {
+        body: {
             name: string;
             password: string;
             email: string;
@@ -140,7 +140,7 @@ export class RegisterController {
         @Headers() headers,
         @Request() request,
         @Body(new ValidationPipe(RegisterController.SignUpSchema))
-            body: {
+        body: {
             name: string;
             password: string;
             email: string;
@@ -203,7 +203,7 @@ export class RegisterController {
     async signdown(
         @Request() request,
         @Body(new ValidationPipe(ValidationSchema.SignDownSchema))
-            body: { password: string },
+        body: { password: string },
     ): Promise<{ status: boolean }> {
         const securityContext = this.securityService.getToken(request);
         const user = await this.usersService.findByEmail(

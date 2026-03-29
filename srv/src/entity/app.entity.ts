@@ -29,7 +29,7 @@ export class App {
     @Column({name: 'created_at', default: () => 'CURRENT_TIMESTAMP'})
     createdAt: Date;
 
-    @Column({ name: 'is_public', type: 'boolean', default: false })
+    @Column({name: 'is_public', type: 'boolean', default: false})
     isPublic: boolean;
 
 }

@@ -3,9 +3,8 @@ import {ForbiddenException, forwardRef, Inject, Injectable, OnModuleInit, Unauth
 import {Environment} from "../config/environment.service";
 import {CaslAbilityFactory} from "./casl-ability.factory";
 import {AnyAbility} from "@casl/ability/dist/types/PureAbility";
-import {AbilityBuilder, createMongoAbility} from "@casl/ability";
+import {AbilityBuilder, createMongoAbility, subject} from "@casl/ability";
 import {Action} from "./actions.enum";
-import {subject} from "@casl/ability";
 import {AuthUserService} from "./authUser.service";
 import {AuthContext, GRANT_TYPES, InternalToken, TechnicalToken, TenantToken,} from "./contexts";
 import {SubjectEnum} from "../entity/subjectEnum";

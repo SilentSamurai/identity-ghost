@@ -2,7 +2,6 @@ import {INestApplication} from "@nestjs/common";
 import {Environment} from "../src/config/environment.service";
 import {Test, TestingModule} from "@nestjs/testing";
 import {AppModule} from "../src/app.module";
-import {JwtService} from "@nestjs/jwt";
 import * as superTest from 'supertest';
 import * as process from "node:process";
 import TestAgent from "supertest/lib/agent";
@@ -39,7 +38,7 @@ export class TestAppFixture {
         Environment.setup();
 
 
-        this.smtpServer = createFakeSmtpServer({ port: 0, controlPort: 0 });
+        this.smtpServer = createFakeSmtpServer({port: 0, controlPort: 0});
         await this.smtpServer.listen();
 
         // Point the mail transport at the actual bound port

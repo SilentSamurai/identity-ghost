@@ -56,7 +56,7 @@ export class UsersController {
         @Request() request,
         @Headers() headers,
         @Body(new ValidationPipe(ValidationSchema.UpdateMyEmailSchema))
-            body: any,
+        body: any,
     ): Promise<{ status: boolean }> {
         const securityContext = this.securityService.getToken(request);
         const user = await this.usersService.findByEmail(
@@ -86,7 +86,7 @@ export class UsersController {
     async updateMyPassword(
         @Request() request,
         @Body(new ValidationPipe(ValidationSchema.UpdateMyPasswordSchema))
-            body: any,
+        body: any,
     ): Promise<{ status: boolean }> {
         const securityContext = this.securityService.getToken(request);
         const user = await this.usersService.findByEmail(
@@ -107,7 +107,7 @@ export class UsersController {
     async updateMyName(
         @Request() request,
         @Body(new ValidationPipe(ValidationSchema.UpdateMyNameSchema))
-            body: any,
+        body: any,
     ): Promise<User> {
         const securityContext = this.securityService.getToken(request);
         const user = await this.usersService.findByEmail(

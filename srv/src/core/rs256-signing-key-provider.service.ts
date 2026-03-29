@@ -19,7 +19,7 @@ export class RS256SigningKeyProvider implements SigningKeyProvider {
 
     async getPrivateKey(tenantId: string): Promise<string> {
         const tenant = await this.tenantRepository.findOne({
-            where: { id: tenantId },
+            where: {id: tenantId},
             select: ['id', 'privateKey']
         });
         if (!tenant) {
@@ -30,7 +30,7 @@ export class RS256SigningKeyProvider implements SigningKeyProvider {
 
     async getPublicKey(tenantId: string): Promise<string> {
         const tenant = await this.tenantRepository.findOne({
-            where: { id: tenantId },
+            where: {id: tenantId},
             select: ['id', 'publicKey']
         });
         if (!tenant) {

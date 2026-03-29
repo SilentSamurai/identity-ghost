@@ -9,7 +9,8 @@ import {TenantToken, Token} from "../casl/contexts";
  */
 @Injectable()
 export class SuperAdminGuard implements CanActivate {
-    constructor(private readonly securityService: SecurityService) {}
+    constructor(private readonly securityService: SecurityService) {
+    }
 
     canActivate(context: ExecutionContext): boolean {
         const request = context.switchToHttp().getRequest();

@@ -3,7 +3,9 @@ import {JwtVerifyOptions} from "@nestjs/jwt/dist/interfaces";
 
 export interface TokenService {
     sign(payload: any, options: JwtSignOptions): Promise<string>;
+
     verify(token: string, options: JwtVerifyOptions): Promise<any>;
+
     decode(token: string): any;
 }
 
@@ -14,7 +16,9 @@ export const PS256_TOKEN_GENERATOR = Symbol("PS256_TOKEN_GENERATOR");
 
 export interface SigningKeyProvider {
     generateKeyPair(): { privateKey: string; publicKey: string };
+
     getPrivateKey(tenantId: string): Promise<string>;
+
     getPublicKey(tenantId: string): Promise<string>;
 }
 

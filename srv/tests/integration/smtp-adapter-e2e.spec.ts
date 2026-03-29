@@ -1,4 +1,4 @@
-import { SharedTestFixture } from '../shared-test.fixture';
+import {SharedTestFixture} from '../shared-test.fixture';
 
 describe('SMTP Adapter End-to-End', () => {
     let fixture: SharedTestFixture;
@@ -19,7 +19,7 @@ describe('SMTP Adapter End-to-End', () => {
             .post('/api/oauth/forgot-password')
             .set('Accept', 'application/json')
             .set('Host', 'localhost:9001')
-            .send({ email: 'admin@auth.server.com' });
+            .send({email: 'admin@auth.server.com'});
 
         expect(response.status).toBe(201);
 

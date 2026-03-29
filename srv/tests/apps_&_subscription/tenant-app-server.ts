@@ -47,18 +47,11 @@ export class TenantAppServer {
     private server: http.Server;
     private config: Required<ServerConfig>;
     private logger: Console;
-    private _boundPort: number = 0;
-
     // Track onboard and offboard requests
     private onboardRequests: OnboardRequest[] = [];
     private offboardRequests: OffboardRequest[] = [];
     private lastDecodedToken: any = null; // Store last decoded JWT for test assertions
     private decodedTokensByTenant: Map<string, any> = new Map(); // Keyed by tenantId for parallel-safe lookups
-
-    /** Actual port after listen() — useful when configured with port 0. */
-    public get boundPort(): number {
-        return this._boundPort;
-    }
 
     constructor(config: ServerConfig = {}) {
         this.config = this.getFullConfig(config);
@@ -78,6 +71,13 @@ export class TenantAppServer {
 
         // Setup graceful shutdown
         this.setupShutdownHandlers();
+    }
+
+    private _boundPort: number = 0;
+
+    /** Actual port after listen() — useful when configured with port 0. */
+    public get boundPort(): number {
+        return this._boundPort;
     }
 
     /**
@@ -153,6 +153,13 @@ export class TenantAppServer {
      */
     public clearOffboardRequests(): void {
         this.offboardRequests = [];
+    }
+
+    /**
+     * Get the last decoded JWT token (for test assertions)
+     */
+    public getLastDecodedToken(): any {
+        return this.lastDecodedToken;
     }
 
     /**
@@ -340,13 +347,6 @@ export class TenantAppServer {
         if (levels[level] <= levels[this.config.logLevel]) {
             console[level === 'error' ? 'error' : level === 'warn' ? 'warn' : level === 'info' ? 'info' : 'log'](...args);
         }
-    }
-
-    /**
-     * Get the last decoded JWT token (for test assertions)
-     */
-    public getLastDecodedToken(): any {
-        return this.lastDecodedToken;
     }
 }
 

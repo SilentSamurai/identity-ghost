@@ -1,8 +1,8 @@
 import * as path from 'path';
 import * as fs from 'fs';
-import { INestApplication } from '@nestjs/common';
-import { FakeSmtpServer } from '../src/mail/FakeSmtpServer';
-import { TenantAppServer } from './apps_&_subscription/tenant-app-server';
+import {INestApplication} from '@nestjs/common';
+import {FakeSmtpServer} from '../src/mail/FakeSmtpServer';
+import {TenantAppServer} from './apps_&_subscription/tenant-app-server';
 
 declare global {
     var __SHARED_TEST_APP__: INestApplication | undefined;

@@ -1,4 +1,4 @@
-import {Injectable, Logger, NotFoundException, UnauthorizedException} from "@nestjs/common";
+import {Inject, Injectable, Logger, NotFoundException, UnauthorizedException} from "@nestjs/common";
 import {Environment} from "../config/environment.service";
 import {UsersService} from "../services/users.service";
 import {User} from "../entity/user.entity";
@@ -21,7 +21,6 @@ import {
 import {AuthUserService} from "../casl/authUser.service";
 import * as yup from "yup";
 import {TechnicalTokenService} from "../core/technical-token.service";
-import {Inject} from "@nestjs/common";
 import {HS256_TOKEN_GENERATOR, RS256_TOKEN_GENERATOR, TokenService} from "../core/token-abstraction";
 import {getPermittedScopes} from "../casl/role-scope-map";
 

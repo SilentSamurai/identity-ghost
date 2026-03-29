@@ -2,9 +2,9 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as superTest from 'supertest';
 import TestAgent from 'supertest/lib/agent';
-import { JwtService } from '@nestjs/jwt';
-import { SmtpClientAdapter } from './smtp-client-adapter';
-import { WebhookClientAdapter } from './webhook-client-adapter';
+import {JwtService} from '@nestjs/jwt';
+import {SmtpClientAdapter} from './smtp-client-adapter';
+import {WebhookClientAdapter} from './webhook-client-adapter';
 
 export interface PortFile {
     appPort: number;

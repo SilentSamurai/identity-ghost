@@ -21,11 +21,11 @@ import {ES256TokenGenerator} from "./es256-token-generator.service";
 import {PS256TokenGenerator} from "./ps256-token-generator.service";
 import {RS256SigningKeyProvider} from "./rs256-signing-key-provider.service";
 import {
-    HS256_TOKEN_GENERATOR,
-    SIGNING_KEY_PROVIDER,
-    RS256_TOKEN_GENERATOR,
     ES256_TOKEN_GENERATOR,
-    PS256_TOKEN_GENERATOR
+    HS256_TOKEN_GENERATOR,
+    PS256_TOKEN_GENERATOR,
+    RS256_TOKEN_GENERATOR,
+    SIGNING_KEY_PROVIDER
 } from "./token-abstraction";
 
 @Module({

@@ -1,4 +1,5 @@
 import {
+    BadRequestException,
     Body,
     ClassSerializerInterceptor,
     Controller,
@@ -10,7 +11,6 @@ import {
     Request,
     UseGuards,
     UseInterceptors,
-    BadRequestException,
 } from "@nestjs/common";
 import * as yup from 'yup';
 
@@ -61,7 +61,7 @@ export class UsersAdminController {
     async createUser(
         @Request() request,
         @Body(new ValidationPipe(ValidationSchema.CreateUserSchema))
-            body: {
+        body: {
             name: string;
             email: string;
             password: string;
@@ -83,7 +83,7 @@ export class UsersAdminController {
     async updateUser(
         @Request() request,
         @Body(new ValidationPipe(ValidationSchema.UpdateUserSchema))
-            body: {
+        body: {
             id: string;
             name: string;
             email: string
@@ -147,7 +147,7 @@ export class UsersAdminController {
     async updateVerification(
         @Request() request,
         @Body(new ValidationPipe(VerifyUserSchema))
-            body: {
+        body: {
             email: string;
             verify: boolean;
         },
@@ -171,7 +171,7 @@ export class UsersAdminController {
         @Param("userId") userId: string,
     ): Promise<any> {
         const user = await this.usersService.lockUser(request, userId);
-        return { id: user.id, locked: user.locked };
+        return {id: user.id, locked: user.locked};
     }
 
     @Put(":userId/unlock")
@@ -181,7 +181,7 @@ export class UsersAdminController {
         @Param("userId") userId: string,
     ): Promise<any> {
         const user = await this.usersService.unlockUser(request, userId);
-        return { id: user.id, locked: user.locked };
+        return {id: user.id, locked: user.locked};
     }
 
     @Put(":userId/password")
@@ -190,7 +190,7 @@ export class UsersAdminController {
         @Request() request: AuthContext,
         @Param("userId") id: string,
         @Body(new ValidationPipe(UpdateUserPasswordSchema))
-            body: { password: string; confirmPassword: string },
+        body: { password: string; confirmPassword: string },
     ): Promise<User> {
         if (body.password !== body.confirmPassword) {
             throw new BadRequestException("Passwords do not match");

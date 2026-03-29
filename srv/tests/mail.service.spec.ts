@@ -2,12 +2,9 @@
 // direct DI container access (app.nestApp.get()) for MailService and UserRepository.
 // SharedTestFixture does not expose the NestJS app instance.
 
-import { Test, TestingModule } from '@nestjs/testing';
-import { MailService } from '../src/mail/mail.service';
-import { Environment } from '../src/config/environment.service';
-import { createFakeSmtpServer, FakeSmtpServer } from '../src/mail/FakeSmtpServer';
-import { TestAppFixture } from './test-app.fixture';
-import { EmailSearchCriteria } from '../src/mail/FakeSmtpServer';
+import {MailService} from '../src/mail/mail.service';
+import {FakeSmtpServer} from '../src/mail/FakeSmtpServer';
+import {TestAppFixture} from './test-app.fixture';
 import * as argon2 from 'argon2';
 import * as process from "node:process";
 
@@ -39,13 +36,13 @@ describe('MailService Rate Limiting', () => {
         });
 
         // Test forgot password requests
-        const headers = { host: 'localhost:3000' };
+        const headers = {host: 'localhost:3000'};
 
         // First request should succeed
         const result1 = await app.getHttpServer()
             .post('/api/oauth/forgot-password')
             .set('Accept', 'application/json')
-            .send({ email: 'test@example.com' });
+            .send({email: 'test@example.com'});
         expect(result1.status).toBe(201);
         expect(result1.body.status).toBe(true);
 
@@ -53,7 +50,7 @@ describe('MailService Rate Limiting', () => {
         const result2 = await app.getHttpServer()
             .post('/api/oauth/forgot-password')
             .set('Accept', 'application/json')
-            .send({ email: 'test@example.com' });
+            .send({email: 'test@example.com'});
         expect(result2.status).toBe(201);
         expect(result2.body.status).toBe(true);
 
@@ -61,7 +58,7 @@ describe('MailService Rate Limiting', () => {
         const result3 = await app.getHttpServer()
             .post('/api/oauth/forgot-password')
             .set('Accept', 'application/json')
-            .send({ email: 'test@example.com' });
+            .send({email: 'test@example.com'});
         expect(result3.status).toBe(201);
         expect(result3.body.status).toBe(true);
 
@@ -69,11 +66,11 @@ describe('MailService Rate Limiting', () => {
         const result4 = await app.getHttpServer()
             .post('/api/oauth/forgot-password')
             .set('Accept', 'application/json')
-            .send({ email: 'test@example.com' });
+            .send({email: 'test@example.com'});
         expect(result4.status).toBe(503); // Too Many Requests
 
         // Verify email count in database
-        const updatedUser = await app.nestApp.get('UserRepository').findOne({ where: { email: 'test@example.com' } });
+        const updatedUser = await app.nestApp.get('UserRepository').findOne({where: {email: 'test@example.com'}});
         expect(updatedUser.emailCount).toBe(3);
     });
 
@@ -93,12 +90,12 @@ describe('MailService Rate Limiting', () => {
         const result = await app.getHttpServer()
             .post('/api/oauth/forgot-password')
             .set('Accept', 'application/json')
-            .send({ email: 'test2@example.com' });
+            .send({email: 'test2@example.com'});
         expect(result.status).toBe(201);
         expect(result.body.status).toBe(true);
 
         // Verify email count was reset
-        const updatedUser = await app.nestApp.get('UserRepository').findOne({ where: { email: 'test2@example.com' } });
+        const updatedUser = await app.nestApp.get('UserRepository').findOne({where: {email: 'test2@example.com'}});
         expect(updatedUser.emailCount).toBe(1);
         expect(updatedUser.emailCountResetAt).toBeDefined();
     });

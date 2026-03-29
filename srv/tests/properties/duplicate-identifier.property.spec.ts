@@ -1,6 +1,6 @@
 import * as fc from 'fast-check';
-import { SharedTestFixture } from '../shared-test.fixture';
-import { TokenFixture } from '../token.fixture';
+import {SharedTestFixture} from '../shared-test.fixture';
+import {TokenFixture} from '../token.fixture';
 
 /**
  * Feature: shared-test-infrastructure, Property 6: Duplicate identifier constraint enforcement
@@ -48,7 +48,7 @@ describe('Property 6: Duplicate identifier constraint enforcement', () => {
                     // First creation should succeed
                     const res1 = await fixture.getHttpServer()
                         .post('/api/tenant/create')
-                        .send({ name, domain })
+                        .send({name, domain})
                         .set('Authorization', `Bearer ${accessToken}`)
                         .set('Accept', 'application/json');
                     expect(res1.status).toBe(201);
@@ -56,14 +56,14 @@ describe('Property 6: Duplicate identifier constraint enforcement', () => {
                     // Second creation with same domain should fail with 4xx
                     const res2 = await fixture.getHttpServer()
                         .post('/api/tenant/create')
-                        .send({ name: `${name}x`, domain })
+                        .send({name: `${name}x`, domain})
                         .set('Authorization', `Bearer ${accessToken}`)
                         .set('Accept', 'application/json');
                     expect(res2.status).toBeGreaterThanOrEqual(400);
                     expect(res2.status).toBeLessThan(500);
                 },
             ),
-            { numRuns: 5 },
+            {numRuns: 5},
         );
     });
 });

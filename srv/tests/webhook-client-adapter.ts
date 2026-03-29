@@ -65,7 +65,9 @@ export class WebhookClientAdapter {
             const url = `${this.baseUrl}${path}`;
             http.get(url, (res) => {
                 let data = '';
-                res.on('data', (chunk) => { data += chunk; });
+                res.on('data', (chunk) => {
+                    data += chunk;
+                });
                 res.on('end', () => {
                     if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
                         try {
@@ -93,7 +95,9 @@ export class WebhookClientAdapter {
             };
             const req = http.request(options, (res) => {
                 let data = '';
-                res.on('data', (chunk) => { data += chunk; });
+                res.on('data', (chunk) => {
+                    data += chunk;
+                });
                 res.on('end', () => {
                     if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
                         resolve();

@@ -1,4 +1,4 @@
-import { SharedTestFixture } from '../shared-test.fixture';
+import {SharedTestFixture} from '../shared-test.fixture';
 
 describe('Shared Infrastructure Lifecycle', () => {
     let fixture: SharedTestFixture;

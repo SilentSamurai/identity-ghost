@@ -1,13 +1,13 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { SecurityService } from '../../src/casl/security.service';
-import { Environment } from '../../src/config/environment.service';
-import { AuthUserService } from '../../src/casl/authUser.service';
-import { CaslAbilityFactory } from '../../src/casl/casl-ability.factory';
-import { AuthContext, GRANT_TYPES, InternalToken, TechnicalToken, TenantToken } from '../../src/casl/contexts';
-import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
-import { RoleEnum } from '../../src/entity/roleEnum';
-import { Action } from '../../src/casl/actions.enum';
-import { PureAbility, AbilityBuilder, MongoAbility, subject } from '@casl/ability';
+import {Test, TestingModule} from '@nestjs/testing';
+import {SecurityService} from '../../src/casl/security.service';
+import {Environment} from '../../src/config/environment.service';
+import {AuthUserService} from '../../src/casl/authUser.service';
+import {CaslAbilityFactory} from '../../src/casl/casl-ability.factory';
+import {AuthContext, GRANT_TYPES, InternalToken, TechnicalToken, TenantToken} from '../../src/casl/contexts';
+import {ForbiddenException, UnauthorizedException} from '@nestjs/common';
+import {RoleEnum} from '../../src/entity/roleEnum';
+import {Action} from '../../src/casl/actions.enum';
+import {AbilityBuilder, MongoAbility, PureAbility} from '@casl/ability';
 
 /**
  * Unit tests for SecurityService.
@@ -54,7 +54,7 @@ describe('SecurityService', () => {
     });
 
     const createMockAbility = () => {
-        const { can, build } = new AbilityBuilder<MongoAbility>(PureAbility);
+        const {can, build} = new AbilityBuilder<MongoAbility>(PureAbility);
         can(Action.Read, 'User');
         return build();
     };
@@ -104,13 +104,13 @@ describe('SecurityService', () => {
     describe('getAbility', () => {
         it('should return abilities when SCOPE_ABILITIES exists', () => {
             const mockAbilities = createMockAbility();
-            const context = { ...mockAuthContext, SCOPE_ABILITIES: mockAbilities };
+            const context = {...mockAuthContext, SCOPE_ABILITIES: mockAbilities};
             const result = service.getAbility(context);
             expect(result).toBe(mockAbilities);
         });
 
         it('should throw UnauthorizedException when SCOPE_ABILITIES is null', () => {
-            const context = { ...mockAuthContext, SCOPE_ABILITIES: null };
+            const context = {...mockAuthContext, SCOPE_ABILITIES: null};
             expect(() => service.getAbility(context)).toThrow(UnauthorizedException);
         });
     });
@@ -118,7 +118,7 @@ describe('SecurityService', () => {
     describe('isAuthorized', () => {
         it('should check authorization without object', () => {
             const mockAbility = createMockAbility();
-            const context = { ...mockAuthContext, SCOPE_ABILITIES: mockAbility };
+            const context = {...mockAuthContext, SCOPE_ABILITIES: mockAbility};
 
             const result = service.isAuthorized(context, Action.Read, 'User');
             expect(result).toBe(true);
@@ -126,8 +126,8 @@ describe('SecurityService', () => {
 
         it('should check authorization with object', () => {
             const mockAbility = createMockAbility();
-            const context = { ...mockAuthContext, SCOPE_ABILITIES: mockAbility };
-            const obj = { id: 1, name: 'Test' };
+            const context = {...mockAuthContext, SCOPE_ABILITIES: mockAbility};
+            const obj = {id: 1, name: 'Test'};
 
             const result = service.isAuthorized(context, Action.Read, 'User', obj);
             expect(result).toBe(true);
@@ -136,16 +136,16 @@ describe('SecurityService', () => {
 
     describe('check', () => {
         it('should throw ForbiddenException when not authorized', () => {
-            const { can, build } = new AbilityBuilder<MongoAbility>(PureAbility);
+            const {can, build} = new AbilityBuilder<MongoAbility>(PureAbility);
             const mockAbility = build();
-            const context = { ...mockAuthContext, SCOPE_ABILITIES: mockAbility };
+            const context = {...mockAuthContext, SCOPE_ABILITIES: mockAbility};
 
             expect(() => service.check(context, Action.Read, 'User')).toThrow(ForbiddenException);
         });
 
         it('should return true when authorized', () => {
             const mockAbility = createMockAbility();
-            const context = { ...mockAuthContext, SCOPE_ABILITIES: mockAbility };
+            const context = {...mockAuthContext, SCOPE_ABILITIES: mockAbility};
 
             const result = service.check(context, Action.Read, 'User');
             expect(result).toBe(true);
@@ -169,13 +169,13 @@ describe('SecurityService', () => {
 
     describe('isClientCredentials', () => {
         it('should return true for client credentials grant type', () => {
-            const request = { SECURITY_CONTEXT: mockTechnicalToken };
+            const request = {SECURITY_CONTEXT: mockTechnicalToken};
             const result = service.isClientCredentials(request);
             expect(result).toBe(true);
         });
 
         it('should return false for other grant types', () => {
-            const request = { SECURITY_CONTEXT: mockTenantToken };
+            const request = {SECURITY_CONTEXT: mockTenantToken};
             const result = service.isClientCredentials(request);
             expect(result).toBe(false);
         });
@@ -183,7 +183,7 @@ describe('SecurityService', () => {
 
     describe('getTechnicalToken', () => {
         it('should return technical token for client credentials', () => {
-            const context = { ...mockAuthContext, SECURITY_CONTEXT: mockTechnicalToken };
+            const context = {...mockAuthContext, SECURITY_CONTEXT: mockTechnicalToken};
             const result = service.getTechnicalToken(context);
             expect(result).toBe(mockTechnicalToken);
         });
@@ -322,7 +322,7 @@ describe('SecurityService', () => {
                 name: 'Test Tenant',
                 domain: 'test.com',
             };
-            const mockRoles = [{ name: RoleEnum.TENANT_ADMIN }];
+            const mockRoles = [{name: RoleEnum.TENANT_ADMIN}];
             const mockAbilities = createMockAbility();
 
             jest.spyOn(authUserService, 'findUserByEmail').mockResolvedValue(mockUser as any);

@@ -36,18 +36,6 @@ export class FakeSmtpServer {
     private controlApp?: express.Express;
     private controlServer?: http.Server;
     private emailHandler?: (email: ParsedMail) => void;
-    private _boundPort: number = 0;
-    private _boundControlPort: number = 0;
-
-    /** Actual SMTP port after listen() — useful when configured with port 0. */
-    public get boundPort(): number {
-        return this._boundPort;
-    }
-
-    /** Actual control-server port after listen() — useful when configured with port 0. */
-    public get boundControlPort(): number {
-        return this._boundControlPort;
-    }
 
     constructor(config: ServerConfig = {}) {
         this.config = this.getFullConfig(config);
@@ -59,6 +47,20 @@ export class FakeSmtpServer {
 
         // Setup graceful shutdown
         this.setupShutdownHandlers();
+    }
+
+    private _boundPort: number = 0;
+
+    /** Actual SMTP port after listen() — useful when configured with port 0. */
+    public get boundPort(): number {
+        return this._boundPort;
+    }
+
+    private _boundControlPort: number = 0;
+
+    /** Actual control-server port after listen() — useful when configured with port 0. */
+    public get boundControlPort(): number {
+        return this._boundControlPort;
     }
 
     public async listen(): Promise<FakeSmtpServer> {
@@ -218,10 +220,14 @@ export class FakeSmtpServer {
                 const to = req.query.to as string | undefined;
                 const subject = req.query.subject as string | undefined;
                 const timeoutMs = Number(req.query.timeoutMs ?? 10000);
-                const criteria: any = { sort: 'newest', limit: 1 };
+                const criteria: any = {sort: 'newest', limit: 1};
                 if (to) criteria.to = to;
                 if (subject) {
-                    try { criteria.subject = new RegExp(subject as string, 'i'); } catch { criteria.subject = subject; }
+                    try {
+                        criteria.subject = new RegExp(subject as string, 'i');
+                    } catch {
+                        criteria.subject = subject;
+                    }
                 }
                 const email = await this.waitForEmail(criteria, timeoutMs, 500);
                 const links = this.extractLinks(email);
@@ -237,7 +243,7 @@ export class FakeSmtpServer {
                     date: email.date,
                 });
             } catch (e: any) {
-                return res.status(404).json({ error: e?.message || 'No matching email found' });
+                return res.status(404).json({error: e?.message || 'No matching email found'});
             }
         });
 
@@ -245,10 +251,14 @@ export class FakeSmtpServer {
             const to = req.query.to as string | undefined;
             const subject = req.query.subject as string | undefined;
             const limit = Number(req.query.limit ?? 10);
-            const criteria: any = { sort: 'newest', limit };
+            const criteria: any = {sort: 'newest', limit};
             if (to) criteria.to = to;
             if (subject) {
-                try { criteria.subject = new RegExp(subject as string, 'i'); } catch { criteria.subject = subject; }
+                try {
+                    criteria.subject = new RegExp(subject as string, 'i');
+                } catch {
+                    criteria.subject = subject;
+                }
             }
             const emails = this.searchEmails(criteria).map(e => ({
                 subject: e.subject,
@@ -256,7 +266,7 @@ export class FakeSmtpServer {
                 from: e.from,
                 date: e.date,
             }));
-            return res.json({ emails });
+            return res.json({emails});
         });
 
         app.post('/__test__/emails/clear', (req, res) => {

@@ -2,9 +2,9 @@ import * as fc from 'fast-check';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { readPortFile } from '../shared-test.fixture';
-import { SmtpClientAdapter } from '../smtp-client-adapter';
-import { WebhookClientAdapter } from '../webhook-client-adapter';
+import {readPortFile} from '../shared-test.fixture';
+import {SmtpClientAdapter} from '../smtp-client-adapter';
+import {WebhookClientAdapter} from '../webhook-client-adapter';
 
 /**
  * Feature: shared-test-infrastructure, Property 2: Fixture URL targeting from port configuration
@@ -22,15 +22,20 @@ describe('Property 2: Fixture URL targeting from port configuration', () => {
     it('SmtpClientAdapter buildUrl() targets the correct smtpControlPort from the port file', () => {
         fc.assert(
             fc.property(
-                fc.integer({ min: 1, max: 65535 }),
-                fc.integer({ min: 1, max: 65535 }),
-                fc.integer({ min: 1, max: 65535 }),
-                fc.integer({ min: 1, max: 65535 }),
+                fc.integer({min: 1, max: 65535}),
+                fc.integer({min: 1, max: 65535}),
+                fc.integer({min: 1, max: 65535}),
+                fc.integer({min: 1, max: 65535}),
                 (appPort, smtpPort, smtpControlPort, webhookPort) => {
                     const tmpFile = path.join(tmpDir, `test-ports-${Date.now()}-${Math.random().toString(36).slice(2)}.json`);
 
                     try {
-                        fs.writeFileSync(tmpFile, JSON.stringify({ appPort, smtpPort, smtpControlPort, webhookPort }), 'utf-8');
+                        fs.writeFileSync(tmpFile, JSON.stringify({
+                            appPort,
+                            smtpPort,
+                            smtpControlPort,
+                            webhookPort
+                        }), 'utf-8');
                         const ports = readPortFile(tmpFile);
 
                         const smtp = new SmtpClientAdapter(`http://127.0.0.1:${ports.smtpControlPort}`);
@@ -42,22 +47,27 @@ describe('Property 2: Fixture URL targeting from port configuration', () => {
                     }
                 },
             ),
-            { numRuns: 100 },
+            {numRuns: 100},
         );
     });
 
     it('WebhookClientAdapter boundPort matches the webhookPort from the port file', () => {
         fc.assert(
             fc.property(
-                fc.integer({ min: 1, max: 65535 }),
-                fc.integer({ min: 1, max: 65535 }),
-                fc.integer({ min: 1, max: 65535 }),
-                fc.integer({ min: 1, max: 65535 }),
+                fc.integer({min: 1, max: 65535}),
+                fc.integer({min: 1, max: 65535}),
+                fc.integer({min: 1, max: 65535}),
+                fc.integer({min: 1, max: 65535}),
                 (appPort, smtpPort, smtpControlPort, webhookPort) => {
                     const tmpFile = path.join(tmpDir, `test-ports-${Date.now()}-${Math.random().toString(36).slice(2)}.json`);
 
                     try {
-                        fs.writeFileSync(tmpFile, JSON.stringify({ appPort, smtpPort, smtpControlPort, webhookPort }), 'utf-8');
+                        fs.writeFileSync(tmpFile, JSON.stringify({
+                            appPort,
+                            smtpPort,
+                            smtpControlPort,
+                            webhookPort
+                        }), 'utf-8');
                         const ports = readPortFile(tmpFile);
 
                         const webhook = new WebhookClientAdapter(`http://127.0.0.1:${ports.webhookPort}`);
@@ -68,22 +78,27 @@ describe('Property 2: Fixture URL targeting from port configuration', () => {
                     }
                 },
             ),
-            { numRuns: 100 },
+            {numRuns: 100},
         );
     });
 
     it('port file ports produce correct base URLs for all adapters', () => {
         fc.assert(
             fc.property(
-                fc.integer({ min: 1, max: 65535 }),
-                fc.integer({ min: 1, max: 65535 }),
-                fc.integer({ min: 1, max: 65535 }),
-                fc.integer({ min: 1, max: 65535 }),
+                fc.integer({min: 1, max: 65535}),
+                fc.integer({min: 1, max: 65535}),
+                fc.integer({min: 1, max: 65535}),
+                fc.integer({min: 1, max: 65535}),
                 (appPort, smtpPort, smtpControlPort, webhookPort) => {
                     const tmpFile = path.join(tmpDir, `test-ports-${Date.now()}-${Math.random().toString(36).slice(2)}.json`);
 
                     try {
-                        fs.writeFileSync(tmpFile, JSON.stringify({ appPort, smtpPort, smtpControlPort, webhookPort }), 'utf-8');
+                        fs.writeFileSync(tmpFile, JSON.stringify({
+                            appPort,
+                            smtpPort,
+                            smtpControlPort,
+                            webhookPort
+                        }), 'utf-8');
                         const ports = readPortFile(tmpFile);
 
                         // SMTP adapter base URL contains the correct control port
@@ -102,7 +117,7 @@ describe('Property 2: Fixture URL targeting from port configuration', () => {
                     }
                 },
             ),
-            { numRuns: 100 },
+            {numRuns: 100},
         );
     });
 });

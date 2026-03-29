@@ -1,9 +1,9 @@
-import { SharedTestFixture } from '../shared-test.fixture';
-import { TokenFixture } from '../token.fixture';
-import { AppClient } from '../api-client/app-client';
-import { SearchClient } from '../api-client/search-client';
-import { AdminTenantClient } from '../api-client/admin-tenant-client';
-import { v4 as uuid } from 'uuid';
+import {SharedTestFixture} from '../shared-test.fixture';
+import {TokenFixture} from '../token.fixture';
+import {AppClient} from '../api-client/app-client';
+import {SearchClient} from '../api-client/search-client';
+import {AdminTenantClient} from '../api-client/admin-tenant-client';
+import {v4 as uuid} from 'uuid';
 
 describe('Webhook Adapter End-to-End', () => {
     let fixture: SharedTestFixture;
@@ -30,8 +30,8 @@ describe('Webhook Adapter End-to-End', () => {
 
         // Find shire.local and bree.local tenants
         const searchClient = new SearchClient(fixture, superAdminToken);
-        const shireTenant = await searchClient.findTenantBy({ domain: 'shire.local' });
-        const breeTenant = await searchClient.findTenantBy({ domain: 'bree.local' });
+        const shireTenant = await searchClient.findTenantBy({domain: 'shire.local'});
+        const breeTenant = await searchClient.findTenantBy({domain: 'bree.local'});
         shireTenantId = shireTenant.id;
         breeTenantId = breeTenant.id;
     });

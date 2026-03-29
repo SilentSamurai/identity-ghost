@@ -47,7 +47,7 @@ export class RoleControllerV2 {
         @Request() request: any,
         @Param("roleId") roleId: string,
         @Body(new ValidationPipe(RoleControllerV2.UpdateRoleSchema))
-            body: { name: string; description: string; appId?: string },
+        body: { name: string; description: string; appId?: string },
     ): Promise<Role> {
         return this.roleService.updateRole(
             request,

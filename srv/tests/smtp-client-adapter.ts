@@ -26,7 +26,8 @@ export interface EmailListResponse {
  * with the shared FakeSmtpServer over HTTP.
  */
 export class SmtpClientAdapter {
-    constructor(private readonly controlBaseUrl: string) {}
+    constructor(private readonly controlBaseUrl: string) {
+    }
 
     async getLatestEmail(params?: { to?: string; subject?: string; timeoutMs?: number }): Promise<EmailResponse> {
         const query = new URLSearchParams();
@@ -103,7 +104,9 @@ export class SmtpClientAdapter {
             const url = this.buildUrl(path);
             http.get(url, (res) => {
                 let data = '';
-                res.on('data', (chunk) => { data += chunk; });
+                res.on('data', (chunk) => {
+                    data += chunk;
+                });
                 res.on('end', () => {
                     if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
                         try {
@@ -131,11 +134,13 @@ export class SmtpClientAdapter {
                 port: url.port,
                 path: url.pathname,
                 method: 'POST',
-                headers: { 'Content-Length': '0' },
+                headers: {'Content-Length': '0'},
             };
             const req = http.request(options, (res) => {
                 let data = '';
-                res.on('data', (chunk) => { data += chunk; });
+                res.on('data', (chunk) => {
+                    data += chunk;
+                });
                 res.on('end', () => {
                     if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
                         resolve();

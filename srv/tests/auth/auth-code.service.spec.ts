@@ -1,15 +1,15 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { AuthCodeService } from '../../src/auth/auth-code.service';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { AuthCode } from '../../src/entity/auth_code.entity';
-import { User } from '../../src/entity/user.entity';
-import { Environment } from '../../src/config/environment.service';
-import { JwtService } from '@nestjs/jwt';
-import { TenantService } from '../../src/services/tenant.service';
-import { AuthUserService } from '../../src/casl/authUser.service';
-import { UnauthorizedException } from '@nestjs/common';
-import { Repository } from 'typeorm';
-import { CryptUtil } from '../../src/util/crypt.util';
+import {Test, TestingModule} from '@nestjs/testing';
+import {AuthCodeService} from '../../src/auth/auth-code.service';
+import {getRepositoryToken} from '@nestjs/typeorm';
+import {AuthCode} from '../../src/entity/auth_code.entity';
+import {User} from '../../src/entity/user.entity';
+import {Environment} from '../../src/config/environment.service';
+import {JwtService} from '@nestjs/jwt';
+import {TenantService} from '../../src/services/tenant.service';
+import {AuthUserService} from '../../src/casl/authUser.service';
+import {UnauthorizedException} from '@nestjs/common';
+import {Repository} from 'typeorm';
+import {CryptUtil} from '../../src/util/crypt.util';
 
 jest.mock('../../src/util/crypt.util', () => ({
     CryptUtil: {

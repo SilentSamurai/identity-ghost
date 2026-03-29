@@ -1,15 +1,5 @@
 import {BadRequestException, Logger} from "@nestjs/common";
-import {
-    Equal,
-    ILike,
-    In,
-    IsNull,
-    LessThan,
-    LessThanOrEqual,
-    MoreThan,
-    MoreThanOrEqual,
-    Not,
-} from "typeorm";
+import {Equal, ILike, In, IsNull, LessThan, LessThanOrEqual, MoreThan, MoreThanOrEqual, Not,} from "typeorm";
 import {FindOperator} from "typeorm/find-options/FindOperator";
 
 const logger = new Logger("SearchFilterUtils");

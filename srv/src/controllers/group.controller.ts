@@ -48,7 +48,7 @@ export class GroupController {
     async createGroup(
         @Request() request,
         @Body(new ValidationPipe(ValidationSchema.CreateGroupSchema))
-            body: { name: string; tenantId: string },
+        body: { name: string; tenantId: string },
     ): Promise<any> {
         let tenant = await this.tenantService.findById(request, body.tenantId);
         let group = await this.groupService.create(request, body.name, tenant);
@@ -77,7 +77,7 @@ export class GroupController {
         @Request() request,
         @Param("groupId") groupId: string,
         @Body(new ValidationPipe(ValidationSchema.UpdateGroupSchema))
-            body: { name: string },
+        body: { name: string },
     ): Promise<any> {
         let group = await this.groupService.findById(request, groupId);
         await this.groupService.updateGroup(request, group, body);
@@ -101,7 +101,7 @@ export class GroupController {
         @Request() request,
         @Param("groupId") groupId: string,
         @Body(new ValidationPipe(ValidationSchema.UpdateGroupRole))
-            body: { roles: string[] },
+        body: { roles: string[] },
     ): Promise<any> {
         let group = await this.groupService.findById(request, groupId);
         await this.groupService.addRoles(request, group, body.roles);
@@ -118,7 +118,7 @@ export class GroupController {
         @Request() request,
         @Param("groupId") groupId: string,
         @Body(new ValidationPipe(ValidationSchema.UpdateGroupRole))
-            body: { roles: string[] },
+        body: { roles: string[] },
     ): Promise<any> {
         let group = await this.groupService.findById(request, groupId);
         await this.groupService.removeRoles(request, group, body.roles);
@@ -135,7 +135,7 @@ export class GroupController {
         @Request() request,
         @Param("groupId") groupId: string,
         @Body(new ValidationPipe(ValidationSchema.UpdateGroupUser))
-            body: { users: string[] },
+        body: { users: string[] },
     ): Promise<any> {
         let group = await this.groupService.findById(request, groupId);
         await this.groupService.addUser(request, group, body.users);
@@ -152,7 +152,7 @@ export class GroupController {
         @Request() request,
         @Param("groupId") groupId: string,
         @Body(new ValidationPipe(ValidationSchema.UpdateGroupUser))
-            body: { users: string[] },
+        body: { users: string[] },
     ): Promise<any> {
         let group = await this.groupService.findById(request, groupId);
         await this.groupService.removeUser(request, group, body.users);

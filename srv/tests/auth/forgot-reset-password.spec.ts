@@ -1,5 +1,5 @@
-import { SharedTestFixture } from "../shared-test.fixture";
-import { TokenFixture } from "../token.fixture";
+import {SharedTestFixture} from "../shared-test.fixture";
+import {TokenFixture} from "../token.fixture";
 
 describe("e2e forgot/reset password flow", () => {
     let app: SharedTestFixture;
@@ -12,20 +12,20 @@ describe("e2e forgot/reset password flow", () => {
         app = new SharedTestFixture();
 
         // Create user via public signup API
-        const { UsersClient } = await import("../api-client/user-client");
+        const {UsersClient} = await import("../api-client/user-client");
         const usersClient = new UsersClient(app, "");
         await usersClient.signup("Forgot Reset User", email, originalPassword, clientId);
 
         // Verify the user via the admin HTTP API (replaces direct repository access)
         const tokenFixture = new TokenFixture(app);
-        const { accessToken } = await tokenFixture.fetchAccessToken(
+        const {accessToken} = await tokenFixture.fetchAccessToken(
             "admin@auth.server.com", "admin9000", "auth.server.com"
         );
         const verifyRes = await app.getHttpServer()
             .put("/api/users/verify-user")
             .set("Authorization", `Bearer ${accessToken}`)
             .set("Accept", "application/json")
-            .send({ email, verify: true });
+            .send({email, verify: true});
         expect(verifyRes.status).toBe(200);
     });
 
@@ -40,7 +40,7 @@ describe("e2e forgot/reset password flow", () => {
             .post("/api/oauth/forgot-password")
             .set("Accept", "application/json")
             .set("Host", "localhost:9001")
-            .send({ email });
+            .send({email});
 
         expect(resForgot.status).toBe(201);
         expect(resForgot.body.status).toBe(true);
@@ -72,7 +72,7 @@ describe("e2e forgot/reset password flow", () => {
             .getHttpServer()
             .post(`/api/oauth/reset-password/${token}`)
             .set("Accept", "application/json")
-            .send({ password: newPassword });
+            .send({password: newPassword});
 
         expect(resReset.status).toBe(201);
         expect(resReset.body.status).toBe(true);

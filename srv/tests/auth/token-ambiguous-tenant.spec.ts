@@ -18,7 +18,6 @@ import {AppClient} from '../api-client/app-client';
 import {SearchClient} from '../api-client/search-client';
 import {TokenFixture} from '../token.fixture';
 import {UsersClient} from '../api-client/user-client';
-import {TenantClient} from '../api-client/tenant-client';
 import {AdminTenantClient} from '../api-client/admin-tenant-client';
 
 describe('Ambiguous Subscription Tenant Flow', () => {

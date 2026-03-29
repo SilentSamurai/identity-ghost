@@ -1,4 +1,4 @@
-import {TestFixture, expect2xx} from "./api-client/client";
+import {expect2xx, TestFixture} from "./api-client/client";
 
 export class TokenFixture {
 
