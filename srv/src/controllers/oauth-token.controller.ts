@@ -1,12 +1,23 @@
+/**
+ * OAuthTokenController - Handles OAuth 2.0 token endpoint operations.
+ * 
+ * This controller implements the token endpoint per RFC 6749:
+ * - Authorization Code grant (exchange code for tokens)
+ * - Refresh Token grant (refresh access tokens)
+ * - Password grant (direct credentials)
+ * - Client Credentials grant (technical tokens)
+ * 
+ * All responses follow OAuth 2.0 token response format and use
+ * OAuthExceptionFilter for proper OAuth error formatting.
+ */
 import {
-    BadRequestException,
     Body,
     ClassSerializerInterceptor,
     Controller,
-    ForbiddenException,
     Logger,
     Post,
     Req,
+    UseFilters,
     UseInterceptors,
 } from "@nestjs/common";
 import {Request as ExpressRequest} from "express";
@@ -20,10 +31,13 @@ import {AuthCodeService} from "../auth/auth-code.service";
 import {GRANT_TYPES} from "../casl/contexts";
 import {AuthUserService} from "../casl/authUser.service";
 import {TokenIssuanceService} from "../auth/token-issuance.service";
+import {OAuthException} from "../exceptions/oauth-exception";
+import {OAuthExceptionFilter} from "../exceptions/filter/oauth-exception.filter";
 
 const logger = new Logger("OAuthTokenController");
 
 @Controller("api/oauth")
+@UseFilters(OAuthExceptionFilter)
 @UseInterceptors(ClassSerializerInterceptor)
 export class OAuthTokenController {
     constructor(
@@ -64,7 +78,7 @@ export class OAuthTokenController {
                 body.client_id,
             );
         } else {
-            throw new BadRequestException("domain || client_id is required");
+            throw OAuthException.invalidClient("Unknown client_id");
         }
 
         const result = await this.tokenIssuanceService.resolveLoginAccess(
@@ -122,10 +136,7 @@ export class OAuthTokenController {
             case GRANT_TYPES.REFRESH_TOKEN:
                 return this.handleRefreshTokenGrant(body);
             default:
-                throw new BadRequestException({
-                    error: "unsupported_grant_type",
-                    error_description: "grant type not recognised.",
-                });
+                throw OAuthException.unsupportedGrantType("grant type not recognised.");
         }
     }
 
@@ -140,7 +151,7 @@ export class OAuthTokenController {
     ): Promise<object> {
         let tenantToken = await this.authService.validateAccessToken(body.access_token);
         if (tenantToken.grant_type !== GRANT_TYPES.PASSWORD) {
-            throw new ForbiddenException("grant_type not allowed");
+            throw OAuthException.invalidGrant("The grant type of the source token is not permitted for exchange");
         }
         await this.authService.validateClientCredentials(
             body.client_id,
@@ -170,20 +181,14 @@ export class OAuthTokenController {
         const authCode = await this.authCodeService.findByCode(body.code);
         if (authCode.redirectUri) {
             if (!body.redirect_uri || body.redirect_uri !== authCode.redirectUri) {
-                throw new BadRequestException({
-                    error: "invalid_grant",
-                    error_description: "redirect_uri does not match",
-                });
+                throw OAuthException.invalidGrant("redirect_uri does not match");
             }
         }
 
         if (body.client_id) {
             if (tenant.clientId !== body.client_id && tenant.domain !== body.client_id) {
                 logger.warn(`Auth code grant mismatch: code's app client_id '${tenant.clientId}'/'${tenant.domain}' does not match request client_id '${body.client_id}'`);
-                throw new BadRequestException({
-                    error: "invalid_grant",
-                    error_description: "The authorization code was not issued to this client or the client_id is invalid.",
-                });
+                throw OAuthException.invalidGrant("The authorization code was not issued to this client or the client_id is invalid.");
             }
         }
 
@@ -209,7 +214,7 @@ export class OAuthTokenController {
         } else if (await this.authUserService.tenantExistsByClientId(body.client_id)) {
             tenant = await this.authUserService.findTenantByClientId(body.client_id);
         } else {
-            throw new BadRequestException("client_id is required");
+            throw OAuthException.invalidRequest("client_id is required");
         }
 
         return this.tokenIssuanceService.issueToken(user, tenant, {

@@ -1,9 +1,26 @@
+/**
+ * Integration tests for the user lock/unlock feature.
+ * 
+ * This suite verifies the full admin lock/unlock lifecycle by booting the real
+ * NestJS app, authenticating as the super-admin, and hitting actual HTTP
+ * endpoints against a real database. It covers:
+ * 
+ *  - Default state: new users are unlocked.
+ *  - Lock/unlock round trips: state toggles correctly and persists.
+ *  - Idempotency: locking an already-locked (or unlocking an already-unlocked)
+ *    user returns 200 without error.
+ *  - Authorization: only super-admins can lock/unlock; tenant admins get 403.
+ *  - Self-protection: the super-admin account itself cannot be locked.
+ *  - Auth denial: locked users are rejected on both password login and refresh
+ *    token exchange, with a generic error message (no info leak).
+ *  - Field visibility: the `locked` field is exposed in admin GET responses
+ *    but hidden from the non-admin `/api/users/me` endpoint.
+ */
 import {SharedTestFixture} from "../shared-test.fixture";
 import {UsersClient} from "../api-client/user-client";
 import {TokenFixture} from "../token.fixture";
 
 /**
- * Integration tests for the user lock/unlock feature.
  *
  * This suite verifies the full admin lock/unlock lifecycle by booting the real
  * NestJS app, authenticating as the super-admin, and hitting actual HTTP
@@ -210,9 +227,10 @@ describe('e2e user lock/unlock', () => {
             })
             .set('Accept', 'application/json');
 
-        expect(response.status).toEqual(401);
+        expect(response.status).toEqual(400);
         // Must be a generic message — no hint that the account is locked
-        expect(response.body.message).toEqual('Invalid credentials');
+        expect(response.body.error).toEqual('invalid_grant');
+        expect(response.body.error_description).toEqual('Invalid email or password');
 
         // Clean up: unlock the user so other tests aren't affected
         await usersClient.unlockUser(shireAdmin.id);
@@ -251,7 +269,8 @@ describe('e2e user lock/unlock', () => {
             })
             .set('Accept', 'application/json');
 
-        expect(response.status).toEqual(401);
+        expect(response.status).toEqual(400);
+        expect(response.body.error).toEqual('invalid_grant');
 
         // Clean up
         await usersClient.unlockUser(shireAdmin.id);

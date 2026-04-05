@@ -1,4 +1,16 @@
+/**
+ * AuthService - Core authentication service handling user and client authentication.
+ * 
+ * This service is responsible for:
+ * - Validating user credentials (email/password)
+ * - Validating refresh tokens
+ * - Validating client credentials (client_id/client_secret)
+ * - Creating security context from tokens
+ * 
+ * It implements OAuth 2.0 token validation per RFC 6749 and JWT token handling.
+ */
 import {Inject, Injectable, Logger, NotFoundException, UnauthorizedException} from "@nestjs/common";
+import {OAuthException} from "../exceptions/oauth-exception";
 import {Environment} from "../config/environment.service";
 import {UsersService} from "../services/users.service";
 import {User} from "../entity/user.entity";
@@ -59,10 +71,10 @@ export class AuthService {
         const user: User = await this.authUserService.findUserByEmail(email);
         const valid: boolean = await argon2.verify(user.password, password);
         if (!valid) {
-            throw new UnauthorizedException('Invalid credentials');
+            throw OAuthException.invalidGrant('Invalid email or password');
         }
         if (user.locked) {
-            throw new UnauthorizedException('Invalid credentials');
+            throw OAuthException.invalidGrant('Invalid email or password');
         }
         return user;
     }
@@ -83,7 +95,7 @@ export class AuthService {
         );
         let user = await this.authUserService.findUserByEmail(payload.email);
         if (user.locked) {
-            throw new UnauthorizedException('Invalid credentials');
+            throw OAuthException.invalidGrant('The refresh token is invalid or has expired');
         }
         await this.tokenGenerator.verify(refreshToken, {
             publicKey: tenant.publicKey,
@@ -121,7 +133,7 @@ export class AuthService {
             return payload;
         } catch (e) {
             this.LOGGER.error("Token Validation Failed: ", e.stack);
-            throw new UnauthorizedException(e);
+            throw OAuthException.invalidToken('The access token is invalid or has expired');
         }
     }
 
@@ -137,11 +149,11 @@ export class AuthService {
             tenant.secretSalt,
         );
         if (!valid) {
-            throw new UnauthorizedException('Invalid credentials');
+            throw OAuthException.invalidClient('Client authentication failed');
         }
         valid = CryptUtil.verifyClientSecret(tenant.clientSecret, clientSecret);
         if (!valid) {
-            throw new UnauthorizedException('Invalid credentials');
+            throw OAuthException.invalidClient('Client authentication failed');
         }
         return tenant;
     }

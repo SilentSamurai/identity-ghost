@@ -1,3 +1,14 @@
+/**
+ * Integration tests for negative OAuth token flow scenarios.
+ * 
+ * Tests error responses for:
+ * - Invalid credentials (wrong password)
+ * - Missing grant type
+ * - Invalid grant types
+ * - Invalid refresh tokens
+ * 
+ * Verifies OAuth 2.0 RFC 6749 compliant error responses.
+ */
 import {SharedTestFixture} from "../shared-test.fixture";
 
 describe('e2e negative token flow', () => {
@@ -26,7 +37,8 @@ describe('e2e negative token flow', () => {
             })
             .set('Accept', 'application/json');
 
-        expect(response.status).toEqual(401);
+        expect(response.status).toEqual(400);
+        expect(response.body.error).toEqual('invalid_grant');
     });
 
     it(`/POST Missing Grant Type `, async () => {

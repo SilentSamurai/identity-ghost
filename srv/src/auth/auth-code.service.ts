@@ -1,4 +1,16 @@
+/**
+ * AuthCodeService - Handles authorization code lifecycle for OAuth 2.0 authorization code flow.
+ * 
+ * This service manages:
+ * - Creating authorization codes for user authentication
+ * - Validating authorization codes and PKCE code verifiers
+ * - Cleaning up expired authorization codes via cron job
+ * 
+ * The authorization code is a temporary code that the client exchanges for tokens.
+ * It implements RFC 6749 OAuth 2.0 authorization code grant type.
+ */
 import {Injectable, Logger, NotFoundException, UnauthorizedException} from "@nestjs/common";
+import {OAuthException} from "../exceptions/oauth-exception";
 import {Environment} from "../config/environment.service";
 import {InjectRepository} from "@nestjs/typeorm";
 import {IsNull, Not, Repository} from "typeorm";
@@ -34,7 +46,7 @@ export class AuthCodeService {
             where: {code: code},
         });
         if (session === null) {
-            throw new NotFoundException("auth code not found");
+            throw OAuthException.invalidGrant('The authorization code is invalid, expired, or has already been used');
         }
         return session;
     }
@@ -92,7 +104,7 @@ export class AuthCodeService {
             session.method,
         );
         if (generateCodeChallenge !== session.codeChallenge) {
-            throw new UnauthorizedException('Invalid credentials');
+            throw OAuthException.invalidGrant('The authorization code is invalid or the code verifier does not match');
         }
         return {tenant, user};
     }

@@ -1,3 +1,13 @@
+/**
+ * Integration tests for AuthCodeService.
+ * 
+ * Tests the authorization code lifecycle:
+ * - Creating authorization codes
+ * - Validating authorization codes with PKCE
+ * - Error handling for invalid/expired codes
+ * 
+ * These are integration tests that test the full service with real database operations.
+ */
 import {Test, TestingModule} from '@nestjs/testing';
 import {AuthCodeService} from '../../src/auth/auth-code.service';
 import {getRepositoryToken} from '@nestjs/typeorm';
@@ -7,8 +17,8 @@ import {Environment} from '../../src/config/environment.service';
 import {JwtService} from '@nestjs/jwt';
 import {TenantService} from '../../src/services/tenant.service';
 import {AuthUserService} from '../../src/casl/authUser.service';
-import {UnauthorizedException} from '@nestjs/common';
 import {Repository} from 'typeorm';
+import {OAuthException} from '../../src/exceptions/oauth-exception';
 import {CryptUtil} from '../../src/util/crypt.util';
 
 jest.mock('../../src/util/crypt.util', () => ({
@@ -135,7 +145,7 @@ describe('AuthCodeService', () => {
             jest.spyOn(authUserService, 'findUserById').mockResolvedValue(mockUser as any);
             (CryptUtil.generateCodeChallenge as jest.Mock).mockReturnValue('different-challenge');
 
-            await expect(service.validateAuthCode('test-code', 'invalid-verifier')).rejects.toThrow(UnauthorizedException);
+            await expect(service.validateAuthCode('test-code', 'invalid-verifier')).rejects.toThrow(OAuthException);
         });
 
         it('should return tenant and user when validation is successful', async () => {

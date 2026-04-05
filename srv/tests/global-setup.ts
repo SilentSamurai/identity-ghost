@@ -1,3 +1,15 @@
+/**
+ * Global test setup for integration tests.
+ * 
+ * This file sets up the shared test application instance that runs once
+ * for all integration tests. It:
+ * - Creates a test NestJS application
+ * - Starts a fake SMTP server for email testing
+ * - Starts a webhook server for subscription testing
+ * - Applies the HttpExceptionFilter globally for consistent error handling
+ * 
+ * The app is reused across all tests for performance (avoids startup overhead).
+ */
 import * as process from 'node:process';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -5,6 +17,7 @@ import {INestApplication} from '@nestjs/common';
 import {Test} from '@nestjs/testing';
 import {Environment} from '../src/config/environment.service';
 import {AppModule} from '../src/app.module';
+import {HttpExceptionFilter} from '../src/exceptions/filter/http-exception.filter';
 import {createFakeSmtpServer, FakeSmtpServer} from '../src/mail/FakeSmtpServer';
 import {createTenantAppServer, TenantAppServer} from './apps_&_subscription/tenant-app-server';
 
@@ -42,6 +55,7 @@ export default async function globalSetup(): Promise<void> {
         }).compile();
 
         app = moduleRef.createNestApplication();
+        app.useGlobalFilters(new HttpExceptionFilter());
         await app.listen(0);
 
         const addr = app.getHttpServer().address();

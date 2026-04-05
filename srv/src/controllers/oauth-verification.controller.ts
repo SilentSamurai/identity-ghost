@@ -1,11 +1,19 @@
+/**
+ * OAuthVerificationController - Handles OAuth authorization code verification.
+ * 
+ * This controller provides endpoints for:
+ * - Verifying authorization codes before token issuance
+ * - Validating that auth codes belong to the correct client
+ * - Token verification for protected resources
+ * 
+ * It works with OAuthTokenController to complete the authorization code flow.
+ */
 import {
-    BadRequestException,
     Body,
     ClassSerializerInterceptor,
     Controller,
-    ForbiddenException,
     Post,
-    UnauthorizedException,
+    UseFilters,
     UseInterceptors,
 } from "@nestjs/common";
 
@@ -15,8 +23,11 @@ import {ValidationSchema} from "../validation/validation.schema";
 import {AuthCodeService} from "../auth/auth-code.service";
 import {Token} from "../casl/contexts";
 import {AuthUserService} from "../casl/authUser.service";
+import {OAuthException} from "../exceptions/oauth-exception";
+import {OAuthExceptionFilter} from "../exceptions/filter/oauth-exception.filter";
 
 @Controller("api/oauth")
+@UseFilters(OAuthExceptionFilter)
 @UseInterceptors(ClassSerializerInterceptor)
 export class OAuthVerificationController {
     constructor(
@@ -32,7 +43,7 @@ export class OAuthVerificationController {
         body: { auth_code: string, client_id: string }
     ) {
         if (!body.client_id) {
-            throw new BadRequestException("client_id is required");
+            throw OAuthException.invalidRequest("client_id is required");
         }
         const authCodeObj = await this.authCodeService.findByCode(body.auth_code);
         let tenant = null;
@@ -41,10 +52,10 @@ export class OAuthVerificationController {
         } else if (await this.authUserService.tenantExistsByClientId(body.client_id)) {
             tenant = await this.authUserService.findTenantByClientId(body.client_id);
         } else {
-            throw new BadRequestException("Invalid client_id");
+            throw OAuthException.invalidClient("Unknown client_id");
         }
         if (authCodeObj.tenantId !== tenant.id) {
-            throw new ForbiddenException("auth_code does not belong to the provided client_id");
+            throw OAuthException.invalidGrant("auth_code does not belong to the provided client_id");
         }
         const user = await this.authUserService.findUserById(authCodeObj.userId);
         return {
@@ -71,6 +82,6 @@ export class OAuthVerificationController {
         if (securityContext.isTenantToken() || securityContext.asTenantToken().tenant.id !== tenant.id) {
             return securityContext;
         }
-        throw new UnauthorizedException("not a valid token");
+        throw OAuthException.invalidToken("The access token is invalid or has expired");
     }
 }

@@ -20,8 +20,9 @@
  *     (Depends on test 2 leaving the user locked.)
  *  4. Dismissing the confirmation dialog does not change lock status.
  *  5. Super-admin self-lock protection: backend returns 403, status stays "Unlocked".
- *  6. Login denial round trip: locked user gets 401 on POST /api/oauth/login,
- *     unlocked user completes the full auth flow (login → token exchange → /home).
+ *  6. Login denial round trip: locked user gets 400 (invalid_grant per RFC 6749 §5.2)
+ *     on POST /api/oauth/login, unlocked user completes the full auth flow
+ *     (login → token exchange → /home).
  */
 describe('Admin User Lock/Unlock', () => {
 
@@ -218,8 +219,10 @@ describe('Admin User Lock/Unlock', () => {
      *  Step 2 — Clear the browser session (cookies, localStorage,
      *           sessionStorage) and attempt to log in as the locked user
      *           on the shire.local login page. The POST /api/oauth/login
-     *           should return 401 ("Invalid credentials") and the browser
-     *           should stay on the login page (not reach /home).
+     *           returns 400 with { error: "invalid_grant" } per RFC 6749 §5.2.
+     *           The same error code is used for wrong credentials and locked
+     *           accounts to avoid leaking account state. The browser should
+     *           stay on the login page (not reach /home).
      *  Step 3 — Log back in as super-admin and unlock the seeded user.
      *  Step 4 — Clear the session again and log in as the now-unlocked user.
      *           This time the two-step auth flow should complete:
@@ -258,9 +261,9 @@ describe('Admin User Lock/Unlock', () => {
         cy.intercept('POST', '**/api/oauth/login*').as('lockedLogin');
         cy.get('#login-btn').click();
 
-        // Backend validates credentials then checks user.locked → 401
+        // Backend validates credentials then checks user.locked → 400 (invalid_grant per RFC 6749)
         cy.wait('@lockedLogin').should(({ response }) => {
-            expect(response!.statusCode).to.equal(401);
+            expect(response!.statusCode).to.equal(400);
         });
 
         // Should stay on the login page, not redirect to /home

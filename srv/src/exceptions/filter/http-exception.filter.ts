@@ -1,3 +1,12 @@
+/**
+ * HttpExceptionFilter - Global exception filter for HTTP responses.
+ * 
+ * This filter handles all unhandled exceptions and formats them as JSON responses.
+ * It adds RFC 6750 compliant WWW-Authenticate headers for 403 errors on protected
+ * resources (insufficient_scope error).
+ * 
+ * The filter ensures consistent error response format with timestamp, URL, status, and message.
+ */
 import {ArgumentsHost, Catch, ExceptionFilter, HttpException, Logger, Type,} from "@nestjs/common";
 import {Request, Response} from "express";
 
@@ -24,6 +33,11 @@ export class HttpExceptionFilter implements ExceptionFilter {
             error["url"] = request.url;
             error["timestamp"] = new Date().toISOString();
             error["status"] = httpException.getStatus();
+
+            // RFC 6750 §3: Add WWW-Authenticate header for 403 on protected resource endpoints
+            if (httpException.getStatus() === 403 && (request as any)["SECURITY_CONTEXT"]) {
+                response.setHeader('WWW-Authenticate', 'Bearer realm="auth-server", error="insufficient_scope"');
+            }
 
             response.status(httpException.getStatus()).json(error);
         } else {
