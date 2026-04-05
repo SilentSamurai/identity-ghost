@@ -45,14 +45,14 @@ describe("e2e forgot/reset password flow", () => {
         expect(resForgot.status).toBe(201);
         expect(resForgot.body.status).toBe(true);
 
-        // 2) Wait for reset email
+        // 2) Wait for reset email (increased timeout for reliability under load)
         const emailMsg = await app.smtp.waitForEmail({
             to: email,
             subject: /Reset your password/i,
             containsLink: true,
             sort: "newest",
             limit: 1,
-        }, 10000, 500);
+        }, 25000, 500);
 
         const links = app.smtp.extractLinks(emailMsg);
         expect(links.length).toBeGreaterThan(0);

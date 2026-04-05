@@ -17,7 +17,7 @@ describe('Super Admin — Client Cross-Tenant CRUD Flow', () => {
     const TENANT_B = 'bree.local';
 
     beforeEach(() => {
-        cy.adminLogin('admin@auth.server.com', 'admin9000');
+        cy.adminLogin(Cypress.env('superAdminEmail'), Cypress.env('superAdminPassword'));
     });
 
     // Navigate to admin CL01 and verify the table renders

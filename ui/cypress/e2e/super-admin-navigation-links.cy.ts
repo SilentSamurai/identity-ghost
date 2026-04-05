@@ -8,7 +8,7 @@
 describe('Super Admin — Admin Navigation Links', () => {
 
     beforeEach(() => {
-        cy.adminLogin('admin@auth.server.com', 'admin9000');
+        cy.adminLogin(Cypress.env('superAdminEmail'), Cypress.env('superAdminPassword'));
     });
 
     /**

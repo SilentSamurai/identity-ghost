@@ -69,7 +69,7 @@ describe('External Sign Up', () => {
         });
 
         // Login after verification
-        cy.visit('/login?client_id=shire.local');
+        cy.visit(`/login?client_id=${Cypress.env('shireTenantAdminClientId')}`);
         cy.get('input#username').type(email);
         cy.get('input#password').type(password);
         cy.get('#login-btn').click();

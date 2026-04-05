@@ -24,7 +24,7 @@ const ALL_ADMIN_ROUTES = [
 describe('Admin Pages Separation — super-admin can access all admin routes', () => {
 
     beforeEach(() => {
-        cy.adminLogin('admin@auth.server.com', 'admin9000');
+        cy.adminLogin(Cypress.env('superAdminEmail'), Cypress.env('superAdminPassword'));
     });
 
     ALL_ADMIN_ROUTES.forEach((route) => {
@@ -54,7 +54,7 @@ describe('Admin Pages Separation — super-admin can access all admin routes', (
 describe('Admin Pages Separation — admin layout renders correctly', () => {
 
     beforeEach(() => {
-        cy.adminLogin('admin@auth.server.com', 'admin9000');
+        cy.adminLogin(Cypress.env('superAdminEmail'), Cypress.env('superAdminPassword'));
         cy.visit('/admin/TN01');
         cy.get('admin-nav-bar', { timeout: 10000 }).should('be.visible');
     });
@@ -80,7 +80,7 @@ describe('Admin Pages Separation — admin layout renders correctly', () => {
         cy.get('admin-nav-bar')
             .find('#adminDropdownUser')
             .should('be.visible')
-            .and('contain.text', 'admin@auth.server.com');
+            .and('contain.text', Cypress.env('superAdminEmail'));
     });
 
     it('should have a sign-out option in the user dropdown', () => {

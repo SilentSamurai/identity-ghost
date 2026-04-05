@@ -23,8 +23,8 @@ describe('External Login', () => {
 
         cy.url().should('include', '/authorize');
 
-        cy.get('#username').type("admin@shire.local")
-        cy.get('#password').type("admin9000")
+        cy.get('#username').type(Cypress.env('shireTenantAdminEmail'));
+        cy.get('#password').type(Cypress.env('shireTenantAdminPassword'));
 
         // cy.intercept('POST', '**/api/oauth/login*').as('authCode')
         // cy.intercept('POST', '**/api/oauth/token*').as('authToken')
@@ -41,8 +41,8 @@ describe('External Login', () => {
 
         cy.url().should('include', '?code');
 
-        cy.get('#decodedToken').should('contain', 'admin@shire.local');
-        cy.get('#decodedToken').should('contain', 'shire.local');
+        cy.get('#decodedToken').should('contain', Cypress.env('shireTenantAdminEmail'));
+        cy.get('#decodedToken').should('contain', Cypress.env('shireTenantAdminClientId'));
 
 
     })

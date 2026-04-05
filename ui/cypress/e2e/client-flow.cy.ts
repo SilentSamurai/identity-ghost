@@ -14,7 +14,11 @@ describe('Client Flow', () => {
     const CLIENT_NAME_DELETE = `E2E-Del-Client-${uniqueSuffix}`;
 
     beforeEach(() => {
-        cy.login("admin@shire.local", "admin9000", "shire.local");
+        cy.login(
+            Cypress.env('shireTenantAdminEmail'),
+            Cypress.env('shireTenantAdminPassword'),
+            Cypress.env('shireTenantAdminClientId')
+        );
     });
 
     // Navigates to the client list page and verifies the table component renders

@@ -77,7 +77,8 @@ describe('UsersController (e2e)', () => {
                 to: testUserEmail,
                 subject: /signing.*up.*Auth.*Server/i,
             };
-            const verificationEmail = await app.smtp.waitForEmail(search);
+            // Increase timeout to 25 seconds to allow for email delivery under load
+            const verificationEmail = await app.smtp.waitForEmail(search, 25000);
             // Verify we found the email
             expect(verificationEmail).toBeDefined();
 

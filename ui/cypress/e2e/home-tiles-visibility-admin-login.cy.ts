@@ -5,15 +5,9 @@
 //
 // Requirements:
 // - Backend must be running locally
-// - Cypress env vars must include ADMIN_EMAIL and ADMIN_PASSWORD for the admin user
-//
-// Usage examples:
-//   npx cypress run --spec cypress/e2e/home-tiles-visibility-admin-login.cy.ts \
-//     --env ADMIN_EMAIL=admin@shire.local,ADMIN_PASSWORD=YourPassword
-//
-//   or set in cypress.config / cypress.env.json.
+// - Cypress env vars must include tenantAdminEmail and tenantAdminPassword
 
-const CLIENT_ID = 'shire.local';
+const CLIENT_ID = Cypress.env('shireTenantAdminClientId');
 const Tiles = {
   TN01: 'TN01',
   TNRL01: 'TNRL01',
@@ -43,27 +37,21 @@ function shouldNotSeeTiles(ids: string[]) {
   ids.forEach((id) => cy.contains(id).should('not.exist'));
 }
 
-function shouldMaybeSeeTiles(ids: string[]) {
-  // Not asserting visibility strictly; only that the test doesn't fail locating them if present
-  ids.forEach((id) => cy.contains(id, { matchCase: false }).should('exist'));
-}
-
 /**
  * Home Tiles Visibility Test
  *
  * Verifies that a tenant admin (non-super-admin) logged in via /login
  * does NOT see global admin tiles (TN01, UR01, RL01, etc.) on the /home page.
  * These tiles should only be visible to super-admins.
- * Requires ADMIN_EMAIL and ADMIN_PASSWORD Cypress env vars.
  */
 describe('Home tiles visibility after real login (tenant admin should not see global tiles)', function () {
   // Logs in as a tenant admin and asserts that all global-scope tiles are hidden
-  it('logs in as admin@shire.local and hides global tiles', function () {
-    const email = (Cypress.env('ADMIN_EMAIL') as string) || '';
-    const password = (Cypress.env('ADMIN_PASSWORD') as string) || '';
+  it('logs in as tenant admin and hides global tiles', function () {
+    const email = Cypress.env('shireTenantAdminEmail');
+    const password = Cypress.env('shireTenantAdminPassword');
 
     if (!email || !password) {
-      cy.log('Skipping: ADMIN_EMAIL and/or ADMIN_PASSWORD not provided');
+      cy.log('Skipping: shireTenantAdminEmail and/or shireTenantAdminPassword not provided');
       this.skip();
       return;
     }
@@ -82,8 +70,5 @@ describe('Home tiles visibility after real login (tenant admin should not see gl
       Tiles.GP01,
       Tiles.GP02,
     ]);
-
-    // Optionally confirm tenant-level tile may exist (TN02), no hard requirement here
-    // cy.contains(Tiles.TN02).should('exist');
   });
 });

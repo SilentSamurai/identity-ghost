@@ -42,19 +42,17 @@ describe('Login', () => {
     });
 
     // Logs in with valid credentials (client_id via query) and verifies redirect to /home
-    it('Should login successfully (stubbed oauth token)', () => {
-        cy.visit('/login?client_id=shire.local');
+    it('Should login successfully', () => {
+        cy.visit(`/login?client_id=${Cypress.env('shireTenantAdminClientId')}`);
 
-        // Stub token endpoint
-        // cy.intercept('POST', '**/api/oauth/token*').as('oauthToken');
+        cy.intercept('POST', '**/api/oauth/token*').as('oauthToken');
 
-        cy.get('#username').type('admin@shire.local');
-        cy.get('#password').type('admin9000');
+        cy.get('#username').type(Cypress.env('shireTenantAdminEmail'));
+        cy.get('#password').type(Cypress.env('shireTenantAdminPassword'));
         cy.get('#login-btn').click();
 
-        // cy.wait('@oauthToken').its('response.statusCode').should('be.oneOf', [200, 201]);
+        cy.wait('@oauthToken').its('response.statusCode').should('be.oneOf', [200, 201]);
 
-        // App should redirect to /home after login
         cy.url().should('include', '/home');
     });
 });

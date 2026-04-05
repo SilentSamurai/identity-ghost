@@ -29,8 +29,8 @@ describe('Admin User Lock/Unlock', () => {
     const TEST_USER_NAME = 'LockTestCypress';
     const TEST_USER_EMAIL = `lock-cypress-${uniqueSuffix}@auth.server.com`;
     const TEST_USER_PASSWORD = 'LockTest9000';
-    const SUPER_ADMIN_EMAIL = 'admin@auth.server.com';
-    const SUPER_ADMIN_PASSWORD = 'admin9000';
+    const SUPER_ADMIN_EMAIL = Cypress.env('superAdminEmail');
+    const SUPER_ADMIN_PASSWORD = Cypress.env('superAdminPassword');
 
     /**
      * Helper: navigate to a user's detail page (UR02) via the value help.
@@ -228,9 +228,9 @@ describe('Admin User Lock/Unlock', () => {
      *           The browser should land on /home.
      */
     it('should prevent a locked user from logging in, and allow login after unlock', () => {
-        const SEEDED_USER_EMAIL = 'admin@shire.local';
-        const SEEDED_USER_PASSWORD = 'admin9000';
-        const SEEDED_USER_TENANT = 'shire.local';
+        const SEEDED_USER_EMAIL = Cypress.env('shireTenantAdminEmail');
+        const SEEDED_USER_PASSWORD = Cypress.env('shireTenantAdminPassword');
+        const SEEDED_USER_TENANT = Cypress.env('shireTenantAdminClientId');
 
         // --- Step 1: Lock the seeded user from the admin detail page ---
         navigateToUserDetail(SEEDED_USER_EMAIL);

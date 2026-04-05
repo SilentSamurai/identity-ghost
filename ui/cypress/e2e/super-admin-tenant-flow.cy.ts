@@ -13,8 +13,8 @@ describe('Super Admin — Tenant CRUD Flow', () => {
     const ROLE_NAME = 'TEST_ROLE';
 
     beforeEach(() => {
-        cy.adminLogin("admin@auth.server.com", "admin9000");
-    })
+        cy.adminLogin(Cypress.env('superAdminEmail'), Cypress.env('superAdminPassword'));
+    });
 
     // Creates a new tenant via the admin TN01 page
     it('Create Tenant', function () {
@@ -24,7 +24,10 @@ describe('Super Admin — Tenant CRUD Flow', () => {
     // Navigates to the tenant object page via value help and verifies it loads
     it('GET Tenant', function () {
         cy.adminGoToTenantObjectPage(TENANT_DOMAIN);
-    })
+        // Verify tenant detail page rendered with expected action buttons
+        cy.get('#UPDATE_TENANT_BTN').should('be.visible');
+        cy.get('#DELETE_TENANT_BTN').should('be.visible');
+    });
 
 
     // Opens the tenant, clicks Update, changes the name, and saves

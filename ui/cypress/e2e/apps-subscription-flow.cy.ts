@@ -9,8 +9,8 @@ import type { Interception } from 'cypress/types/net-stubbing';
  * Verifies cross-tenant app visibility, subscription, and OAuth token exchange.
  */
 describe('Apps & Subscription Flow', () => {
-    const TENANT_A_ADMIN = 'admin@shire.local';
-    const TENANT_A_DOMAIN = 'shire.local';
+    const TENANT_A_ADMIN = Cypress.env('shireTenantAdminEmail');
+    const TENANT_A_DOMAIN = Cypress.env('shireTenantAdminClientId');
     const TENANT_B_ADMIN = 'admin@bree.local';
     const TENANT_B_DOMAIN = 'bree.local';
     const APP_NAME = 'Subscription Test App';
@@ -20,7 +20,7 @@ describe('Apps & Subscription Flow', () => {
 
     // Tenant A creates a new app from the tenant overview page
     it('Tenant A should add an app', () => {
-        cy.login(TENANT_A_ADMIN, 'admin9000', TENANT_A_DOMAIN);
+        cy.login(TENANT_A_ADMIN, Cypress.env('shireTenantAdminPassword'), TENANT_A_DOMAIN);
         cy.userOpenTenantOverview();
         cy.addAppFromOverview(APP_NAME, APP_URL, APP_DESC);
     });
@@ -38,8 +38,8 @@ describe('Apps & Subscription Flow', () => {
 
     // Tenant A publishes the app and verifies it shows as "Public" in the table
     it('Tenant A should publish the app', () => {
-        cy.login(TENANT_A_ADMIN, 'admin9000', TENANT_A_DOMAIN);
-        cy.userPublishApp(APP_NAME)
+        cy.login(TENANT_A_ADMIN, Cypress.env('shireTenantAdminPassword'), TENANT_A_DOMAIN);
+        cy.userPublishApp(APP_NAME);
         cy.get('table').contains('tr', APP_NAME).should('contain', 'Public');
     });
 
@@ -90,7 +90,7 @@ describe('Apps & Subscription Flow', () => {
 
     // Cleanup: Tenant A deletes the app
     it('Tenant A should delete an app', () => {
-        cy.login(TENANT_A_ADMIN, 'admin9000', TENANT_A_DOMAIN);
+        cy.login(TENANT_A_ADMIN, Cypress.env('shireTenantAdminPassword'), TENANT_A_DOMAIN);
         cy.userOpenTenantOverview();
         cy.deleteAppFromOverview(APP_NAME);
     });

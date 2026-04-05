@@ -12,8 +12,8 @@ describe('Super Admin — User CRUD Flow', () => {
     const USER_PASSWORD = "test9000"
 
     beforeEach(() => {
-        cy.adminLogin("admin@auth.server.com", "admin9000");
-    })
+        cy.adminLogin(Cypress.env('superAdminEmail'), Cypress.env('superAdminPassword'));
+    });
 
     // Opens the admin user list (UR01), fills the create-user dialog, and submits
     it('Create User', function () {
