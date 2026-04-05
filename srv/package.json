@@ -13,7 +13,7 @@
         "start": "nest start",
         "start:debug": "nest start --debug --watch",
         "start:prod": "NODE_ENV=production node dist/src/main",
-        "test": "jest --coverage  --silent=true",
+        "test": "jest --coverage --silent=true --maxWorkers=25%",
         "test:watch": "set CUSTOM_LOG=1 && jest --watch --verbose --silent=false",
         "package": "node create-zip.js",
         "start:mail-server": "ts-node src/mail/FakeSmtpServer.ts",

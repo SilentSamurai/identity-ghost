@@ -12,7 +12,6 @@ import {
 import {Request as ExpressRequest} from "express";
 
 import {User} from "../entity/user.entity";
-import {Environment} from "../config/environment.service";
 import {AuthService} from "../auth/auth.service";
 import {ValidationPipe} from "../validation/validation.pipe";
 import {ValidationSchema} from "../validation/validation.schema";
@@ -21,9 +20,6 @@ import {AuthCodeService} from "../auth/auth-code.service";
 import {GRANT_TYPES} from "../casl/contexts";
 import {AuthUserService} from "../casl/authUser.service";
 import {TokenIssuanceService} from "../auth/token-issuance.service";
-import {ScopeResolverService} from "../casl/scope-resolver.service";
-import {ClientService} from "../services/client.service";
-import {ScopeNormalizer} from "../casl/scope-normalizer";
 
 const logger = new Logger("OAuthTokenController");
 
@@ -31,13 +27,10 @@ const logger = new Logger("OAuthTokenController");
 @UseInterceptors(ClassSerializerInterceptor)
 export class OAuthTokenController {
     constructor(
-        private readonly configService: Environment,
         private readonly authService: AuthService,
         private readonly authCodeService: AuthCodeService,
         private readonly authUserService: AuthUserService,
         private readonly tokenIssuanceService: TokenIssuanceService,
-        private readonly scopeResolverService: ScopeResolverService,
-        private readonly clientService: ClientService,
     ) {
     }
 
@@ -236,35 +229,10 @@ export class OAuthTokenController {
                 body.client_secret,
             );
 
-        // Resolve scopes: intersection of requested ∩ client allowed
-        let clientAllowedScopes = 'openid profile email';
-        try {
-            const clients = await this.clientService.findByTenantId(tenant.id);
-            if (clients.length > 0 && clients[0].allowedScopes) {
-                clientAllowedScopes = clients[0].allowedScopes;
-            }
-        } catch {
-            // Fall through to default
-        }
-
-        const grantedScopes = this.scopeResolverService.resolveScopes(
+        return this.tokenIssuanceService.issueClientCredentialsToken(
+            tenant,
             body.scope ?? null,
-            clientAllowedScopes,
         );
-
-        const token: string =
-            await this.authService.createTechnicalAccessToken(
-                tenant,
-                grantedScopes,
-            );
-        return {
-            access_token: token,
-            expires_in: this.configService.get(
-                "TOKEN_EXPIRATION_TIME_IN_SECONDS",
-            ),
-            token_type: "Bearer",
-            scope: ScopeNormalizer.format(grantedScopes),
-        };
     }
 
     private async handleRefreshTokenGrant(body: any): Promise<any> {

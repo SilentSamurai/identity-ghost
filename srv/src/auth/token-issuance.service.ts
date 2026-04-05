@@ -1,4 +1,4 @@
-import {BadRequestException, ForbiddenException, Injectable} from "@nestjs/common";
+import {BadRequestException, ForbiddenException, Injectable, InternalServerErrorException} from "@nestjs/common";
 import {AuthService} from "./auth.service";
 import {TenantService} from "../services/tenant.service";
 import {SubscriptionService} from "../services/subscription.service";
@@ -11,13 +11,15 @@ import {AuthContext} from "../casl/contexts";
 import {ScopeResolverService} from "../casl/scope-resolver.service";
 import {ClientService} from "../services/client.service";
 import {ScopeNormalizer} from "../casl/scope-normalizer";
+import {IdTokenService} from "./id-token.service";
 
 export interface TokenResponse {
     access_token: string;
-    expires_in: any;
     token_type: string;
+    expires_in: number;
     refresh_token?: string;
-    scope?: string;
+    scope: string;
+    id_token?: string;
 }
 
 export interface IssueTokenOptions {
@@ -37,6 +39,7 @@ export class TokenIssuanceService {
         private readonly authCodeService: AuthCodeService,
         private readonly scopeResolverService: ScopeResolverService,
         private readonly clientService: ClientService,
+        private readonly idTokenService: IdTokenService,
     ) {
     }
 
@@ -71,7 +74,14 @@ export class TokenIssuanceService {
         const {accessToken, refreshToken, scopes} =
             await this.authService.createUserAccessToken(user, tenant, grantedScopes, roleNames);
 
-        return this.formatResponse(accessToken, refreshToken, scopes);
+        const idToken = await this.idTokenService.generateIdToken({
+            user: {id: user.id, email: user.email, name: user.name},
+            tenant: {privateKey: tenant.privateKey},
+            clientId: tenant.clientId,
+            grantedScopes: scopes,
+        });
+
+        return this.formatResponse(accessToken, refreshToken, scopes, idToken);
     }
 
     /**
@@ -158,17 +168,69 @@ export class TokenIssuanceService {
                 user, tenant, subscribingTenant, grantedScopes, allRoleNames,
             );
 
-        return this.formatResponse(accessToken, refreshToken, scopes);
+        const idToken = await this.idTokenService.generateIdToken({
+            user: {id: user.id, email: user.email, name: user.name},
+            tenant: {privateKey: tenant.privateKey},
+            clientId: tenant.clientId,
+            grantedScopes: scopes,
+        });
+
+        return this.formatResponse(accessToken, refreshToken, scopes, idToken);
     }
 
-    private formatResponse(accessToken: string, refreshToken: string, scopes: string[]): TokenResponse {
-        return {
+    /**
+     * Issues a token for client_credentials grant (machine-to-machine).
+     * No refresh_token or id_token — there is no user identity.
+     */
+    async issueClientCredentialsToken(
+        tenant: Tenant,
+        requestedScope: string | null,
+    ): Promise<TokenResponse> {
+        const clientAllowedScopes = await this.getClientAllowedScopes(tenant);
+        const grantedScopes = this.scopeResolverService.resolveScopes(
+            requestedScope,
+            clientAllowedScopes,
+        );
+        const accessToken = await this.authService.createTechnicalAccessToken(
+            tenant,
+            grantedScopes,
+        );
+        return this.formatResponse(accessToken, undefined, grantedScopes);
+    }
+
+    private formatResponse(
+        accessToken: string,
+        refreshToken: string | undefined,
+        scopes: string[],
+        idToken?: string,
+    ): TokenResponse {
+        const expiresIn = parseInt(
+            this.configService.get("TOKEN_EXPIRATION_TIME_IN_SECONDS"),
+            10,
+        );
+
+        if (!Number.isFinite(expiresIn) || !Number.isInteger(expiresIn) || expiresIn <= 0) {
+            throw new InternalServerErrorException(
+                "Invalid TOKEN_EXPIRATION_TIME_IN_SECONDS configuration: must be a finite positive integer",
+            );
+        }
+
+        const response: TokenResponse = {
             access_token: accessToken,
-            expires_in: this.configService.get("TOKEN_EXPIRATION_TIME_IN_SECONDS"),
             token_type: "Bearer",
-            refresh_token: refreshToken,
+            expires_in: expiresIn,
             scope: ScopeNormalizer.format(scopes || []),
         };
+
+        if (refreshToken) {
+            response.refresh_token = refreshToken;
+        }
+
+        if (idToken) {
+            response.id_token = idToken;
+        }
+
+        return response;
     }
 
     private async getClientAllowedScopes(tenant: Tenant): Promise<string> {
