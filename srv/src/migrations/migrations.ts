@@ -11,6 +11,7 @@ import {AddEmailRateLimitColumns1710000000000} from "./1710000000000-AddEmailRat
 import {CreateClientsTable1748000000000} from "./1748000000000-create-clients-table";
 import {AddUserLocked1749000000000} from "./1749000000000-add-user-locked";
 import {AddRedirectUriToAuthCode1750000000000} from "./1750000000000-AddRedirectUriToAuthCode";
+import {AddAuthCodeBindingColumns1751000000000} from "./1751000000000-AddAuthCodeBindingColumns";
 
 export const migrations = [
     CreateInitialTables1681147242561,
@@ -25,5 +26,6 @@ export const migrations = [
     AddEmailRateLimitColumns1710000000000,
     CreateClientsTable1748000000000,
     AddUserLocked1749000000000,
-    AddRedirectUriToAuthCode1750000000000
+    AddRedirectUriToAuthCode1750000000000,
+    AddAuthCodeBindingColumns1751000000000
 ];

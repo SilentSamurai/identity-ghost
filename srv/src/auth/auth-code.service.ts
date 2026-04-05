@@ -9,17 +9,16 @@
  * The authorization code is a temporary code that the client exchanges for tokens.
  * It implements RFC 6749 OAuth 2.0 authorization code grant type.
  */
-import {Injectable, Logger, NotFoundException, UnauthorizedException} from "@nestjs/common";
+import {Injectable, Logger} from "@nestjs/common";
 import {OAuthException} from "../exceptions/oauth-exception";
 import {Environment} from "../config/environment.service";
 import {InjectRepository} from "@nestjs/typeorm";
-import {IsNull, Not, Repository} from "typeorm";
+import {IsNull, Not, Repository, DataSource} from "typeorm";
 import {AuthCode} from "../entity/auth_code.entity";
 import {User} from "../entity/user.entity";
 import {Tenant} from "../entity/tenant.entity";
 import {CryptUtil} from "../util/crypt.util";
 import {Cron} from "@nestjs/schedule";
-import * as ms from "ms";
 import {AuthUserService} from "../casl/authUser.service";
 
 @Injectable()
@@ -32,7 +31,12 @@ export class AuthCodeService {
         @InjectRepository(AuthCode)
         private authCodeRepository: Repository<AuthCode>,
         @InjectRepository(User) private usersRepository: Repository<User>,
+        private dataSource: DataSource,
     ) {
+    }
+
+    private isSqlite(): boolean {
+        return this.dataSource.options.type === 'sqlite' || this.dataSource.options.type === 'better-sqlite3';
     }
 
     async existByCode(code: string): Promise<boolean> {
@@ -61,36 +65,120 @@ export class AuthCodeService {
     }
 
     /**
-     * Create a verification token for the user.
+     * Create an authorization code bound to the requesting client's parameters.
      */
     async createAuthToken(
         user: User,
         tenant: Tenant,
-        code_challenge: string,
+        clientId: string,
+        codeChallenge: string,
         method: string,
         subscriberTenantHint?: string,
         redirectUri?: string,
+        scope?: string,
     ): Promise<string> {
-        let roles = await this.authUserService.getMemberRoles(tenant, user);
-
         let code = CryptUtil.generateOTP(6);
 
         if (await this.existByCode(code)) {
             code = CryptUtil.generateRandomString(16);
         }
 
-        let session = this.authCodeRepository.create({
-            codeChallenge: code_challenge,
-            code: code,
-            method: method,
+        const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+
+        const authCode = this.authCodeRepository.create({
+            code,
+            codeChallenge,
+            method,
             tenantId: tenant.id,
             userId: user.id,
+            clientId,
             subscriberTenantHint: subscriberTenantHint || null,
             redirectUri: redirectUri || null,
+            scope: scope || null,
+            used: false,
+            expiresAt,
         });
 
-        session = await this.authCodeRepository.save(session);
-        return session.code;
+        await this.authCodeRepository.save(authCode);
+
+        return code;
+    }
+
+    /**
+     * Atomically redeem an authorization code.
+     * Uses a single UPDATE ... WHERE ... RETURNING to prevent TOCTOU race conditions
+     * and ensure single-use enforcement under concurrent access.
+     * Supports both PostgreSQL (production) and SQLite (testing).
+     */
+    async redeemAuthCode(code: string): Promise<AuthCode> {
+        if (this.isSqlite()) {
+            return this.redeemAuthCodeSqlite(code);
+        }
+        return this.redeemAuthCodePostgres(code);
+    }
+
+    private async redeemAuthCodePostgres(code: string): Promise<AuthCode> {
+        const result: any[] = await this.authCodeRepository.query(
+            `UPDATE auth_code SET used = true, used_at = NOW() WHERE code = $1 AND used = false AND expires_at > NOW() RETURNING *`,
+            [code],
+        );
+
+        if (!result || result.length === 0) {
+            this.LOGGER.warn(`Auth code redemption failed for code: ${code.substring(0, 4)}****`);
+            throw OAuthException.invalidGrant('The authorization code is invalid, expired, or has already been used');
+        }
+
+        const row = result[0];
+        return this.mapRowToAuthCode(row);
+    }
+
+    private async redeemAuthCodeSqlite(code: string): Promise<AuthCode> {
+        const now = new Date();
+
+        // First check if the code exists and is not expired
+        const authCode = await this.authCodeRepository.findOne({
+            where: {code},
+        });
+
+        if (!authCode || new Date(authCode.expiresAt) <= now) {
+            this.LOGGER.warn(`Auth code redemption failed for code: ${code.substring(0, 4)}****`);
+            throw OAuthException.invalidGrant('The authorization code is invalid, expired, or has already been used');
+        }
+
+        // Atomic UPDATE ... WHERE used = false to prevent concurrent double-redemption.
+        // SQLite serializes writes, so this is safe against race conditions.
+        const updateResult = await this.authCodeRepository
+            .createQueryBuilder()
+            .update(AuthCode)
+            .set({used: true, usedAt: now})
+            .where('code = :code AND used = 0', {code})
+            .execute();
+
+        if (!updateResult.affected || updateResult.affected === 0) {
+            this.LOGGER.warn(`Auth code redemption failed for code: ${code.substring(0, 4)}****`);
+            throw OAuthException.invalidGrant('The authorization code is invalid, expired, or has already been used');
+        }
+
+        // Re-fetch to get the updated record
+        return await this.authCodeRepository.findOne({where: {code}});
+    }
+
+    private mapRowToAuthCode(row: any): AuthCode {
+        const authCode = new AuthCode();
+        authCode.code = row.code;
+        authCode.codeChallenge = row.code_challenge;
+        authCode.method = row.method;
+        authCode.userId = row.user_id;
+        authCode.tenantId = row.tenant_id;
+        authCode.clientId = row.client_id;
+        authCode.subscriberTenantHint = row.subscriber_tenant_hint;
+        authCode.redirectUri = row.redirect_uri;
+        authCode.scope = row.scope;
+        authCode.used = row.used;
+        authCode.usedAt = row.used_at;
+        authCode.expiresAt = row.expires_at;
+        authCode.createdAt = row.created_at;
+        return authCode;
     }
 
     async validateAuthCode(code: string, codeVerifier: string) {
@@ -110,32 +198,24 @@ export class AuthCodeService {
     }
 
     /**
-     * Delete the expired not verified users.
+     * Delete expired and used authorization codes.
      */
     @Cron("0 1 * * * *") // Every hour, at the start of the 1st minute.
-    async deleteExpiredNotVerifiedUsers() {
-        this.LOGGER.log("Delete expired auth codes");
+    async deleteExpiredAuthCodes() {
+        this.LOGGER.log("Delete expired and used auth codes");
 
-        const now: Date = new Date();
-        const expirationTime: any = this.configService.get(
-            "TOKEN_EXPIRATION_TIME",
-        );
+        const now = this.isSqlite()
+            ? `datetime('now')`
+            : `NOW()`;
 
-        const authCodes: AuthCode[] = await this.authCodeRepository.find();
-        for (let i = 0; i < authCodes.length; i++) {
-            const authCode: AuthCode = authCodes[i];
-            const createDate: Date = new Date(authCode.createdAt);
-            const expirationDate: Date = new Date(
-                createDate.getTime() + ms(expirationTime),
-            );
+        const result = await this.authCodeRepository
+            .createQueryBuilder()
+            .delete()
+            .where(`expires_at < ${now} OR used = true`)
+            .execute();
 
-            if (now > expirationDate) {
-                try {
-                    await this.authCodeRepository.delete(authCode.code);
-                    this.LOGGER.log("auth codes " + authCode.code + " deleted");
-                } catch (exception) {
-                }
-            }
+        if (result.affected > 0) {
+            this.LOGGER.log(`Deleted ${result.affected} expired/used auth codes`);
         }
     }
 }

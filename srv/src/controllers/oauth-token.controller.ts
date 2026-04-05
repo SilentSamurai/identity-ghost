@@ -33,6 +33,7 @@ import {AuthUserService} from "../casl/authUser.service";
 import {TokenIssuanceService} from "../auth/token-issuance.service";
 import {OAuthException} from "../exceptions/oauth-exception";
 import {OAuthExceptionFilter} from "../exceptions/filter/oauth-exception.filter";
+import {CryptUtil} from "../util/crypt.util";
 
 const logger = new Logger("OAuthTokenController");
 
@@ -59,6 +60,7 @@ export class OAuthTokenController {
             code_challenge: string;
             subscriber_tenant_hint?: string;
             redirect_uri?: string;
+            scope?: string;
         },
     ) {
         const user: User = await this.authService.validate(
@@ -95,10 +97,12 @@ export class OAuthTokenController {
         const auth_code = await this.authCodeService.createAuthToken(
             user,
             tenant,
+            body.client_id,
             body.code_challenge,
             body.code_challenge_method,
             result.resolvedHint,
             body.redirect_uri,
+            body.scope,
         );
         return {
             authentication_code: auth_code,
@@ -172,29 +176,35 @@ export class OAuthTokenController {
             ValidationSchema.CodeGrantSchema,
         );
         await validationPipe.transform(body, null);
-        const {user, tenant} = await this.authCodeService.validateAuthCode(
-            body.code,
-            body.code_verifier,
-        );
 
-        // Validate redirect_uri binding (RFC 6749 §4.1.3)
-        const authCode = await this.authCodeService.findByCode(body.code);
+        // Atomically redeem the auth code (single-use + expiration check)
+        const authCode = await this.authCodeService.redeemAuthCode(body.code);
+
+        // Verify client_id binding
+        if (body.client_id !== authCode.clientId) {
+            logger.warn(`Auth code grant mismatch: stored client_id '${authCode.clientId}' does not match request client_id '${body.client_id}'`);
+            throw OAuthException.invalidGrant("The authorization code was not issued to this client or the client_id is invalid.");
+        }
+
+        // Verify redirect_uri binding
         if (authCode.redirectUri) {
             if (!body.redirect_uri || body.redirect_uri !== authCode.redirectUri) {
                 throw OAuthException.invalidGrant("redirect_uri does not match");
             }
         }
 
-        if (body.client_id) {
-            if (tenant.clientId !== body.client_id && tenant.domain !== body.client_id) {
-                logger.warn(`Auth code grant mismatch: code's app client_id '${tenant.clientId}'/'${tenant.domain}' does not match request client_id '${body.client_id}'`);
-                throw OAuthException.invalidGrant("The authorization code was not issued to this client or the client_id is invalid.");
-            }
+        // Validate PKCE
+        const generatedChallenge = CryptUtil.generateCodeChallenge(body.code_verifier, authCode.method);
+        if (generatedChallenge !== authCode.codeChallenge) {
+            throw OAuthException.invalidGrant("The authorization code is invalid or the code verifier does not match");
         }
 
+        // Resolve user and tenant from the auth code record
+        const user = await this.authUserService.findUserById(authCode.userId);
+        const tenant = await this.authUserService.findTenantById(authCode.tenantId);
+
         return this.tokenIssuanceService.issueToken(user, tenant, {
-            subscriberTenantHint: body.subscriber_tenant_hint,
-            authCode: body.code,
+            subscriberTenantHint: authCode.subscriberTenantHint,
             requestedScope: body.scope,
         });
     }

@@ -17,7 +17,7 @@ import {Environment} from '../../src/config/environment.service';
 import {JwtService} from '@nestjs/jwt';
 import {TenantService} from '../../src/services/tenant.service';
 import {AuthUserService} from '../../src/casl/authUser.service';
-import {Repository} from 'typeorm';
+import {Repository, DataSource} from 'typeorm';
 import {OAuthException} from '../../src/exceptions/oauth-exception';
 import {CryptUtil} from '../../src/util/crypt.util';
 
@@ -67,6 +67,8 @@ describe('AuthCodeService', () => {
                         save: jest.fn(),
                         find: jest.fn(),
                         delete: jest.fn(),
+                        query: jest.fn(),
+                        createQueryBuilder: jest.fn(),
                     },
                 },
                 {
@@ -99,6 +101,12 @@ describe('AuthCodeService', () => {
                         getMemberRoles: jest.fn(),
                         findTenantById: jest.fn(),
                         findUserById: jest.fn(),
+                    },
+                },
+                {
+                    provide: DataSource,
+                    useValue: {
+                        options: { type: 'postgres' },
                     },
                 },
             ],
@@ -162,33 +170,18 @@ describe('AuthCodeService', () => {
         });
     });
 
-    describe('deleteExpiredNotVerifiedUsers', () => {
-        it('should delete expired auth codes', async () => {
-            const expiredAuthCode = {
-                ...mockAuthCode,
-                createdAt: new Date(Date.now() - 7200000), // 2 hours ago
-            };
+    describe('deleteExpiredAuthCodes', () => {
+        it('should delete expired and used auth codes via query builder', async () => {
+            const mockExecute = jest.fn().mockResolvedValue({ affected: 2 });
+            const mockWhere = jest.fn().mockReturnValue({ execute: mockExecute });
+            const mockDelete = jest.fn().mockReturnValue({ where: mockWhere });
+            jest.spyOn(authCodeRepository, 'createQueryBuilder').mockReturnValue({
+                delete: mockDelete,
+            } as any);
 
-            jest.spyOn(authCodeRepository, 'find').mockResolvedValue([expiredAuthCode] as AuthCode[]);
-            jest.spyOn(authCodeRepository, 'delete').mockResolvedValue(undefined);
+            await service.deleteExpiredAuthCodes();
 
-            await service.deleteExpiredNotVerifiedUsers();
-
-            expect(authCodeRepository.delete).toHaveBeenCalledWith(expiredAuthCode.code);
-        });
-
-        it('should not delete non-expired auth codes', async () => {
-            const nonExpiredAuthCode = {
-                ...mockAuthCode,
-                createdAt: new Date(), // current time
-            };
-
-            jest.spyOn(authCodeRepository, 'find').mockResolvedValue([nonExpiredAuthCode] as AuthCode[]);
-            jest.spyOn(authCodeRepository, 'delete').mockResolvedValue(undefined);
-
-            await service.deleteExpiredNotVerifiedUsers();
-
-            expect(authCodeRepository.delete).not.toHaveBeenCalled();
+            expect(mockWhere).toHaveBeenCalledWith("expires_at < NOW() OR used = true");
         });
     });
 }); 

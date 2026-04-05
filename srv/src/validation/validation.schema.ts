@@ -188,6 +188,7 @@ const LoginSchema = yup.object().shape({
     code_challenge: yup.string().required("code_challenge is required"),
     subscriber_tenant_hint: yup.string().optional().nullable(),
     redirect_uri: yup.string().optional(),
+    scope: yup.string().optional(),
 });
 
 const PasswordGrantSchema = yup.object().shape({
@@ -237,7 +238,7 @@ const CodeGrantSchema = yup.object().shape({
         }),
     code: yup.string().required("code is required"),
     code_verifier: yup.string().required("code_verifier is required"),
-    client_id: yup.string().optional(),
+    client_id: yup.string().required("client_id is required"),
     subscriber_tenant_hint: yup.string().nullable(),
     scope: yup.string().optional(),
     redirect_uri: yup.string().optional(),
