@@ -346,7 +346,7 @@ describe('Ambiguous Subscription Tenant Flow', () => {
             testUserEmail,
             testUserPassword,
             appOwnerTenant.clientId,
-            'verifier',
+            'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq',
             subscriber1.domain
         );
         expect(resolvedResponse.authentication_code).toBeDefined();

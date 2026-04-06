@@ -59,7 +59,7 @@ describe('auth code parameter binding at creation', () => {
 
     // Requirement 1.1: client_id is stored and verified at token exchange
     it('should store client_id — exchange with matching client_id succeeds', async () => {
-        const challenge = "binding-client-id-test";
+        const challenge = "binding-client-id-test-ABCDEFGHIJKLMNOPQRSTU";
         const code = await loginAndGetCode({codeChallenge: challenge});
 
         const response = await app.getHttpServer()
@@ -78,7 +78,7 @@ describe('auth code parameter binding at creation', () => {
 
     // Requirement 1.1: client_id binding is enforced — mismatched client_id is rejected
     it('should reject token exchange when client_id does not match stored value', async () => {
-        const challenge = "binding-client-mismatch";
+        const challenge = "binding-client-mismatch-ABCDEFGHIJKLMNOPQRST";
         const code = await loginAndGetCode({codeChallenge: challenge});
 
         const response = await app.getHttpServer()
@@ -97,7 +97,7 @@ describe('auth code parameter binding at creation', () => {
 
     // Requirement 1.2: redirect_uri is stored — exchange with matching redirect_uri succeeds
     it('should store redirect_uri — exchange with matching redirect_uri succeeds', async () => {
-        const challenge = "binding-redirect-uri-test";
+        const challenge = "binding-redirect-uri-test-ABCDEFGHIJKLMNOPQR";
         const redirectUri = "https://app.example.com/callback";
         const code = await loginAndGetCode({codeChallenge: challenge, redirectUri});
 
@@ -118,7 +118,7 @@ describe('auth code parameter binding at creation', () => {
 
     // Requirement 1.2: redirect_uri binding is enforced — mismatched redirect_uri is rejected
     it('should reject token exchange when redirect_uri does not match stored value', async () => {
-        const challenge = "binding-redirect-mismatch";
+        const challenge = "binding-redirect-mismatch-ABCDEFGHIJKLMNOPQR";
         const redirectUri = "https://app.example.com/callback";
         const code = await loginAndGetCode({codeChallenge: challenge, redirectUri});
 
@@ -139,7 +139,7 @@ describe('auth code parameter binding at creation', () => {
 
     // Requirement 1.3: scope is stored — exchange succeeds when scope was provided at login
     it('should store scope — token exchange succeeds after login with scope', async () => {
-        const challenge = "binding-scope-test";
+        const challenge = "binding-scope-test-ABCDEFGHIJKLMNOPQRSTUVWX";
         const code = await loginAndGetCode({codeChallenge: challenge, scope: "openid profile"});
 
         const response = await app.getHttpServer()
@@ -158,7 +158,7 @@ describe('auth code parameter binding at creation', () => {
 
     // Requirement 1.4: code_challenge is stored — PKCE verification succeeds with matching verifier
     it('should store code_challenge — PKCE verification succeeds with matching verifier', async () => {
-        const challenge = "binding-pkce-verify";
+        const challenge = "binding-pkce-verify-ABCDEFGHIJKLMNOPQRSTUVW";
         const code = await loginAndGetCode({codeChallenge: challenge});
 
         const response = await app.getHttpServer()
@@ -177,7 +177,7 @@ describe('auth code parameter binding at creation', () => {
 
     // Requirement 1.4: code_challenge binding is enforced — wrong verifier is rejected
     it('should reject token exchange when code_verifier does not match stored code_challenge', async () => {
-        const challenge = "binding-pkce-mismatch";
+        const challenge = "binding-pkce-mismatch-ABCDEFGHIJKLMNOPQRSTUV";
         const code = await loginAndGetCode({codeChallenge: challenge});
 
         const response = await app.getHttpServer()
@@ -185,7 +185,7 @@ describe('auth code parameter binding at creation', () => {
             .send({
                 grant_type: "authorization_code",
                 code,
-                code_verifier: "wrong-verifier-value",
+                code_verifier: "wrong-verifier-value-ABCDEFGHIJKLMNOPQRSTUVW",
                 client_id: clientId,
             })
             .set('Accept', 'application/json');

@@ -34,6 +34,9 @@ import {TokenIssuanceService} from "../auth/token-issuance.service";
 import {OAuthException} from "../exceptions/oauth-exception";
 import {OAuthExceptionFilter} from "../exceptions/filter/oauth-exception.filter";
 import {CryptUtil} from "../util/crypt.util";
+import {InjectRepository} from "@nestjs/typeorm";
+import {Client} from "../entity/client.entity";
+import {Repository} from "typeorm";
 
 const logger = new Logger("OAuthTokenController");
 
@@ -46,6 +49,8 @@ export class OAuthTokenController {
         private readonly authCodeService: AuthCodeService,
         private readonly authUserService: AuthUserService,
         private readonly tokenIssuanceService: TokenIssuanceService,
+        @InjectRepository(Client)
+        private readonly clientRepository: Repository<Client>,
     ) {
     }
 
@@ -69,6 +74,8 @@ export class OAuthTokenController {
         );
 
         let tenant: Tenant;
+        let client: Client | null = null;
+
         if (await this.authUserService.tenantExistsByDomain(body.client_id)) {
             tenant = await this.authUserService.findTenantByDomain(
                 body.client_id,
@@ -80,7 +87,30 @@ export class OAuthTokenController {
                 body.client_id,
             );
         } else {
-            throw OAuthException.invalidClient("Unknown client_id");
+            // Check if client_id refers to a registered Client entity
+            client = await this.clientRepository.findOne({
+                where: {clientId: body.client_id},
+                relations: ['tenant'],
+            });
+            if (client) {
+                tenant = await this.authUserService.findTenantById(client.tenantId);
+            } else {
+                throw OAuthException.invalidClient("Unknown client_id");
+            }
+        }
+
+        // PKCE S256 enforcement and downgrade prevention
+        // Load Client entity if not already loaded (for tenant-based lookups, try matching by client_id)
+        if (!client) {
+            client = await this.clientRepository.findOne({where: {clientId: body.client_id}});
+        }
+        if (client) {
+            if (client.requirePkce && body.code_challenge_method === 'plain') {
+                throw OAuthException.invalidRequest('S256 code_challenge_method is required for this client');
+            }
+            if (client.pkceMethodUsed === 'S256' && body.code_challenge_method === 'plain') {
+                throw OAuthException.invalidRequest('PKCE downgrade not allowed: this client has previously used S256');
+            }
         }
 
         const result = await this.tokenIssuanceService.resolveLoginAccess(
@@ -104,6 +134,13 @@ export class OAuthTokenController {
             body.redirect_uri,
             body.scope,
         );
+
+        // Update pkceMethodUsed if client used S256 for the first time
+        if (client && body.code_challenge_method === 'S256' && client.pkceMethodUsed !== 'S256') {
+            client.pkceMethodUsed = 'S256';
+            await this.clientRepository.save(client);
+        }
+
         return {
             authentication_code: auth_code,
         };

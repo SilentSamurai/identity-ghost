@@ -69,7 +69,7 @@ describe('auth code expiration', () => {
      * check (`expires_at > NOW()`) passes.
      */
     it('should allow immediate exchange of a fresh code (expires_at is in the future)', async () => {
-        const challenge = "expiration-fresh-code";
+        const challenge = "expiration-fresh-code-ABCDEFGHIJKLMNOPQRSTUV";
         const code = await loginAndGetCode(challenge);
 
         const response = await app.getHttpServer()
@@ -100,7 +100,7 @@ describe('auth code expiration', () => {
      * a second attempt — the same atomic UPDATE clause handles both cases.
      */
     it('should reject a code that has already been redeemed (atomic UPDATE enforces expiration + single-use)', async () => {
-        const challenge = "expiration-reuse-check";
+        const challenge = "expiration-reuse-check-ABCDEFGHIJKLMNOPQRSTU";
         const code = await loginAndGetCode(challenge);
 
         // First exchange — should succeed
@@ -139,7 +139,7 @@ describe('auth code expiration', () => {
      * remains valid well within the 5-minute expiration window.
      */
     it('should allow exchange within the expiration window (after a short delay)', async () => {
-        const challenge = "expiration-delay-check";
+        const challenge = "expiration-delay-check-ABCDEFGHIJKLMNOPQRSTU";
         const code = await loginAndGetCode(challenge);
 
         // Wait 2 seconds — well within the 5-minute window
@@ -173,7 +173,7 @@ describe('auth code expiration', () => {
             .send({
                 grant_type: "authorization_code",
                 code: "DOES_NOT_EXIST_999",
-                code_verifier: "any-verifier",
+                code_verifier: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq",
                 client_id: clientId,
             })
             .set('Accept', 'application/json');

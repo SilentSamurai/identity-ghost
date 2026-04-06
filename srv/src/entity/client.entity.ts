@@ -33,6 +33,9 @@ export class Client {
     @Column({name: "require_pkce", type: "boolean", default: false})
     requirePkce: boolean;
 
+    @Column({name: "pkce_method_used", nullable: true})
+    pkceMethodUsed: string;
+
     @Column({name: "allow_password_grant", type: "boolean", default: false})
     allowPasswordGrant: boolean;
 

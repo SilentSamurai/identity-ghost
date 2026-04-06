@@ -28,8 +28,8 @@ import {expect2xx} from "../api-client/client";
 describe('auth code cleanup — lifecycle state verification', () => {
     let app: SharedTestFixture;
     const clientId = "auth.server.com";
-    const verifier = "cleanup-test-verifier";
-    const challenge = "cleanup-test-verifier";
+    const verifier = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq";
+    const challenge = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq";
     const email = "admin@auth.server.com";
     const password = "admin9000";
 
@@ -80,7 +80,7 @@ describe('auth code cleanup — lifecycle state verification', () => {
     // where `used = true`. This test confirms the used state is correctly set
     // by verifying the code is rejected on a second exchange attempt.
     it('should mark codes as used after redemption — used codes are cleanup targets', async () => {
-        const codeChallenge = "cleanup-used-code-test";
+        const codeChallenge = "cleanup-used-code-test-ABCDEFGHIJKLMNOPQRST";
         const code = await loginAndGetCode(codeChallenge);
 
         // First exchange succeeds — code is now used=true, used_at=NOW()
@@ -101,7 +101,7 @@ describe('auth code cleanup — lifecycle state verification', () => {
     // so active codes must survive. This test confirms an unused, non-expired
     // code can be successfully exchanged.
     it('should keep active codes exchangeable — active codes are not cleanup targets', async () => {
-        const codeChallenge = "cleanup-active-code-test";
+        const codeChallenge = "cleanup-active-code-test-ABCDEFGHIJKLMNOPQR";
         const code = await loginAndGetCode(codeChallenge);
 
         // Exchange the active code — should succeed because it's neither
@@ -120,7 +120,7 @@ describe('auth code cleanup — lifecycle state verification', () => {
     // Here we verify the complementary case: a freshly created code (within
     // its 5-minute TTL) is NOT expired and can be exchanged successfully.
     it('should allow exchange of non-expired code — confirms expires_at is in the future', async () => {
-        const codeChallenge = "cleanup-not-expired-test";
+        const codeChallenge = "cleanup-not-expired-test-ABCDEFGHIJKLMNOPQR";
         const code = await loginAndGetCode(codeChallenge);
 
         // Immediately exchange — the code was just created, so expires_at
@@ -137,8 +137,8 @@ describe('auth code cleanup — lifecycle state verification', () => {
     // This mirrors the cleanup cron's behavior: it would delete the used
     // code and leave the active one untouched.
     it('should distinguish used codes from active codes across multiple auth codes', async () => {
-        const usedChallenge = "cleanup-multi-used";
-        const activeChallenge = "cleanup-multi-active";
+        const usedChallenge = "cleanup-multi-used-ABCDEFGHIJKLMNOPQRSTUVWX";
+        const activeChallenge = "cleanup-multi-active-ABCDEFGHIJKLMNOPQRSTUV";
 
         // Create two auth codes
         const usedCode = await loginAndGetCode(usedChallenge);

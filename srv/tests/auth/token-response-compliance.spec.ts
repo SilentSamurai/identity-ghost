@@ -223,7 +223,7 @@ describe('Token Response RFC 6749 Compliance', () => {
         let response: any;
 
         beforeAll(async () => {
-            const verifier = "compliance-test-verifier";
+            const verifier = "compliance-test-verifier-ABCDEFGHIJKLMNOPQRS";
 
             // Step 1: Login to get an auth code
             const loginResponse = await app.getHttpServer()

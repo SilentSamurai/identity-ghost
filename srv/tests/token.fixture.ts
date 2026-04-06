@@ -110,7 +110,7 @@ export class TokenFixture {
      * Login using OAuth authorization code flow.
      * Returns the response which may contain an authentication_code or requires_tenant_selection.
      */
-    public async login(email: string, password: string, clientId: string, codeChallenge: string = 'verifier', subscriberTenantHint?: string): Promise<any> {
+    public async login(email: string, password: string, clientId: string, codeChallenge: string = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq', subscriberTenantHint?: string): Promise<any> {
         const body: any = {
             email,
             password,
@@ -133,7 +133,7 @@ export class TokenFixture {
     public async exchangeCodeForToken(
         code: string,
         clientId: string,
-        codeVerifier: string = 'verifier'
+        codeVerifier: string = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq'
     ): Promise<{
         access_token?: string,
         refresh_token?: string,
@@ -172,7 +172,7 @@ export class TokenFixture {
         code: string,
         clientId: string,
         subscriptionTenantId?: string,
-        codeVerifier: string = 'verifier'
+        codeVerifier: string = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq'
     ): Promise<{
         access_token?: string,
         refresh_token?: string,

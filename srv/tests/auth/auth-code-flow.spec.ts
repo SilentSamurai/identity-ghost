@@ -7,8 +7,8 @@ describe('e2e positive auth code flow', () => {
     let accessToken = "";
     let clientId = "auth.server.com";
     let clientSecret = "";
-    const verifier = "challenge-ABCD";
-    const challenge = "challenge-ABCD";
+    const verifier = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq";
+    const challenge = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq";
 
     beforeAll(async () => {
         app = new SharedTestFixture();

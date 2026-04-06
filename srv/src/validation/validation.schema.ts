@@ -237,7 +237,11 @@ const CodeGrantSchema = yup.object().shape({
             message: "grant type not recognised",
         }),
     code: yup.string().required("code is required"),
-    code_verifier: yup.string().required("code_verifier is required"),
+    code_verifier: yup.string()
+        .required("code_verifier is required")
+        .min(43, "code_verifier must be at least 43 characters")
+        .max(128, "code_verifier must be at most 128 characters")
+        .matches(/^[A-Za-z0-9\-._~]+$/, "code_verifier contains invalid characters"),
     client_id: yup.string().required("client_id is required"),
     subscriber_tenant_hint: yup.string().nullable(),
     scope: yup.string().optional(),

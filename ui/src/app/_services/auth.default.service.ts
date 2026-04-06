@@ -35,7 +35,7 @@ export class AuthDefaultService {
         client_id: string | null,
     ): Promise<void> {
         let code_challenge =
-            await this.sessionService.getCodeChallenge('plain');
+            await this.sessionService.getCodeChallenge('S256');
         if (client_id) {
             await this.router.navigate(['login'], {
                 queryParams: {

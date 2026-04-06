@@ -13,8 +13,8 @@ import {expect2xx} from "../api-client/client";
 describe('auth code concurrency safety', () => {
     let app: SharedTestFixture;
     const clientId = "auth.server.com";
-    const verifier = "challenge-ABCD";
-    const challenge = "challenge-ABCD";
+    const verifier = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq";
+    const challenge = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq";
     const email = "admin@auth.server.com";
     const password = "admin9000";
 

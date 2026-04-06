@@ -14,8 +14,8 @@ describe('client_id binding verification at token exchange', () => {
     const clientId = "auth.server.com";
     const email = "admin@auth.server.com";
     const password = "admin9000";
-    const verifier = "client-binding-verifier";
-    const challenge = "client-binding-verifier";
+    const verifier = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq";
+    const challenge = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq";
 
     beforeAll(async () => {
         app = new SharedTestFixture();
