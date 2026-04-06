@@ -1,8 +1,8 @@
 name: Build, Test and Create Docker Image
 
 on:
-    push:
-        branches: [ "main", "development" ]  # Added release branch
+    pull_request:
+        branches: [ "main" ]
 
 jobs:
     test:
