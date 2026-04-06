@@ -293,11 +293,16 @@ export class OAuthTokenController {
         );
         await validationPipe.transform(body, null);
 
-        // Authenticate the client before processing the refresh
-        await this.authService.validateClientCredentials(
-            body.client_id,
-            body.client_secret,
-        );
+        // Authenticate the client: confidential clients must provide a secret,
+        // public clients only need a valid client_id (RFC 6749 §6).
+        if (body.client_secret) {
+            await this.authService.validateClientCredentials(
+                body.client_id,
+                body.client_secret,
+            );
+        } else {
+            await this.authService.validatePublicClient(body.client_id);
+        }
 
         return this.tokenIssuanceService.refreshToken(
             body.refresh_token,

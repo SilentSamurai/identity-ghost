@@ -133,6 +133,27 @@ export class AuthService {
         return tenant;
     }
 
+    /**
+     * Validate that a public client exists by its client_id.
+     *
+     * Per RFC 6749 §6, public clients cannot authenticate with a secret
+     * but must still provide a valid client_id so the server can verify
+     * the refresh token was issued to that client.
+     */
+    async validatePublicClient(clientId: string): Promise<Tenant> {
+        const tenant: Tenant =
+            await this.authUserService.findTenantByClientId(clientId);
+        const valid: boolean = CryptUtil.verifyClientId(
+            tenant.clientSecret,
+            clientId,
+            tenant.secretSalt,
+        );
+        if (!valid) {
+            throw OAuthException.invalidClient('Client authentication failed');
+        }
+        return tenant;
+    }
+
     createTechnicalToken(tenant: Tenant, roles: string[]): TechnicalToken {
         return this.technicalTokenService.createTechnicalToken(tenant, roles);
     }

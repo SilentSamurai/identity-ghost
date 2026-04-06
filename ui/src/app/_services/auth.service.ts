@@ -120,4 +120,28 @@ export class AuthService {
         );
     }
 
+    refreshAccessToken(refreshToken: string, clientId: string): Observable<any> {
+        return this.http.post(
+            `${AUTH_API}/token`,
+            {
+                grant_type: 'refresh_token',
+                refresh_token: refreshToken,
+                client_id: clientId,
+            },
+            httpOptions,
+        );
+    }
+
+    async logout(refreshToken: string): Promise<void> {
+        await lastValueFrom(
+            this.http.post(
+                `${AUTH_API}/logout`,
+                {
+                    refresh_token: refreshToken,
+                },
+                httpOptions,
+            ),
+        );
+    }
+
 }

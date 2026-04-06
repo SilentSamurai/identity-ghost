@@ -2,6 +2,7 @@ import {Injectable} from '@angular/core';
 import {Router} from '@angular/router';
 import {SessionService} from './session.service';
 import {MessageService} from 'primeng/api';
+import {AuthService} from './auth.service';
 
 @Injectable({
     providedIn: 'root',
@@ -13,6 +14,7 @@ export class AuthDefaultService {
         private router: Router,
         private sessionService: SessionService,
         private messageService: MessageService,
+        private authService: AuthService,
     ) {
     }
 
@@ -26,8 +28,19 @@ export class AuthDefaultService {
             });
         }
         const userInfo = this.sessionService.getUser();
+        const refreshToken = this.sessionService.getRefreshToken();
+        const clientId = client_id || userInfo?.tenant.client_id || null;
+
+        if (refreshToken) {
+            try {
+                await this.authService.logout(refreshToken);
+            } catch {
+                // fire-and-forget: proceed with local cleanup regardless of server error
+            }
+        }
+
         this.sessionService.clearSession();
-        await this.navToLogin(redirect, client_id || userInfo?.tenant.client_id || null);
+        await this.navToLogin(redirect, clientId);
     }
 
     public async navToLogin(

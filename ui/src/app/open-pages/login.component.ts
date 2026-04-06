@@ -353,6 +353,9 @@ export class LoginComponent implements OnInit {
                 this.authService.fetchAccessToken(code, verifier, clientId),
             );
             this.tokenStorage.saveToken(data.access_token);
+            if (data.refresh_token) {
+                this.tokenStorage.saveRefreshToken(data.refresh_token);
+            }
             const rules = await this.authService.fetchPermissions();
             this.tokenStorage.savePermissions(rules);
         } catch (e: any) {

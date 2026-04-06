@@ -7,8 +7,8 @@ module.exports = {
     testTimeout: 30000,
     collectCoverage: true, // ensures coverage is actually collected
     collectCoverageFrom: [
-        "src/**",
-        '!test/**/*.ts',  // exclude test files
-        '!dist/**/*',  // exclude test files
+        "src/**/*.ts",
+        '!tests/**/*.ts',  // exclude test files
+        '!dist/src/**/*',  // exclude compiled output
     ]
 };
