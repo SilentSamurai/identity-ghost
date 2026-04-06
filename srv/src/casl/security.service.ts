@@ -100,6 +100,7 @@ export class SecurityService implements OnModuleInit {
         can(Action.Read, SubjectEnum.TENANT);
         can(Action.Read, SubjectEnum.MEMBER);
         can(Action.Read, SubjectEnum.ROLE);
+        can(Action.Read, SubjectEnum.USER);
         return {
             SECURITY_CONTEXT: InternalToken.create({purpose: "token-issuance", scopedTenantId: tenantId}),
             SCOPE_ABILITIES: build(),

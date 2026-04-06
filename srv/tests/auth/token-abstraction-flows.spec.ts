@@ -93,10 +93,10 @@ describe('Token Abstraction Flows', () => {
             }
         });
 
-        it('should have correct claims in refresh token', () => {
+        it('should have an opaque refresh token (not a JWT)', () => {
+            // Refresh tokens are now opaque strings, not JWTs
             const decoded: any = jwtService.decode(passwordGrantResponse.refreshToken);
-            expect(decoded.email).toEqual("admin@auth.server.com");
-            expect(decoded.domain).toEqual("auth.server.com");
+            expect(decoded).toBeNull();
         });
     });
 
@@ -147,7 +147,9 @@ describe('Token Abstraction Flows', () => {
                 .post('/api/oauth/token')
                 .send({
                     "grant_type": "refresh_token",
-                    "refresh_token": passwordGrantResponse.refreshToken
+                    "refresh_token": passwordGrantResponse.refreshToken,
+                    "client_id": clientId,
+                    "client_secret": clientSecret,
                 })
                 .set('Accept', 'application/json');
 

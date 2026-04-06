@@ -27,22 +27,6 @@ describe('e2e positive token flow', () => {
         accessToken = response.accessToken;
     });
 
-    it(`/POST Refresh Token`, async () => {
-        const response = await app.getHttpServer()
-            .post('/api/oauth/token')
-            .send({
-                "grant_type": "refresh_token",
-                "refresh_token": refreshToken,
-            })
-            .set('Accept', 'application/json');
-
-        expect(response.status).toEqual(201);
-        expect(response.body.access_token).toBeDefined();
-        expect(response.body.expires_in).toBeDefined();
-        expect(response.body.token_type).toEqual('Bearer');
-        expect(response.body.refresh_token).toBeDefined();
-    });
-
     it(`/GET Global Tenant Credentials`, async () => {
         const creds = await app.getHttpServer()
             .get("/api/tenant/my/credentials")
@@ -55,6 +39,24 @@ describe('e2e positive token flow', () => {
 
         clientId = creds.body.clientId;
         clientSecret = creds.body.clientSecret;
+    });
+
+    it(`/POST Refresh Token`, async () => {
+        const response = await app.getHttpServer()
+            .post('/api/oauth/token')
+            .send({
+                "grant_type": "refresh_token",
+                "refresh_token": refreshToken,
+                "client_id": clientId,
+                "client_secret": clientSecret,
+            })
+            .set('Accept', 'application/json');
+
+        expect(response.status).toEqual(201);
+        expect(response.body.access_token).toBeDefined();
+        expect(response.body.expires_in).toBeDefined();
+        expect(response.body.token_type).toEqual('Bearer');
+        expect(response.body.refresh_token).toBeDefined();
     });
 
     it(`/POST Client Credentials`, async () => {

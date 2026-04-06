@@ -12,6 +12,9 @@ import {ScopeResolverService} from "../casl/scope-resolver.service";
 import {ClientService} from "../services/client.service";
 import {ScopeNormalizer} from "../casl/scope-normalizer";
 import {IdTokenService} from "./id-token.service";
+import {RefreshTokenService} from "./refresh-token.service";
+import {UsersService} from "../services/users.service";
+import {OAuthException} from "../exceptions/oauth-exception";
 
 export interface TokenResponse {
     access_token: string;
@@ -40,6 +43,8 @@ export class TokenIssuanceService {
         private readonly scopeResolverService: ScopeResolverService,
         private readonly clientService: ClientService,
         private readonly idTokenService: IdTokenService,
+        private readonly refreshTokenService: RefreshTokenService,
+        private readonly usersService: UsersService,
     ) {
     }
 
@@ -71,8 +76,15 @@ export class TokenIssuanceService {
             clientAllowedScopes,
         );
 
-        const {accessToken, refreshToken, scopes} =
+        const {accessToken, scopes} =
             await this.authService.createUserAccessToken(user, tenant, grantedScopes, roleNames);
+
+        const {plaintext: refreshToken} = await this.refreshTokenService.create({
+            userId: user.id,
+            clientId: tenant.clientId,
+            tenantId: tenant.id,
+            scope: ScopeNormalizer.format(scopes),
+        });
 
         const idToken = await this.idTokenService.generateIdToken({
             user: {id: user.id, email: user.email, name: user.name},
@@ -163,10 +175,17 @@ export class TokenIssuanceService {
             clientAllowedScopes,
         );
 
-        const {accessToken, refreshToken, scopes} =
+        const {accessToken, scopes} =
             await this.authService.createSubscribedUserAccessToken(
                 user, tenant, subscribingTenant, grantedScopes, allRoleNames,
             );
+
+        const {plaintext: refreshToken} = await this.refreshTokenService.create({
+            userId: user.id,
+            clientId: tenant.clientId,
+            tenantId: tenant.id,
+            scope: ScopeNormalizer.format(scopes),
+        });
 
         const idToken = await this.idTokenService.generateIdToken({
             user: {id: user.id, email: user.email, name: user.name},
@@ -176,6 +195,48 @@ export class TokenIssuanceService {
         });
 
         return this.formatResponse(accessToken, refreshToken, scopes, idToken);
+    }
+
+    /**
+     * Orchestrates the refresh_token grant:
+     * consume + rotate → resolve user/tenant → check locked → re-fetch roles → issue access token → format response.
+     */
+    async refreshToken(
+        plaintextToken: string,
+        clientId: string,
+        requestedScope?: string,
+    ): Promise<TokenResponse> {
+        const {plaintext: newRefreshToken, record} = await this.refreshTokenService.consumeAndRotate({
+            plaintextToken,
+            clientId,
+            requestedScope,
+        });
+
+        const adminContext = await this.securityService.getContextForTokenIssuance(record.tenantId);
+
+        const user = await this.usersService.findById(adminContext, record.userId);
+        if (user.locked) {
+            throw OAuthException.invalidGrant("The refresh token is invalid or has expired");
+        }
+
+        const tenant = await this.tenantService.findById(adminContext, record.tenantId);
+
+        const roles = await this.tenantService.getMemberRoles(adminContext, tenant.id, user);
+        const roleNames = roles.map(r => r.name);
+
+        const grantedScopes = ScopeNormalizer.parse(record.scope);
+
+        const {accessToken, scopes} =
+            await this.authService.createUserAccessToken(user, tenant, grantedScopes, roleNames);
+
+        const idToken = await this.idTokenService.generateIdToken({
+            user: {id: user.id, email: user.email, name: user.name},
+            tenant: {privateKey: tenant.privateKey},
+            clientId: tenant.clientId,
+            grantedScopes: scopes,
+        });
+
+        return this.formatResponse(accessToken, newRefreshToken, scopes, idToken);
     }
 
     /**

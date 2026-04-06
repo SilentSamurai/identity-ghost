@@ -225,7 +225,8 @@ const RefreshTokenGrantSchema = yup.object().shape({
         .required()
         .matches(/^refresh_token$/g, {message: "grant type not recognised"}),
     refresh_token: yup.string().required("refresh_token is required"),
-    subscriber_tenant_hint: yup.string().nullable(),
+    client_id: yup.string().required("client_id is required"),
+    client_secret: yup.string().required("client_secret is required"),
     scope: yup.string().optional(),
 });
 

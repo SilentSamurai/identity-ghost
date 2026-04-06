@@ -12,6 +12,7 @@ import {App} from "./app.entity";
 import {Subscription} from "./subscription.entity";
 import {TenantBits} from "./tenant-bits.entity";
 import {Client} from "./client.entity";
+import {RefreshToken} from "./refresh-token.entity";
 
 export const entities = [
     Tenant,
@@ -27,5 +28,6 @@ export const entities = [
     App,
     Subscription,
     TenantBits,
-    Client
+    Client,
+    RefreshToken
 ];

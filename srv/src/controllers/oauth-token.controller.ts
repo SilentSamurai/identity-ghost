@@ -288,18 +288,21 @@ export class OAuthTokenController {
     }
 
     private async handleRefreshTokenGrant(body: any): Promise<any> {
-        let validationPipe = new ValidationPipe(
+        const validationPipe = new ValidationPipe(
             ValidationSchema.RefreshTokenGrantSchema,
         );
         await validationPipe.transform(body, null);
-        const {tenant, user} =
-            await this.authService.validateRefreshToken(
-                body.refresh_token,
-            );
 
-        return this.tokenIssuanceService.issueToken(user, tenant, {
-            subscriberTenantHint: body.subscriber_tenant_hint,
-            requestedScope: body.scope,
-        });
+        // Authenticate the client before processing the refresh
+        await this.authService.validateClientCredentials(
+            body.client_id,
+            body.client_secret,
+        );
+
+        return this.tokenIssuanceService.refreshToken(
+            body.refresh_token,
+            body.client_id,
+            body.scope,
+        );
     }
 }

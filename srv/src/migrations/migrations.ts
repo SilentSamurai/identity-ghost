@@ -13,6 +13,7 @@ import {AddUserLocked1749000000000} from "./1749000000000-add-user-locked";
 import {AddRedirectUriToAuthCode1750000000000} from "./1750000000000-AddRedirectUriToAuthCode";
 import {AddAuthCodeBindingColumns1751000000000} from "./1751000000000-AddAuthCodeBindingColumns";
 import {AddPkceMethodUsedToClients1752000000000} from "./1752000000000-AddPkceMethodUsedToClients";
+import {CreateRefreshTokensTable1753000000000} from "./1753000000000-CreateRefreshTokensTable";
 
 export const migrations = [
     CreateInitialTables1681147242561,
@@ -29,5 +30,6 @@ export const migrations = [
     AddUserLocked1749000000000,
     AddRedirectUriToAuthCode1750000000000,
     AddAuthCodeBindingColumns1751000000000,
-    AddPkceMethodUsedToClients1752000000000
+    AddPkceMethodUsedToClients1752000000000,
+    CreateRefreshTokensTable1753000000000
 ];

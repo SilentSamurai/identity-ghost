@@ -257,6 +257,13 @@ describe('e2e user lock/unlock', () => {
         );
         const refreshToken = tokenResponse.refreshToken;
 
+        // Fetch shire.local tenant credentials for the refresh request
+        const creds = await app.getHttpServer()
+            .get("/api/tenant/my/credentials")
+            .set('Authorization', `Bearer ${tokenResponse.accessToken}`);
+        const shireClientId = creds.body.clientId;
+        const shireClientSecret = creds.body.clientSecret;
+
         // Lock the user while they hold a valid refresh token
         await usersClient.lockUser(shireAdmin.id);
 
@@ -266,6 +273,8 @@ describe('e2e user lock/unlock', () => {
             .send({
                 "grant_type": "refresh_token",
                 "refresh_token": refreshToken,
+                "client_id": shireClientId,
+                "client_secret": shireClientSecret,
             })
             .set('Accept', 'application/json');
 

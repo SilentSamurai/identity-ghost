@@ -175,6 +175,8 @@ describe('Token Response RFC 6749 Compliance', () => {
                 .send({
                     grant_type: "refresh_token",
                     refresh_token: refreshToken,
+                    client_id: clientId,
+                    client_secret: clientSecret,
                 })
                 .set('Accept', 'application/json');
 
