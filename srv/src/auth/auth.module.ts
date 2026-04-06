@@ -13,6 +13,7 @@ import {SuperAdminGuard} from "./super-admin.guard";
 import {CoreModule} from "../core/core.module";
 import {ServiceModule} from "../services/service.module";
 import {IdTokenService} from "./id-token.service";
+import {TokenIntrospectionService} from "./token-introspection.service";
 
 @Module({
     imports: [
@@ -23,8 +24,8 @@ import {IdTokenService} from "./id-token.service";
         TypeOrmModule.forFeature([AuthCode, User]),
     ],
     controllers: [],
-    providers: [JwtAuthGuard, AuthService, AuthCodeService, TokenIssuanceService, TenantResolutionGuard, SuperAdminGuard, IdTokenService],
-    exports: [JwtAuthGuard, AuthService, AuthCodeService, TokenIssuanceService, TenantResolutionGuard, SuperAdminGuard, IdTokenService],
+    providers: [JwtAuthGuard, AuthService, AuthCodeService, TokenIssuanceService, TenantResolutionGuard, SuperAdminGuard, IdTokenService, TokenIntrospectionService],
+    exports: [JwtAuthGuard, AuthService, AuthCodeService, TokenIssuanceService, TenantResolutionGuard, SuperAdminGuard, IdTokenService, TokenIntrospectionService],
 })
 export class AuthModule {
 }

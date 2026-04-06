@@ -31,6 +31,7 @@ import {TenantBitsController} from "./tenant-bits.controller";
 import {ClientController} from "./client.controller";
 import {Client} from "../entity/client.entity";
 import {AdminTenantController} from "./admin-tenant.controller";
+import {IntrospectionController} from "./introspection.controller";
 
 @Module(
     {
@@ -62,7 +63,8 @@ import {AdminTenantController} from "./admin-tenant.controller";
             AppController,
             TenantBitsController,
             ClientController,
-            AdminTenantController
+            AdminTenantController,
+            IntrospectionController
         ],
         providers: [],
         exports: []
