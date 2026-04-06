@@ -92,8 +92,8 @@ export class RefreshTokenService {
         const tokenHash = hashToken(plaintext);
         const familyId = crypto.randomUUID();
         const now = new Date();
-        const expiresAt = new Date(now.getTime() + this.getSlidingExpiryMs());
         const absoluteExpiresAt = new Date(now.getTime() + this.getAbsoluteExpiryMs());
+        const expiresAt = clampExpiry(this.getSlidingExpiryMs(), absoluteExpiresAt);
 
         const record = this.repo.create({
             tokenHash,
@@ -161,7 +161,7 @@ export class RefreshTokenService {
 
         if (updateResult.affected === 0) {
             // Token was already used — replay detection
-            return this.handleReplay(existing);
+            return this.handleReplay(existing, params.plaintextToken);
         }
 
         // Refresh the record to get the updated usedAt
@@ -197,32 +197,34 @@ export class RefreshTokenService {
 
     /**
      * Handle replay detection: check grace window, return existing child or revoke family.
+     *
+     * Grace window strategy: when a replay is detected within the window, we return the
+     * child record (which carries the correct scope/expiry metadata for the response) but
+     * pair it with the *caller's own plaintext* — the consumed parent token they just sent.
+     *
+     * Why: we only store hashes, so we cannot recover the child's plaintext. Re-keying the
+     * child (generating a new plaintext + updating its hash) would invalidate the token that
+     * the first successful caller already received, which defeats the purpose of the grace
+     * window. Returning the parent plaintext is safe because:
+     *   - The first caller holds the child plaintext and will use that going forward.
+     *   - The replaying caller (lost-response retry) gets back a token it already knows.
+     *     On the next refresh attempt it will hit replay detection again; if still within
+     *     the grace window it will succeed, otherwise the family is revoked as expected.
      */
-    private async handleReplay(existing: RefreshToken): Promise<{ plaintext: string; record: RefreshToken }> {
+    private async handleReplay(
+        existing: RefreshToken,
+        callerPlaintext: string,
+    ): Promise<{ plaintext: string; record: RefreshToken }> {
         const graceWindowSeconds = this.getGraceWindowSeconds();
 
         if (graceWindowSeconds > 0 && existing.usedAt) {
             const graceDeadline = new Date(existing.usedAt.getTime() + graceWindowSeconds * 1000);
             if (new Date() <= graceDeadline) {
-                // Within grace window — return the existing child token (idempotent)
                 const child = await this.repo.findOne({ where: { parentId: existing.id } });
                 if (child) {
-                    // We cannot return the plaintext of the child since we only store the hash.
-                    // The grace window returns the same child record; the client should already have the plaintext.
-                    // Per the design, we return the existing child — but we need a new plaintext for it.
-                    // Actually, the grace window means we return the same child token that was already issued.
-                    // Since we can't recover the plaintext, we generate a new token for the child and update its hash.
-                    // However, the design says "return the same child token" — meaning the same record.
-                    // The correct approach: generate a fresh plaintext that maps to the child, update the child's hash.
-                    // But that would break if the client already stored the previous plaintext.
-                    // The simplest correct approach: return the child record as-is. The client should use the
-                    // plaintext from the first response. But since this is a retry scenario (lost response),
-                    // we need to give them a working token. So we re-key the child.
-                    const newPlaintext = generateOpaqueToken();
-                    const newHash = hashToken(newPlaintext);
-                    await this.repo.update(child.id, { tokenHash: newHash });
-                    child.tokenHash = newHash;
-                    return { plaintext: newPlaintext, record: child };
+                    // Return the child record for its metadata, but the caller's own plaintext
+                    // so we don't invalidate the first caller's token.
+                    return { plaintext: callerPlaintext, record: child };
                 }
             }
         }

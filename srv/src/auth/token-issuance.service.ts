@@ -242,6 +242,7 @@ export class TokenIssuanceService {
     /**
      * Issues a token for client_credentials grant (machine-to-machine).
      * No refresh_token or id_token — there is no user identity.
+     * Per RFC 6749 §4.4.3, the response MUST NOT include a refresh_token.
      */
     async issueClientCredentialsToken(
         tenant: Tenant,
@@ -265,10 +266,8 @@ export class TokenIssuanceService {
         scopes: string[],
         idToken?: string,
     ): TokenResponse {
-        const expiresIn = parseInt(
-            this.configService.get("TOKEN_EXPIRATION_TIME_IN_SECONDS"),
-            10,
-        );
+        const raw = this.configService.get("TOKEN_EXPIRATION_TIME_IN_SECONDS", "3600");
+        const expiresIn = parseInt(raw, 10);
 
         if (!Number.isFinite(expiresIn) || !Number.isInteger(expiresIn) || expiresIn <= 0) {
             throw new InternalServerErrorException(
@@ -294,11 +293,16 @@ export class TokenIssuanceService {
         return response;
     }
 
+    /**
+     * Resolve the allowed scopes for a specific tenant's client.
+     * Uses the tenant's clientId to find the exact client rather than
+     * arbitrarily picking the first client in the tenant.
+     */
     private async getClientAllowedScopes(tenant: Tenant): Promise<string> {
         try {
-            const clients = await this.clientService.findByTenantId(tenant.id);
-            if (clients.length > 0 && clients[0].allowedScopes) {
-                return clients[0].allowedScopes;
+            const client = await this.clientService.findByClientId(tenant.clientId);
+            if (client?.allowedScopes) {
+                return client.allowedScopes;
             }
         } catch {
             // Fall through to default
