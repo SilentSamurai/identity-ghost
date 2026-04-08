@@ -32,7 +32,7 @@ import {
 import {AuthUserService} from "../casl/authUser.service";
 import * as yup from "yup";
 import {TechnicalTokenService} from "../core/technical-token.service";
-import {HS256_TOKEN_GENERATOR, RS256_TOKEN_GENERATOR, TokenService} from "../core/token-abstraction";
+import {HS256_TOKEN_GENERATOR, RS256_TOKEN_GENERATOR, SIGNING_KEY_PROVIDER, SigningKeyProvider, TokenService} from "../core/token-abstraction";
 
 const SecurityContextSchema = yup.object().shape({
     sub: yup.string().required("token is invalid"),
@@ -59,6 +59,8 @@ export class AuthService {
         private readonly tokenGenerator: TokenService,
         @Inject(HS256_TOKEN_GENERATOR)
         private readonly hs256TokenGenerator: TokenService,
+        @Inject(SIGNING_KEY_PROVIDER)
+        private readonly signingKeyProvider: SigningKeyProvider,
     ) {
         this.LOGGER = new Logger(AuthService.name);
     }
@@ -87,8 +89,10 @@ export class AuthService {
             let tenant = await this.authUserService.findTenantByDomain(
                 decoded.tenant.domain,
             );
+            const { header } = this.tokenGenerator.decodeComplete(token);
+            const publicKey = await this.signingKeyProvider.getPublicKeyByKid(header.kid);
             const verifiedToken = await this.tokenGenerator.verify(token, {
-                publicKey: tenant.publicKey,
+                publicKey,
             })
             const payload: Token = verifiedToken.isTechnical ? TechnicalToken.create(verifiedToken) : TenantToken.create(verifiedToken)
 
@@ -198,8 +202,10 @@ export class AuthService {
             grant_type: GRANT_TYPES.PASSWORD,
         });
 
+        const { privateKey, kid } = await this.signingKeyProvider.getSigningKeyWithKid(tenant.id);
         const accessToken = await this.tokenGenerator.sign(accessTokenPayload.asPlainObject(), {
-                privateKey: tenant.privateKey,
+                privateKey,
+                keyid: kid,
                 issuer: this.configService.get("SUPER_TENANT_DOMAIN"),
             },
         );
@@ -242,8 +248,10 @@ export class AuthService {
             grant_type: GRANT_TYPES.PASSWORD,
         });
 
+        const { privateKey: issuingPrivateKey, kid: issuingKid } = await this.signingKeyProvider.getSigningKeyWithKid(issuingTenant.id);
         const accessToken = await this.tokenGenerator.sign(accessTokenPayload.asPlainObject(), {
-                privateKey: issuingTenant.privateKey,
+                privateKey: issuingPrivateKey,
+                keyid: issuingKid,
                 issuer: this.configService.get("SUPER_TENANT_DOMAIN"),
             },
         );

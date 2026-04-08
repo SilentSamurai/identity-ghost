@@ -4,6 +4,7 @@ import {
     Controller,
     Delete,
     Get,
+    Inject,
     Patch,
     Post,
     Request,
@@ -22,6 +23,7 @@ import {SubjectEnum} from "../entity/subjectEnum";
 import {Action} from "../casl/actions.enum";
 import {subject} from "@casl/ability";
 import {CurrentTenantId} from "../auth/current-tenant.decorator";
+import {SIGNING_KEY_PROVIDER, SigningKeyProvider} from "../core/token-abstraction";
 import * as yup from "yup";
 
 @Controller("api/tenant")
@@ -37,6 +39,8 @@ export class TenantController {
         private readonly tenantService: TenantService,
         private readonly usersService: UsersService,
         private readonly securityService: SecurityService,
+        @Inject(SIGNING_KEY_PROVIDER)
+        private readonly signingKeyProvider: SigningKeyProvider,
     ) {
     }
 
@@ -96,11 +100,12 @@ export class TenantController {
             Action.ReadCredentials,
             subject(SubjectEnum.TENANT, tenant),
         );
+        const publicKey = await this.signingKeyProvider.getPublicKey(tenant.id);
         return {
             id: tenant.id,
             clientId: tenant.clientId,
             clientSecret: tenant.clientSecret,
-            publicKey: tenant.publicKey,
+            publicKey,
         };
     }
 

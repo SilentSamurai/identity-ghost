@@ -88,7 +88,7 @@ export class TokenIssuanceService {
 
         const idToken = await this.idTokenService.generateIdToken({
             user: {id: user.id, email: user.email, name: user.name},
-            tenant: {privateKey: tenant.privateKey},
+            tenantId: tenant.id,
             clientId: tenant.clientId,
             grantedScopes: scopes,
         });
@@ -189,7 +189,7 @@ export class TokenIssuanceService {
 
         const idToken = await this.idTokenService.generateIdToken({
             user: {id: user.id, email: user.email, name: user.name},
-            tenant: {privateKey: tenant.privateKey},
+            tenantId: tenant.id,
             clientId: tenant.clientId,
             grantedScopes: scopes,
         });
@@ -231,7 +231,7 @@ export class TokenIssuanceService {
 
         const idToken = await this.idTokenService.generateIdToken({
             user: {id: user.id, email: user.email, name: user.name},
-            tenant: {privateKey: tenant.privateKey},
+            tenantId: tenant.id,
             clientId: tenant.clientId,
             grantedScopes: scopes,
         });

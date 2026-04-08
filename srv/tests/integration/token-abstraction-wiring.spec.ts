@@ -4,7 +4,7 @@ import {RS256TokenGenerator} from '../../src/core/rs256-token-generator.service'
 import {RS256SigningKeyProvider} from '../../src/core/rs256-signing-key-provider.service';
 import {Environment} from '../../src/config/environment.service';
 import {getRepositoryToken} from '@nestjs/typeorm';
-import {Tenant} from '../../src/entity/tenant.entity';
+import {TenantKey} from '../../src/entity/tenant-key.entity';
 
 describe('Token Abstraction DI Wiring', () => {
     let module: TestingModule;
@@ -37,7 +37,7 @@ describe('Token Abstraction DI Wiring', () => {
                     useValue: mockConfig,
                 },
                 {
-                    provide: getRepositoryToken(Tenant),
+                    provide: getRepositoryToken(TenantKey),
                     useValue: mockRepo,
                 },
             ],

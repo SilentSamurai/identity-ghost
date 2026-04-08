@@ -1,15 +1,15 @@
 import {Injectable, NotFoundException} from "@nestjs/common";
 import {InjectRepository} from "@nestjs/typeorm";
-import {Repository} from "typeorm";
-import {Tenant} from "../entity/tenant.entity";
+import {IsNull, Repository} from "typeorm";
+import {TenantKey} from "../entity/tenant-key.entity";
 import {CryptUtil} from "../util/crypt.util";
 import {SigningKeyProvider} from "./token-abstraction";
 
 @Injectable()
 export class RS256SigningKeyProvider implements SigningKeyProvider {
     constructor(
-        @InjectRepository(Tenant)
-        private readonly tenantRepository: Repository<Tenant>
+        @InjectRepository(TenantKey)
+        private readonly tenantKeyRepository: Repository<TenantKey>
     ) {
     }
 
@@ -18,24 +18,46 @@ export class RS256SigningKeyProvider implements SigningKeyProvider {
     }
 
     async getPrivateKey(tenantId: string): Promise<string> {
-        const tenant = await this.tenantRepository.findOne({
-            where: {id: tenantId},
+        const tenantKey = await this.tenantKeyRepository.findOne({
+            where: {tenantId, isCurrent: true},
             select: ['id', 'privateKey']
         });
-        if (!tenant) {
-            throw new NotFoundException(`Tenant with ID ${tenantId} not found`);
+        if (!tenantKey) {
+            throw new NotFoundException(`No current key found for tenant ${tenantId}`);
         }
-        return tenant.privateKey;
+        return tenantKey.privateKey;
     }
 
     async getPublicKey(tenantId: string): Promise<string> {
-        const tenant = await this.tenantRepository.findOne({
-            where: {id: tenantId},
+        const tenantKey = await this.tenantKeyRepository.findOne({
+            where: {tenantId, isCurrent: true},
             select: ['id', 'publicKey']
         });
-        if (!tenant) {
-            throw new NotFoundException(`Tenant with ID ${tenantId} not found`);
+        if (!tenantKey) {
+            throw new NotFoundException(`No current key found for tenant ${tenantId}`);
         }
-        return tenant.publicKey;
+        return tenantKey.publicKey;
+    }
+
+    async getSigningKeyWithKid(tenantId: string): Promise<{ privateKey: string; kid: string }> {
+        const tenantKey = await this.tenantKeyRepository.findOne({
+            where: {tenantId, isCurrent: true},
+            select: ['id', 'privateKey', 'kid']
+        });
+        if (!tenantKey) {
+            throw new NotFoundException(`No current key found for tenant ${tenantId}`);
+        }
+        return {privateKey: tenantKey.privateKey, kid: tenantKey.kid};
+    }
+
+    async getPublicKeyByKid(kid: string): Promise<string> {
+        const tenantKey = await this.tenantKeyRepository.findOne({
+            where: {kid, deactivatedAt: IsNull()},
+            select: ['id', 'publicKey']
+        });
+        if (!tenantKey) {
+            throw new NotFoundException(`No active key found for kid ${kid}`);
+        }
+        return tenantKey.publicKey;
     }
 }

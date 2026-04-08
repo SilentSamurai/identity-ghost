@@ -29,4 +29,9 @@ export class HS256TokenGenerator implements TokenService {
     decode(token: string): any {
         return this.jwtService.decode(token, {json: true});
     }
+
+    decodeComplete(token: string): { header: any; payload: any } {
+        const decoded = this.jwtService.decode(token, { complete: true }) as { header: any; payload: any } | null;
+        return decoded ?? { header: {}, payload: {} };
+    }
 }

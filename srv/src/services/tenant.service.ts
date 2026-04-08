@@ -22,6 +22,7 @@ import {SecurityService} from "../casl/security.service";
 import {Action} from "../casl/actions.enum";
 import {SubjectEnum} from "../entity/subjectEnum";
 import {SIGNING_KEY_PROVIDER, SigningKeyProvider} from "../core/token-abstraction";
+import {KeyManagementService} from "./key-management.service";
 
 @Injectable()
 export class TenantService implements OnModuleInit {
@@ -32,6 +33,7 @@ export class TenantService implements OnModuleInit {
         private readonly securityService: SecurityService,
         @Inject(SIGNING_KEY_PROVIDER)
         private readonly signingKeyProvider: SigningKeyProvider,
+        private readonly keyManagementService: KeyManagementService,
         @InjectRepository(Tenant) private tenantRepository: Repository<Tenant>,
         @InjectRepository(TenantMember)
         private tenantMemberRepository: Repository<TenantMember>,
@@ -61,15 +63,12 @@ export class TenantService implements OnModuleInit {
             throw new BadRequestException("Domain already Taken");
         }
 
-        const {privateKey, publicKey} = this.signingKeyProvider.generateKeyPair();
         const {clientId, clientSecret, salt} =
             CryptUtil.generateClientIdAndSecret();
 
         let tenant: Tenant = this.tenantRepository.create({
             name: name,
             domain: domain,
-            privateKey: privateKey,
-            publicKey: publicKey,
             clientId: clientId,
             clientSecret: clientSecret,
             secretSalt: salt,
@@ -78,6 +77,9 @@ export class TenantService implements OnModuleInit {
         });
 
         tenant = await this.tenantRepository.save(tenant);
+
+        const {privateKey, publicKey} = this.signingKeyProvider.generateKeyPair();
+        await this.keyManagementService.createInitialKey(tenant.id, publicKey, privateKey);
 
         await this.addMember(authContext, tenant.id, owner);
 
@@ -123,12 +125,9 @@ export class TenantService implements OnModuleInit {
             throw new NotFoundException("tenant id not found");
         }
 
-        const {privateKey, publicKey} = this.signingKeyProvider.generateKeyPair();
+        await this.keyManagementService.rotateKey(tenant.id);
 
-        tenant.publicKey = publicKey;
-        tenant.privateKey = privateKey;
-
-        return this.tenantRepository.save(tenant);
+        return tenant;
     }
 
     async existByDomain(
@@ -189,6 +188,12 @@ export class TenantService implements OnModuleInit {
             throw new NotFoundException("tenant not found");
         }
         return tenant;
+    }
+
+    async findByDomainPublic(domain: string): Promise<Tenant | null> {
+        return this.tenantRepository.findOne({
+            where: {domain},
+        });
     }
 
     async findByClientId(

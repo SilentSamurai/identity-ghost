@@ -12,6 +12,10 @@ server {
         proxy_pass ${AUTH_SERVER};
     }
 
+    location ~* ^/[^/]+/\.well-known/ {
+        proxy_pass ${AUTH_SERVER};
+    }
+
     location / {
         try_files $uri$args $uri$args/ /index.html;
     }

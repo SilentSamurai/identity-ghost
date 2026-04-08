@@ -19,17 +19,19 @@ import {ClientService} from "./client.service";
 import {CoreModule} from "../core/core.module";
 import {Role} from "../entity/role.entity";
 import {UserRole} from "../entity/user.roles.entity";
+import {TenantKey} from "../entity/tenant-key.entity";
+import {JwksService} from "./jwks.service";
 
 @Module(
     {
         imports: [
-            TypeOrmModule.forFeature([Tenant, User, TenantMember, Role, UserRole, AuthCode, Group, GroupRole, GroupUser, App, Subscription, TenantBits, Client]),
+            TypeOrmModule.forFeature([Tenant, User, TenantMember, Role, UserRole, AuthCode, Group, GroupRole, GroupUser, App, Subscription, TenantBits, Client, TenantKey]),
             CaslModule,
             CoreModule,
         ],
         controllers: [],
-        providers: [GroupService, AppService, TenantBitsService, ClientService],
-        exports: [GroupService, AppService, TenantBitsService, ClientService, CoreModule],
+        providers: [GroupService, AppService, TenantBitsService, ClientService, JwksService],
+        exports: [GroupService, AppService, TenantBitsService, ClientService, CoreModule, JwksService],
     })
 export class ServiceModule {
 }

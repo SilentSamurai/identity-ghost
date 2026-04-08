@@ -1,6 +1,6 @@
 import {RS256SigningKeyProvider} from '../../src/core/rs256-signing-key-provider.service';
 import {Repository} from 'typeorm';
-import {Tenant} from '../../src/entity/tenant.entity';
+import {TenantKey} from '../../src/entity/tenant-key.entity';
 import {JwtService} from '@nestjs/jwt';
 import * as fc from 'fast-check';
 
@@ -8,7 +8,7 @@ describe('RS256SigningKeyProvider key generation', () => {
     let provider: RS256SigningKeyProvider;
 
     beforeAll(() => {
-        provider = new RS256SigningKeyProvider({} as Repository<Tenant>);
+        provider = new RS256SigningKeyProvider({} as Repository<TenantKey>);
     });
 
     it('should produce valid RSA 2048-bit PEM keys', async () => {

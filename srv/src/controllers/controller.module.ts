@@ -33,6 +33,7 @@ import {Client} from "../entity/client.entity";
 import {AdminTenantController} from "./admin-tenant.controller";
 import {IntrospectionController} from "./introspection.controller";
 import {RevocationController} from "./revocation.controller";
+import {JwksController} from "./jwks.controller";
 
 @Module(
     {
@@ -66,7 +67,8 @@ import {RevocationController} from "./revocation.controller";
             ClientController,
             AdminTenantController,
             IntrospectionController,
-            RevocationController
+            RevocationController,
+            JwksController
         ],
         providers: [],
         exports: []

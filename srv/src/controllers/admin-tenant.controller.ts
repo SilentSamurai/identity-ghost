@@ -5,6 +5,7 @@ import {
     Delete,
     ForbiddenException,
     Get,
+    Inject,
     Param,
     ParseUUIDPipe,
     Patch,
@@ -31,6 +32,7 @@ import {User} from "../entity/user.entity";
 import {Role} from "../entity/role.entity";
 import {InjectRepository} from "@nestjs/typeorm";
 import {Repository} from "typeorm";
+import {SIGNING_KEY_PROVIDER, SigningKeyProvider} from "../core/token-abstraction";
 import * as yup from "yup";
 
 /**
@@ -61,6 +63,8 @@ export class AdminTenantController {
         private readonly appService: AppService,
         private readonly subscriptionService: SubscriptionService,
         @InjectRepository(User) private usersRepository: Repository<User>,
+        @Inject(SIGNING_KEY_PROVIDER)
+        private readonly signingKeyProvider: SigningKeyProvider,
     ) {
     }
 
@@ -97,17 +101,26 @@ export class AdminTenantController {
         return this.tenantService.deleteTenant(request, tenantId);
     }
 
+    @Put("/:tenantId/keys")
+    async rotateTenantKeys(
+        @Request() request,
+        @Param("tenantId", ParseUUIDPipe) tenantId: string,
+    ): Promise<Tenant> {
+        return this.tenantService.updateKeys(request, tenantId);
+    }
+
     @Get("/:tenantId/credentials")
     async getTenantCredentials(
         @Request() request,
         @Param("tenantId", ParseUUIDPipe) tenantId: string,
     ): Promise<any> {
         let tenant = await this.tenantService.findById(request, tenantId);
+        const publicKey = await this.signingKeyProvider.getPublicKey(tenant.id);
         return {
             id: tenant.id,
             clientId: tenant.clientId,
             clientSecret: tenant.clientSecret,
-            publicKey: tenant.publicKey,
+            publicKey,
         };
     }
 

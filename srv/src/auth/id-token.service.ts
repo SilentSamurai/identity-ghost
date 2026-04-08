@@ -1,12 +1,11 @@
 import {Inject, Injectable} from "@nestjs/common";
-import {RS256_TOKEN_GENERATOR, TokenService} from "../core/token-abstraction";
+import {RS256_TOKEN_GENERATOR, SIGNING_KEY_PROVIDER, SigningKeyProvider, TokenService} from "../core/token-abstraction";
 import {Environment} from "../config/environment.service";
 import {User} from "../entity/user.entity";
-import {Tenant} from "../entity/tenant.entity";
 
 export interface GenerateIdTokenParams {
     user: Pick<User, "id" | "email" | "name">;
-    tenant: Pick<Tenant, "privateKey">;
+    tenantId: string;
     clientId: string;
     grantedScopes: string[];
 }
@@ -16,11 +15,13 @@ export class IdTokenService {
     constructor(
         @Inject(RS256_TOKEN_GENERATOR)
         private readonly tokenGenerator: TokenService,
+        @Inject(SIGNING_KEY_PROVIDER)
+        private readonly signingKeyProvider: SigningKeyProvider,
         private readonly configService: Environment,
     ) {}
 
     async generateIdToken(params: GenerateIdTokenParams): Promise<string | undefined> {
-        const {user, tenant, clientId, grantedScopes} = params;
+        const {user, tenantId, clientId, grantedScopes} = params;
 
         // Return undefined if openid scope is not granted
         if (!grantedScopes.includes("openid")) {
@@ -43,10 +44,10 @@ export class IdTokenService {
             claims.name = user.name;
         }
 
-        // Let the RS256TokenGenerator handle exp/iat/iss via its default signOptions,
-        // consistent with how access tokens are signed elsewhere in the codebase.
+        const { privateKey, kid } = await this.signingKeyProvider.getSigningKeyWithKid(tenantId);
         const idToken = await this.tokenGenerator.sign(claims, {
-            privateKey: tenant.privateKey,
+            privateKey,
+            keyid: kid,
             issuer: this.configService.get("SUPER_TENANT_DOMAIN"),
         });
 

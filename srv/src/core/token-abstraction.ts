@@ -7,6 +7,8 @@ export interface TokenService {
     verify(token: string, options: JwtVerifyOptions): Promise<any>;
 
     decode(token: string): any;
+
+    decodeComplete(token: string): { header: any; payload: any };
 }
 
 export const RS256_TOKEN_GENERATOR = Symbol("RS256_TOKEN_GENERATOR");
@@ -20,6 +22,10 @@ export interface SigningKeyProvider {
     getPrivateKey(tenantId: string): Promise<string>;
 
     getPublicKey(tenantId: string): Promise<string>;
+
+    getSigningKeyWithKid(tenantId: string): Promise<{ privateKey: string; kid: string }>;
+
+    getPublicKeyByKid(kid: string): Promise<string>;
 }
 
 export const SIGNING_KEY_PROVIDER = Symbol("SIGNING_KEY_PROVIDER");

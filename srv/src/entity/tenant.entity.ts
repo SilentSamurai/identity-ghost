@@ -29,13 +29,7 @@ export class Tenant {
     @Exclude()
     secretSalt: string;
 
-    @Column({nullable: false, name: "private_key"})
-    @Exclude()
-    privateKey: string;
-
-    @Column({nullable: false, name: "public_key"})
-    @Exclude()
-    publicKey: string;
+    // privateKey and publicKey columns REMOVED — keys live in tenant_keys table
 
     @Column({nullable: false, name: "allow_sign_up", default: false})
     allowSignUp: boolean;

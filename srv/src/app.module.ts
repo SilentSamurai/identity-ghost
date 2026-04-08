@@ -1,6 +1,7 @@
 import {MiddlewareConsumer, Module, NestModule} from "@nestjs/common";
 import {ConfigModule} from "./config/config.module";
 import {ScheduleModule} from "@nestjs/schedule";
+import {EventEmitterModule} from "@nestjs/event-emitter";
 import {TypeOrmModule} from "@nestjs/typeorm";
 import {CaslModule} from "./casl/casl.module";
 import {AuthModule} from "./auth/auth.module";
@@ -23,6 +24,7 @@ import {entities} from "./entity/entities";
         //         }
         //     }),
         ScheduleModule.forRoot(), // Initializes the scheduler and registers any declarative cron jobs, timeouts and intervals that exist within the app.
+        EventEmitterModule.forRoot(),
         TypeOrmModule.forRootAsync(
             // Get the configuration settings from the config service asynchronously.
             {
