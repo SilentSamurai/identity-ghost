@@ -23,24 +23,36 @@ describe('Property 6: Tokens contain only OAuth scopes', () => {
     const rolesArb = fc.subarray(VALID_ROLES, {minLength: 0});
 
     function makeTenantToken(scopes: string[], roles: string[]): TenantToken {
-        return TenantToken.create({
+        const tenant = {id: 'tid-1', name: 'Test Tenant', domain: 'test.local'};
+        const token = TenantToken.create({
             sub: 'user@test.com',
-            email: 'user@test.com',
-            name: 'Test User',
-            userId: 'uid-1',
-            tenant: {id: 'tid-1', name: 'Test Tenant', domain: 'test.local'},
-            userTenant: {id: 'tid-1', name: 'Test Tenant', domain: 'test.local'},
-            scopes,
+            tenant,
             roles,
             grant_type: GRANT_TYPES.PASSWORD,
+            aud: ['test.local'],
+            jti: 'test-jti',
+            nbf: 0,
+            scope: scopes.join(' '),
+            client_id: 'test-client',
+            tenant_id: tenant.id,
         });
+        token.email = 'user@test.com';
+        token.name = 'Test User';
+        token.userId = 'uid-1';
+        return token;
     }
 
     function makeTechnicalToken(scopes: string[]): TechnicalToken {
+        const tenant = {id: 'tid-1', name: 'Test Tenant', domain: 'test.local'};
         return TechnicalToken.create({
             sub: 'client:test.local',
-            tenant: {id: 'tid-1', name: 'Test Tenant', domain: 'test.local'},
-            scopes,
+            tenant,
+            scope: scopes.join(' '),
+            aud: ['test.local'],
+            jti: 'test-jti',
+            nbf: 0,
+            client_id: 'test-client',
+            tenant_id: tenant.id,
         });
     }
 

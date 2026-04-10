@@ -105,7 +105,7 @@ export class JwtAuthGuard implements CanActivate {
         if (payload.isTenantToken()) {
             const tenantToken = payload as TenantToken;
             request["RESOLVED_TENANT_ID"] = tenantToken.tenant.id;
-            request["RESOLVED_USER_TENANT_ID"] = tenantToken.userTenant.id;
+            request["RESOLVED_USER_TENANT_ID"] = tenantToken.userTenant?.id;
         } else if (payload.isTechnicalToken()) {
             const technicalToken = payload as TechnicalToken;
             request["RESOLVED_TENANT_ID"] = technicalToken.tenant.id;

@@ -14,12 +14,14 @@ import {RS256_TOKEN_GENERATOR, TokenService} from '../core/token-abstraction';
  */
 export interface IntrospectionResponse {
     active: boolean;
-    /** Subject identifier — user email (TenantToken) or "oauth" (TechnicalToken). */
+    /** Subject identifier — user UUID (TenantToken) or "oauth" (TechnicalToken). */
     sub?: string;
     /** Space-delimited OIDC scopes (never contains role enum values). */
     scope?: string;
-    /** The client_id of the authenticated requesting client. */
+    /** The client_id from the token's client_id claim. */
     client_id?: string;
+    /** Audience — JSON array from the token's aud claim. */
+    aud?: string[];
     /** Always "Bearer". */
     token_type?: string;
     /** Expiration time as an integer Unix timestamp (seconds since epoch). */
@@ -130,6 +132,9 @@ export class TokenIntrospectionService {
     /**
      * Map a validated token to the RFC 7662 active response format.
      *
+     * - `sub` is the token's `sub` claim (UUID for TenantTokens, "oauth" for TechnicalTokens).
+     * - `aud` is the token's `aud` claim as a JSON array.
+     * - `client_id` is the token's `client_id` claim (not the requesting client's ID).
      * - `scope` is derived via {@link ScopeNormalizer.format} which produces a
      *   space-delimited string of OIDC values only (openid, profile, email).
      *   Internal role enums (SUPER_ADMIN, TENANT_ADMIN, TENANT_VIEWER) are
@@ -143,7 +148,8 @@ export class TokenIntrospectionService {
             active: true,
             sub: token.sub,
             scope: ScopeNormalizer.format(token.scopes),
-            client_id: clientId,
+            client_id: token.client_id,
+            aud: token.aud,
             token_type: 'Bearer',
             exp: decoded.exp,
             iat: decoded.iat,

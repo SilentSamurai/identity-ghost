@@ -9,6 +9,7 @@
  * 
  * It implements OAuth 2.0 token validation per RFC 6749 and JWT token handling.
  */
+import {randomUUID} from "crypto";
 import {Inject, Injectable, Logger, NotFoundException, UnauthorizedException} from "@nestjs/common";
 import {OAuthException} from "../exceptions/oauth-exception";
 import {Environment} from "../config/environment.service";
@@ -18,7 +19,6 @@ import * as argon2 from "argon2";
 import {Tenant} from "../entity/tenant.entity";
 import {CryptUtil} from "../util/crypt.util";
 import {ValidationPipe} from "../validation/validation.pipe";
-import {ValidationSchema} from "../validation/validation.schema";
 import {SecurityService} from "../casl/security.service";
 import {
     ChangeEmailToken,
@@ -36,13 +36,17 @@ import {HS256_TOKEN_GENERATOR, RS256_TOKEN_GENERATOR, SIGNING_KEY_PROVIDER, Sign
 
 const SecurityContextSchema = yup.object().shape({
     sub: yup.string().required("token is invalid"),
+    aud: yup.array().of(yup.string()).required("token is invalid").min(1, "token is invalid"),
+    jti: yup.string().required("token is invalid"),
+    scope: yup.string().defined(),
+    client_id: yup.string().required("token is invalid"),
+    tenant_id: yup.string().required("token is invalid").uuid("tenant_id must be a valid UUID"),
+    grant_type: yup.string().required("token is invalid"),
     tenant: yup.object().shape({
         id: yup.string().required("token is invalid").uuid("tenant id must be a valid UUID"),
         name: yup.string().required("token is invalid"),
         domain: yup.string().required("token is invalid"),
     }),
-    scopes: yup.array().of(yup.string().max(128)),
-    grant_type: yup.string().required("token is invalid"),
 });
 
 @Injectable()
@@ -82,17 +86,34 @@ export class AuthService {
 
     async validateAccessToken(token: string): Promise<Token> {
         try {
+            const rawDecoded = this.tokenGenerator.decode(token);
+
+            // Reject tokens missing any required claim before further processing
+            const requiredClaims = ['iss', 'sub', 'aud', 'exp', 'iat', 'nbf', 'jti'];
+            for (const claim of requiredClaims) {
+                if (rawDecoded[claim] === undefined || rawDecoded[claim] === null) {
+                    throw new Error(`Missing required claim: ${claim}`);
+                }
+            }
+
+            // Enforce aud is an array (reject bare strings)
+            if (!Array.isArray(rawDecoded.aud)) {
+                throw new Error('aud must be a JSON array');
+            }
+
             let decoded = await new ValidationPipe(SecurityContextSchema).transform(
-                this.tokenGenerator.decode(token),
+                rawDecoded,
                 null,
             );
-            let tenant = await this.authUserService.findTenantByDomain(
-                decoded.tenant.domain,
-            );
+
             const { header } = this.tokenGenerator.decodeComplete(token);
             const publicKey = await this.signingKeyProvider.getPublicKeyByKid(header.kid);
+
+            // Apply clock skew tolerance for time-based claim validation
+            const clockSkew = parseInt(this.configService.get("JWT_CLOCK_SKEW_SECONDS", "30"), 10);
             const verifiedToken = await this.tokenGenerator.verify(token, {
                 publicKey,
+                clockTolerance: clockSkew,
             })
             const payload: Token = verifiedToken.isTechnical ? TechnicalToken.create(verifiedToken) : TenantToken.create(verifiedToken)
 
@@ -102,12 +123,16 @@ export class AuthService {
                     throw "Invalid Token";
                 }
             } else {
-                let user = await this.authUserService.findUserByEmail(
-                    (payload as TenantToken).email,
-                );
+                // Look up user by sub (UUID) instead of by email
+                const user = await this.authUserService.findUserById(payload.sub);
                 if (user.locked) {
                     throw new UnauthorizedException('Invalid credentials');
                 }
+                // Populate email, name, and userId on TenantToken from DB lookup
+                const tenantToken = payload as TenantToken;
+                tenantToken.email = user.email;
+                tenantToken.name = user.name;
+                tenantToken.userId = user.id;
             }
             return payload;
         } catch (e) {
@@ -177,29 +202,29 @@ export class AuthService {
         tenant: Tenant,
         scopes: string[] = [],
         roles: string[] = [],
+        grant_type: GRANT_TYPES = GRANT_TYPES.PASSWORD,
     ): Promise<{ accessToken: string; scopes: string[] }> {
         if (!user.verified) {
             throw new UnauthorizedException('Email not verified');
         }
 
+        const uniqueScopes = [...new Set(scopes)].sort();
+
         const accessTokenPayload = TenantToken.create({
-            sub: user.email,
-            email: user.email,
-            name: user.name,
-            userId: user.id,
+            sub: user.id,
             tenant: {
                 id: tenant.id,
                 name: tenant.name,
                 domain: tenant.domain,
             },
-            userTenant: {
-                id: tenant.id,
-                name: tenant.name,
-                domain: tenant.domain,
-            },
-            scopes: [...new Set(scopes)].sort(),
             roles: [...new Set(roles)].sort(),
-            grant_type: GRANT_TYPES.PASSWORD,
+            grant_type,
+            aud: [this.configService.get("SUPER_TENANT_DOMAIN")],
+            jti: randomUUID(),
+            nbf: Math.floor(Date.now() / 1000),
+            scope: uniqueScopes.join(' '),
+            client_id: tenant.clientId,
+            tenant_id: tenant.id,
         });
 
         const { privateKey, kid } = await this.signingKeyProvider.getSigningKeyWithKid(tenant.id);
@@ -223,30 +248,35 @@ export class AuthService {
         userTenant: Tenant,
         scopes: string[] = [],
         roles: string[] = [],
+        grant_type: GRANT_TYPES = GRANT_TYPES.PASSWORD,
     ): Promise<{ accessToken: string; scopes: string[] }> {
         if (!user.verified) {
             throw new UnauthorizedException('Email not verified');
         }
 
+        const uniqueScopes = [...new Set(scopes)].sort();
+
         const accessTokenPayload = TenantToken.create({
-            sub: user.email,
-            email: user.email,
-            name: user.name,
-            userId: user.id,
+            sub: user.id,
             tenant: {
                 id: issuingTenant.id,
                 name: issuingTenant.name,
                 domain: issuingTenant.domain,
             },
-            userTenant: {
-                id: userTenant.id,
-                name: userTenant.name,
-                domain: userTenant.domain,
-            },
-            scopes: [...new Set(scopes)].sort(),
             roles: [...new Set(roles)].sort(),
-            grant_type: GRANT_TYPES.PASSWORD,
+            grant_type,
+            aud: [this.configService.get("SUPER_TENANT_DOMAIN")],
+            jti: randomUUID(),
+            nbf: Math.floor(Date.now() / 1000),
+            scope: uniqueScopes.join(' '),
+            client_id: issuingTenant.clientId,
+            tenant_id: issuingTenant.id,
         });
+        accessTokenPayload.userTenant = {
+            id: userTenant.id,
+            name: userTenant.name,
+            domain: userTenant.domain,
+        };
 
         const { privateKey: issuingPrivateKey, kid: issuingKid } = await this.signingKeyProvider.getSigningKeyWithKid(issuingTenant.id);
         const accessToken = await this.tokenGenerator.sign(accessTokenPayload.asPlainObject(), {

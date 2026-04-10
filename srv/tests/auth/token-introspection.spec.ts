@@ -88,10 +88,11 @@ describe('Token Introspection Endpoint (RFC 7662)', () => {
             .set('Accept', 'application/json');
     }
 
-    // ── Active response: user token (Req 3.1, 3.2, 3.4) ───────────
+    // ── Active response: user token (Req 3.1, 3.2, 3.4, 10.1, 10.2, 10.3) ───
 
     describe('valid user token introspection', () => {
         let response: any;
+        let decodedToken: any;
 
         beforeAll(async () => {
             response = await introspect({
@@ -99,6 +100,7 @@ describe('Token Introspection Endpoint (RFC 7662)', () => {
                 client_id: clientId,
                 client_secret: clientSecret,
             });
+            decodedToken = app.jwtService().decode(userAccessToken, { json: true }) as any;
         });
 
         it('returns 200 with active: true', () => {
@@ -106,9 +108,15 @@ describe('Token Introspection Endpoint (RFC 7662)', () => {
             expect(response.body.active).toBe(true);
         });
 
-        it('includes sub as a string', () => {
+        it('includes sub as a UUID (not email) matching the token sub claim (Req 10.1)', () => {
             expect(typeof response.body.sub).toBe('string');
             expect(response.body.sub.length).toBeGreaterThan(0);
+            // sub must be a UUID, not an email address
+            const uuidV4Regex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+            expect(response.body.sub).toMatch(uuidV4Regex);
+            expect(response.body.sub).not.toContain('@');
+            // Must match the token's sub claim
+            expect(response.body.sub).toEqual(decodedToken.sub);
         });
 
         it('includes scope as a string', () => {
@@ -116,9 +124,18 @@ describe('Token Introspection Endpoint (RFC 7662)', () => {
             expect(response.body.scope.length).toBeGreaterThan(0);
         });
 
-        it('includes client_id as a string', () => {
+        it('includes client_id from the token client_id claim (Req 10.2)', () => {
             expect(typeof response.body.client_id).toBe('string');
-            expect(response.body.client_id).toEqual(clientId);
+            // client_id in introspection response comes from the token's client_id claim,
+            // not the requesting client's ID
+            expect(response.body.client_id).toEqual(decodedToken.client_id);
+        });
+
+        it('includes aud as a JSON array matching the token aud claim (Req 10.3)', () => {
+            expect(Array.isArray(response.body.aud)).toBe(true);
+            expect(response.body.aud.length).toBeGreaterThan(0);
+            // Must match the token's aud claim
+            expect(response.body.aud).toEqual(decodedToken.aud);
         });
 
         it('includes token_type as "Bearer"', () => {
@@ -138,10 +155,11 @@ describe('Token Introspection Endpoint (RFC 7662)', () => {
         });
     });
 
-    // ── Active response: technical token (Req 3.5) ─────────────────
+    // ── Active response: technical token (Req 3.5, 10.1, 10.2, 10.3) ─
 
     describe('valid technical token introspection', () => {
         let response: any;
+        let decodedToken: any;
 
         beforeAll(async () => {
             response = await introspect({
@@ -149,6 +167,7 @@ describe('Token Introspection Endpoint (RFC 7662)', () => {
                 client_id: clientId,
                 client_secret: clientSecret,
             });
+            decodedToken = app.jwtService().decode(technicalAccessToken, { json: true }) as any;
         });
 
         it('returns 200 with active: true and all required fields', () => {
@@ -160,6 +179,21 @@ describe('Token Introspection Endpoint (RFC 7662)', () => {
             expect(response.body.token_type).toEqual('Bearer');
             expect(Number.isInteger(response.body.exp)).toBe(true);
             expect(Number.isInteger(response.body.iat)).toBe(true);
+        });
+
+        it('returns sub as "oauth" for technical tokens (Req 10.1)', () => {
+            expect(response.body.sub).toEqual('oauth');
+        });
+
+        it('returns aud as a JSON array matching the token aud claim (Req 10.3)', () => {
+            expect(Array.isArray(response.body.aud)).toBe(true);
+            expect(response.body.aud.length).toBeGreaterThan(0);
+            expect(response.body.aud).toEqual(decodedToken.aud);
+        });
+
+        it('returns client_id from the token client_id claim (Req 10.2)', () => {
+            expect(typeof response.body.client_id).toBe('string');
+            expect(response.body.client_id).toEqual(decodedToken.client_id);
         });
     });
 

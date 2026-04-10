@@ -62,32 +62,44 @@ describe('Feature: casl-internal-external-separation — Property Tests', () => 
         email?: string;
         userId?: string;
     }): TenantToken {
-        return TenantToken.create({
-            sub: overrides.email ?? 'user@test.com',
-            email: overrides.email ?? 'user@test.com',
-            name: 'Test User',
-            userId: overrides.userId ?? 'uid-1',
-            tenant: {
-                id: overrides.tenantId ?? 'tid-1',
-                name: 'Test Tenant',
-                domain: overrides.domain ?? 'test.com',
-            },
-            userTenant: {
-                id: overrides.tenantId ?? 'tid-1',
-                name: 'Test Tenant',
-                domain: overrides.domain ?? 'test.com',
-            },
-            scopes: ['openid', 'profile', 'email'],
+        const tenantId = overrides.tenantId ?? 'tid-1';
+        const domain = overrides.domain ?? 'test.com';
+        const email = overrides.email ?? 'user@test.com';
+        const userId = overrides.userId ?? 'uid-1';
+        const tenant = {
+            id: tenantId,
+            name: 'Test Tenant',
+            domain,
+        };
+        const token = TenantToken.create({
+            sub: email,
+            tenant,
             roles: overrides.roles,
             grant_type: GRANT_TYPES.PASSWORD,
+            aud: [domain],
+            jti: 'test-jti',
+            nbf: 0,
+            scope: 'openid profile email',
+            client_id: 'test-client',
+            tenant_id: tenantId,
         });
+        token.email = email;
+        token.name = 'Test User';
+        token.userId = userId;
+        token.userTenant = tenant;
+        return token;
     }
 
     function makeTechnicalToken(tenantId: string, domain: string = 'test.com'): TechnicalToken {
         return TechnicalToken.create({
             sub: 'client-app',
             tenant: {id: tenantId, name: 'Test Tenant', domain},
-            scopes: ['openid', 'profile', 'email'],
+            scope: 'openid profile email',
+            aud: [domain],
+            jti: 'test-jti',
+            nbf: 0,
+            client_id: 'test-client',
+            tenant_id: tenantId,
         });
     }
 

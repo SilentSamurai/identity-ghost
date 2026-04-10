@@ -10,6 +10,13 @@ const TOKEN_KEY = 'auth-token';
 const AUTH_CODE_KEY = 'auth-code';
 const PERMISSIONS_KEY = 'auth-permissions';
 const REFRESH_TOKEN_KEY = 'auth-refresh-token';
+const USER_PROFILE_KEY = 'auth-user-profile';
+
+export interface UserProfile {
+    email: string;
+    name: string;
+    id: string;
+}
 
 @Injectable({
     providedIn: 'root',
@@ -28,6 +35,7 @@ export class SessionService {
         window.sessionStorage.removeItem(AUTH_CODE_KEY);
         window.sessionStorage.removeItem(PERMISSIONS_KEY);
         window.sessionStorage.removeItem(REFRESH_TOKEN_KEY);
+        window.sessionStorage.removeItem(USER_PROFILE_KEY);
     }
 
     public getAuthCode(): string | null {
@@ -73,6 +81,12 @@ export class SessionService {
             if (tokenExpired(decodedToken)) {
                 this.clearSession();
                 return null;
+            }
+            // Merge stored user profile (email, name) into decoded token
+            const profile = this.getUserProfile();
+            if (profile) {
+                decodedToken.email = profile.email;
+                decodedToken.name = profile.name;
             }
             return decodedToken;
         } catch (error) {
@@ -124,6 +138,24 @@ export class SessionService {
         } catch (error) {
             console.error('Error parsing permissions:', error);
             window.sessionStorage.removeItem(PERMISSIONS_KEY);
+            return null;
+        }
+    }
+
+    public saveUserProfile(profile: UserProfile): void {
+        window.sessionStorage.setItem(USER_PROFILE_KEY, JSON.stringify(profile));
+    }
+
+    public getUserProfile(): UserProfile | null {
+        const raw = window.sessionStorage.getItem(USER_PROFILE_KEY);
+        if (!raw) {
+            return null;
+        }
+        try {
+            return JSON.parse(raw);
+        } catch (error) {
+            console.error('Error parsing user profile:', error);
+            window.sessionStorage.removeItem(USER_PROFILE_KEY);
             return null;
         }
     }

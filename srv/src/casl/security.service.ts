@@ -158,26 +158,29 @@ export class SecurityService implements OnModuleInit {
 
     async getUserAuthContext(email: string): Promise<AuthContext> {
         const user = await this.authUserService.findUserByEmail(email);
+        const token = TenantToken.create({
+            sub: user.id,
+            roles: [],
+            grant_type: GRANT_TYPES.REFRESH_TOKEN,
+            tenant: {
+                id: "",
+                name: "",
+                domain: this.configService.get("SUPER_TENANT_DOMAIN"),
+            },
+            aud: [this.configService.get("SUPER_TENANT_DOMAIN")],
+            jti: '',
+            nbf: Math.floor(Date.now() / 1000),
+            scope: '',
+            client_id: '',
+            tenant_id: '',
+        });
+        // Populate profile fields from DB (not from JWT)
+        token.email = user.email;
+        token.name = user.name;
+        token.userId = user.id;
+
         const authContext: AuthContext = {
-            SECURITY_CONTEXT: TenantToken.create({
-                email: user.email,
-                sub: user.email,
-                userId: user.id,
-                name: user.name,
-                scopes: [],
-                roles: [],
-                grant_type: GRANT_TYPES.REFRESH_TOKEN,
-                tenant: {
-                    id: "",
-                    name: "",
-                    domain: this.configService.get("SUPER_TENANT_DOMAIN"),
-                },
-                userTenant: {
-                    id: "",
-                    name: "",
-                    domain: this.configService.get("SUPER_TENANT_DOMAIN"),
-                }
-            }),
+            SECURITY_CONTEXT: token,
             SCOPE_ABILITIES: null,
         };
         authContext.SCOPE_ABILITIES = this.caslAbilityFactory.createContextForUserAuth(user);
@@ -192,26 +195,34 @@ export class SecurityService implements OnModuleInit {
         const tenant = await this.authUserService.findTenantByDomain(domain);
         const roles = await this.authUserService.findMemberRoles(tenant, user);
         const roleNames = roles.map((item) => item.name);
+        const token = TenantToken.create({
+            sub: user.id,
+            tenant: {
+                id: tenant.id,
+                name: tenant.name,
+                domain: tenant.domain,
+            },
+            roles: roleNames,
+            grant_type: GRANT_TYPES.CODE,
+            aud: [this.configService.get("SUPER_TENANT_DOMAIN")],
+            jti: '',
+            nbf: Math.floor(Date.now() / 1000),
+            scope: '',
+            client_id: tenant.clientId,
+            tenant_id: tenant.id,
+        });
+        // Populate profile fields from DB (not from JWT)
+        token.email = user.email;
+        token.name = user.name;
+        token.userId = user.id;
+        token.userTenant = {
+            id: tenant.id,
+            name: tenant.name,
+            domain: tenant.domain,
+        };
+
         const authContext: AuthContext = {
-            SECURITY_CONTEXT: TenantToken.create({
-                email: user.email,
-                sub: user.email,
-                userId: user.id,
-                name: user.name,
-                tenant: {
-                    id: tenant.id,
-                    name: tenant.name,
-                    domain: tenant.domain,
-                },
-                scopes: [],
-                roles: roleNames,
-                grant_type: GRANT_TYPES.CODE,
-                userTenant: {
-                    id: tenant.id,
-                    name: tenant.name,
-                    domain: tenant.domain,
-                }
-            }),
+            SECURITY_CONTEXT: token,
             SCOPE_ABILITIES: null,
         };
         authContext.SCOPE_ABILITIES = this.caslAbilityFactory.createForSecurityContext(

@@ -40,17 +40,24 @@ describe('Property 7: CASL abilities from roles', () => {
     const oidcScopesArb = fc.subarray(['openid', 'profile', 'email']);
 
     function makeTenantToken(roles: string[], domain: string, scopes: string[] = ['openid', 'profile', 'email']): TenantToken {
-        return TenantToken.create({
+        const tenant = {id: TENANT_ID, name: 'Test Tenant', domain};
+        const token = TenantToken.create({
             sub: 'user@test.com',
-            email: 'user@test.com',
-            name: 'Test User',
-            userId: 'uid-1',
-            tenant: {id: TENANT_ID, name: 'Test Tenant', domain},
-            userTenant: {id: TENANT_ID, name: 'Test Tenant', domain},
-            scopes,
+            tenant,
             roles,
             grant_type: GRANT_TYPES.PASSWORD,
+            aud: [domain],
+            jti: 'test-jti',
+            nbf: 0,
+            scope: scopes.join(' '),
+            client_id: 'test-client',
+            tenant_id: TENANT_ID,
         });
+        token.email = 'user@test.com';
+        token.name = 'Test User';
+        token.userId = 'uid-1';
+        token.userTenant = tenant;
+        return token;
     }
 
     /** Helper: check ability on a subject scoped to a tenant */
@@ -228,17 +235,24 @@ describe('Property 2: TENANT_VIEWER grants read-only access', () => {
         .filter(d => d !== SUPER_DOMAIN);
 
     function makeTenantTokenWithTenantId(tenantId: string, domain: string): TenantToken {
-        return TenantToken.create({
+        const tenant = {id: tenantId, name: 'Test Tenant', domain};
+        const token = TenantToken.create({
             sub: 'user@test.com',
-            email: 'user@test.com',
-            name: 'Test User',
-            userId: 'uid-1',
-            tenant: {id: tenantId, name: 'Test Tenant', domain},
-            userTenant: {id: tenantId, name: 'Test Tenant', domain},
-            scopes: ['openid', 'profile', 'email'],
+            tenant,
             roles: [RoleEnum.TENANT_VIEWER],
             grant_type: GRANT_TYPES.PASSWORD,
+            aud: [domain],
+            jti: 'test-jti',
+            nbf: 0,
+            scope: 'openid profile email',
+            client_id: 'test-client',
+            tenant_id: tenantId,
         });
+        token.email = 'user@test.com';
+        token.name = 'Test User';
+        token.userId = 'uid-1';
+        token.userTenant = tenant;
+        return token;
     }
 
     it('TENANT_VIEWER grants Read on Tenant, Member, Role, Policy for token tenant', () => {
@@ -346,17 +360,24 @@ describe('Property 3: TENANT_ADMIN grants management access', () => {
         .filter(d => d !== SUPER_DOMAIN);
 
     function makeTenantAdminToken(tenantId: string, domain: string): TenantToken {
-        return TenantToken.create({
+        const tenant = {id: tenantId, name: 'Test Tenant', domain};
+        const token = TenantToken.create({
             sub: 'admin@test.com',
-            email: 'admin@test.com',
-            name: 'Admin User',
-            userId: 'uid-admin',
-            tenant: {id: tenantId, name: 'Test Tenant', domain},
-            userTenant: {id: tenantId, name: 'Test Tenant', domain},
-            scopes: ['openid', 'profile', 'email'],
+            tenant,
             roles: [RoleEnum.TENANT_ADMIN],
             grant_type: GRANT_TYPES.PASSWORD,
+            aud: [domain],
+            jti: 'test-jti',
+            nbf: 0,
+            scope: 'openid profile email',
+            client_id: 'test-client',
+            tenant_id: tenantId,
         });
+        token.email = 'admin@test.com';
+        token.name = 'Admin User';
+        token.userId = 'uid-admin';
+        token.userTenant = tenant;
+        return token;
     }
 
     it('TENANT_ADMIN grants Manage on Member, Role, Policy, Client for token tenant', () => {
@@ -456,17 +477,24 @@ describe('Property 4: SUPER_ADMIN abilities are gated by tenant domain', () => {
         .filter(d => d !== SUPER_DOMAIN);
 
     function makeSuperAdminToken(tenantId: string, domain: string): TenantToken {
-        return TenantToken.create({
+        const tenant = {id: tenantId, name: 'Super Tenant', domain};
+        const token = TenantToken.create({
             sub: 'superadmin@test.com',
-            email: 'superadmin@test.com',
-            name: 'Super Admin User',
-            userId: 'uid-superadmin',
-            tenant: {id: tenantId, name: 'Super Tenant', domain},
-            userTenant: {id: tenantId, name: 'Super Tenant', domain},
-            scopes: ['openid', 'profile', 'email'],
+            tenant,
             roles: [RoleEnum.SUPER_ADMIN],
             grant_type: GRANT_TYPES.PASSWORD,
+            aud: [domain],
+            jti: 'test-jti',
+            nbf: 0,
+            scope: 'openid profile email',
+            client_id: 'test-client',
+            tenant_id: tenantId,
         });
+        token.email = 'superadmin@test.com';
+        token.name = 'Super Admin User';
+        token.userId = 'uid-superadmin';
+        token.userTenant = tenant;
+        return token;
     }
 
     it('SUPER_ADMIN with matching domain grants Manage on all subjects including other tenants', () => {
@@ -629,7 +657,12 @@ describe('Property 5: TechnicalToken grants scoped read access', () => {
         return TechnicalToken.create({
             sub: 'tech@test.com',
             tenant: {id: tenantId, name: 'Tech Tenant', domain},
-            scopes: ['openid', 'profile', 'email'],
+            scope: 'openid profile email',
+            aud: [domain],
+            jti: 'test-jti',
+            nbf: 0,
+            client_id: 'test-client',
+            tenant_id: tenantId,
         });
     }
 

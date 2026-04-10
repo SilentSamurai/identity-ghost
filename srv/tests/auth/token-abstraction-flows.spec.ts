@@ -47,29 +47,33 @@ describe('Token Abstraction Flows', () => {
 
         it('should have standard claims in access token', () => {
             const decoded: any = jwtService.decode(passwordGrantResponse.accessToken);
-            expect(decoded.sub).toEqual("admin@auth.server.com");
-            expect(decoded.email).toEqual("admin@auth.server.com");
-            expect(decoded.name).toBeDefined();
-            expect(decoded.userId).toBeDefined();
+            // sub is now user UUID, not email
+            expect(decoded.sub).toBeDefined();
+            expect(decoded.sub).not.toContain('@');
             expect(decoded.tenant).toBeDefined();
             expect(decoded.tenant.domain).toEqual("auth.server.com");
-            expect(decoded.userTenant).toBeDefined();
             expect(decoded.grant_type).toEqual("password");
+            // Profile data removed from JWT (RFC 9068 compliance)
+            expect(decoded.email).toBeUndefined();
+            expect(decoded.name).toBeUndefined();
+            expect(decoded.userId).toBeUndefined();
+            expect(decoded.userTenant).toBeUndefined();
         });
 
-        it('should have scopes field with only OIDC values', () => {
+        it('should have scope field as space-delimited OIDC string', () => {
             const decoded: any = jwtService.decode(passwordGrantResponse.accessToken);
-            expect(decoded.scopes).toBeDefined();
-            expect(Array.isArray(decoded.scopes)).toBe(true);
+            expect(decoded.scope).toBeDefined();
+            expect(typeof decoded.scope).toBe('string');
 
-            // scopes must contain only OIDC values
-            for (const scope of decoded.scopes) {
+            // scope must contain only OIDC values
+            const scopeParts = decoded.scope.split(' ').filter((s: string) => s.length > 0);
+            for (const scope of scopeParts) {
                 expect(OIDC_SCOPES).toContain(scope);
             }
 
-            // scopes must not contain any role names
+            // scope must not contain any role names
             for (const role of ROLE_NAMES) {
-                expect(decoded.scopes).not.toContain(role);
+                expect(decoded.scope).not.toContain(role);
             }
         });
 
@@ -130,9 +134,11 @@ describe('Token Abstraction Flows', () => {
             expect(decoded.grant_type).toEqual("client_credentials");
             expect(decoded.isTechnical).toBe(true);
 
-            // Technical token scopes should be OIDC only
-            expect(decoded.scopes).toBeDefined();
-            for (const scope of decoded.scopes) {
+            // Technical token scope should be a space-delimited OIDC string
+            expect(decoded.scope).toBeDefined();
+            expect(typeof decoded.scope).toBe('string');
+            const scopeParts = decoded.scope.split(' ').filter((s: string) => s.length > 0);
+            for (const scope of scopeParts) {
                 expect(OIDC_SCOPES).toContain(scope);
             }
 
@@ -160,12 +166,14 @@ describe('Token Abstraction Flows', () => {
             // Verify the refreshed token also has proper scope/role separation
             const decoded: any = jwtService.decode(response.body.access_token);
 
-            expect(decoded.scopes).toBeDefined();
-            for (const scope of decoded.scopes) {
+            expect(decoded.scope).toBeDefined();
+            expect(typeof decoded.scope).toBe('string');
+            const scopeParts = decoded.scope.split(' ').filter((s: string) => s.length > 0);
+            for (const scope of scopeParts) {
                 expect(OIDC_SCOPES).toContain(scope);
             }
             for (const role of ROLE_NAMES) {
-                expect(decoded.scopes).not.toContain(role);
+                expect(decoded.scope).not.toContain(role);
             }
 
             expect(decoded.roles).toBeDefined();
@@ -190,7 +198,9 @@ describe('Token Abstraction Flows', () => {
                 .set('Accept', 'application/json');
 
             expect(response.status).toEqual(201);
-            expect(response.body.sub).toEqual("admin@auth.server.com");
+            // sub is now user UUID, not email
+            expect(response.body.sub).toBeDefined();
+            expect(response.body.sub).not.toContain('@');
             expect(response.body.tenant.domain).toEqual("auth.server.com");
         });
     });

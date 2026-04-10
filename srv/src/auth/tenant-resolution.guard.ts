@@ -20,7 +20,7 @@ export class TenantResolutionGuard implements CanActivate {
         if (securityContext.isTenantToken()) {
             const token = securityContext as TenantToken;
             request["RESOLVED_TENANT_ID"] = token.tenant.id;
-            request["RESOLVED_USER_TENANT_ID"] = token.userTenant.id;
+            request["RESOLVED_USER_TENANT_ID"] = token.userTenant?.id;
         } else if (securityContext.isTechnicalToken()) {
             const token = securityContext as TechnicalToken;
             request["RESOLVED_TENANT_ID"] = token.tenant.id;

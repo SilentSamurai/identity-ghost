@@ -28,23 +28,38 @@ describe('Property 2: Scope contains only OIDC values, never roles', () => {
     });
 
     const tenantTokenArb = fc.tuple(oidcScopesArb, rolesArb, tenantInfoArb).map(
-        ([scopes, roles, tenant]) =>
-            TenantToken.create({
+        ([scopes, roles, tenant]) => {
+            const token = TenantToken.create({
                 sub: 'user@test.com',
-                email: 'user@test.com',
-                name: 'Test User',
-                userId: 'uid-1',
                 tenant,
-                userTenant: tenant,
-                scopes,
                 roles,
                 grant_type: GRANT_TYPES.PASSWORD,
-            }),
+                aud: [tenant.domain],
+                jti: 'test-jti',
+                nbf: 0,
+                scope: scopes.join(' '),
+                client_id: 'test-client',
+                tenant_id: tenant.id,
+            });
+            token.email = 'user@test.com';
+            token.name = 'Test User';
+            token.userId = 'uid-1';
+            return token;
+        },
     );
 
     const technicalTokenArb = fc.tuple(oidcScopesArb, tenantInfoArb).map(
         ([scopes, tenant]) =>
-            TechnicalToken.create({sub: 'oauth', tenant, scopes}),
+            TechnicalToken.create({
+                sub: 'oauth',
+                tenant,
+                scope: scopes.join(' '),
+                aud: [tenant.domain],
+                jti: 'test-jti',
+                nbf: 0,
+                client_id: 'test-client',
+                tenant_id: tenant.id,
+            }),
     );
 
     it('TenantToken scope equals ScopeNormalizer.format(token.scopes) and contains no role values', () => {
@@ -95,14 +110,15 @@ describe('Property 2: Scope contains only OIDC values, never roles', () => {
             fc.property(oidcScopesArb, (scopes) => {
                 const token = TenantToken.create({
                     sub: 'user@test.com',
-                    email: 'user@test.com',
-                    name: 'Test User',
-                    userId: 'uid-1',
                     tenant: {id: 'tid-1', name: 'T', domain: 'test.com'},
-                    userTenant: {id: 'tid-1', name: 'T', domain: 'test.com'},
-                    scopes,
                     roles: [...ROLE_VALUES],
                     grant_type: GRANT_TYPES.PASSWORD,
+                    aud: ['test.com'],
+                    jti: 'test-jti',
+                    nbf: 0,
+                    scope: scopes.join(' '),
+                    client_id: 'test-client',
+                    tenant_id: 'tid-1',
                 });
 
                 const scope = ScopeNormalizer.format(token.scopes);

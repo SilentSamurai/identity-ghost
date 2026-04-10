@@ -65,6 +65,10 @@ export class AuthService {
         return await lastValueFrom(this.http.get('/api/v1/my/internal-permissions'));
     }
 
+    async fetchMyProfile(): Promise<any> {
+        return await lastValueFrom(this.http.get('/api/users/me'));
+    }
+
     validateAuthCode(authCode: string, clientId: string): Promise<any> {
         return lastValueFrom(
             this.http.post(

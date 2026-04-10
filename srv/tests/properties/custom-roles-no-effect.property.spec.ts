@@ -45,17 +45,24 @@ describe('Property 1: Custom roles do not affect internal abilities', () => {
     );
 
     function makeTenantToken(roles: string[], domain: string): TenantToken {
-        return TenantToken.create({
+        const tenant = {id: TENANT_ID, name: 'Test Tenant', domain};
+        const token = TenantToken.create({
             sub: 'user@test.com',
-            email: 'user@test.com',
-            name: 'Test User',
-            userId: 'uid-prop1',
-            tenant: {id: TENANT_ID, name: 'Test Tenant', domain},
-            userTenant: {id: TENANT_ID, name: 'Test Tenant', domain},
-            scopes: ['openid', 'profile', 'email'],
+            tenant,
             roles,
             grant_type: GRANT_TYPES.PASSWORD,
+            aud: [domain],
+            jti: 'test-jti',
+            nbf: 0,
+            scope: 'openid profile email',
+            client_id: 'test-client',
+            tenant_id: TENANT_ID,
         });
+        token.email = 'user@test.com';
+        token.name = 'Test User';
+        token.userId = 'uid-prop1';
+        token.userTenant = tenant;
+        return token;
     }
 
     function subjectWith(subjectType: string, tenantField: string, tenantId: string) {

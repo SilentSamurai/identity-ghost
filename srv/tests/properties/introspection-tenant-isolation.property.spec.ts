@@ -52,16 +52,18 @@ describe('Property 4: Tenant isolation', () => {
                     // Ensure tenant IDs are different
                     fc.pre(tokenTenantId !== clientTenantId);
 
+                    const tenant = {id: tokenTenantId, name: 'Token Tenant', domain: 'token.com'};
                     const token = TenantToken.create({
                         sub: 'user@test.com',
-                        email: 'user@test.com',
-                        name: 'Test User',
-                        userId: 'uid-1',
-                        tenant: {id: tokenTenantId, name: 'Token Tenant', domain: 'token.com'},
-                        userTenant: {id: tokenTenantId, name: 'Token Tenant', domain: 'token.com'},
-                        scopes,
+                        tenant,
                         roles: ['TENANT_ADMIN'],
                         grant_type: GRANT_TYPES.PASSWORD,
+                        aud: ['token.com'],
+                        jti: 'test-jti',
+                        nbf: 0,
+                        scope: scopes.join(' '),
+                        client_id: 'test-client',
+                        tenant_id: tokenTenantId,
                     });
 
                     const response = checkTenantIsolation(token, clientTenantId);
@@ -86,7 +88,12 @@ describe('Property 4: Tenant isolation', () => {
                     const token = TechnicalToken.create({
                         sub: 'oauth',
                         tenant: {id: tokenTenantId, name: 'Token Tenant', domain: 'token.com'},
-                        scopes,
+                        scope: scopes.join(' '),
+                        aud: ['token.com'],
+                        jti: 'test-jti',
+                        nbf: 0,
+                        client_id: 'test-client',
+                        tenant_id: tokenTenantId,
                     });
 
                     const response = checkTenantIsolation(token, clientTenantId);
@@ -102,16 +109,18 @@ describe('Property 4: Tenant isolation', () => {
     it('same tenant ID returns active response (positive control)', () => {
         fc.assert(
             fc.property(tenantIdArb, oidcScopesArb, (tenantId, scopes) => {
+                const tenant = {id: tenantId, name: 'Same Tenant', domain: 'same.com'};
                 const token = TenantToken.create({
                     sub: 'user@test.com',
-                    email: 'user@test.com',
-                    name: 'Test User',
-                    userId: 'uid-1',
-                    tenant: {id: tenantId, name: 'Same Tenant', domain: 'same.com'},
-                    userTenant: {id: tenantId, name: 'Same Tenant', domain: 'same.com'},
-                    scopes,
+                    tenant,
                     roles: [],
                     grant_type: GRANT_TYPES.PASSWORD,
+                    aud: ['same.com'],
+                    jti: 'test-jti',
+                    nbf: 0,
+                    scope: scopes.join(' '),
+                    client_id: 'test-client',
+                    tenant_id: tenantId,
                 });
 
                 const response = checkTenantIsolation(token, tenantId);

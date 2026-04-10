@@ -356,7 +356,15 @@ export class LoginComponent implements OnInit {
             if (data.refresh_token) {
                 this.tokenStorage.saveRefreshToken(data.refresh_token);
             }
-            const rules = await this.authService.fetchPermissions();
+            const [rules, profile] = await Promise.all([
+                this.authService.fetchPermissions(),
+                this.authService.fetchMyProfile(),
+            ]);
+            this.tokenStorage.saveUserProfile({
+                email: profile.email,
+                name: profile.name,
+                id: profile.id,
+            });
             this.tokenStorage.savePermissions(rules);
         } catch (e: any) {
             console.error(e);

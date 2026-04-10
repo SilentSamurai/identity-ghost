@@ -243,6 +243,7 @@ export class OAuthTokenController {
         return this.tokenIssuanceService.issueToken(user, tenant, {
             subscriberTenantHint: authCode.subscriberTenantHint,
             requestedScope: body.scope,
+            grant_type: GRANT_TYPES.CODE,
         });
     }
 
@@ -267,6 +268,7 @@ export class OAuthTokenController {
         return this.tokenIssuanceService.issueToken(user, tenant, {
             subscriberTenantHint: body.subscriber_tenant_hint,
             requestedScope: body.scope,
+            grant_type: GRANT_TYPES.PASSWORD,
         });
     }
 

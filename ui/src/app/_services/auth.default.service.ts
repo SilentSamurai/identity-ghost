@@ -29,7 +29,7 @@ export class AuthDefaultService {
         }
         const userInfo = this.sessionService.getUser();
         const refreshToken = this.sessionService.getRefreshToken();
-        const clientId = client_id || userInfo?.tenant.client_id || null;
+        const clientId = client_id || userInfo?.client_id || userInfo?.tenant?.client_id || null;
 
         if (refreshToken) {
             try {

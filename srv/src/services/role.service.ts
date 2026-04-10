@@ -347,33 +347,35 @@ export class RoleService {
             {id: tenant.id},
         );
 
-        return await Promise.all(
-            roles.map(async (role: string | Role) => {
-                if (typeof role == "string") {
-                    let name = role as string;
-                    role = await this.roleRepository.findOne({
-                        where: {
-                            name,
-                            tenant: {id: tenant.id},
-                        },
-                        relations: {
-                            users: true,
-                        },
-                    });
-                }
-                if (role !== null) {
-                    let userRole = await this.userRoleRepository.findOne({
-                        where: {
-                            tenantId: tenant.id,
-                            userId: user.id,
-                            roleId: role.id,
-                            from_group: from_group,
-                        },
-                    });
-                    await this.userRoleRepository.remove(userRole);
-                }
-            }),
-        );
+        const results: void[] = [];
+        for (const roleInput of roles) {
+            let role: string | Role = roleInput;
+            if (typeof role == "string") {
+                let name = role as string;
+                role = await this.roleRepository.findOne({
+                    where: {
+                        name,
+                        tenant: {id: tenant.id},
+                    },
+                    relations: {
+                        users: true,
+                    },
+                });
+            }
+            if (role !== null) {
+                let userRole = await this.userRoleRepository.findOne({
+                    where: {
+                        tenantId: tenant.id,
+                        userId: user.id,
+                        roleId: (role as Role).id,
+                        from_group: from_group,
+                    },
+                });
+                await this.userRoleRepository.remove(userRole);
+            }
+            results.push(undefined);
+        }
+        return results;
     }
 
     async addRoles(

@@ -1,7 +1,9 @@
 import {Inject, Injectable} from "@nestjs/common";
+import {randomUUID} from "crypto";
 import {Tenant} from "../entity/tenant.entity";
 import {TechnicalToken} from "../casl/contexts";
 import {ScopeNormalizer} from "../casl/scope-normalizer";
+import {Environment} from "../config/environment.service";
 import {RS256_TOKEN_GENERATOR, SIGNING_KEY_PROVIDER, SigningKeyProvider, TokenService} from "./token-abstraction";
 
 const DEFAULT_TECHNICAL_SCOPES = ['openid', 'profile', 'email'];
@@ -13,14 +15,13 @@ export class TechnicalTokenService {
         private readonly tokenGenerator: TokenService,
         @Inject(SIGNING_KEY_PROVIDER)
         private readonly signingKeyProvider: SigningKeyProvider,
+        private readonly configService: Environment,
     ) {
     }
 
     createTechnicalToken(tenant: Tenant, additionalScopes: string[]): TechnicalToken {
         additionalScopes = additionalScopes instanceof Array ? additionalScopes : [];
-        const merged = ScopeNormalizer.parse(
-            ScopeNormalizer.format([...DEFAULT_TECHNICAL_SCOPES, ...additionalScopes])
-        );
+        const scopeString = ScopeNormalizer.format([...DEFAULT_TECHNICAL_SCOPES, ...additionalScopes]);
         return TechnicalToken.create({
             sub: "oauth",
             tenant: {
@@ -28,7 +29,12 @@ export class TechnicalTokenService {
                 name: tenant.name,
                 domain: tenant.domain,
             },
-            scopes: merged
+            scope: scopeString,
+            aud: [this.configService.get("SUPER_TENANT_DOMAIN")],
+            jti: randomUUID(),
+            nbf: Math.floor(Date.now() / 1000),
+            client_id: tenant.clientId,
+            tenant_id: tenant.id,
         });
     }
 
@@ -42,6 +48,7 @@ export class TechnicalTokenService {
         return this.tokenGenerator.sign(payload.asPlainObject(), {
             privateKey,
             keyid: kid,
+            issuer: this.configService.get("SUPER_TENANT_DOMAIN"),
         });
     }
 }

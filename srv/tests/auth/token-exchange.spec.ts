@@ -90,13 +90,14 @@ describe('e2e token exchange flow', () => {
 
         let decode = app.jwtService().decode(response.body.access_token, {json: true}) as any;
         expect(decode.sub).toBeDefined();
-        expect(decode.email).toBeDefined();
-        expect(decode.name).toBeDefined();
         expect(decode.grant_type).toBeDefined();
         expect(decode.tenant.id).toBeDefined();
         expect(decode.tenant.name).toBeDefined();
         expect(decode.tenant.domain).toBeDefined();
         expect(decode.tenant.domain).toEqual(tenantDomain);
+        // Profile data must not be in the JWT payload (RFC 9068 compliance)
+        expect(decode.email).toBeUndefined();
+        expect(decode.name).toBeUndefined();
     });
 
     it(`/POST Token Wrong Exchange`, async () => {

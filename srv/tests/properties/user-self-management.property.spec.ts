@@ -59,17 +59,24 @@ describe('Property 6: User self-management is always granted', () => {
         tenantId: string,
         domain: string,
     ): TenantToken {
-        return TenantToken.create({
+        const tenant = {id: tenantId, name: 'Test Tenant', domain};
+        const token = TenantToken.create({
             sub: email,
-            email,
-            name: 'Test User',
-            userId,
-            tenant: {id: tenantId, name: 'Test Tenant', domain},
-            userTenant: {id: tenantId, name: 'Test Tenant', domain},
-            scopes: ['openid', 'profile', 'email'],
+            tenant,
             roles,
             grant_type: GRANT_TYPES.PASSWORD,
+            aud: [domain],
+            jti: 'test-jti',
+            nbf: 0,
+            scope: 'openid profile email',
+            client_id: 'test-client',
+            tenant_id: tenantId,
         });
+        token.email = email;
+        token.name = 'Test User';
+        token.userId = userId;
+        token.userTenant = tenant;
+        return token;
     }
 
     it('user can always Manage their own User by email', () => {

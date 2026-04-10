@@ -35,8 +35,6 @@ export class TokenFixture {
 
         let decode = this.app.jwtService().decode(response.body.access_token, {json: true}) as any;
         expect(decode.sub).toBeDefined();
-        expect(decode.email).toBeDefined();
-        expect(decode.name).toBeDefined();
         expect(decode.grant_type).toBeDefined();
         expect(decode.tenant.id).toBeDefined();
         expect(decode.tenant.name).toBeDefined();

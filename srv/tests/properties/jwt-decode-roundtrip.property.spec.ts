@@ -22,8 +22,8 @@ describe('Property 5: JWT decode round-trip', () => {
 
     const payloadArbitrary = fc.record({
         sub: fc.uuid(),
-        email: fc.emailAddress(),
-        name: fc.string({minLength: 1, maxLength: 100}),
+        scope: fc.constantFrom('openid profile email'),
+        client_id: fc.string({minLength: 1, maxLength: 50}),
         tenant: tenantArbitrary,
     });
 
@@ -35,8 +35,8 @@ describe('Property 5: JWT decode round-trip', () => {
 
                 expect(decoded).toBeTruthy();
                 expect(decoded.sub).toBe(payload.sub);
-                expect(decoded.email).toBe(payload.email);
-                expect(decoded.name).toBe(payload.name);
+                expect(decoded.scope).toBe(payload.scope);
+                expect(decoded.client_id).toBe(payload.client_id);
                 expect(decoded.tenant).toEqual(payload.tenant);
             }),
             {numRuns: 100},

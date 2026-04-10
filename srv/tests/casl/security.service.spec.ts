@@ -24,34 +24,47 @@ describe('SecurityService', () => {
     let caslAbilityFactory: CaslAbilityFactory;
     let configService: Environment;
 
-    const mockTenantToken = TenantToken.create({
-        email: 'test@example.com',
-        sub: 'test@example.com',
-        userId: '1',
-        name: 'Test User',
-        tenant: {
+    const mockTenantToken = (() => {
+        const token = TenantToken.create({
+            sub: '1',
+            tenant: {
+                id: '1',
+                name: 'Test Tenant',
+                domain: 'test.com',
+            },
+            roles: [RoleEnum.TENANT_ADMIN],
+            grant_type: GRANT_TYPES.PASSWORD,
+            aud: ['test.com'],
+            jti: 'test-jti',
+            nbf: 0,
+            scope: 'openid profile email',
+            client_id: 'test-client',
+            tenant_id: '1',
+        });
+        token.email = 'test@example.com';
+        token.name = 'Test User';
+        token.userId = '1';
+        token.userTenant = {
             id: '1',
             name: 'Test Tenant',
             domain: 'test.com',
-        },
-        scopes: ['openid', 'profile', 'email'],
-        roles: [RoleEnum.TENANT_ADMIN],
-        grant_type: GRANT_TYPES.PASSWORD,
-        userTenant: {
-            id: '1',
-            name: 'Test Tenant',
-            domain: 'test.com',
-        },
-    });
+        };
+        return token;
+    })();
 
     const mockTechnicalToken = TechnicalToken.create({
-        sub: 'test@example.com',
+        sub: 'oauth',
         tenant: {
             id: '1',
             name: 'Test Tenant',
             domain: 'test.com',
         },
-        scopes: [RoleEnum.TENANT_ADMIN],
+        scope: 'openid profile email',
+        aud: ['test.com'],
+        jti: 'test-jti',
+        nbf: 0,
+        client_id: 'test-client',
+        tenant_id: '1',
     });
 
     const createMockAbility = () => {
@@ -199,75 +212,99 @@ describe('SecurityService', () => {
     describe('isSuperAdmin', () => {
         // Super admin: has SUPER_ADMIN role AND domain matches SUPER_TENANT_DOMAIN
         it('should return true when roles contains SUPER_ADMIN and domain matches super tenant', () => {
-            const superAdminToken = TenantToken.create({
-                email: 'test@example.com',
-                sub: 'test@example.com',
-                userId: '1',
-                name: 'Test User',
-                tenant: {
+            const superAdminToken = (() => {
+                const token = TenantToken.create({
+                    sub: '1',
+                    tenant: {
+                        id: '1',
+                        name: 'Test Tenant',
+                        domain: 'super.com',
+                    },
+                    roles: [RoleEnum.SUPER_ADMIN],
+                    grant_type: GRANT_TYPES.PASSWORD,
+                    aud: ['super.com'],
+                    jti: 'test-jti',
+                    nbf: 0,
+                    scope: 'openid profile email',
+                    client_id: 'test-client',
+                    tenant_id: '1',
+                });
+                token.email = 'test@example.com';
+                token.name = 'Test User';
+                token.userId = '1';
+                token.userTenant = {
                     id: '1',
                     name: 'Test Tenant',
                     domain: 'super.com',
-                },
-                scopes: ['openid', 'profile', 'email'],
-                roles: [RoleEnum.SUPER_ADMIN],
-                grant_type: GRANT_TYPES.PASSWORD,
-                userTenant: {
-                    id: '1',
-                    name: 'Test Tenant',
-                    domain: 'super.com',
-                },
-            });
+                };
+                return token;
+            })();
             const result = service.isSuperAdmin(superAdminToken);
             expect(result).toBe(true);
         });
 
         // Has SUPER_ADMIN role but wrong domain — not a super admin
         it('should return false when roles contains SUPER_ADMIN but domain does not match', () => {
-            const wrongDomainToken = TenantToken.create({
-                email: 'test@example.com',
-                sub: 'test@example.com',
-                userId: '1',
-                name: 'Test User',
-                tenant: {
+            const wrongDomainToken = (() => {
+                const token = TenantToken.create({
+                    sub: '1',
+                    tenant: {
+                        id: '1',
+                        name: 'Test Tenant',
+                        domain: 'other.com',
+                    },
+                    roles: [RoleEnum.SUPER_ADMIN],
+                    grant_type: GRANT_TYPES.PASSWORD,
+                    aud: ['other.com'],
+                    jti: 'test-jti',
+                    nbf: 0,
+                    scope: 'openid profile email',
+                    client_id: 'test-client',
+                    tenant_id: '1',
+                });
+                token.email = 'test@example.com';
+                token.name = 'Test User';
+                token.userId = '1';
+                token.userTenant = {
                     id: '1',
                     name: 'Test Tenant',
                     domain: 'other.com',
-                },
-                scopes: ['openid', 'profile', 'email'],
-                roles: [RoleEnum.SUPER_ADMIN],
-                grant_type: GRANT_TYPES.PASSWORD,
-                userTenant: {
-                    id: '1',
-                    name: 'Test Tenant',
-                    domain: 'other.com',
-                },
-            });
+                };
+                return token;
+            })();
             const result = service.isSuperAdmin(wrongDomainToken);
             expect(result).toBe(false);
         });
 
         // Has correct domain but no SUPER_ADMIN role — not a super admin
         it('should return false when domain matches but roles does not contain SUPER_ADMIN', () => {
-            const noRoleToken = TenantToken.create({
-                email: 'test@example.com',
-                sub: 'test@example.com',
-                userId: '1',
-                name: 'Test User',
-                tenant: {
+            const noRoleToken = (() => {
+                const token = TenantToken.create({
+                    sub: '1',
+                    tenant: {
+                        id: '1',
+                        name: 'Test Tenant',
+                        domain: 'super.com',
+                    },
+                    roles: [RoleEnum.TENANT_ADMIN],
+                    grant_type: GRANT_TYPES.PASSWORD,
+                    aud: ['super.com'],
+                    jti: 'test-jti',
+                    nbf: 0,
+                    scope: 'openid profile email',
+                    client_id: 'test-client',
+                    tenant_id: '1',
+                });
+                token.email = 'test@example.com';
+                token.name = 'Test User';
+                token.userId = '1';
+                token.userTenant = {
                     id: '1',
                     name: 'Test Tenant',
                     domain: 'super.com',
-                },
-                scopes: ['openid', 'profile', 'email'],
-                roles: [RoleEnum.TENANT_ADMIN],
-                grant_type: GRANT_TYPES.PASSWORD,
-                userTenant: {
-                    id: '1',
-                    name: 'Test Tenant',
-                    domain: 'super.com',
-                },
-            });
+                };
+                return token;
+            })();
             const result = service.isSuperAdmin(noRoleToken);
             expect(result).toBe(false);
         });

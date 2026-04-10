@@ -221,10 +221,11 @@ describe('AppController', () => {
         );
         // The decoded JWT is in tokenResponse.jwt
         expect(tokenResponse.jwt).toBeDefined();
-        expect(tokenResponse.jwt.scopes).toBeDefined();
-        expect(Array.isArray(tokenResponse.jwt.scopes)).toBe(true);
-        // Should include at least one scope (role) from the subscription
-        expect(tokenResponse.jwt.scopes.length).toBeGreaterThan(0);
+        // JWT now uses `scope` (space-delimited string) instead of `scopes` (array)
+        expect(tokenResponse.jwt.scope).toBeDefined();
+        expect(typeof tokenResponse.jwt.scope).toBe('string');
+        // Should include at least one OIDC scope
+        expect(tokenResponse.jwt.scope.length).toBeGreaterThan(0);
     });
 
     describe('app visibility and publishing', () => {

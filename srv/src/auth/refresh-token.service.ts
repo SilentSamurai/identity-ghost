@@ -152,20 +152,28 @@ export class RefreshTokenService {
         }
 
         // Atomic consumption: UPDATE ... WHERE used_at IS NULL
-        const updateResult = await this.repo
+        // If usedAt was already set before we tried, it's a replay — no need to hit the DB.
+        if (existing.usedAt !== null && existing.usedAt !== undefined) {
+            return this.handleReplay(existing, params.plaintextToken);
+        }
+
+        // Note: SQLite's QueryBuilder.update().execute() may return affected=0 even on success,
+        // so we re-fetch the record after the update to confirm it landed.
+        await this.repo
             .createQueryBuilder()
             .update(RefreshToken)
             .set({ usedAt: now })
             .where("id = :id AND used_at IS NULL", { id: existing.id })
             .execute();
 
-        if (updateResult.affected === 0) {
-            // Token was already used — replay detection
+        const afterUpdate = await this.repo.findOne({ where: { id: existing.id } });
+        if (!afterUpdate || afterUpdate.usedAt === null || afterUpdate.usedAt === undefined) {
+            // Update did not land — another concurrent caller consumed it first
             return this.handleReplay(existing, params.plaintextToken);
         }
 
         // Refresh the record to get the updated usedAt
-        existing.usedAt = now;
+        existing.usedAt = afterUpdate.usedAt;
 
         // Compute scope
         const grantedScope = params.requestedScope

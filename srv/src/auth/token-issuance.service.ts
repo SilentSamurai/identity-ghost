@@ -7,7 +7,7 @@ import {Environment} from "../config/environment.service";
 import {AuthCodeService} from "./auth-code.service";
 import {User} from "../entity/user.entity";
 import {Tenant} from "../entity/tenant.entity";
-import {AuthContext} from "../casl/contexts";
+import {AuthContext, GRANT_TYPES} from "../casl/contexts";
 import {ScopeResolverService} from "../casl/scope-resolver.service";
 import {ClientService} from "../services/client.service";
 import {ScopeNormalizer} from "../casl/scope-normalizer";
@@ -29,6 +29,7 @@ export interface IssueTokenOptions {
     subscriberTenantHint?: string;
     authCode?: string;
     requestedScope?: string;
+    grant_type?: GRANT_TYPES;
 }
 
 @Injectable()
@@ -77,7 +78,7 @@ export class TokenIssuanceService {
         );
 
         const {accessToken, scopes} =
-            await this.authService.createUserAccessToken(user, tenant, grantedScopes, roleNames);
+            await this.authService.createUserAccessToken(user, tenant, grantedScopes, roleNames, options?.grant_type ?? GRANT_TYPES.PASSWORD);
 
         const {plaintext: refreshToken} = await this.refreshTokenService.create({
             userId: user.id,
@@ -177,7 +178,7 @@ export class TokenIssuanceService {
 
         const {accessToken, scopes} =
             await this.authService.createSubscribedUserAccessToken(
-                user, tenant, subscribingTenant, grantedScopes, allRoleNames,
+                user, tenant, subscribingTenant, grantedScopes, allRoleNames, options?.grant_type ?? GRANT_TYPES.PASSWORD,
             );
 
         const {plaintext: refreshToken} = await this.refreshTokenService.create({
@@ -227,7 +228,7 @@ export class TokenIssuanceService {
         const grantedScopes = ScopeNormalizer.parse(record.scope);
 
         const {accessToken, scopes} =
-            await this.authService.createUserAccessToken(user, tenant, grantedScopes, roleNames);
+            await this.authService.createUserAccessToken(user, tenant, grantedScopes, roleNames, GRANT_TYPES.REFRESH_TOKEN);
 
         const idToken = await this.idTokenService.generateIdToken({
             user: {id: user.id, email: user.email, name: user.name},

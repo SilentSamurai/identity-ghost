@@ -189,15 +189,14 @@ describe('JWKS endpoint', () => {
 
     // ─── Requirement 6.1, 6.2: Cache-Control header ───
 
-    it('should return Cache-Control: public, max-age=300', async () => {
+    it('should return Cache-Control: no-cache', async () => {
         const res = await app.getHttpServer()
             .get(`/${tenantA.domain}/.well-known/jwks.json`);
         expect(res.status).toEqual(200);
 
         const cacheControl = res.headers['cache-control'];
         expect(cacheControl).toBeDefined();
-        expect(cacheControl).toContain('public');
-        expect(cacheControl).toContain('max-age=300');
+        expect(cacheControl).toContain('no-cache');
     });
 
     // ─── Requirement 6.5: Cache-Control does not contain no-store or private ───
@@ -208,6 +207,7 @@ describe('JWKS endpoint', () => {
         expect(res.status).toEqual(200);
 
         const cacheControl = res.headers['cache-control'];
+
         expect(cacheControl).not.toContain('no-store');
         expect(cacheControl).not.toContain('private');
     });

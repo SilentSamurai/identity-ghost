@@ -26,20 +26,39 @@ describe('Property 1: Active response completeness and type correctness', () => 
 
     const tenantTokenArb = fc.record({
         sub: fc.emailAddress(),
-        email: fc.emailAddress(),
-        name: fc.string({minLength: 1, maxLength: 100}),
-        userId: fc.uuid(),
         tenant: tenantInfoArb,
-        userTenant: tenantInfoArb,
-        scopes: oidcScopesArb,
         roles: fc.subarray(['SUPER_ADMIN', 'TENANT_ADMIN', 'TENANT_VIEWER']),
         grant_type: fc.constantFrom(GRANT_TYPES.PASSWORD, GRANT_TYPES.CODE),
-    }).map(params => TenantToken.create(params as any));
+        scopes: oidcScopesArb,
+    }).map(params => {
+        const token = TenantToken.create({
+            sub: params.sub,
+            tenant: params.tenant,
+            roles: params.roles,
+            grant_type: params.grant_type,
+            aud: [params.tenant.domain],
+            jti: 'test-jti',
+            nbf: 0,
+            scope: params.scopes.join(' '),
+            client_id: 'test-client',
+            tenant_id: params.tenant.id,
+        });
+        return token;
+    });
 
     const technicalTokenArb = fc.record({
         tenant: tenantInfoArb,
         scopes: oidcScopesArb,
-    }).map(params => TechnicalToken.create({sub: 'oauth', ...params}));
+    }).map(params => TechnicalToken.create({
+        sub: 'oauth',
+        tenant: params.tenant,
+        scope: params.scopes.join(' '),
+        aud: [params.tenant.domain],
+        jti: 'test-jti',
+        nbf: 0,
+        client_id: 'test-client',
+        tenant_id: params.tenant.id,
+    }));
 
     const clientIdArb = fc.uuid();
 

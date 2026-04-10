@@ -31,17 +31,24 @@ describe('Property 5: Super-admin check equivalence', () => {
     );
 
     function makeTenantToken(roles: string[], domain: string): TenantToken {
-        return TenantToken.create({
+        const tenant = {id: 'tid-1', name: 'Test Tenant', domain};
+        const token = TenantToken.create({
             sub: 'user@test.com',
-            email: 'user@test.com',
-            name: 'Test User',
-            userId: 'uid-1',
-            tenant: {id: 'tid-1', name: 'Test Tenant', domain},
-            userTenant: {id: 'tid-1', name: 'Test Tenant', domain},
-            scopes: ['openid', 'profile', 'email'],
+            tenant,
             roles,
             grant_type: GRANT_TYPES.PASSWORD,
+            aud: [domain],
+            jti: 'test-jti',
+            nbf: 0,
+            scope: 'openid profile email',
+            client_id: 'test-client',
+            tenant_id: tenant.id,
         });
+        token.email = 'user@test.com';
+        token.name = 'Test User';
+        token.userId = 'uid-1';
+        token.userTenant = tenant;
+        return token;
     }
 
     it('returns true iff SUPER_ADMIN ∈ roles AND domain === super tenant domain', () => {

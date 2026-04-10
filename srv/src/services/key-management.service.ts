@@ -52,25 +52,22 @@ export class KeyManagementService {
     }
 
     async rotateKey(tenantId: string): Promise<TenantKey> {
-        const queryRunner = this.dataSource.createQueryRunner();
-        await queryRunner.connect();
-        await queryRunner.startTransaction();
-
-        try {
-            let currentKey: TenantKey | null;
+        return this.dataSource.transaction(async (manager) => {
             const isSqlite = this.dataSource.options.type === 'sqlite' || this.dataSource.options.type === 'better-sqlite3';
 
+            let currentKey: TenantKey | null;
+
             if (isSqlite) {
-                currentKey = await queryRunner.manager.findOne(TenantKey, {
+                currentKey = await manager.findOne(TenantKey, {
                     where: {tenantId, isCurrent: true},
                 });
             } else {
-                const rows = await queryRunner.query(
+                const rows = await manager.query(
                     `SELECT * FROM tenant_keys WHERE tenant_id = $1 AND is_current = true FOR UPDATE`,
                     [tenantId],
                 );
                 currentKey = rows && rows.length > 0
-                    ? queryRunner.manager.create(TenantKey, rows[0])
+                    ? manager.create(TenantKey, rows[0])
                     : null;
             }
 
@@ -79,17 +76,16 @@ export class KeyManagementService {
             }
 
             // Mark current key as superseded
-            await queryRunner.manager.update(TenantKey, currentKey.id, {
-                isCurrent: false,
-                supersededAt: new Date(),
-            });
+            currentKey.isCurrent = false;
+            currentKey.supersededAt = new Date();
+            await manager.save(TenantKey, currentKey);
 
             // Generate new key pair
             const {publicKey, privateKey} = CryptUtil.generateKeyPair();
             const newVersion = currentKey.keyVersion + 1;
             const newKid = KidUtil.generate(tenantId, newVersion);
 
-            const newKey = queryRunner.manager.create(TenantKey, {
+            const newKey = manager.create(TenantKey, {
                 tenantId,
                 keyVersion: newVersion,
                 kid: newKid,
@@ -98,20 +94,13 @@ export class KeyManagementService {
                 isCurrent: true,
             });
 
-            const savedKey = await queryRunner.manager.save(TenantKey, newKey);
+            const savedKey = await manager.save(TenantKey, newKey);
 
             // Enforce max keys within the same transaction
-            await this.enforceMaxKeys(tenantId, queryRunner);
-
-            await queryRunner.commitTransaction();
+            await this.enforceMaxKeysWithManager(tenantId, manager);
 
             return savedKey;
-        } catch (error) {
-            await queryRunner.rollbackTransaction();
-            throw error;
-        } finally {
-            await queryRunner.release();
-        }
+        });
     }
 
     @Cron(process.env.JWKS_CLEANUP_CRON ?? '0 * * * * *')
@@ -143,13 +132,13 @@ export class KeyManagementService {
         }
     }
 
-    private async enforceMaxKeys(tenantId: string, queryRunner: any): Promise<void> {
+    private async enforceMaxKeysWithManager(tenantId: string, manager: any): Promise<void> {
         const maxKeys = parseInt(
             Environment.get('JWKS_MAX_ACTIVE_KEYS_PER_TENANT', '3'),
             10,
         );
 
-        const activeKeys = await queryRunner.manager.find(TenantKey, {
+        const activeKeys = await manager.find(TenantKey, {
             where: {tenantId, deactivatedAt: IsNull()},
             order: {keyVersion: 'ASC'},
         });
@@ -157,9 +146,8 @@ export class KeyManagementService {
         if (activeKeys.length > maxKeys) {
             const keysToDeactivate = activeKeys.slice(0, activeKeys.length - maxKeys);
             for (const key of keysToDeactivate) {
-                await queryRunner.manager.update(TenantKey, key.id, {
-                    deactivatedAt: new Date(),
-                });
+                key.deactivatedAt = new Date();
+                await manager.save(TenantKey, key);
                 this.logger.warn(
                     `Deactivated oldest active key for tenant ${tenantId}, key version ${key.keyVersion} (max active keys exceeded)`,
                 );

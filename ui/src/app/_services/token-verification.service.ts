@@ -25,8 +25,8 @@ export class TokenVerificationService {
                 return false;
             }
 
-            if (!this.verifyScopes(decodedToken.scopes)) {
-                console.error('Invalid scopes in token');
+            if (!this.verifyAudience(decodedToken.aud)) {
+                console.error('Invalid audience in token');
                 return false;
             }
 
@@ -47,10 +47,13 @@ export class TokenVerificationService {
             decodedToken.sub &&
             decodedToken.exp &&
             decodedToken.iat &&
-            decodedToken.scopes &&
-            decodedToken.email &&
-            decodedToken.name &&
-            decodedToken.iss
+            decodedToken.iss &&
+            decodedToken.aud &&
+            decodedToken.jti &&
+            decodedToken.client_id &&
+            decodedToken.tenant_id &&
+            decodedToken.scope !== undefined &&
+            decodedToken.grant_type
         );
     }
 
@@ -64,8 +67,8 @@ export class TokenVerificationService {
         return iat <= currentTime + 300;
     }
 
-    private verifyScopes(scopes: string[]): boolean {
-        return Array.isArray(scopes);
+    private verifyAudience(aud: string[]): boolean {
+        return Array.isArray(aud) && aud.length > 0;
     }
 
     private verifyRoles(roles: string[]): boolean {

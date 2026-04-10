@@ -21,15 +21,16 @@ describe('Property 6: Token scopes and roles are disjoint', () => {
 
     function makeTenantToken(scopes: string[], roles: string[]): TenantToken {
         return TenantToken.create({
-            sub: 'user@test.com',
-            email: 'user@test.com',
-            name: 'Test User',
-            userId: 'uid-1',
+            sub: '550e8400-e29b-41d4-a716-446655440000',
             tenant: {id: 'tid-1', name: 'Test Tenant', domain: 'test.local'},
-            userTenant: {id: 'tid-1', name: 'Test Tenant', domain: 'test.local'},
-            scopes,
             roles,
             grant_type: GRANT_TYPES.PASSWORD,
+            aud: ['test.local'],
+            jti: '660e8400-e29b-41d4-a716-446655440000',
+            nbf: Math.floor(Date.now() / 1000),
+            scope: scopes.join(' '),
+            client_id: 'client-1',
+            tenant_id: 'tid-1',
         });
     }
 

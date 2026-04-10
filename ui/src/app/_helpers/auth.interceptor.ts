@@ -125,7 +125,7 @@ export class AuthInterceptor implements HttpInterceptor {
         }
         try {
             const decoded = jwt_decode<JwtToken>(token);
-            return decoded.tenant?.client_id ?? null;
+            return decoded.client_id ?? decoded.tenant?.client_id ?? null;
         } catch {
             return null;
         }
