@@ -19,6 +19,7 @@ import {AP01AComponent} from './apps/AP01A.component';
 import {CL01AComponent} from './clients/CL01A.component';
 import {CL02ASelectionComponent} from './clients/CL02A-selection.component';
 import {CL02AComponent} from './clients/CL02A.component';
+import {KY01AComponent} from './keys/KY01A.component';
 
 const adminRoutes: Routes = [
     {
@@ -43,6 +44,7 @@ const adminRoutes: Routes = [
             {path: 'CL01', component: CL01AComponent},
             {path: 'CL02', component: CL02ASelectionComponent},
             {path: 'CL02/:clientId', component: CL02AComponent},
+            {path: 'KY01', component: KY01AComponent},
         ],
     },
 ];

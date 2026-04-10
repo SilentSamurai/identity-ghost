@@ -101,6 +101,12 @@ tasks:
       - npm test
       - npm run e2e:test
 
+  "cypress:spec":
+    desc: "Run a single Cypress spec file (usage: task cypress:spec -- cypress/e2e/admin-keys.cy.ts)"
+    dir: ./ui
+    cmds:
+      - npm run e2e:spec --spec={{.CLI_ARGS}}
+
   # ─── Kubernetes ───
 
   download-and-import-image:

@@ -17,6 +17,8 @@
         "e2e": "ng e2e",
         "cypress:open": "cypress open",
         "cypress:run": "cypress run",
+        "cypress:run:spec": "cypress run --spec",
+        "e2e:spec": "start-server-and-test start:all \"http://localhost:4200|http://localhost:9001\" \"cypress run --spec %npm_config_spec%\"",
         "start:all": "concurrently \"npm run start:backend\" \"npm run ui:serve\" \"npm run start:external-service\""
     },
     "private": true,

@@ -69,6 +69,9 @@ import {CreateClientAdminComponent} from './clients/dialogs/create-client-admin.
 import {SecretDisplayAdminComponent} from './clients/dialogs/secret-display-admin.component';
 import {EditClientAdminComponent} from './clients/dialogs/edit-client-admin.component';
 
+// Keys
+import {KY01AComponent} from './keys/KY01A.component';
+
 @NgModule({
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
     declarations: [
@@ -117,6 +120,8 @@ import {EditClientAdminComponent} from './clients/dialogs/edit-client-admin.comp
         CreateClientAdminComponent,
         EditClientAdminComponent,
         SecretDisplayAdminComponent,
+        // Keys
+        KY01AComponent,
     ],
     imports: [
         AdminRoutingModule,

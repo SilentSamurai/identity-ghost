@@ -183,6 +183,66 @@ import {ModalService} from '../../component/dialogs/modal.service';
                     </app-section-content>
                 </app-op-section>
             </app-op-tab>
+            <app-op-tab name="Keys">
+                <app-op-section name="Keys" id="KEYS_SECTION_NAV">
+                    <app-section-content>
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div>
+                                <span
+                                    id="ACTIVE_KEY_COUNT"
+                                    [class]="activeKeyCount === keyMetadata.maxActiveKeys ? 'text-warning fw-bold' : ''"
+                                >
+                                    {{ activeKeyCount }} of {{ keyMetadata.maxActiveKeys }} active
+                                </span>
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                <code id="JWKS_URL">{{ '/' + tenant.domain + '/.well-known/jwks.json' }}</code>
+                                <button
+                                    (click)="copyJwksUrl()"
+                                    class="btn btn-outline-secondary btn-sm"
+                                    id="COPY_JWKS_URL_BTN"
+                                    type="button"
+                                    title="Copy JWKS URL"
+                                >
+                                    <i class="fa fa-copy"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <app-table title="Signing Keys" [dataSource]="keysDataModel">
+                            <app-table-col label="Version" name="keyVersion"></app-table-col>
+                            <app-table-col label="Key ID" name="kid"></app-table-col>
+                            <app-table-col label="Status" name="status"></app-table-col>
+                            <app-table-col label="Created" name="createdAt"></app-table-col>
+                            <app-table-col label="Superseded" name="supersededAt"></app-table-col>
+                            <app-table-col label="Deactivated" name="deactivatedAt"></app-table-col>
+                            <app-table-actions>
+                                <button
+                                    (click)="onRotateKey()"
+                                    id="ROTATE_KEY_BTN"
+                                    class="btn btn-primary btn-sm"
+                                >
+                                    Rotate Key
+                                </button>
+                            </app-table-actions>
+                            <ng-template let-key #table_body>
+                                <td>{{ key.keyVersion }}</td>
+                                <td>{{ key.kid ? key.kid.substring(0, 8) + '\u2026' : '' }}</td>
+                                <td>
+                                    <span *ngIf="key.deactivatedAt" class="badge bg-secondary">Deactivated</span>
+                                    <span *ngIf="!key.deactivatedAt && key.isCurrent" class="badge bg-success">Current</span>
+                                    <span *ngIf="!key.deactivatedAt && !key.isCurrent" class="badge bg-warning text-dark">
+                                        Active
+                                        <small class="ms-1">{{ getOverlapCountdown(key) }}</small>
+                                    </span>
+                                </td>
+                                <td>{{ key.createdAt | date:'medium' }}</td>
+                                <td>{{ key.supersededAt ? (key.supersededAt | date:'medium') : '' }}</td>
+                                <td>{{ key.deactivatedAt ? (key.deactivatedAt | date:'medium') : '' }}</td>
+                            </ng-template>
+                        </app-table>
+                    </app-section-content>
+                </app-op-section>
+            </app-op-tab>
         </app-object-page>
     `,
     styles: [''],
@@ -195,6 +255,9 @@ export class TN02AComponent implements OnInit {
     memberDataModel: StaticSource<any>;
     rolesDataModel: StaticSource<any>;
     createdAppsDataModel: StaticSource<any>;
+    keysDataModel: StaticSource<any>;
+    keyMetadata: { maxActiveKeys: number; tokenExpirationSeconds: number } = { maxActiveKeys: 3, tokenExpirationSeconds: 3600 };
+    activeKeyCount = 0;
 
     constructor(
         private adminTenantService: AdminTenantService,
@@ -210,6 +273,7 @@ export class TN02AComponent implements OnInit {
         this.memberDataModel = new StaticSource(['id']);
         this.rolesDataModel = new StaticSource(['id']);
         this.createdAppsDataModel = new StaticSource(['id']);
+        this.keysDataModel = new StaticSource(['id']);
     }
 
     async ngOnInit() {
@@ -226,9 +290,71 @@ export class TN02AComponent implements OnInit {
             this.rolesDataModel.setData(Array.isArray(roles) ? roles : []);
             this.createdAppsDataModel.setData(Array.isArray(createdApps) ? createdApps : []);
 
+            await this.loadKeys();
+
             this.authDefaultService.setTitle('TN02: ' + this.tenant.name);
         } finally {
             this.loading = false;
+        }
+    }
+
+    private async loadKeys() {
+        try {
+            const result: any = await this.adminTenantService.getKeys(this.tenant_id);
+            const keys = Array.isArray(result.keys) ? result.keys : [];
+            this.keysDataModel.setData(keys);
+            this.keyMetadata = {
+                maxActiveKeys: result.maxActiveKeys ?? 3,
+                tokenExpirationSeconds: result.tokenExpirationSeconds ?? 3600,
+            };
+            this.activeKeyCount = keys.filter((k: any) => !k.deactivatedAt).length;
+        } catch (e) {
+            this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to load keys' });
+        }
+    }
+
+    getOverlapCountdown(key: any): string {
+        if (!key.supersededAt) return '';
+        const supersededAt = new Date(key.supersededAt).getTime();
+        const expiryMs = supersededAt + this.keyMetadata.tokenExpirationSeconds * 1000;
+        const remaining = expiryMs - Date.now();
+        if (remaining <= 0) return 'expiring soon';
+        const minutes = Math.ceil(remaining / 60000);
+        if (minutes >= 60) {
+            const hours = Math.floor(minutes / 60);
+            return `expires in ${hours}h ${minutes % 60}m`;
+        }
+        return `expires in ${minutes} min`;
+    }
+
+    async copyJwksUrl() {
+        const url = '/' + this.tenant.domain + '/.well-known/jwks.json';
+        try {
+            await navigator.clipboard.writeText(url);
+            this.messageService.add({ severity: 'success', summary: 'Copied', detail: 'JWKS URL copied to clipboard' });
+        } catch (e) {
+            this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Copy not supported' });
+        }
+    }
+
+    async onRotateKey() {
+        const rotated = await this.confirmationService.confirm({
+            message: `Are you sure you want to rotate the signing key for ${this.tenant.name}?`,
+            header: 'Rotate Key',
+            icon: 'pi pi-info-circle',
+            accept: async () => {
+                try {
+                    await this.adminTenantService.rotateKeys(this.tenant_id);
+                    this.messageService.add({ severity: 'success', summary: 'Success', detail: 'Key rotated successfully' });
+                    return true;
+                } catch (e) {
+                    this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Key rotation failed' });
+                }
+                return null;
+            },
+        });
+        if (rotated) {
+            await this.loadKeys();
         }
     }
 

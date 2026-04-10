@@ -28,6 +28,15 @@ export class AdminTenantService {
 
     // ─── Tenant ───
 
+    async getAllTenants(): Promise<any[]> {
+        return lastValueFrom(
+            this.http.get<any[]>(
+                `${API_URL}/admin/tenant`,
+                this.getHttpOptions(),
+            ),
+        );
+    }
+
     async getTenantDetails(tenantId: string) {
         return lastValueFrom(
             this.http.get(
@@ -196,6 +205,38 @@ export class AdminTenantService {
                     body: {emails: [email]},
                 },
             ),
+        );
+    }
+
+    // ─── Keys ───
+
+    async getKeys(tenantId: string) {
+        return lastValueFrom(
+            this.http.get(
+                `${API_URL}/admin/tenant/${tenantId}/keys`,
+                this.getHttpOptions(),
+            ),
+        );
+    }
+
+    async rotateKeys(tenantId: string) {
+        return lastValueFrom(
+            this.http.put(
+                `${API_URL}/admin/tenant/${tenantId}/keys`,
+                {},
+                this.getHttpOptions(),
+            ),
+        );
+    }
+
+    async getAllKeys(params?: { status?: string; tenantId?: string }) {
+        let url = `${API_URL}/admin/keys`;
+        const queryParts: string[] = [];
+        if (params?.status && params.status !== 'all') queryParts.push(`status=${params.status}`);
+        if (params?.tenantId) queryParts.push(`tenantId=${params.tenantId}`);
+        if (queryParts.length) url += '?' + queryParts.join('&');
+        return lastValueFrom(
+            this.http.get(url, this.getHttpOptions()),
         );
     }
 }

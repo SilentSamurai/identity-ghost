@@ -33,6 +33,8 @@ import {Role} from "../entity/role.entity";
 import {InjectRepository} from "@nestjs/typeorm";
 import {Repository} from "typeorm";
 import {SIGNING_KEY_PROVIDER, SigningKeyProvider} from "../core/token-abstraction";
+import {TenantKey} from "../entity/tenant-key.entity";
+import {Environment} from "../config/environment.service";
 import * as yup from "yup";
 
 /**
@@ -63,6 +65,7 @@ export class AdminTenantController {
         private readonly appService: AppService,
         private readonly subscriptionService: SubscriptionService,
         @InjectRepository(User) private usersRepository: Repository<User>,
+        @InjectRepository(TenantKey) private tenantKeyRepository: Repository<TenantKey>,
         @Inject(SIGNING_KEY_PROVIDER)
         private readonly signingKeyProvider: SigningKeyProvider,
     ) {
@@ -71,8 +74,24 @@ export class AdminTenantController {
     // ─── Tenant operations ───
 
     @Get("")
-    async getAllTenants(@Request() request): Promise<Tenant[]> {
-        return this.tenantService.getAllTenants(request);
+    async getAllTenants(@Request() request): Promise<any[]> {
+        const tenants = await this.tenantService.getAllTenants(request);
+
+        const counts = await this.tenantKeyRepository
+            .createQueryBuilder('tk')
+            .select('tk.tenant_id', 'tenantId')
+            .addSelect('COUNT(*)', 'activeKeyCount')
+            .where('tk.deactivated_at IS NULL')
+            .groupBy('tk.tenant_id')
+            .getRawMany();
+
+        const countMap = new Map(counts.map(c => [c.tenantId, Number(c.activeKeyCount)]));
+
+        for (const tenant of tenants) {
+            (tenant as any).activeKeyCount = countMap.get(tenant.id) ?? 0;
+        }
+
+        return tenants;
     }
 
     @Get("/:tenantId")
@@ -107,6 +126,25 @@ export class AdminTenantController {
         @Param("tenantId", ParseUUIDPipe) tenantId: string,
     ): Promise<Tenant> {
         return this.tenantService.updateKeys(request, tenantId);
+    }
+
+    @Get("/:tenantId/keys")
+    async getTenantKeys(
+        @Request() request,
+        @Param("tenantId", ParseUUIDPipe) tenantId: string,
+    ): Promise<{ keys: any[]; maxActiveKeys: number; tokenExpirationSeconds: number }> {
+        await this.tenantService.findById(request, tenantId);
+
+        const keys = await this.tenantKeyRepository.find({
+            where: {tenantId},
+            select: ['id', 'keyVersion', 'kid', 'isCurrent', 'createdAt', 'supersededAt', 'deactivatedAt'],
+            order: {keyVersion: 'DESC'},
+        });
+
+        const maxActiveKeys = Number(Environment.get('JWKS_MAX_ACTIVE_KEYS_PER_TENANT', 3));
+        const tokenExpirationSeconds = Number(Environment.get('TOKEN_EXPIRATION_TIME_IN_SECONDS', 3600));
+
+        return {keys, maxActiveKeys, tokenExpirationSeconds};
     }
 
     @Get("/:tenantId/credentials")

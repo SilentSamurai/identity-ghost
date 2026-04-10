@@ -117,6 +117,19 @@ export class AdminHomeComponent implements OnInit {
             ],
         },
         {
+            name: 'Keys',
+            tiles: [
+                {
+                    title: 'KY01',
+                    subtitle: 'Manage Signing Keys',
+                    icon: 'fa-key',
+                    link: ['/admin/KY01'],
+                    canActivate: (ps: PermissionService) =>
+                        ps.isAuthorized(Actions.Manage, Subjects.TENANT, 'all'),
+                },
+            ],
+        },
+        {
             name: 'Groups',
             tiles: [
                 {

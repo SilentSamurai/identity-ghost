@@ -22,6 +22,7 @@ import {LaunchPadComponent} from './tile/launchpad.component';
 import {PageViewComponent} from './page-view/page-view.component';
 import {TableColumnComponent} from './table/app-table-column.component';
 import {FilterFieldComponent} from './filter-bar/filter-field.component';
+import {FilterSelectFieldComponent} from './filter-bar/filter-select-field.component';
 import {FilterValueHelpComponent} from './filter-bar/filter-value-help.component';
 import {ButtonModule} from 'primeng/button';
 import {RippleModule} from 'primeng/ripple';
@@ -56,6 +57,7 @@ import { PasswordInputComponent } from './inputs/password-input.component';
         FilterBarComponent,
         FilterBarColumnComponent,
         FilterFieldComponent,
+        FilterSelectFieldComponent,
         FilterValueHelpComponent,
         TableColumnComponent,
         TileGroupsComponent,

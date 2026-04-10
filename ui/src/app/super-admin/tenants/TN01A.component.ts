@@ -49,6 +49,7 @@ import {DataSource} from "../../component/model/DataSource";
                 >
                     <app-table-col label="Domain" name="domain"></app-table-col>
                     <app-table-col label="Name" name="name"></app-table-col>
+                    <app-table-col label="Active Keys" name="activeKeyCount"></app-table-col>
                     <app-table-col>
                         <th style="max-width: 100px">Action</th>
                     </app-table-col>
@@ -62,6 +63,7 @@ import {DataSource} from "../../component/model/DataSource";
                             >
                         </td>
                         <td>{{ tenant.name }}</td>
+                        <td>{{ activeKeyCountMap.get(tenant.id) ?? 0 }}</td>
                         <td class="" style="max-width: 100px">
                             <button
                                 (click)="openUpdateModal(tenant)"
@@ -96,6 +98,7 @@ export class TN01AComponent implements OnInit {
     isTenantAdmin = false;
     deleteAllowed = false;
     dataSource: DataSource<any>;
+    activeKeyCountMap: Map<string, number> = new Map();
 
     constructor(
         private tokenStorageService: SessionService,
@@ -131,6 +134,15 @@ export class TN01AComponent implements OnInit {
         }
 
         await this.refreshData();
+
+        try {
+            const tenants: any[] = await this.adminTenantService.getAllTenants();
+            this.activeKeyCountMap = new Map(
+                tenants.map(t => [t.id, t.activeKeyCount ?? 0])
+            );
+        } catch (e) {
+            // silently fail — column will show 0
+        }
     }
 
     async refreshData() {

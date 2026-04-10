@@ -1,6 +1,7 @@
 import {Component, ContentChildren, EventEmitter, Input, OnInit, Output, QueryList, ViewChildren,} from '@angular/core';
 import {Operators} from '../model/Operator';
 import {FilterFieldComponent} from './filter-field.component';
+import {FilterSelectFieldComponent, FilterSelectOption} from './filter-select-field.component';
 import {Filter} from '../model/Filters';
 
 @Component({
@@ -10,13 +11,14 @@ import {Filter} from '../model/Filters';
 })
 export class FilterBarColumnComponent implements OnInit {
     @Input() label: string = '';
-    @Input() name: string = ''; // Identifier for the filter field
+    @Input() name: string = '';
+    @Input() type: 'text' | 'select' = 'text';
+    @Input() options: FilterSelectOption[] = [];
 
     constructor() {
     }
 
     ngOnInit(): void {
-        // Initialization logic for a column if needed in the future
     }
 }
 
@@ -29,11 +31,18 @@ export class FilterBarColumnComponent implements OnInit {
                     <!-- Render a filter field for each projected column -->
                     <div *ngFor="let column of columns" class="col-auto">
                         <app-filter-field
-                            *ngIf="visibility"
+                            *ngIf="visibility && column.type === 'text'"
                             [name]="column.name"
                             [label]="column.label"
                         >
                         </app-filter-field>
+                        <app-filter-select-field
+                            *ngIf="visibility && column.type === 'select'"
+                            [name]="column.name"
+                            [label]="column.label"
+                            [options]="column.options"
+                        >
+                        </app-filter-select-field>
                     </div>
                 </div>
             </div>
@@ -133,6 +142,10 @@ export class FilterBarComponent implements OnInit {
     @ViewChildren(FilterFieldComponent)
     filterFields!: QueryList<FilterFieldComponent>;
 
+    // Query rendered FilterSelectFieldComponent instances
+    @ViewChildren(FilterSelectFieldComponent)
+    filterSelectFields!: QueryList<FilterSelectFieldComponent>;
+
     goButtonId: string = '';
 
     constructor() {
@@ -143,13 +156,19 @@ export class FilterBarComponent implements OnInit {
     }
 
     getFilters(): Filter[] {
-        if (!this.filterFields) {
-            return [];
-        }
-        return this.filterFields.toArray().flatMap(
-            (ff: FilterFieldComponent) =>
-                ff.getFilters ? ff.getFilters() : [], // Add check for method existence
-        );
+        const textFilters = this.filterFields
+            ? this.filterFields.toArray().flatMap(
+                (ff: FilterFieldComponent) =>
+                    ff.getFilters ? ff.getFilters() : [],
+            )
+            : [];
+        const selectFilters = this.filterSelectFields
+            ? this.filterSelectFields.toArray().flatMap(
+                (ff: FilterSelectFieldComponent) =>
+                    ff.getFilters ? ff.getFilters() : [],
+            )
+            : [];
+        return [...textFilters, ...selectFilters];
     }
 
     toggleVisibility(): void {
