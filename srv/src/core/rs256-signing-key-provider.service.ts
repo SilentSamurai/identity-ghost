@@ -31,7 +31,8 @@ export class RS256SigningKeyProvider implements SigningKeyProvider {
     async getPublicKey(tenantId: string): Promise<string> {
         const tenantKey = await this.tenantKeyRepository.findOne({
             where: {tenantId, isCurrent: true},
-            select: ['id', 'publicKey']
+            select: ['id', 'publicKey'],
+            order: {keyVersion: 'DESC'},
         });
         if (!tenantKey) {
             throw new NotFoundException(`No current key found for tenant ${tenantId}`);

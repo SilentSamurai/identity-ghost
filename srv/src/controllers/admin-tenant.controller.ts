@@ -5,6 +5,7 @@ import {
     Delete,
     ForbiddenException,
     Get,
+    Header,
     Inject,
     Param,
     ParseUUIDPipe,
@@ -148,6 +149,7 @@ export class AdminTenantController {
     }
 
     @Get("/:tenantId/credentials")
+    @Header('Cache-Control', 'no-store')
     async getTenantCredentials(
         @Request() request,
         @Param("tenantId", ParseUUIDPipe) tenantId: string,

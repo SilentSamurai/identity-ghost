@@ -1,7 +1,6 @@
 import {Injectable, Logger, NotFoundException} from "@nestjs/common";
 import {InjectRepository} from "@nestjs/typeorm";
 import {DataSource, IsNull, Repository} from "typeorm";
-import {EventEmitter2} from "@nestjs/event-emitter";
 import {Cron} from "@nestjs/schedule";
 import {TenantKey} from "../entity/tenant-key.entity";
 import {KidUtil} from "../util/kid.util";
@@ -16,7 +15,6 @@ export class KeyManagementService {
         @InjectRepository(TenantKey)
         private readonly tenantKeyRepository: Repository<TenantKey>,
         private readonly dataSource: DataSource,
-        private readonly eventEmitter: EventEmitter2,
     ) {}
 
     async createInitialKey(tenantId: string, publicKey: string, privateKey: string): Promise<TenantKey> {
@@ -107,9 +105,6 @@ export class KeyManagementService {
 
             await queryRunner.commitTransaction();
 
-            // Emit event after commit
-            this.eventEmitter.emit('key.rotated', {tenantId});
-
             return savedKey;
         } catch (error) {
             await queryRunner.rollbackTransaction();
@@ -135,7 +130,6 @@ export class KeyManagementService {
             .getMany();
 
         const now = new Date();
-        const affectedTenantIds = new Set<string>();
 
         for (const key of expiredKeys) {
             const supersededAt = new Date(key.supersededAt);
@@ -145,12 +139,7 @@ export class KeyManagementService {
                 await this.tenantKeyRepository.update(key.id, {
                     deactivatedAt: now,
                 });
-                affectedTenantIds.add(key.tenantId);
             }
-        }
-
-        for (const tenantId of affectedTenantIds) {
-            this.eventEmitter.emit('key.rotated', {tenantId});
         }
     }
 

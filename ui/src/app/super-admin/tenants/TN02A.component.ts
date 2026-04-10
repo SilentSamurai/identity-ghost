@@ -355,6 +355,7 @@ export class TN02AComponent implements OnInit {
         });
         if (rotated) {
             await this.loadKeys();
+            this.credentials = await this.adminTenantService.getTenantCredentials(this.tenant_id);
         }
     }
 
