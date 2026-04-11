@@ -73,28 +73,28 @@ export class RoleController {
     // ─── Shared implementation methods ───
 
     private async _createRole(permission: Permission, tenantId: string, name: string): Promise<Role> {
-        const tenant = await this.tenantService.findById(permission.authContext, tenantId);
+        const tenant = await this.tenantService.findById(permission, tenantId);
         permission.isAuthorized(Action.Update, SubjectEnum.TENANT, tenant);
-        return this.roleService.create(permission.authContext, name, tenant);
+        return this.roleService.create(permission, name, tenant);
     }
 
     private async _deleteRole(permission: Permission, tenantId: string, name: string): Promise<Role> {
-        const tenant = await this.tenantService.findById(permission.authContext, tenantId);
+        const tenant = await this.tenantService.findById(permission, tenantId);
         permission.isAuthorized(Action.Update, SubjectEnum.TENANT, tenant);
-        const role = await this.roleService.findByNameAndTenant(permission.authContext, name, tenant);
-        return this.roleService.deleteById(permission.authContext, role.id);
+        const role = await this.roleService.findByNameAndTenant(permission, name, tenant);
+        return this.roleService.deleteById(permission, role.id);
     }
 
     private async _getTenantRoles(permission: Permission, tenantId: string): Promise<Role[]> {
-        const tenant = await this.tenantService.findById(permission.authContext, tenantId);
-        return this.tenantService.getTenantRoles(permission.authContext, tenant);
+        const tenant = await this.tenantService.findById(permission, tenantId);
+        return this.tenantService.getTenantRoles(permission, tenant);
     }
 
     private async _getRole(permission: Permission, tenantId: string, name: string): Promise<any> {
-        const tenant = await this.tenantService.findById(permission.authContext, tenantId);
+        const tenant = await this.tenantService.findById(permission, tenantId);
         permission.isAuthorized(Action.Read, SubjectEnum.TENANT, tenant);
-        const role = await this.roleService.findByNameAndTenant(permission.authContext, name, tenant);
-        const users = await this.userService.findByRole(permission.authContext, role);
+        const role = await this.roleService.findByNameAndTenant(permission, name, tenant);
+        const users = await this.userService.findByRole(permission, role);
         return {role, users};
     }
 }

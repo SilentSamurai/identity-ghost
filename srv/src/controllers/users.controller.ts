@@ -40,7 +40,7 @@ export class UsersController {
         @CurrentPermission() permission: Permission,
         @CurrentUser() user: User,
     ): Promise<User> {
-        return this.usersService.findById(permission.authContext, user.id);
+        return this.usersService.findById(permission, user.id);
     }
 
     @Patch("/me/email")
@@ -77,7 +77,7 @@ export class UsersController {
         body: any,
     ): Promise<{ status: boolean }> {
         await this.usersService.updatePasswordSecure(
-            permission.authContext,
+            permission,
             user.id,
             body.currentPassword,
             body.newPassword,
@@ -93,7 +93,7 @@ export class UsersController {
         @Body(new ValidationPipe(ValidationSchema.UpdateMyNameSchema))
         body: any,
     ): Promise<User> {
-        return this.usersService.updateName(permission.authContext, user.id, body.name);
+        return this.usersService.updateName(permission, user.id, body.name);
     }
 
     @Get("/me/tenants")
@@ -102,6 +102,6 @@ export class UsersController {
         @CurrentPermission() permission: Permission,
         @CurrentUser() user: User,
     ): Promise<Tenant[]> {
-        return this.tenantService.findByViewership(permission.authContext, user);
+        return this.tenantService.findByViewership(permission, user);
     }
 }

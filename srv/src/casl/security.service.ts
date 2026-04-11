@@ -9,6 +9,7 @@ import {AuthUserService} from "./authUser.service";
 import {AuthContext, GRANT_TYPES, InternalToken, TechnicalToken, TenantToken,} from "./contexts";
 import {SubjectEnum} from "../entity/subjectEnum";
 import {RoleEnum} from "../entity/roleEnum";
+import {Permission} from "../auth/auth.decorator";
 
 @Injectable()
 export class SecurityService implements OnModuleInit {
@@ -24,8 +25,17 @@ export class SecurityService implements OnModuleInit {
     }
 
     /**
-     * @deprecated Use `@CurrentPermission()` or `@CurrentUser()` decorators in controllers instead.
-     * Internal service use only.
+     * Creates a Permission object from an AuthContext.
+     * Use this for internal (non-HTTP) flows that need to pass Permission objects
+     * to services without an HTTP request (e.g., startup seed, token issuance, registration).
+     */
+    createPermission(authContext: AuthContext): Permission {
+        return new Permission(authContext, this);
+    }
+
+    /**
+     * @deprecated Internal use only — called by Permission.isAuthorized().
+     * Use @CurrentPermission() and permission.isAuthorized() in controllers/services instead.
      */
     getAbility(authContext: AuthContext): AnyAbility {
         if (authContext.SCOPE_ABILITIES) {
@@ -35,8 +45,8 @@ export class SecurityService implements OnModuleInit {
     }
 
     /**
-     * @deprecated Use `Permission.isAuthorized()` in controllers instead.
-     * In services, call this directly only when no Permission object is available in the call chain.
+     * @deprecated Internal use only — called by Permission.isAuthorized().
+     * Use @CurrentPermission() and permission.isAuthorized() in controllers/services instead.
      */
     isAuthorized(
         authContext: AuthContext,
@@ -51,8 +61,8 @@ export class SecurityService implements OnModuleInit {
     }
 
     /**
-     * @deprecated Use `Permission.isAuthorized()` in controllers instead.
-     * In services, prefer `isAuthorized()` over calling this directly.
+     * @deprecated Internal use only — called by Permission.isAuthorized().
+     * Use @CurrentPermission() and permission.isAuthorized() in controllers/services instead.
      */
     check(authContext: AuthContext, ...args: any): boolean {
         let ability = this.getAbility(authContext);
@@ -63,7 +73,8 @@ export class SecurityService implements OnModuleInit {
     }
 
     /**
-     * @deprecated Use `@CurrentUser()` or `@CurrentPermission()` decorators in controllers instead.
+     * @deprecated Internal use only — called by Permission.isAuthorized().
+     * Use @CurrentPermission() and permission.isAuthorized() in controllers/services instead.
      */
     getToken(authContext: AuthContext): TenantToken {
         let payload = authContext.SECURITY_CONTEXT;
@@ -90,8 +101,8 @@ export class SecurityService implements OnModuleInit {
     }
 
     /**
-     * @deprecated Use `@CurrentPermission()` or `@CurrentUser()` decorators in controllers instead.
-     * Internal service use only.
+     * @deprecated Internal use only — called by Permission.isAuthorized().
+     * Use @CurrentPermission() and permission.isAuthorized() in controllers/services instead.
      */
     getUserOrTechnicalSecurityContext(request: any): TenantToken {
         return request["SECURITY_CONTEXT"] as TenantToken;
@@ -114,38 +125,40 @@ export class SecurityService implements OnModuleInit {
      * Needs broad Read on TENANT because findByMembership checks Read TENANT without conditions.
      * Needs broad Read on ROLE because getMemberRoles may operate on the subscribing tenant.
      */
-    async getContextForTokenIssuance(tenantId: string): Promise<AuthContext> {
+    createPermissionForTokenIssuance(tenantId: string): Permission {
         const {can, build} = new AbilityBuilder(createMongoAbility);
         can(Action.Read, SubjectEnum.TENANT);
         can(Action.Read, SubjectEnum.MEMBER);
         can(Action.Read, SubjectEnum.ROLE);
         can(Action.Read, SubjectEnum.USER);
-        return {
+        const authContext: AuthContext = {
             SECURITY_CONTEXT: InternalToken.create({purpose: "token-issuance", scopedTenantId: tenantId}),
             SCOPE_ABILITIES: build(),
         };
+        return this.createPermission(authContext);
     }
 
     /**
      * For adding members: can read/create users and read tenant membership.
      */
-    async getContextForMemberManagement(tenantId: string): Promise<AuthContext> {
+    createPermissionForMemberManagement(tenantId: string): Permission {
         const {can, build} = new AbilityBuilder(createMongoAbility);
         can(Action.Read, SubjectEnum.TENANT, {id: tenantId});
         can(Action.Read, SubjectEnum.MEMBER, {tenantId});
         can(Action.Read, SubjectEnum.USER);
         can(Action.Create, SubjectEnum.USER);
-        return {
+        const authContext: AuthContext = {
             SECURITY_CONTEXT: InternalToken.create({purpose: "member-management", scopedTenantId: tenantId}),
             SCOPE_ABILITIES: build(),
         };
+        return this.createPermission(authContext);
     }
 
     /**
      * For registration: can check domain existence, create tenants/users, manage roles,
      * add members, and update user verification status.
      */
-    async getContextForRegistration(): Promise<AuthContext> {
+    createPermissionForRegistration(): Permission {
         const {can, build} = new AbilityBuilder(createMongoAbility);
         can(Action.Read, SubjectEnum.TENANT);
         can(Action.Create, SubjectEnum.TENANT);
@@ -157,22 +170,24 @@ export class SecurityService implements OnModuleInit {
         can(Action.Create, SubjectEnum.ROLE);
         can(Action.Read, SubjectEnum.ROLE);
         can(Action.Update, SubjectEnum.ROLE);
-        return {
+        const authContext: AuthContext = {
             SECURITY_CONTEXT: InternalToken.create({purpose: "registration"}),
             SCOPE_ABILITIES: build(),
         };
+        return this.createPermission(authContext);
     }
 
     /**
      * For startup seed data: full access (this is the only legitimate use of broad permissions).
      */
-    async getContextForStartup(): Promise<AuthContext> {
+    createPermissionForStartupSeed(): Permission {
         const {can, build} = new AbilityBuilder(createMongoAbility);
         can(Action.Manage, "all");
-        return {
+        const authContext: AuthContext = {
             SECURITY_CONTEXT: InternalToken.create({purpose: "startup-seed"}),
             SCOPE_ABILITIES: build(),
         };
+        return this.createPermission(authContext);
     }
 
     async getUserAuthContext(email: string): Promise<AuthContext> {

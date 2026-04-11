@@ -1,4 +1,4 @@
-import {createParamDecorator, ExecutionContext, ForbiddenException, Injectable, PipeTransform} from "@nestjs/common";
+import {createParamDecorator, ExecutionContext, ForbiddenException, Inject, Injectable, PipeTransform, forwardRef} from "@nestjs/common";
 import {AuthContext, TenantToken} from "../casl/contexts";
 import {AuthUserService} from "../casl/authUser.service";
 import {SecurityService} from "../casl/security.service";
@@ -104,7 +104,7 @@ const CurrentAuthContext = createParamDecorator(
  */
 @Injectable()
 export class ResolvePermissionPipe implements PipeTransform<AuthContext, Permission> {
-    constructor(private readonly securityService: SecurityService) {}
+    constructor(@Inject(forwardRef(() => SecurityService)) private readonly securityService: SecurityService) {}
 
     transform(authContext: AuthContext): Permission {
         return new Permission(authContext, this.securityService);

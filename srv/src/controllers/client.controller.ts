@@ -7,16 +7,13 @@ import {
     Param,
     Patch,
     Post,
-    Request,
     UseGuards,
     UseInterceptors,
 } from '@nestjs/common';
 import {JwtAuthGuard} from '../auth/jwt-auth.guard';
 import {ClientService} from '../services/client.service';
-import {SecurityService} from '../casl/security.service';
-import {AuthContext} from '../casl/contexts';
 import {schemaPipe} from '../validation/validation.pipe';
-import {CurrentTenantId} from '../auth/auth.decorator';
+import {CurrentPermission, CurrentTenantId, Permission} from '../auth/auth.decorator';
 import * as yup from 'yup';
 
 const CreateClientSchema = yup.object().shape({
@@ -46,14 +43,13 @@ const UpdateClientSchema = yup.object().shape({
 export class ClientController {
     constructor(
         private readonly clientService: ClientService,
-        private readonly securityService: SecurityService,
     ) {
     }
 
     @Post('/create')
     @UseGuards(JwtAuthGuard)
     async createClient(
-        @Request() request: AuthContext,
+        @CurrentPermission() permission: Permission,
         @Body(schemaPipe(CreateClientSchema)) body: {
             tenantId: string;
             name: string;
@@ -69,7 +65,7 @@ export class ClientController {
         },
     ) {
         const result = await this.clientService.createClient(
-            request,
+            permission,
             body.tenantId,
             body.name,
             body.redirectUris || [],
@@ -93,7 +89,6 @@ export class ClientController {
     @Get('/my/clients')
     @UseGuards(JwtAuthGuard)
     async getMyClients(
-        @Request() request: AuthContext,
         @CurrentTenantId() tenantId: string,
     ) {
         return this.clientService.findByTenantId(tenantId);
@@ -102,7 +97,6 @@ export class ClientController {
     @Get('/:clientId')
     @UseGuards(JwtAuthGuard)
     async getClient(
-        @Request() request: AuthContext,
         @Param('clientId') clientId: string,
     ) {
         return this.clientService.findByClientId(clientId);
@@ -111,7 +105,6 @@ export class ClientController {
     @Post('/:clientId/rotate-secret')
     @UseGuards(JwtAuthGuard)
     async rotateSecret(
-        @Request() request: AuthContext,
         @Param('clientId') clientId: string,
     ) {
         const result = await this.clientService.rotateSecret(clientId);
@@ -124,7 +117,7 @@ export class ClientController {
     @Patch('/:clientId')
     @UseGuards(JwtAuthGuard)
     async updateClient(
-        @Request() request: AuthContext,
+        @CurrentPermission() permission: Permission,
         @Param('clientId') clientId: string,
         @Body(schemaPipe(UpdateClientSchema)) body: {
             name?: string;
@@ -134,16 +127,16 @@ export class ClientController {
             allowRefreshToken?: boolean;
         },
     ) {
-        return this.clientService.updateClient(request, clientId, body);
+        return this.clientService.updateClient(permission, clientId, body);
     }
 
     @Delete('/:clientId')
     @UseGuards(JwtAuthGuard)
     async deleteClient(
-        @Request() request: AuthContext,
+        @CurrentPermission() permission: Permission,
         @Param('clientId') clientId: string,
     ) {
-        await this.clientService.deleteClient(request, clientId);
+        await this.clientService.deleteClient(permission, clientId);
         return {status: 'success'};
     }
 }

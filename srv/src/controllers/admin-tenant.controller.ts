@@ -12,7 +12,6 @@ import {
     Patch,
     Post,
     Put,
-    Request,
     UseGuards,
     UseInterceptors,
 } from "@nestjs/common";
@@ -76,8 +75,8 @@ export class AdminTenantController {
     // ─── Tenant operations ───
 
     @Get("")
-    async getAllTenants(@Request() request): Promise<any[]> {
-        const tenants = await this.tenantService.getAllTenants(request);
+    async getAllTenants(@CurrentPermission() permission: Permission): Promise<any[]> {
+        const tenants = await this.tenantService.getAllTenants(permission);
 
         const counts = await this.tenantKeyRepository
             .createQueryBuilder('tk')
@@ -98,44 +97,44 @@ export class AdminTenantController {
 
     @Get("/:tenantId")
     async getTenant(
-        @Request() request,
+        @CurrentPermission() permission: Permission,
         @Param("tenantId", ParseUUIDPipe) tenantId: string,
     ): Promise<Tenant> {
-        return this.tenantService.findById(request, tenantId);
+        return this.tenantService.findById(permission, tenantId);
     }
 
     @Patch("/:tenantId")
     async updateTenant(
-        @Request() request,
+        @CurrentPermission() permission: Permission,
         @Param("tenantId", ParseUUIDPipe) tenantId: string,
         @Body(new ValidationPipe(AdminTenantController.UpdateTenantSchema))
         body: { name?: string; allowSignUp?: boolean },
     ): Promise<Tenant> {
-        return this.tenantService.updateTenant(request, tenantId, body);
+        return this.tenantService.updateTenant(permission, tenantId, body);
     }
 
     @Delete("/:tenantId")
     async deleteTenant(
-        @Request() request,
+        @CurrentPermission() permission: Permission,
         @Param("tenantId", ParseUUIDPipe) tenantId: string,
     ): Promise<Tenant> {
-        return this.tenantService.deleteTenant(request, tenantId);
+        return this.tenantService.deleteTenant(permission, tenantId);
     }
 
     @Put("/:tenantId/keys")
     async rotateTenantKeys(
-        @Request() request,
+        @CurrentPermission() permission: Permission,
         @Param("tenantId", ParseUUIDPipe) tenantId: string,
     ): Promise<Tenant> {
-        return this.tenantService.updateKeys(request, tenantId);
+        return this.tenantService.updateKeys(permission, tenantId);
     }
 
     @Get("/:tenantId/keys")
     async getTenantKeys(
-        @Request() request,
+        @CurrentPermission() permission: Permission,
         @Param("tenantId", ParseUUIDPipe) tenantId: string,
     ): Promise<{ keys: any[]; maxActiveKeys: number; tokenExpirationSeconds: number }> {
-        await this.tenantService.findById(request, tenantId);
+        await this.tenantService.findById(permission, tenantId);
 
         const keys = await this.tenantKeyRepository.find({
             where: {tenantId},
@@ -152,10 +151,10 @@ export class AdminTenantController {
     @Get("/:tenantId/credentials")
     @Header('Cache-Control', 'no-store')
     async getTenantCredentials(
-        @Request() request,
+        @CurrentPermission() permission: Permission,
         @Param("tenantId", ParseUUIDPipe) tenantId: string,
     ): Promise<any> {
-        let tenant = await this.tenantService.findById(request, tenantId);
+        let tenant = await this.tenantService.findById(permission, tenantId);
         const publicKey = await this.signingKeyProvider.getPublicKey(tenant.id);
         return {
             id: tenant.id,
@@ -169,74 +168,74 @@ export class AdminTenantController {
 
     @Get("/:tenantId/members")
     async getTenantMembers(
-        @Request() request,
+        @CurrentPermission() permission: Permission,
         @Param("tenantId", ParseUUIDPipe) tenantId: string,
     ): Promise<User[]> {
-        let tenant = await this.tenantService.findById(request, tenantId);
+        let tenant = await this.tenantService.findById(permission, tenantId);
         const members: User[] = await this.usersRepository.find({
             where: {tenants: {id: tenant.id}},
         });
         for (const member of members) {
-            member.roles = await this.roleService.getMemberRoles(request, tenant, member);
+            member.roles = await this.roleService.getMemberRoles(permission, tenant, member);
         }
         return members;
     }
 
     @Get("/:tenantId/member/:userId")
     async getMember(
-        @Request() request,
+        @CurrentPermission() permission: Permission,
         @Param("tenantId", ParseUUIDPipe) tenantId: string,
         @Param("userId") userId: string,
     ): Promise<any> {
-        const user = await this.usersService.findById(request, userId);
-        const tenant = await this.tenantService.findById(request, tenantId);
-        let roles = await this.tenantService.getMemberRoles(request, tenantId, user);
+        const user = await this.usersService.findById(permission, userId);
+        const tenant = await this.tenantService.findById(permission, tenantId);
+        let roles = await this.tenantService.getMemberRoles(permission, tenantId, user);
         return {tenantId: tenant.id, userId: user.id, roles};
     }
 
     @Get("/:tenantId/member/:userId/roles")
     async getMemberRoles(
-        @Request() request,
+        @CurrentPermission() permission: Permission,
         @Param("tenantId", ParseUUIDPipe) tenantId: string,
         @Param("userId") userId: string,
     ): Promise<any> {
-        const user = await this.usersService.findById(request, userId);
-        await this.tenantService.findById(request, tenantId);
-        let roles = await this.tenantService.getMemberRoles(request, tenantId, user);
+        const user = await this.usersService.findById(permission, userId);
+        await this.tenantService.findById(permission, tenantId);
+        let roles = await this.tenantService.getMemberRoles(permission, tenantId, user);
         return {roles};
     }
 
     @Put("/:tenantId/member/:userId/roles")
     async setMemberRoles(
-        @Request() request,
+        @CurrentPermission() permission: Permission,
         @Param("tenantId", ParseUUIDPipe) tenantId: string,
         @Param("userId") userId: string,
         @Body(new ValidationPipe(ValidationSchema.OperatingRoleSchema))
         body: { roles: string[] },
     ): Promise<Role[]> {
-        const user = await this.usersService.findById(request, userId);
-        await this.tenantService.findById(request, tenantId);
-        return this.tenantService.updateRolesOfMember(request, body.roles, tenantId, user);
+        const user = await this.usersService.findById(permission, userId);
+        await this.tenantService.findById(permission, tenantId);
+        return this.tenantService.updateRolesOfMember(permission, body.roles, tenantId, user);
     }
 
     @Post("/:tenantId/members/add")
     async addMembers(
-        @Request() request,
+        @CurrentPermission() permission: Permission,
         @Param("tenantId", ParseUUIDPipe) tenantId: string,
         @Body(new ValidationPipe(AdminTenantController.MemberOperationSchema))
         body: { emails: string[] },
     ): Promise<Tenant> {
-        let tenant = await this.tenantService.findById(request, tenantId);
-        const adminContext = await this.securityService.getContextForMemberManagement(tenantId);
+        let tenant = await this.tenantService.findById(permission, tenantId);
+        const adminPermission = this.securityService.createPermissionForMemberManagement(tenantId);
         for (const email of body.emails) {
-            const isPresent = await this.usersService.existByEmail(adminContext, email);
+            const isPresent = await this.usersService.existByEmail(adminPermission, email);
             if (!isPresent) {
-                await this.usersService.createShadowUser(adminContext, email, email);
+                await this.usersService.createShadowUser(adminPermission, email, email);
             }
-            const user = await this.usersService.findByEmail(adminContext, email);
-            await this.tenantService.addMember(request, tenant.id, user);
+            const user = await this.usersService.findByEmail(adminPermission, email);
+            await this.tenantService.addMember(permission, tenant.id, user);
         }
-        return this.tenantService.findById(request, tenantId);
+        return this.tenantService.findById(permission, tenantId);
     }
 
     @Delete("/:tenantId/members/delete")
@@ -247,65 +246,64 @@ export class AdminTenantController {
         @Body(new ValidationPipe(AdminTenantController.MemberOperationSchema))
         body: { emails: string[] },
     ): Promise<Tenant> {
-        await this.tenantService.findById(permission.authContext, tenantId);
+        await this.tenantService.findById(permission, tenantId);
         for (const email of body.emails) {
             if (currentUser.email === email) {
                 throw new ForbiddenException("cannot remove self");
             }
-            const user = await this.usersService.findByEmail(permission.authContext, email);
-            await this.tenantService.removeMember(permission.authContext, tenantId, user);
+            const user = await this.usersService.findByEmail(permission, email);
+            await this.tenantService.removeMember(permission, tenantId, user);
         }
-        return this.tenantService.findById(permission.authContext, tenantId);
+        return this.tenantService.findById(permission, tenantId);
     }
 
     // ─── Role operations ───
 
     @Get("/:tenantId/roles")
     async getTenantRoles(
-        @Request() request,
+        @CurrentPermission() permission: Permission,
         @Param("tenantId", ParseUUIDPipe) tenantId: string,
     ): Promise<Role[]> {
-        const tenant = await this.tenantService.findById(request, tenantId);
-        return this.tenantService.getTenantRoles(request, tenant);
+        const tenant = await this.tenantService.findById(permission, tenantId);
+        return this.tenantService.getTenantRoles(permission, tenant);
     }
 
     @Post("/:tenantId/role/:name")
     async createRole(
-        @Request() request,
+        @CurrentPermission() permission: Permission,
         @Param("tenantId", ParseUUIDPipe) tenantId: string,
         @Param("name") name: string,
     ): Promise<Role> {
-        let tenant = await this.tenantService.findById(request, tenantId);
-        return this.roleService.create(request, name, tenant);
+        let tenant = await this.tenantService.findById(permission, tenantId);
+        return this.roleService.create(permission, name, tenant);
     }
 
     @Delete("/:tenantId/role/:name")
     async deleteRole(
-        @Request() request,
+        @CurrentPermission() permission: Permission,
         @Param("tenantId", ParseUUIDPipe) tenantId: string,
         @Param("name") name: string,
     ): Promise<Role> {
-        let tenant = await this.tenantService.findById(request, tenantId);
-        let role = await this.roleService.findByNameAndTenant(request, name, tenant);
-        return this.roleService.deleteById(request, role.id);
+        let tenant = await this.tenantService.findById(permission, tenantId);
+        let role = await this.roleService.findByNameAndTenant(permission, name, tenant);
+        return this.roleService.deleteById(permission, role.id);
     }
 
     // ─── Group operations ───
 
     @Get("/:tenantId/groups")
     async getTenantGroups(
-        @Request() request,
+        @CurrentPermission() permission: Permission,
         @Param("tenantId", ParseUUIDPipe) tenantId: string,
     ): Promise<any> {
-        let tenant = await this.tenantService.findById(request, tenantId);
-        return this.groupService.findByTenantId(request, tenant.id);
+        let tenant = await this.tenantService.findById(permission, tenantId);
+        return this.groupService.findByTenantId(permission, tenant.id);
     }
 
     // ─── Client operations ───
 
     @Get("/:tenantId/clients")
     async getTenantClients(
-        @Request() request,
         @Param("tenantId", ParseUUIDPipe) tenantId: string,
     ) {
         return this.clientService.findByTenantId(tenantId);
@@ -315,7 +313,6 @@ export class AdminTenantController {
 
     @Get("/:tenantId/apps/created")
     async getAppsCreatedByTenant(
-        @Request() request,
         @Param("tenantId", ParseUUIDPipe) tenantId: string,
     ) {
         return this.appService.findByTenantId(tenantId);
@@ -323,7 +320,6 @@ export class AdminTenantController {
 
     @Get("/:tenantId/apps/subscriptions")
     async getTenantSubscriptions(
-        @Request() request,
         @Param("tenantId", ParseUUIDPipe) tenantId: string,
     ) {
         return this.subscriptionService.findByTenantId(tenantId);
@@ -331,11 +327,11 @@ export class AdminTenantController {
 
     @Post("/:tenantId/apps/:appId/subscribe")
     async subscribeToApp(
-        @Request() request,
+        @CurrentPermission() permission: Permission,
         @Param("tenantId", ParseUUIDPipe) tenantId: string,
         @Param("appId", ParseUUIDPipe) appId: string,
     ) {
-        const tenant = await this.tenantService.findById(request, tenantId);
+        const tenant = await this.tenantService.findById(permission, tenantId);
         const app = await this.appService.getAppById(appId);
         await this.subscriptionService.subscribeApp(tenant, app);
         return {status: "success"};
@@ -343,11 +339,11 @@ export class AdminTenantController {
 
     @Post("/:tenantId/apps/:appId/unsubscribe")
     async unsubscribeFromApp(
-        @Request() request,
+        @CurrentPermission() permission: Permission,
         @Param("tenantId", ParseUUIDPipe) tenantId: string,
         @Param("appId", ParseUUIDPipe) appId: string,
     ) {
-        const tenant = await this.tenantService.findById(request, tenantId);
+        const tenant = await this.tenantService.findById(permission, tenantId);
         const app = await this.appService.getAppById(appId);
         await this.subscriptionService.unsubscribe(tenant, app);
         return {status: "success"};

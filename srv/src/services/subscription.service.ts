@@ -5,9 +5,9 @@ import {Subscription, SubscriptionStatus} from '../entity/subscription.entity';
 import {Tenant} from '../entity/tenant.entity';
 import {App} from '../entity/app.entity';
 import {User} from "../entity/user.entity";
-import {AuthContext} from "../casl/contexts";
 import {TenantService} from "./tenant.service";
 import {AppSubscriptionService} from './app-subscription.service';
+import {Permission} from "../auth/auth.decorator";
 
 const logger = new Logger("SubscriptionService");
 
@@ -74,13 +74,13 @@ export class SubscriptionService {
         return subscriptions;
     }
 
-    async isUserSubscribedToTenant(authContext: AuthContext, user: User, appOwnerTenant: Tenant): Promise<boolean> {
+    async isUserSubscribedToTenant(permission: Permission, user: User, appOwnerTenant: Tenant): Promise<boolean> {
         // Get all tenants the user belongs to
-        const userTenants = await this.tenantService.findByMembership(authContext, user);
+        const userTenants = await this.tenantService.findByMembership(permission, user);
         // For each user tenant, check if it is subscribed to any app owned by the logging-in tenant
         for (const tenant of userTenants) {
             if (tenant.id == appOwnerTenant.id) continue;
-            if (await this.canLoginToTenant(authContext, tenant, appOwnerTenant)) {
+            if (await this.canLoginToTenant(tenant, appOwnerTenant)) {
                 return true
             }
         }
@@ -91,24 +91,24 @@ export class SubscriptionService {
      * Resolves subscription tenant ambiguity for a user and a target tenant (app owner).
      * Returns { resolvedTenant } if unambiguous, or { ambiguousTenants: [...] } if ambiguous.
      */
-    async resolveSubscriptionTenantAmbiguity(context: AuthContext, user: User, appOwnerTenant: Tenant, subscriberTenantHint: string | null): Promise<{
+    async resolveSubscriptionTenantAmbiguity(permission: Permission, user: User, appOwnerTenant: Tenant, subscriberTenantHint: string | null): Promise<{
         resolvedTenant?: Tenant,
         ambiguousTenants?: Tenant[]
     }> {
         // Find all userTenants that are subscribed to any of the ownedApps
         if (subscriberTenantHint) {
-            const resolvedTenant = await this.tenantService.findByClientIdOrDomain(context, subscriberTenantHint);
-            if (await this.canLoginToTenant(context, resolvedTenant, appOwnerTenant)) {
+            const resolvedTenant = await this.tenantService.findByClientIdOrDomain(permission, subscriberTenantHint);
+            if (await this.canLoginToTenant(resolvedTenant, appOwnerTenant)) {
                 return {resolvedTenant}
             }
             throw new InternalServerErrorException("subscribedTenant hint did not work");
         } else {
             // Find all tenants the user is a member of
-            const userTenants = await this.tenantService.findByMembership(context, user);
+            const userTenants = await this.tenantService.findByMembership(permission, user);
             const validTenants = [];
             for (const t of userTenants) {
                 if (t.id == appOwnerTenant.id) continue;
-                if (await this.canLoginToTenant(context, t, appOwnerTenant)) {
+                if (await this.canLoginToTenant(t, appOwnerTenant)) {
                     validTenants.push(t)
                 }
             }
@@ -130,7 +130,7 @@ export class SubscriptionService {
         }
     }
 
-    async canLoginToTenant(authContext: AuthContext, loggingTenant: Tenant, appOwnerTenant: Tenant): Promise<boolean> {
+    async canLoginToTenant(loggingTenant: Tenant, appOwnerTenant: Tenant): Promise<boolean> {
         // Get all apps owned by the app owner tenant
         const ownedApps = await this.appRepo.findBy({
             owner: {

@@ -3,12 +3,10 @@ import {InjectRepository} from '@nestjs/typeorm';
 import {Not, Repository} from 'typeorm';
 import {App} from '../entity/app.entity';
 import {TenantService} from "./tenant.service";
-import {AuthContext} from "../casl/contexts";
 import {SubscriptionService} from "./subscription.service";
-import {SecurityService} from "../casl/security.service";
+import {Permission} from "../auth/auth.decorator";
 import {Action} from "../casl/actions.enum";
 import {SubjectEnum} from '../entity/subjectEnum';
-import {subject} from "@casl/ability";
 
 @Injectable()
 export class AppService {
@@ -17,20 +15,15 @@ export class AppService {
         private readonly appRepository: Repository<App>,
         private readonly tenantService: TenantService,
         private readonly subscriptionService: SubscriptionService,
-        private readonly securityService: SecurityService
     ) {
     }
 
     /**
      * Creates a new application owned by the specified tenant.
      */
-    async createApp(authContext: AuthContext, tenantId: string, name: string, appUrl: string, description?: string): Promise<App> {
-        const tenant = await this.tenantService.findById(authContext, tenantId);
-        this.securityService.check(
-            authContext,
-            Action.Update,
-            subject(SubjectEnum.TENANT, tenant),
-        );
+    async createApp(permission: Permission, tenantId: string, name: string, appUrl: string, description?: string): Promise<App> {
+        const tenant = await this.tenantService.findById(permission, tenantId);
+        permission.isAuthorized(Action.Update, SubjectEnum.TENANT, {id: tenant.id});
         const newApp = this.appRepository.create({
             name,
             description,
@@ -81,13 +74,9 @@ export class AppService {
     /**
      * Deletes an app by its ID. This will also handle unsubscribing all tenants from the app.
      */
-    async deleteApp(authContext: AuthContext, appId: string): Promise<void> {
+    async deleteApp(permission: Permission, appId: string): Promise<void> {
         const app = await this.getAppById(appId);
-        this.securityService.check(
-            authContext,
-            Action.Update,
-            subject(SubjectEnum.TENANT, app.owner),
-        );
+        permission.isAuthorized(Action.Update, SubjectEnum.TENANT, {id: app.owner.id});
 
         // Get all subscriptions for this app
         const subscriptions = await this.subscriptionService.findAllByAppId(appId);
@@ -102,16 +91,11 @@ export class AppService {
     /**
      * Updates an existing application.
      */
-    async updateApp(authContext: AuthContext, appId: string, name: string, appUrl: string, description?: string): Promise<App> {
+    async updateApp(permission: Permission, appId: string, name: string, appUrl: string, description?: string): Promise<App> {
         const app = await this.getAppById(appId);
 
         // Check if the user has permission to update this app
-        this.securityService.isAuthorized(
-            authContext,
-            Action.Update,
-            SubjectEnum.APPS,
-            {id: app.id}
-        );
+        permission.isAuthorized(Action.Update, SubjectEnum.APPS, {id: app.id});
 
         app.name = name;
         app.appUrl = appUrl;
@@ -122,13 +106,9 @@ export class AppService {
         return this.appRepository.save(app);
     }
 
-    async publishApp(authContext: AuthContext, appId: string): Promise<App> {
+    async publishApp(permission: Permission, appId: string): Promise<App> {
         const app = await this.getAppById(appId);
-        this.securityService.check(
-            authContext,
-            Action.Update,
-            subject(SubjectEnum.TENANT, app.owner),
-        );
+        permission.isAuthorized(Action.Update, SubjectEnum.TENANT, {id: app.owner.id});
         app.isPublic = true;
         return this.appRepository.save(app);
     }

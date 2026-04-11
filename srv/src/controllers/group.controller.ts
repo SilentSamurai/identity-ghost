@@ -7,7 +7,6 @@ import {
     Param,
     Patch,
     Post,
-    Request,
     UseGuards,
     UseInterceptors,
 } from "@nestjs/common";
@@ -17,7 +16,7 @@ import {ValidationSchema} from "../validation/validation.schema";
 import {TenantService} from "../services/tenant.service";
 import {GroupService} from "../services/group.service";
 import {JwtAuthGuard} from "../auth/jwt-auth.guard";
-import {CurrentTenantId} from "../auth/auth.decorator";
+import {CurrentPermission, CurrentTenantId, Permission} from "../auth/auth.decorator";
 
 @Controller("/api")
 @UseInterceptors(ClassSerializerInterceptor)
@@ -34,11 +33,11 @@ export class GroupController {
     @Get("/tenant/my/groups")
     @UseGuards(JwtAuthGuard)
     async getMyTenantGroups(
-        @Request() request,
+        @CurrentPermission() permission: Permission,
         @CurrentTenantId() tenantId: string,
     ): Promise<any> {
-        let tenant = await this.tenantService.findById(request, tenantId);
-        return await this.groupService.findByTenantId(request, tenant.id);
+        let tenant = await this.tenantService.findById(permission, tenantId);
+        return await this.groupService.findByTenantId(permission, tenant.id);
     }
 
     // ─── Non-tenant routes (no migration needed) ───
@@ -46,24 +45,24 @@ export class GroupController {
     @Post("/group/create")
     @UseGuards(JwtAuthGuard)
     async createGroup(
-        @Request() request,
+        @CurrentPermission() permission: Permission,
         @Body(new ValidationPipe(ValidationSchema.CreateGroupSchema))
         body: { name: string; tenantId: string },
     ): Promise<any> {
-        let tenant = await this.tenantService.findById(request, body.tenantId);
-        let group = await this.groupService.create(request, body.name, tenant);
+        let tenant = await this.tenantService.findById(permission, body.tenantId);
+        let group = await this.groupService.create(permission, body.name, tenant);
         return group;
     }
 
     @Get("/group/:groupId")
     @UseGuards(JwtAuthGuard)
     async getGroup(
-        @Request() request,
+        @CurrentPermission() permission: Permission,
         @Param("groupId") groupId: string,
     ): Promise<any> {
-        let group = await this.groupService.findById(request, groupId);
-        let roles = await this.groupService.findGroupRoles(request, group);
-        let users = await this.groupService.findGroupUsers(request, group);
+        let group = await this.groupService.findById(permission, groupId);
+        let roles = await this.groupService.findGroupRoles(permission, group);
+        let users = await this.groupService.findGroupUsers(permission, group);
         return {
             group: group,
             roles: roles,
@@ -74,38 +73,38 @@ export class GroupController {
     @Patch("/group/:groupId/update")
     @UseGuards(JwtAuthGuard)
     async updateGroup(
-        @Request() request,
+        @CurrentPermission() permission: Permission,
         @Param("groupId") groupId: string,
         @Body(new ValidationPipe(ValidationSchema.UpdateGroupSchema))
         body: { name: string },
     ): Promise<any> {
-        let group = await this.groupService.findById(request, groupId);
-        await this.groupService.updateGroup(request, group, body);
+        let group = await this.groupService.findById(permission, groupId);
+        await this.groupService.updateGroup(permission, group, body);
         return group;
     }
 
     @Delete("/group/:groupId/delete")
     @UseGuards(JwtAuthGuard)
     async deleteGroup(
-        @Request() request,
+        @CurrentPermission() permission: Permission,
         @Param("groupId") groupId: string,
     ): Promise<any> {
-        let group = await this.groupService.findById(request, groupId);
-        await this.groupService.deleteById(request, groupId);
+        let group = await this.groupService.findById(permission, groupId);
+        await this.groupService.deleteById(permission, groupId);
         return group;
     }
 
     @Post("/group/:groupId/add-roles")
     @UseGuards(JwtAuthGuard)
     async addRole(
-        @Request() request,
+        @CurrentPermission() permission: Permission,
         @Param("groupId") groupId: string,
         @Body(new ValidationPipe(ValidationSchema.UpdateGroupRole))
         body: { roles: string[] },
     ): Promise<any> {
-        let group = await this.groupService.findById(request, groupId);
-        await this.groupService.addRoles(request, group, body.roles);
-        let roles = await this.groupService.findGroupRoles(request, group);
+        let group = await this.groupService.findById(permission, groupId);
+        await this.groupService.addRoles(permission, group, body.roles);
+        let roles = await this.groupService.findGroupRoles(permission, group);
         return {
             group: group,
             roles: roles,
@@ -115,14 +114,14 @@ export class GroupController {
     @Post("/group/:groupId/remove-roles")
     @UseGuards(JwtAuthGuard)
     async removeRole(
-        @Request() request,
+        @CurrentPermission() permission: Permission,
         @Param("groupId") groupId: string,
         @Body(new ValidationPipe(ValidationSchema.UpdateGroupRole))
         body: { roles: string[] },
     ): Promise<any> {
-        let group = await this.groupService.findById(request, groupId);
-        await this.groupService.removeRoles(request, group, body.roles);
-        let roles = await this.groupService.findGroupRoles(request, group);
+        let group = await this.groupService.findById(permission, groupId);
+        await this.groupService.removeRoles(permission, group, body.roles);
+        let roles = await this.groupService.findGroupRoles(permission, group);
         return {
             group: group,
             roles: roles,
@@ -132,14 +131,14 @@ export class GroupController {
     @Post("/group/:groupId/add-users")
     @UseGuards(JwtAuthGuard)
     async addUsers(
-        @Request() request,
+        @CurrentPermission() permission: Permission,
         @Param("groupId") groupId: string,
         @Body(new ValidationPipe(ValidationSchema.UpdateGroupUser))
         body: { users: string[] },
     ): Promise<any> {
-        let group = await this.groupService.findById(request, groupId);
-        await this.groupService.addUser(request, group, body.users);
-        let users = await this.groupService.findGroupUsers(request, group);
+        let group = await this.groupService.findById(permission, groupId);
+        await this.groupService.addUser(permission, group, body.users);
+        let users = await this.groupService.findGroupUsers(permission, group);
         return {
             group: group,
             users: users,
@@ -149,14 +148,14 @@ export class GroupController {
     @Post("/group/:groupId/remove-users")
     @UseGuards(JwtAuthGuard)
     async removeUsers(
-        @Request() request,
+        @CurrentPermission() permission: Permission,
         @Param("groupId") groupId: string,
         @Body(new ValidationPipe(ValidationSchema.UpdateGroupUser))
         body: { users: string[] },
     ): Promise<any> {
-        let group = await this.groupService.findById(request, groupId);
-        await this.groupService.removeUser(request, group, body.users);
-        let users = await this.groupService.findGroupUsers(request, group);
+        let group = await this.groupService.findById(permission, groupId);
+        await this.groupService.removeUser(permission, group, body.users);
+        let users = await this.groupService.findGroupUsers(permission, group);
         return {
             group: group,
             users: users,

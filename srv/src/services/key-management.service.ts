@@ -1,6 +1,6 @@
 import {Injectable, Logger, NotFoundException} from "@nestjs/common";
 import {InjectRepository} from "@nestjs/typeorm";
-import {DataSource, IsNull, Repository} from "typeorm";
+import {IsNull, Repository} from "typeorm";
 import {Cron} from "@nestjs/schedule";
 import {TenantKey} from "../entity/tenant-key.entity";
 import {KidUtil} from "../util/kid.util";
@@ -14,7 +14,6 @@ export class KeyManagementService {
     constructor(
         @InjectRepository(TenantKey)
         private readonly tenantKeyRepository: Repository<TenantKey>,
-        private readonly dataSource: DataSource,
     ) {}
 
     async createInitialKey(tenantId: string, publicKey: string, privateKey: string): Promise<TenantKey> {
@@ -51,56 +50,63 @@ export class KeyManagementService {
         return tenantKey.publicKey;
     }
 
+    /**
+     * Rotate the signing key for a tenant.
+     *
+     * Uses atomic UPDATE … WHERE is_current = true as a compare-and-swap
+     * instead of an explicit transaction. Each individual write is atomic
+     * in both PostgreSQL and SQLite, avoiding the "cannot start a transaction
+     * within a transaction" error that SQLite raises under concurrent access.
+     */
     async rotateKey(tenantId: string): Promise<TenantKey> {
-        return this.dataSource.transaction(async (manager) => {
-            const isSqlite = this.dataSource.options.type === 'sqlite' || this.dataSource.options.type === 'better-sqlite3';
+        const now = new Date();
 
-            let currentKey: TenantKey | null;
-
-            if (isSqlite) {
-                currentKey = await manager.findOne(TenantKey, {
-                    where: {tenantId, isCurrent: true},
-                });
-            } else {
-                const rows = await manager.query(
-                    `SELECT * FROM tenant_keys WHERE tenant_id = $1 AND is_current = true FOR UPDATE`,
-                    [tenantId],
-                );
-                currentKey = rows && rows.length > 0
-                    ? manager.create(TenantKey, rows[0])
-                    : null;
-            }
-
-            if (!currentKey) {
-                throw new NotFoundException(`No current key found for tenant ${tenantId}`);
-            }
-
-            // Mark current key as superseded
-            currentKey.isCurrent = false;
-            currentKey.supersededAt = new Date();
-            await manager.save(TenantKey, currentKey);
-
-            // Generate new key pair
-            const {publicKey, privateKey} = CryptUtil.generateKeyPair();
-            const newVersion = currentKey.keyVersion + 1;
-            const newKid = KidUtil.generate(tenantId, newVersion);
-
-            const newKey = manager.create(TenantKey, {
+        // Step 1: Atomically supersede the current key.
+        // The WHERE is_current = true clause acts as a compare-and-swap —
+        // only one concurrent caller can succeed.
+        const superseded = await this.tenantKeyRepository
+            .createQueryBuilder()
+            .update(TenantKey)
+            .set({isCurrent: false, supersededAt: now})
+            .where('tenant_id = :tenantId AND is_current = :isCurrent', {
                 tenantId,
-                keyVersion: newVersion,
-                kid: newKid,
-                publicKey,
-                privateKey,
                 isCurrent: true,
-            });
+            })
+            .execute();
 
-            const savedKey = await manager.save(TenantKey, newKey);
+        if (!superseded.affected || superseded.affected === 0) {
+            throw new NotFoundException(`No current key found for tenant ${tenantId}`);
+        }
 
-            // Enforce max keys within the same transaction
-            await this.enforceMaxKeysWithManager(tenantId, manager);
-
-            return savedKey;
+        // Step 2: Find the highest version for this tenant to compute the next one.
+        const previousKey = await this.tenantKeyRepository.findOne({
+            where: {tenantId},
+            select: ['id', 'keyVersion'],
+            order: {keyVersion: 'DESC'},
         });
+
+        const previousVersion = previousKey?.keyVersion ?? 0;
+
+        // Step 3: Generate and insert the new current key.
+        const {publicKey, privateKey} = CryptUtil.generateKeyPair();
+        const newVersion = previousVersion + 1;
+        const newKid = KidUtil.generate(tenantId, newVersion);
+
+        const newKey = this.tenantKeyRepository.create({
+            tenantId,
+            keyVersion: newVersion,
+            kid: newKid,
+            publicKey,
+            privateKey,
+            isCurrent: true,
+        });
+
+        const savedKey = await this.tenantKeyRepository.save(newKey);
+
+        // Step 4: Enforce max active keys.
+        await this.enforceMaxKeys(tenantId);
+
+        return savedKey;
     }
 
     @Cron(process.env.JWKS_CLEANUP_CRON ?? '0 * * * * *')
@@ -132,13 +138,13 @@ export class KeyManagementService {
         }
     }
 
-    private async enforceMaxKeysWithManager(tenantId: string, manager: any): Promise<void> {
+    private async enforceMaxKeys(tenantId: string): Promise<void> {
         const maxKeys = parseInt(
             Environment.get('JWKS_MAX_ACTIVE_KEYS_PER_TENANT', '3'),
             10,
         );
 
-        const activeKeys = await manager.find(TenantKey, {
+        const activeKeys = await this.tenantKeyRepository.find({
             where: {tenantId, deactivatedAt: IsNull()},
             order: {keyVersion: 'ASC'},
         });
@@ -146,8 +152,9 @@ export class KeyManagementService {
         if (activeKeys.length > maxKeys) {
             const keysToDeactivate = activeKeys.slice(0, activeKeys.length - maxKeys);
             for (const key of keysToDeactivate) {
-                key.deactivatedAt = new Date();
-                await manager.save(TenantKey, key);
+                await this.tenantKeyRepository.update(key.id, {
+                    deactivatedAt: new Date(),
+                });
                 this.logger.warn(
                     `Deactivated oldest active key for tenant ${tenantId}, key version ${key.keyVersion} (max active keys exceeded)`,
                 );

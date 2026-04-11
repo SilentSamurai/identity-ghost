@@ -48,7 +48,7 @@ export class TenantController {
         @Body(new ValidationPipe(ValidationSchema.CreateTenantSchema))
         body: any,
     ): Promise<Tenant> {
-        return this.tenantService.create(permission.authContext, body.name, body.domain, user);
+        return this.tenantService.create(permission, body.name, body.domain, user);
     }
 
     // ─── New token-derived routes (no :tenantId in URL) ───
@@ -70,7 +70,7 @@ export class TenantController {
         @CurrentPermission() permission: Permission,
         @CurrentTenantId() tenantId: string,
     ): Promise<Tenant> {
-        return this.tenantService.deleteTenant(permission.authContext, tenantId);
+        return this.tenantService.deleteTenant(permission, tenantId);
     }
 
     @Get("/my/credentials")
@@ -79,7 +79,7 @@ export class TenantController {
         @CurrentPermission() permission: Permission,
         @CurrentTenantId() tenantId: string,
     ): Promise<any> {
-        const tenant = await this.tenantService.findById(permission.authContext, tenantId);
+        const tenant = await this.tenantService.findById(permission, tenantId);
         permission.isAuthorized(Action.ReadCredentials, SubjectEnum.TENANT, tenant);
         const publicKey = await this.signingKeyProvider.getPublicKey(tenant.id);
         return {
@@ -105,13 +105,13 @@ export class TenantController {
         name?: string;
         allowSignUp?: boolean
     }): Promise<Tenant> {
-        const tenant = await this.tenantService.findById(permission.authContext, tenantId);
+        const tenant = await this.tenantService.findById(permission, tenantId);
         permission.isAuthorized(Action.Update, SubjectEnum.TENANT, tenant);
-        return this.tenantService.updateTenant(permission.authContext, tenantId, body);
+        return this.tenantService.updateTenant(permission, tenantId, body);
     }
 
     private async _getTenant(permission: Permission, tenantId: string): Promise<Tenant> {
-        const tenant = await this.tenantService.findById(permission.authContext, tenantId);
+        const tenant = await this.tenantService.findById(permission, tenantId);
         permission.isAuthorized(Action.Read, SubjectEnum.TENANT, tenant);
         return tenant;
     }

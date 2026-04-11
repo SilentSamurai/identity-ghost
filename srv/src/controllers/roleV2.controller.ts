@@ -46,7 +46,7 @@ export class RoleControllerV2 {
         @Body(new ValidationPipe(RoleControllerV2.UpdateRoleSchema))
         body: { name: string; description: string; appId?: string },
     ): Promise<Role> {
-        return this.roleService.updateRole(permission.authContext, roleId, body.name, body.description, body.appId);
+        return this.roleService.updateRole(permission, roleId, body.name, body.description, body.appId);
     }
 
     @Get("/:roleId")
@@ -55,9 +55,9 @@ export class RoleControllerV2 {
         @CurrentPermission() permission: Permission,
         @Param("roleId") roleId: string,
     ): Promise<any> {
-        const role = await this.roleService.findById(permission.authContext, roleId);
+        const role = await this.roleService.findById(permission, roleId);
         permission.isAuthorized(Action.Read, SubjectEnum.TENANT, role.tenant);
-        const users = await this.userService.findByRole(permission.authContext, role);
+        const users = await this.userService.findByRole(permission, role);
         return {role, users};
     }
 }

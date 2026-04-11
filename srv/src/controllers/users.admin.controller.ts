@@ -60,8 +60,8 @@ export class UsersAdminController {
         @Body(new ValidationPipe(ValidationSchema.CreateUserSchema))
         body: { name: string; email: string; password: string },
     ): Promise<User> {
-        const user = await this.usersService.create(permission.authContext, body.password, body.email, body.name);
-        await this.usersService.updateVerified(permission.authContext, user.id, true);
+        const user = await this.usersService.create(permission, body.password, body.email, body.name);
+        await this.usersService.updateVerified(permission, user.id, true);
         return user;
     }
 
@@ -72,7 +72,7 @@ export class UsersAdminController {
         @Body(new ValidationPipe(ValidationSchema.UpdateUserSchema))
         body: { id: string; name: string; email: string },
     ): Promise<User> {
-        return this.usersService.update(permission.authContext, body.id, body.name, body.email);
+        return this.usersService.update(permission, body.id, body.name, body.email);
     }
 
     @Get("/:userId")
@@ -81,7 +81,7 @@ export class UsersAdminController {
         @CurrentPermission() permission: Permission,
         @Param("userId") userId: string,
     ): Promise<any> {
-        const user = await this.usersService.findById(permission.authContext, userId);
+        const user = await this.usersService.findById(permission, userId);
         return {
             id: user.id,
             name: user.name,
@@ -95,7 +95,7 @@ export class UsersAdminController {
     @Get("")
     @UseGuards(JwtAuthGuard)
     async getUsers(@CurrentPermission() permission: Permission): Promise<User[]> {
-        return this.usersService.getAll(permission.authContext);
+        return this.usersService.getAll(permission);
     }
 
     @Delete("/:id")
@@ -104,7 +104,7 @@ export class UsersAdminController {
         @CurrentPermission() permission: Permission,
         @Param("id") id: string,
     ): Promise<User> {
-        return this.usersService.delete(permission.authContext, id);
+        return this.usersService.delete(permission, id);
     }
 
     @Get("/:userId/tenants")
@@ -113,8 +113,8 @@ export class UsersAdminController {
         @CurrentPermission() permission: Permission,
         @Param("userId") userId: string,
     ): Promise<Tenant[]> {
-        const user = await this.usersService.findById(permission.authContext, userId);
-        return this.tenantService.findByMembership(permission.authContext, user);
+        const user = await this.usersService.findById(permission, userId);
+        return this.tenantService.findByMembership(permission, user);
     }
 
     @Put("/verify-user")
@@ -124,8 +124,8 @@ export class UsersAdminController {
         @Body(new ValidationPipe(VerifyUserSchema))
         body: { email: string; verify: boolean },
     ): Promise<User> {
-        const user = await this.usersService.findByEmail(permission.authContext, body.email);
-        return this.usersService.updateVerified(permission.authContext, user.id, body.verify);
+        const user = await this.usersService.findByEmail(permission, body.email);
+        return this.usersService.updateVerified(permission, user.id, body.verify);
     }
 
     @Put(":userId/lock")
@@ -134,7 +134,7 @@ export class UsersAdminController {
         @CurrentPermission() permission: Permission,
         @Param("userId") userId: string,
     ): Promise<any> {
-        const user = await this.usersService.lockUser(permission.authContext, userId);
+        const user = await this.usersService.lockUser(permission, userId);
         return {id: user.id, locked: user.locked};
     }
 
@@ -144,7 +144,7 @@ export class UsersAdminController {
         @CurrentPermission() permission: Permission,
         @Param("userId") userId: string,
     ): Promise<any> {
-        const user = await this.usersService.unlockUser(permission.authContext, userId);
+        const user = await this.usersService.unlockUser(permission, userId);
         return {id: user.id, locked: user.locked};
     }
 
@@ -159,6 +159,6 @@ export class UsersAdminController {
         if (body.password !== body.confirmPassword) {
             throw new BadRequestException("Passwords do not match");
         }
-        return this.usersService.updatePassword(permission.authContext, id, body.password);
+        return this.usersService.updatePassword(permission, id, body.password);
     }
 }

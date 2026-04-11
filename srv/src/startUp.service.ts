@@ -45,43 +45,42 @@ export class StartUpService implements OnModuleInit {
 
     async createAdminUser() {
         try {
-            let adminContext =
-                await this.securityService.getContextForStartup();
+            const permission = this.securityService.createPermissionForStartupSeed();
             if (
                 !(await this.usersService.existByEmail(
-                    adminContext,
+                    permission,
                     this.configService.get("SUPER_ADMIN_EMAIL"),
                 ))
             ) {
                 let user: User = await this.usersService.create(
-                    adminContext,
+                    permission,
                     this.configService.get("SUPER_ADMIN_PASSWORD"),
                     this.configService.get("SUPER_ADMIN_EMAIL"),
                     this.configService.get("SUPER_ADMIN_NAME"),
                 );
 
                 await this.usersService.updateVerified(
-                    adminContext,
+                    permission,
                     user.id,
                     true,
                 );
 
                 const isPresent = await this.usersService.existByEmail(
-                    adminContext,
+                    permission,
                     "admin@mail.com",
                 );
 
                 if (!isPresent) {
 
                     let normalUser: User = await this.usersService.create(
-                        adminContext,
+                        permission,
                         "admin9000",
                         "admin@mail.com",
                         "admin",
                     );
 
                     await this.usersService.updateVerified(
-                        adminContext,
+                        permission,
                         user.id,
                         true,
                     );
@@ -96,8 +95,7 @@ export class StartUpService implements OnModuleInit {
     async createDummyTenantAndUser(): Promise<void> {
         try {
             // 1) Get admin context for creating data
-            const adminContext =
-                await this.securityService.getContextForStartup();
+            const permission = this.securityService.createPermissionForStartupSeed();
 
             // 3) Define a list of dummy tenants to create
             const dummyTenants = [
@@ -118,7 +116,7 @@ export class StartUpService implements OnModuleInit {
             for (const {name, domain, signUp} of dummyTenants) {
                 const adminEmail = `admin@${domain}`;
                 const isPresent = await this.usersService.existByEmail(
-                    adminContext,
+                    permission,
                     adminEmail,
                 );
                 if (isPresent) {
@@ -126,19 +124,19 @@ export class StartUpService implements OnModuleInit {
                 }
 
                 const adminUser: User = await this.usersService.create(
-                    adminContext,
+                    permission,
                     "admin9000",
                     adminEmail,
                     "Admin",
                 );
                 await this.usersService.updateVerified(
-                    adminContext,
+                    permission,
                     adminUser.id,
                     true,
                 );
 
                 const createdTenant: Tenant = await this.tenantService.create(
-                    adminContext,
+                    permission,
                     name,
                     domain,
                     adminUser,
@@ -146,7 +144,7 @@ export class StartUpService implements OnModuleInit {
 
                 if (signUp) {
                     await this.tenantService.updateTenant(
-                        adminContext,
+                        permission,
                         createdTenant.id,
                         {
                             allowSignUp: true,
@@ -169,25 +167,24 @@ export class StartUpService implements OnModuleInit {
     async populateDummyUsers(): Promise<void> {
         try {
             const data: string = await readFile("./users.json", "utf8");
-            const adminContext =
-                await this.securityService.getContextForStartup();
+            const permission = this.securityService.createPermissionForStartupSeed();
             const users = JSON.parse(data);
 
             for (const record of users.records) {
                 try {
                     const isPresent = await this.usersService.existByEmail(
-                        adminContext,
+                        permission,
                         record.email,
                     );
                     if (!isPresent) {
                         const user: User = await this.usersService.create(
-                            adminContext,
+                            permission,
                             record.password,
                             record.email,
                             record.name,
                         );
                         await this.usersService.updateVerified(
-                            adminContext,
+                            permission,
                             user.id,
                             true,
                         );
@@ -203,57 +200,56 @@ export class StartUpService implements OnModuleInit {
 
     async populateGlobalTenant() {
         try {
-            let adminContext =
-                await this.securityService.getContextForStartup();
+            const permission = this.securityService.createPermissionForStartupSeed();
             let globalTenantExists = await this.tenantService.existByDomain(
-                adminContext,
+                permission,
                 this.configService.get("SUPER_TENANT_DOMAIN"),
             );
             if (!globalTenantExists) {
                 const user = await this.usersService.findByEmail(
-                    adminContext,
+                    permission,
                     this.configService.get("SUPER_ADMIN_EMAIL"),
                 );
                 const tenant: Tenant = await this.tenantService.create(
-                    adminContext,
+                    permission,
                     this.configService.get("SUPER_TENANT_NAME"),
                     this.configService.get("SUPER_TENANT_DOMAIN"),
                     user,
                 );
                 const adminRole = await this.roleService.findByNameAndTenant(
-                    adminContext,
+                    permission,
                     RoleEnum.TENANT_ADMIN,
                     tenant,
                 );
                 const viewerRole = await this.roleService.findByNameAndTenant(
-                    adminContext,
+                    permission,
                     RoleEnum.TENANT_VIEWER,
                     tenant,
                 );
                 const superAdminRole = await this.roleService.create(
-                    adminContext,
+                    permission,
                     RoleEnum.SUPER_ADMIN,
                     tenant,
                     false,
                 );
                 await this.roleService.updateUserRoles(
-                    adminContext,
+                    permission,
                     [adminRole.name, viewerRole.name, superAdminRole.name],
                     tenant,
                     user,
                 );
 
                 const normalUser = await this.usersService.findByEmail(
-                    adminContext,
+                    permission,
                     "admin@mail.com",
                 );
 
-                const isMember = await this.tenantService.isMember(adminContext, tenant.id, normalUser)
+                const isMember = await this.tenantService.isMember(permission, tenant.id, normalUser)
                 if (!isMember) {
-                    await this.tenantService.addMember(adminContext, tenant.id, normalUser);
+                    await this.tenantService.addMember(permission, tenant.id, normalUser);
 
                     await this.roleService.updateUserRoles(
-                        adminContext,
+                        permission,
                         [viewerRole.name],
                         tenant,
                         normalUser,
@@ -267,7 +263,7 @@ export class StartUpService implements OnModuleInit {
 
     async createDummyAppsGroupsRoles(): Promise<void> {
         try {
-            const adminContext = await this.securityService.getContextForStartup();
+            const permission = this.securityService.createPermissionForStartupSeed();
 
             const dummyData = [
                 {
@@ -369,7 +365,7 @@ export class StartUpService implements OnModuleInit {
             for (const entry of dummyData) {
                 let tenant: Tenant;
                 try {
-                    tenant = await this.tenantService.findByDomain(adminContext, entry.domain);
+                    tenant = await this.tenantService.findByDomain(permission, entry.domain);
                 } catch {
                     this.logger.warn(`Tenant ${entry.domain} not found, skipping`);
                     continue;
@@ -377,19 +373,19 @@ export class StartUpService implements OnModuleInit {
 
                 for (const roleName of entry.roles) {
                     try {
-                        const exists = await this.roleService.findByNameAndTenant(adminContext, roleName, tenant);
+                        const exists = await this.roleService.findByNameAndTenant(permission, roleName, tenant);
                         if (exists) continue;
                     } catch {
-                        await this.roleService.create(adminContext, roleName, tenant);
+                        await this.roleService.create(permission, roleName, tenant);
                         this.logger.log(`Created role: ${roleName} in ${entry.domain}`);
                     }
                 }
 
                 for (const groupName of entry.groups) {
                     try {
-                        const exists = await this.groupService.existsByNameAndTenantId(adminContext, groupName, tenant.id);
+                        const exists = await this.groupService.existsByNameAndTenantId(permission, groupName, tenant.id);
                         if (exists) continue;
-                        await this.groupService.create(adminContext, groupName, tenant);
+                        await this.groupService.create(permission, groupName, tenant);
                         this.logger.log(`Created group: ${groupName} in ${entry.domain}`);
                     } catch (e) {
                         this.logger.warn(`Group ${groupName} in ${entry.domain} may already exist`);
@@ -398,7 +394,7 @@ export class StartUpService implements OnModuleInit {
 
                 for (const app of entry.apps) {
                     try {
-                        await this.appService.createApp(adminContext, tenant.id, app.name, app.appUrl, app.description);
+                        await this.appService.createApp(permission, tenant.id, app.name, app.appUrl, app.description);
                         this.logger.log(`Created app: ${app.name} in ${entry.domain}`);
                     } catch (e) {
                         this.logger.warn(`App ${app.name} in ${entry.domain} may already exist`);
@@ -408,7 +404,7 @@ export class StartUpService implements OnModuleInit {
                 for (const client of entry.clients) {
                     try {
                         await this.clientService.createClient(
-                            adminContext,
+                            permission,
                             tenant.id,
                             client.name,
                             client.redirectUris,

@@ -323,16 +323,17 @@ export class AuthService {
         const authContext = await this.securityService.getUserAuthContext(
             payload.sub,
         );
+        const permission = this.securityService.createPermission(authContext);
 
         const user: User = await this.userService.findByEmail(
-            authContext,
+            permission,
             payload.sub,
         );
         if (user.verified) {
             return false;
         }
 
-        await this.userService.updateVerified(authContext, user.id, true);
+        await this.userService.updateVerified(permission, user.id, true);
 
         return true;
     }
@@ -383,12 +384,13 @@ export class AuthService {
         const authContext = await this.securityService.getUserAuthContext(
             payload.sub,
         );
+        const permission = this.securityService.createPermission(authContext);
 
         if (!user.verified) {
             throw new UnauthorizedException('Email not verified');
         }
 
-        await this.userService.updatePassword(authContext, user.id, password);
+        await this.userService.updatePassword(permission, user.id, password);
 
         return true;
     }
@@ -439,9 +441,10 @@ export class AuthService {
         const authContext = await this.securityService.getUserAuthContext(
             payload.sub,
         );
+        const permission = this.securityService.createPermission(authContext);
 
         await this.userService.updateEmail(
-            authContext,
+            permission,
             user.id,
             payload.updatedEmail,
         );

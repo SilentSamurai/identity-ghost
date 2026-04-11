@@ -7,7 +7,8 @@ import {Environment} from "../config/environment.service";
 import {AuthCodeService} from "./auth-code.service";
 import {User} from "../entity/user.entity";
 import {Tenant} from "../entity/tenant.entity";
-import {AuthContext, GRANT_TYPES} from "../casl/contexts";
+import {GRANT_TYPES} from "../casl/contexts";
+import {Permission} from "../auth/auth.decorator";
 import {ScopeResolverService} from "../casl/scope-resolver.service";
 import {ClientService} from "../services/client.service";
 import {ScopeNormalizer} from "../casl/scope-normalizer";
@@ -16,6 +17,57 @@ import {RefreshTokenService} from "./refresh-token.service";
 import {UsersService} from "../services/users.service";
 import {OAuthException} from "../exceptions/oauth-exception";
 
+/**
+ * TokenIssuanceService — Central orchestrator for OAuth 2.0 / OIDC token issuance.
+ *
+ * This service coordinates the full token issuance pipeline for all grant types:
+ * - Authorization Code (via issueToken with authCode)
+ * - Resource Owner Password Credentials (via issueToken)
+ * - Refresh Token (via refreshToken)
+ * - Client Credentials (via issueClientCredentialsToken)
+ *
+ * ## Core Responsibilities
+ *
+ * 1. **Scope Resolution**: Performs two-way intersection between requested scopes
+ *    and client-allowed scopes via ScopeResolverService. Never includes roles in scopes.
+ *
+ * 2. **Role Fetching**: Retrieves user roles from the database for tenant members.
+ *    Roles are kept separate from OAuth scopes per the token architecture.
+ *
+ * 3. **Membership & Subscription Validation**: Verifies the user is either a direct
+ *    tenant member or has a valid app subscription before issuing tokens.
+ *
+ * 4. **Subscription Ambiguity Resolution**: When a user has subscriptions to multiple
+ *    tenants, resolves which tenant context to use (may require user hint).
+ *
+ * 5. **Token Assembly**: Coordinates with:
+ *    - AuthService — creates the signed JWT access token with scopes + roles
+ *    - IdTokenService — generates the OIDC ID token for user identity
+ *    - RefreshTokenService — creates, rotates, and validates refresh tokens
+ *
+ * ## Token Types Produced
+ *
+ * - **TenantToken** (user grants): Contains both `scopes` (OIDC values) and `roles`
+ *   (role enums). Used for authorization_code, password, and refresh_token grants.
+ *
+ * - **TechnicalToken** (client_credentials): Contains only `scopes`, no `roles` field
+ *   since there is no user identity. Per RFC 6749 §4.4.3, never includes refresh_token.
+ *
+ * ## Response Format
+ *
+ * All methods return a TokenResponse conforming to OAuth 2.0 (RFC 6749):
+ * - access_token: The JWT for API access
+ * - token_type: Always "Bearer"
+ * - expires_in: Token lifetime in seconds
+ * - scope: Space-delimited granted scopes (OIDC values only)
+ * - refresh_token: Only for user grants (not client_credentials)
+ * - id_token: Only for user grants with 'openid' scope
+ *
+ * @see ScopeResolverService — two-way scope intersection logic
+ * @see AuthService — JWT signing and claims assembly
+ * @see IdTokenService — OIDC ID token generation
+ * @see RefreshTokenService — refresh token lifecycle management
+ */
 export interface TokenResponse {
     access_token: string;
     token_type: string;
@@ -54,10 +106,12 @@ export class TokenIssuanceService {
      * membership check → subscription resolution → scope building → token creation → response formatting.
      */
     async issueToken(user: User, tenant: Tenant, options?: IssueTokenOptions): Promise<TokenResponse> {
-        const adminContext = await this.securityService.getContextForTokenIssuance(tenant.id);
+        // this is needed because when you are creating a token you do not have a logged in user yet
+        // TODO : but for some scenarios there is logged in user so we can update this 
+        const permission = this.securityService.createPermissionForTokenIssuance(tenant.id);
 
-        const isMember = await this.tenantService.isMember(adminContext, tenant.id, user);
-        const isSubscribed = await this.subscriptionService.isUserSubscribedToTenant(adminContext, user, tenant);
+        const isMember = await this.tenantService.isMember(permission, tenant.id, user);
+        const isSubscribed = await this.subscriptionService.isUserSubscribedToTenant(permission, user, tenant);
 
         if (!isMember && !isSubscribed) {
             throw new BadRequestException("User is not a member of the tenant and does not have a valid app subscription");
@@ -67,10 +121,10 @@ export class TokenIssuanceService {
         const clientAllowedScopes = await this.getClientAllowedScopes(tenant);
 
         if (isSubscribed) {
-            return this.issueSubscribedToken(adminContext, user, tenant, clientAllowedScopes, options);
+            return this.issueSubscribedToken(permission, user, tenant, clientAllowedScopes, options);
         }
 
-        const roles = await this.tenantService.getMemberRoles(adminContext, tenant.id, user);
+        const roles = await this.tenantService.getMemberRoles(permission, tenant.id, user);
         const roleNames = roles.map(r => r.name);
         const grantedScopes = this.scopeResolverService.resolveScopes(
             options?.requestedScope ?? null,
@@ -107,10 +161,10 @@ export class TokenIssuanceService {
         ambiguousTenants?: any[];
         resolvedHint?: string;
     }> {
-        const adminContext = await this.securityService.getContextForTokenIssuance(tenant.id);
+        const permission = this.securityService.createPermissionForTokenIssuance(tenant.id);
 
-        const isMember = await this.tenantService.isMember(adminContext, tenant.id, user);
-        const isSubscribed = await this.subscriptionService.isUserSubscribedToTenant(adminContext, user, tenant);
+        const isMember = await this.tenantService.isMember(permission, tenant.id, user);
+        const isSubscribed = await this.subscriptionService.isUserSubscribedToTenant(permission, user, tenant);
 
         if (!isMember && !isSubscribed) {
             throw new ForbiddenException("User is not a member of the tenant and does not have a valid app subscription");
@@ -123,7 +177,7 @@ export class TokenIssuanceService {
 
         // Subscribed user — check for ambiguity
         const ambiguityResult = await this.subscriptionService
-            .resolveSubscriptionTenantAmbiguity(adminContext, user, tenant, subscriberTenantHint || null);
+            .resolveSubscriptionTenantAmbiguity(permission, user, tenant, subscriberTenantHint || null);
 
         if (ambiguityResult.ambiguousTenants) {
             return {
@@ -142,7 +196,7 @@ export class TokenIssuanceService {
     }
 
     private async issueSubscribedToken(
-        adminContext: AuthContext,
+        permission: Permission,
         user: User,
         tenant: Tenant,
         clientAllowedScopes: string,
@@ -161,14 +215,14 @@ export class TokenIssuanceService {
         }
 
         const ambiguityResult = await this.subscriptionService
-            .resolveSubscriptionTenantAmbiguity(adminContext, user, tenant, hint);
+            .resolveSubscriptionTenantAmbiguity(permission, user, tenant, hint);
 
         if (ambiguityResult.ambiguousTenants) {
             throw new BadRequestException("Multiple subscription tenants found. Please specify a subscriber_tenant_hint.");
         }
 
         const subscribingTenant = ambiguityResult.resolvedTenant!;
-        let additionalRoles = await this.tenantService.getMemberRoles(adminContext, subscribingTenant.id, user);
+        let additionalRoles = await this.tenantService.getMemberRoles(permission, subscribingTenant.id, user);
         const allRoleNames = additionalRoles.map(r => r.name);
 
         const grantedScopes = this.scopeResolverService.resolveScopes(
@@ -213,16 +267,16 @@ export class TokenIssuanceService {
             requestedScope,
         });
 
-        const adminContext = await this.securityService.getContextForTokenIssuance(record.tenantId);
+        const permission = this.securityService.createPermissionForTokenIssuance(record.tenantId);
 
-        const user = await this.usersService.findById(adminContext, record.userId);
+        const user = await this.usersService.findById(permission, record.userId);
         if (user.locked) {
             throw OAuthException.invalidGrant("The refresh token is invalid or has expired");
         }
 
-        const tenant = await this.tenantService.findById(adminContext, record.tenantId);
+        const tenant = await this.tenantService.findById(permission, record.tenantId);
 
-        const roles = await this.tenantService.getMemberRoles(adminContext, tenant.id, user);
+        const roles = await this.tenantService.getMemberRoles(permission, tenant.id, user);
         const roleNames = roles.map(r => r.name);
 
         const grantedScopes = ScopeNormalizer.parse(record.scope);

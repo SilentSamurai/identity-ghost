@@ -3,12 +3,11 @@ import {InjectRepository} from '@nestjs/typeorm';
 import {Repository} from 'typeorm';
 import {Client} from '../entity/client.entity';
 import {TenantService} from './tenant.service';
-import {SecurityService} from '../casl/security.service';
-import {AuthContext} from '../casl/contexts';
 import {Action} from '../casl/actions.enum';
 import {SubjectEnum} from '../entity/subjectEnum';
 import {randomBytes, scryptSync, timingSafeEqual} from 'crypto';
 import {v4 as uuidv4} from 'uuid';
+import {Permission} from '../auth/auth.decorator';
 
 @Injectable()
 export class ClientService {
@@ -16,12 +15,11 @@ export class ClientService {
         @InjectRepository(Client)
         private readonly clientRepository: Repository<Client>,
         private readonly tenantService: TenantService,
-        private readonly securityService: SecurityService,
     ) {
     }
 
     async createClient(
-        authContext: AuthContext,
+        permission: Permission,
         tenantId: string,
         name: string,
         redirectUris: string[],
@@ -34,9 +32,9 @@ export class ClientService {
         allowPasswordGrant?: boolean,
         allowRefreshToken?: boolean,
     ): Promise<{ client: Client; plainSecret: string | null }> {
-        this.securityService.isAuthorized(authContext, Action.Create, SubjectEnum.CLIENT, {tenantId});
+        permission.isAuthorized(Action.Create, SubjectEnum.CLIENT, {tenantId});
 
-        const tenant = await this.tenantService.findById(authContext, tenantId);
+        const tenant = await this.tenantService.findById(permission, tenantId);
         const clientId = uuidv4();
 
         let clientSecrets: { secret: string; salt: string; created_at: string; expires_at: string | null }[] = [];
@@ -140,7 +138,7 @@ export class ClientService {
     }
 
     async updateClient(
-        authContext: AuthContext,
+        permission: Permission,
         clientId: string,
         updates: {
             name?: string;
@@ -151,7 +149,7 @@ export class ClientService {
         },
     ): Promise<Client> {
         const client = await this.findByClientId(clientId);
-        this.securityService.isAuthorized(authContext, Action.Update, SubjectEnum.CLIENT, {tenantId: client.tenantId});
+        permission.isAuthorized(Action.Update, SubjectEnum.CLIENT, {tenantId: client.tenantId});
         if (updates.name !== undefined) client.name = updates.name;
         if (updates.redirectUris !== undefined) client.redirectUris = updates.redirectUris;
         if (updates.requirePkce !== undefined) client.requirePkce = updates.requirePkce;
@@ -160,9 +158,9 @@ export class ClientService {
         return this.clientRepository.save(client);
     }
 
-    async deleteClient(authContext: AuthContext, clientId: string): Promise<void> {
+    async deleteClient(permission: Permission, clientId: string): Promise<void> {
         const client = await this.findByClientId(clientId);
-        this.securityService.isAuthorized(authContext, Action.Delete, SubjectEnum.CLIENT, {tenantId: client.tenantId});
+        permission.isAuthorized(Action.Delete, SubjectEnum.CLIENT, {tenantId: client.tenantId});
         await this.clientRepository.remove(client);
     }
 

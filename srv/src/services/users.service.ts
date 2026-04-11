@@ -16,8 +16,7 @@ import {Role} from "../entity/role.entity";
 import {Tenant} from "src/entity/tenant.entity";
 import {Action} from "../casl/actions.enum";
 import {SubjectEnum} from "../entity/subjectEnum";
-import {SecurityService} from "../casl/security.service";
-import {AuthContext} from "../casl/contexts";
+import {Permission} from "../auth/auth.decorator";
 
 @Injectable()
 export class UsersService implements OnModuleInit {
@@ -26,7 +25,6 @@ export class UsersService implements OnModuleInit {
     constructor(
         @InjectRepository(User) private usersRepository: Repository<User>,
         private readonly configService: Environment,
-        private readonly securityService: SecurityService,
     ) {
     }
 
@@ -37,14 +35,13 @@ export class UsersService implements OnModuleInit {
      * Create a user.
      */
     async create(
-        authContext: AuthContext,
+        permission: Permission,
         password: string,
         email: string,
         name: string,
     ): Promise<User> {
         // Check read policy and if email is already taken
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Read,
             SubjectEnum.USER,
             {email},
@@ -54,8 +51,7 @@ export class UsersService implements OnModuleInit {
         }
 
         // Check create policy
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Create,
             SubjectEnum.USER,
         );
@@ -71,12 +67,11 @@ export class UsersService implements OnModuleInit {
     }
 
     async createShadowUser(
-        authContext: AuthContext,
+        permission: Permission,
         email: string,
         name: string,
     ) {
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Read,
             SubjectEnum.USER,
             {email: email},
@@ -89,8 +84,7 @@ export class UsersService implements OnModuleInit {
             throw new ConflictException('Email is already being used');
         }
 
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Create,
             SubjectEnum.USER,
         );
@@ -107,9 +101,8 @@ export class UsersService implements OnModuleInit {
     /**
      * Get all the users.
      */
-    async getAll(authContext: AuthContext): Promise<User[]> {
-        this.securityService.isAuthorized(
-            authContext,
+    async getAll(permission: Permission): Promise<User[]> {
+        permission.isAuthorized(
             Action.Read,
             SubjectEnum.USER,
         );
@@ -120,9 +113,8 @@ export class UsersService implements OnModuleInit {
      * Get all the not verified users.
      * Roles relation is not returned.
      */
-    async findByNotVerified(authContext: AuthContext): Promise<User[]> {
-        this.securityService.isAuthorized(
-            authContext,
+    async findByNotVerified(permission: Permission): Promise<User[]> {
+        permission.isAuthorized(
             Action.Read,
             SubjectEnum.USER,
         );
@@ -136,9 +128,8 @@ export class UsersService implements OnModuleInit {
     /**
      * Get a user by id.
      */
-    async findById(authContext: AuthContext, id: string): Promise<User> {
-        this.securityService.isAuthorized(
-            authContext,
+    async findById(permission: Permission, id: string): Promise<User> {
+        permission.isAuthorized(
             Action.Read,
             SubjectEnum.USER,
             {id: id},
@@ -156,9 +147,8 @@ export class UsersService implements OnModuleInit {
     /**
      * Get a user by email.
      */
-    async findByEmail(authContext: AuthContext, email: string): Promise<User> {
-        this.securityService.isAuthorized(
-            authContext,
+    async findByEmail(permission: Permission, email: string): Promise<User> {
+        permission.isAuthorized(
             Action.Read,
             SubjectEnum.USER,
             {email: email},
@@ -173,11 +163,10 @@ export class UsersService implements OnModuleInit {
     }
 
     async findByTenant(
-        authContext: AuthContext,
+        permission: Permission,
         tenant: Tenant,
     ): Promise<User[]> {
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Read,
             SubjectEnum.USER,
         );
@@ -189,9 +178,8 @@ export class UsersService implements OnModuleInit {
         return users;
     }
 
-    async findByRole(authContext: AuthContext, role: Role): Promise<User[]> {
-        this.securityService.isAuthorized(
-            authContext,
+    async findByRole(permission: Permission, role: Role): Promise<User[]> {
+        permission.isAuthorized(
             Action.Read,
             SubjectEnum.USER,
         );
@@ -204,11 +192,10 @@ export class UsersService implements OnModuleInit {
     }
 
     async existById(
-        authContext: AuthContext,
+        permission: Permission,
         userId: string,
     ): Promise<boolean> {
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Read,
             SubjectEnum.USER,
             {id: userId},
@@ -219,11 +206,10 @@ export class UsersService implements OnModuleInit {
     }
 
     async existByEmail(
-        authContext: AuthContext,
+        permission: Permission,
         email: string,
     ): Promise<boolean> {
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Read,
             SubjectEnum.USER,
             {email: email},
@@ -237,15 +223,14 @@ export class UsersService implements OnModuleInit {
      * Update the user.
      */
     async update(
-        authContext: AuthContext,
+        permission: Permission,
         id: string,
         name: string,
         email: string,
     ): Promise<User> {
-        const user: User = await this.findById(authContext, id);
+        const user: User = await this.findById(permission, id);
 
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Update,
             SubjectEnum.USER,
             {email: email},
@@ -269,20 +254,19 @@ export class UsersService implements OnModuleInit {
      * Update the user's username if the password is verified.
      */
     async updateEmailSecure(
-        authContext: AuthContext,
+        permission: Permission,
         id: string,
         email: string,
         password: string,
     ): Promise<User> {
-        const user: User = await this.findById(authContext, id);
+        const user: User = await this.findById(permission, id);
 
         const valid: boolean = await argon2.verify(user.password, password);
         if (!valid) {
             throw new UnauthorizedException('Invalid credentials');
         }
 
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Update,
             SubjectEnum.USER,
             {email: email},
@@ -304,15 +288,14 @@ export class UsersService implements OnModuleInit {
      * Update the user's email.
      */
     async updateEmail(
-        authContext: AuthContext,
+        permission: Permission,
         id: string,
         newEmail: string,
     ): Promise<User> {
-        const user: User = await this.findById(authContext, id);
+        const user: User = await this.findById(permission, id);
         user.email = newEmail;
 
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Update,
             SubjectEnum.USER,
             {id: id},
@@ -325,15 +308,14 @@ export class UsersService implements OnModuleInit {
      * Update the user's password.
      */
     async updatePassword(
-        authContext: AuthContext,
+        permission: Permission,
         id: string,
         password: string,
     ): Promise<User> {
-        const user: User = await this.findById(authContext, id);
+        const user: User = await this.findById(permission, id);
         user.password = await argon2.hash(password);
 
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Update,
             SubjectEnum.USER,
             {id: id},
@@ -346,12 +328,12 @@ export class UsersService implements OnModuleInit {
      * Update the user's password if the password is verified.
      */
     async updatePasswordSecure(
-        authContext: AuthContext,
+        permission: Permission,
         id: string,
         currentPassword: string,
         newPassword: string,
     ): Promise<User> {
-        const user: User = await this.findById(authContext, id);
+        const user: User = await this.findById(permission, id);
         const valid: boolean = await argon2.verify(
             user.password,
             currentPassword,
@@ -359,8 +341,7 @@ export class UsersService implements OnModuleInit {
         if (!valid) {
             throw new UnauthorizedException('Invalid credentials');
         }
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Update,
             SubjectEnum.USER,
             {id: id},
@@ -374,14 +355,13 @@ export class UsersService implements OnModuleInit {
      * Update the user's name.
      */
     async updateName(
-        authContext: AuthContext,
+        permission: Permission,
         id: string,
         name: string = "",
     ): Promise<User> {
-        const user: User = await this.findById(authContext, id);
+        const user: User = await this.findById(permission, id);
         user.name = name;
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Update,
             SubjectEnum.USER,
             {id: id},
@@ -393,14 +373,13 @@ export class UsersService implements OnModuleInit {
      * Update the user's verified field.
      */
     async updateVerified(
-        authContext: AuthContext,
+        permission: Permission,
         id: string,
         verified: boolean,
     ): Promise<User> {
-        const user: User = await this.findById(authContext, id);
+        const user: User = await this.findById(permission, id);
 
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Update,
             SubjectEnum.USER,
             {id: id},
@@ -413,9 +392,9 @@ export class UsersService implements OnModuleInit {
     /**
      * Lock the user account.
      */
-    async lockUser(authContext: AuthContext, id: string): Promise<User> {
-        const user = await this.findById(authContext, id);
-        this.securityService.isAuthorized(authContext, Action.Update, SubjectEnum.USER, {id});
+    async lockUser(permission: Permission, id: string): Promise<User> {
+        const user = await this.findById(permission, id);
+        permission.isAuthorized(Action.Update, SubjectEnum.USER, {id});
         if (user.email === this.configService.get("SUPER_ADMIN_EMAIL")) {
             throw new ForbiddenException("Cannot lock the super-admin account");
         }
@@ -426,9 +405,9 @@ export class UsersService implements OnModuleInit {
     /**
      * Unlock the user account.
      */
-    async unlockUser(authContext: AuthContext, id: string): Promise<User> {
-        const user = await this.findById(authContext, id);
-        this.securityService.isAuthorized(authContext, Action.Update, SubjectEnum.USER, {id});
+    async unlockUser(permission: Permission, id: string): Promise<User> {
+        const user = await this.findById(permission, id);
+        permission.isAuthorized(Action.Update, SubjectEnum.USER, {id});
         user.locked = false;
         return this.usersRepository.save(user);
     }
@@ -436,14 +415,13 @@ export class UsersService implements OnModuleInit {
     /**
      * Delete the user.
      */
-    async delete(authContext: AuthContext, id: string): Promise<User> {
-        this.securityService.isAuthorized(
-            authContext,
+    async delete(permission: Permission, id: string): Promise<User> {
+        permission.isAuthorized(
             Action.Delete,
             SubjectEnum.USER,
             {id: id},
         );
-        const user: User = await this.findById(authContext, id);
+        const user: User = await this.findById(permission, id);
         if (user.email === this.configService.get("SUPER_ADMIN_EMAIL")) {
             throw new UnauthorizedException("cannot delete super secure");
         }
@@ -454,13 +432,12 @@ export class UsersService implements OnModuleInit {
      * Delete the user if the password is verified.
      */
     async deleteSecure(
-        authContext: AuthContext,
+        permission: Permission,
         id: string,
         password: string,
     ): Promise<User> {
-        const user: User = await this.findById(authContext, id);
-        this.securityService.isAuthorized(
-            authContext,
+        const user: User = await this.findById(permission, id);
+        permission.isAuthorized(
             Action.Delete,
             SubjectEnum.USER,
             {id: id},
@@ -499,11 +476,10 @@ export class UsersService implements OnModuleInit {
     // }
 
     async countByTenant(
-        authContext: AuthContext,
+        permission: Permission,
         tenant: Tenant,
     ): Promise<number> {
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Read,
             SubjectEnum.USER,
         );
@@ -516,12 +492,11 @@ export class UsersService implements OnModuleInit {
     }
 
     async findByEmailSecure(
-        authContext: AuthContext,
+        permission: Permission,
         email: string,
         password: string,
     ): Promise<User> {
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Read,
             SubjectEnum.USER,
             {email: email},

@@ -17,8 +17,7 @@ import {RoleService} from "./role.service";
 import {RoleEnum} from "../entity/roleEnum";
 import {CryptUtil} from "../util/crypt.util";
 import {TenantMember} from "../entity/tenant.members.entity";
-import {AuthContext} from "../casl/contexts";
-import {SecurityService} from "../casl/security.service";
+import {Permission} from "../auth/auth.decorator";
 import {Action} from "../casl/actions.enum";
 import {SubjectEnum} from "../entity/subjectEnum";
 import {SIGNING_KEY_PROVIDER, SigningKeyProvider} from "../core/token-abstraction";
@@ -30,7 +29,6 @@ export class TenantService implements OnModuleInit {
         private readonly configService: Environment,
         private readonly usersService: UsersService,
         private readonly roleService: RoleService,
-        private readonly securityService: SecurityService,
         @Inject(SIGNING_KEY_PROVIDER)
         private readonly signingKeyProvider: SigningKeyProvider,
         private readonly keyManagementService: KeyManagementService,
@@ -45,13 +43,12 @@ export class TenantService implements OnModuleInit {
     }
 
     async create(
-        authContext: AuthContext,
+        permission: Permission,
         name: string,
         domain: string,
         owner: User,
     ): Promise<Tenant> {
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Create,
             SubjectEnum.TENANT,
         );
@@ -81,16 +78,16 @@ export class TenantService implements OnModuleInit {
         const {privateKey, publicKey} = this.signingKeyProvider.generateKeyPair();
         await this.keyManagementService.createInitialKey(tenant.id, publicKey, privateKey);
 
-        await this.addMember(authContext, tenant.id, owner);
+        await this.addMember(permission, tenant.id, owner);
 
         let adminRole = await this.roleService.create(
-            authContext,
+            permission,
             RoleEnum.TENANT_ADMIN,
             tenant,
             false,
         );
         let viewerRole = await this.roleService.create(
-            authContext,
+            permission,
             RoleEnum.TENANT_VIEWER,
             tenant,
             false,
@@ -103,7 +100,7 @@ export class TenantService implements OnModuleInit {
             .add([adminRole.id, viewerRole.id]);
 
         await this.updateRolesOfMember(
-            authContext,
+            permission,
             [adminRole.name],
             tenant.id,
             owner,
@@ -112,15 +109,14 @@ export class TenantService implements OnModuleInit {
         return tenant;
     }
 
-    async updateKeys(authContext: AuthContext, id: string): Promise<Tenant> {
-        this.securityService.isAuthorized(
-            authContext,
+    async updateKeys(permission: Permission, id: string): Promise<Tenant> {
+        permission.isAuthorized(
             Action.Update,
             SubjectEnum.TENANT,
             {id: id},
         );
 
-        const tenant: Tenant = await this.findById(authContext, id);
+        const tenant: Tenant = await this.findById(permission, id);
         if (!tenant) {
             throw new NotFoundException("tenant id not found");
         }
@@ -131,11 +127,10 @@ export class TenantService implements OnModuleInit {
     }
 
     async existByDomain(
-        authContext: AuthContext,
+        permission: Permission,
         domain: string,
     ): Promise<boolean> {
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Read,
             SubjectEnum.TENANT,
         );
@@ -145,9 +140,8 @@ export class TenantService implements OnModuleInit {
         });
     }
 
-    async findById(authContext: AuthContext, id: string) {
-        this.securityService.isAuthorized(
-            authContext,
+    async findById(permission: Permission, id: string) {
+        permission.isAuthorized(
             Action.Read,
             SubjectEnum.TENANT,
             {id: id},
@@ -167,11 +161,10 @@ export class TenantService implements OnModuleInit {
     }
 
     async findByDomain(
-        authContext: AuthContext,
+        permission: Permission,
         domain: string,
     ): Promise<Tenant> {
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Read,
             SubjectEnum.TENANT,
             {domain: domain},
@@ -197,11 +190,10 @@ export class TenantService implements OnModuleInit {
     }
 
     async findByClientId(
-        authContext: AuthContext,
+        permission: Permission,
         clientId: string,
     ): Promise<Tenant> {
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Read,
             SubjectEnum.TENANT,
             {clientId: clientId},
@@ -221,18 +213,17 @@ export class TenantService implements OnModuleInit {
     }
 
     async addMember(
-        authContext: AuthContext,
+        permission: Permission,
         tenantId: string,
         user: User,
     ): Promise<TenantMember> {
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Update,
             SubjectEnum.TENANT,
             {id: tenantId},
         );
 
-        let tenant: Tenant = await this.findById(authContext, tenantId);
+        let tenant: Tenant = await this.findById(permission, tenantId);
         let tenantMember = this.tenantMemberRepository.create({
             tenantId: tenant.id,
             userId: user.id,
@@ -241,9 +232,8 @@ export class TenantService implements OnModuleInit {
         return this.tenantMemberRepository.save(tenantMember);
     }
 
-    async getAllTenants(authContext: AuthContext) {
-        this.securityService.isAuthorized(
-            authContext,
+    async getAllTenants(permission: Permission) {
+        permission.isAuthorized(
             Action.Update,
             SubjectEnum.TENANT,
         );
@@ -252,16 +242,15 @@ export class TenantService implements OnModuleInit {
     }
 
     async updateTenant(
-        authContext: AuthContext,
+        permission: Permission,
         id: string,
         data: { name?: string; allowSignUp?: boolean },
     ) {
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Update,
             SubjectEnum.TENANT,
         );
-        const tenant: Tenant = await this.findById(authContext, id);
+        const tenant: Tenant = await this.findById(permission, id);
 
         if (data.name !== undefined) tenant.name = data.name;
         if (data.allowSignUp !== undefined)
@@ -271,43 +260,41 @@ export class TenantService implements OnModuleInit {
     }
 
     async getMemberRoles(
-        authContext: AuthContext,
+        permission: Permission,
         tenantId: string,
         user: User,
     ): Promise<Role[]> {
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Read,
             SubjectEnum.TENANT,
             {id: tenantId},
         );
 
-        let tenant: Tenant = await this.findById(authContext, tenantId);
-        let isMember = await this.isMember(authContext, tenant.id, user);
+        let tenant: Tenant = await this.findById(permission, tenantId);
+        let isMember = await this.isMember(permission, tenant.id, user);
         if (!isMember) {
             throw new ForbiddenException("Not a Member.");
         }
-        return this.roleService.getMemberRoles(authContext, tenant, user);
+        return this.roleService.getMemberRoles(permission, tenant, user);
     }
 
     async isViewer(
-        authContext: AuthContext,
+        permission: Permission,
         tenantId: string,
         user: User,
     ): Promise<boolean> {
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Read,
             SubjectEnum.TENANT,
             {id: tenantId},
         );
 
-        let tenant: Tenant = await this.findById(authContext, tenantId);
-        if (!(await this.isMember(authContext, tenantId, user))) {
+        let tenant: Tenant = await this.findById(permission, tenantId);
+        if (!(await this.isMember(permission, tenantId, user))) {
             return false;
         }
         return this.roleService.hasAnyOfRoles(
-            authContext,
+            permission,
             [RoleEnum.TENANT_ADMIN, RoleEnum.TENANT_VIEWER],
             tenant,
             user,
@@ -315,31 +302,29 @@ export class TenantService implements OnModuleInit {
     }
 
     async removeMember(
-        authContext: AuthContext,
+        permission: Permission,
         tenantId: string,
         user: User,
     ): Promise<Tenant> {
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Update,
             SubjectEnum.TENANT,
             {id: tenantId},
         );
 
-        let tenant: Tenant = await this.findById(authContext, tenantId);
-        let tenantMember = await this.findMembership(authContext, tenant, user);
-        await this.updateRolesOfMember(authContext, [], tenantId, user);
+        let tenant: Tenant = await this.findById(permission, tenantId);
+        let tenantMember = await this.findMembership(permission, tenant, user);
+        await this.updateRolesOfMember(permission, [], tenantId, user);
         await this.tenantMemberRepository.remove(tenantMember);
         return tenant;
     }
 
     async isMember(
-        authContext: AuthContext,
+        permission: Permission,
         tenantId: string,
         user: User,
     ): Promise<boolean> {
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Read,
             SubjectEnum.TENANT,
             {id: tenantId},
@@ -354,12 +339,11 @@ export class TenantService implements OnModuleInit {
     }
 
     async findMembership(
-        authContext: AuthContext,
+        permission: Permission,
         tenant: Tenant,
         user: User,
     ): Promise<TenantMember> {
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Read,
             SubjectEnum.TENANT,
             {id: tenant.id},
@@ -378,52 +362,50 @@ export class TenantService implements OnModuleInit {
     }
 
     async isAdmin(
-        authContext: AuthContext,
+        permission: Permission,
         tenantId: string,
         user: User,
     ): Promise<boolean> {
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Read,
             SubjectEnum.TENANT,
             {id: tenantId},
         );
 
-        let tenant: Tenant = await this.findById(authContext, tenantId);
-        if (!(await this.isMember(authContext, tenantId, user))) {
+        let tenant: Tenant = await this.findById(permission, tenantId);
+        if (!(await this.isMember(permission, tenantId, user))) {
             return false;
         }
         return this.roleService.hasAllRoles(
-            authContext,
+            permission,
             [RoleEnum.TENANT_ADMIN],
             tenant,
             user,
         );
     }
 
-    async findGlobalTenant(authContext: AuthContext): Promise<Tenant> {
+    async findGlobalTenant(permission: Permission): Promise<Tenant> {
         return this.findByDomain(
-            authContext,
+            permission,
             this.configService.get("SUPER_TENANT_DOMAIN"),
         );
     }
 
     async updateRolesOfMember(
-        authContext: AuthContext,
+        permission: Permission,
         roles: string[],
         tenantId: string,
         user: User,
     ): Promise<Role[]> {
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Update,
             SubjectEnum.TENANT,
             {id: tenantId},
         );
 
-        let tenant: Tenant = await this.findById(authContext, tenantId);
+        let tenant: Tenant = await this.findById(permission, tenantId);
         const isMember: boolean = await this.isMember(
-            authContext,
+            permission,
             tenantId,
             user,
         );
@@ -431,7 +413,7 @@ export class TenantService implements OnModuleInit {
             throw new NotFoundException("user is not a member of this tenant");
         }
         return this.roleService.updateUserRoles(
-            authContext,
+            permission,
             roles,
             tenant,
             user,
@@ -439,11 +421,10 @@ export class TenantService implements OnModuleInit {
     }
 
     async findByMembership(
-        authContext: AuthContext,
+        permission: Permission,
         user: User,
     ): Promise<Tenant[]> {
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Read,
             SubjectEnum.TENANT,
         );
@@ -460,11 +441,10 @@ export class TenantService implements OnModuleInit {
     }
 
     async findByViewership(
-        authContext: AuthContext,
+        permission: Permission,
         user: User,
     ): Promise<Tenant[]> {
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Read,
             SubjectEnum.TENANT,
         );
@@ -478,36 +458,34 @@ export class TenantService implements OnModuleInit {
             },
         });
         return tenants.filter((tenant) =>
-            this.isViewer(authContext, tenant.id, user),
+            this.isViewer(permission, tenant.id, user),
         );
     }
 
-    async deleteTenant(authContext: AuthContext, tenantId: string) {
-        this.securityService.isAuthorized(
-            authContext,
+    async deleteTenant(permission: Permission, tenantId: string) {
+        permission.isAuthorized(
             Action.Delete,
             SubjectEnum.TENANT,
             {id: tenantId},
         );
 
-        let tenant: Tenant = await this.findById(authContext, tenantId);
+        let tenant: Tenant = await this.findById(permission, tenantId);
         if (tenant.domain === this.configService.get("SUPER_TENANT_DOMAIN")) {
             throw new ForbiddenException("Super tenant cannot be deleted");
         }
-        await this.roleService.deleteByTenant(authContext, tenant);
+        await this.roleService.deleteByTenant(permission, tenant);
         return this.tenantRepository.remove(tenant);
     }
 
-    async deleteTenantSecure(authContext: AuthContext, tenantId: string) {
-        this.securityService.isAuthorized(
-            authContext,
+    async deleteTenantSecure(permission: Permission, tenantId: string) {
+        permission.isAuthorized(
             Action.Delete,
             SubjectEnum.TENANT,
             {id: tenantId},
         );
 
-        let tenant: Tenant = await this.findById(authContext, tenantId);
-        let count = await this.usersService.countByTenant(authContext, tenant);
+        let tenant: Tenant = await this.findById(permission, tenantId);
+        let count = await this.usersService.countByTenant(permission, tenant);
         if (count > 0) {
             throw new BadRequestException("tenant contains members");
         }
@@ -515,25 +493,23 @@ export class TenantService implements OnModuleInit {
     }
 
     async getTenantRoles(
-        authContext: AuthContext,
+        permission: Permission,
         tenant: Tenant,
     ): Promise<Role[]> {
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Read,
             SubjectEnum.ROLE,
             {tenantId: tenant.id},
         );
 
-        return this.roleService.getTenantRoles(authContext, tenant);
+        return this.roleService.getTenantRoles(permission, tenant);
     }
 
     async findByClientIdOrDomain(
-        authContext: AuthContext,
+        permission: Permission,
         clientIdOrDomain: string,
     ): Promise<Tenant> {
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Read,
             SubjectEnum.TENANT,
             {clientId: clientIdOrDomain},
@@ -553,12 +529,11 @@ export class TenantService implements OnModuleInit {
     }
 
     async findMember(
-        request: AuthContext,
+        permission: Permission,
         tenant: Tenant,
         email: string,
     ): Promise<User> {
-        this.securityService.isAuthorized(
-            request,
+        permission.isAuthorized(
             Action.Read,
             SubjectEnum.TENANT,
             {id: tenant.id},

@@ -17,6 +17,7 @@ import {Policy} from "../entity/authorization.entity";
 import {PolicyService} from "./policy.service";
 import {CacheService} from "./cache.service";
 import {ScopeResolverService} from "./scope-resolver.service";
+import {ResolvePermissionPipe} from "../auth/auth.decorator";
 
 @Module({
     imports: [
@@ -42,6 +43,7 @@ import {ScopeResolverService} from "./scope-resolver.service";
         PolicyService,
         CacheService,
         ScopeResolverService,
+        ResolvePermissionPipe,
     ],
     exports: [
         SecurityService,
@@ -50,6 +52,7 @@ import {ScopeResolverService} from "./scope-resolver.service";
         PolicyService,
         CacheService,
         ScopeResolverService,
+        ResolvePermissionPipe,
     ],
 })
 export class CaslModule {

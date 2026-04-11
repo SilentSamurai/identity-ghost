@@ -11,10 +11,9 @@ import {RoleService} from "./role.service";
 import {User} from "../entity/user.entity";
 import {Role} from "../entity/role.entity";
 import {TenantService} from "./tenant.service";
-import {AuthContext} from "../casl/contexts";
-import {SecurityService} from "../casl/security.service";
 import {Action} from "../casl/actions.enum";
 import {SubjectEnum} from "../entity/subjectEnum";
+import {Permission} from "../auth/auth.decorator";
 
 @Injectable()
 export class GroupService {
@@ -23,7 +22,6 @@ export class GroupService {
         private readonly usersService: UsersService,
         private readonly roleService: RoleService,
         private readonly tenantService: TenantService,
-        private readonly securityService: SecurityService,
         @InjectRepository(Group) private groupRepository: Repository<Group>,
         @InjectRepository(GroupUser)
         private groupUserRepository: Repository<GroupUser>,
@@ -33,12 +31,11 @@ export class GroupService {
     }
 
     async create(
-        authContext: AuthContext,
+        permission: Permission,
         name: string,
         tenant: Tenant,
     ): Promise<Group> {
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Create,
             SubjectEnum.GROUP,
             {tenantId: tenant.id},
@@ -50,9 +47,8 @@ export class GroupService {
         return await this.groupRepository.save(group);
     }
 
-    async findById(authContext: AuthContext, id: string): Promise<Group> {
-        this.securityService.isAuthorized(
-            authContext,
+    async findById(permission: Permission, id: string): Promise<Group> {
+        permission.isAuthorized(
             Action.Read,
             SubjectEnum.GROUP,
             {id},
@@ -68,11 +64,10 @@ export class GroupService {
     }
 
     async findByTenantId(
-        authContext: AuthContext,
+        permission: Permission,
         tenantId: string,
     ): Promise<Group[]> {
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Read,
             SubjectEnum.GROUP,
             {tenantId: tenantId},
@@ -83,7 +78,7 @@ export class GroupService {
     }
 
     async findByNameAndTenantId(
-        authContext: AuthContext,
+        permission: Permission,
         name: string,
         tenantId: string,
     ): Promise<Group> {
@@ -97,8 +92,7 @@ export class GroupService {
         if (group === null) {
             throw new BadRequestException("group not found");
         }
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Read,
             SubjectEnum.GROUP,
             {id: group.id},
@@ -107,12 +101,11 @@ export class GroupService {
     }
 
     async existsByNameAndTenantId(
-        authContext: AuthContext,
+        permission: Permission,
         name: string,
         tenantId: string,
     ): Promise<boolean> {
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Read,
             SubjectEnum.GROUP,
         );
@@ -125,23 +118,22 @@ export class GroupService {
         });
     }
 
-    async deleteById(authContext: AuthContext, id: string): Promise<Group> {
-        let group: Group = await this.findById(authContext, id);
-        let roles = await this.findGroupRoles(authContext, group);
+    async deleteById(permission: Permission, id: string): Promise<Group> {
+        let group: Group = await this.findById(permission, id);
+        let roles = await this.findGroupRoles(permission, group);
         await this.removeRoles(
-            authContext,
+            permission,
             group,
             roles.map((r) => r.name),
         );
-        let users = await this.findGroupUsers(authContext, group);
+        let users = await this.findGroupUsers(permission, group);
         await this.removeUser(
-            authContext,
+            permission,
             group,
             users.map((u) => u.email),
         );
 
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Delete,
             SubjectEnum.GROUP,
             {id: id},
@@ -152,12 +144,11 @@ export class GroupService {
     }
 
     async isRoleInGroup(
-        authContext: AuthContext,
+        permission: Permission,
         group: Group,
         role: Role,
     ): Promise<boolean> {
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Read,
             SubjectEnum.GROUP_ROLE,
             {
@@ -176,12 +167,11 @@ export class GroupService {
     }
 
     async findGroupRole(
-        authContext: AuthContext,
+        permission: Permission,
         group: Group,
         role: Role,
     ): Promise<GroupRole> {
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Read,
             SubjectEnum.GROUP,
             {
@@ -199,12 +189,11 @@ export class GroupService {
     }
 
     async isUserInGroup(
-        authContext: AuthContext,
+        permission: Permission,
         group: Group,
         user: User,
     ): Promise<boolean> {
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Read,
             SubjectEnum.GROUP,
             {
@@ -222,12 +211,11 @@ export class GroupService {
     }
 
     async findGroupUser(
-        authContext: AuthContext,
+        permission: Permission,
         group: Group,
         user: User,
     ): Promise<GroupUser> {
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Read,
             SubjectEnum.GROUP,
             {
@@ -245,11 +233,10 @@ export class GroupService {
     }
 
     async findGroupUsers(
-        authContext: AuthContext,
+        permission: Permission,
         group: Group,
     ): Promise<User[]> {
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Read,
             SubjectEnum.GROUP,
             {
@@ -263,18 +250,17 @@ export class GroupService {
         let users = await Promise.all(
             groupUsers.map(
                 async (gu) =>
-                    await this.usersService.findById(authContext, gu.userId),
+                    await this.usersService.findById(permission, gu.userId),
             ),
         );
         return users;
     }
 
     public async findGroupRoles(
-        authContext: AuthContext,
+        permission: Permission,
         group: Group,
     ): Promise<Role[]> {
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Read,
             SubjectEnum.GROUP,
             {
@@ -288,15 +274,14 @@ export class GroupService {
         let roles = await Promise.all(
             groupRoles.map(
                 async (gr) =>
-                    await this.roleService.findById(authContext, gr.roleId),
+                    await this.roleService.findById(permission, gr.roleId),
             ),
         );
         return roles;
     }
 
-    async addRoles(authContext: AuthContext, group: Group, roles: string[]) {
-        this.securityService.isAuthorized(
-            authContext,
+    async addRoles(permission: Permission, group: Group, roles: string[]) {
+        permission.isAuthorized(
             Action.Update,
             SubjectEnum.GROUP,
             {
@@ -306,16 +291,16 @@ export class GroupService {
 
         let oRole = [];
         let tenant = await this.tenantService.findById(
-            authContext,
+            permission,
             group.tenantId,
         );
         for (let role_name of roles) {
             let role = await this.roleService.findByNameAndTenant(
-                authContext,
+                permission,
                 role_name,
                 group.tenant,
             );
-            if (!(await this.isRoleInGroup(authContext, group, role))) {
+            if (!(await this.isRoleInGroup(permission, group, role))) {
                 let groupRole = this.groupRoleRepository.create({
                     groupId: group.id,
                     tenantId: group.tenantId,
@@ -325,10 +310,10 @@ export class GroupService {
                 oRole.push(role);
             }
         }
-        let users = await this.findGroupUsers(authContext, group);
+        let users = await this.findGroupUsers(permission, group);
         for (const user of users) {
             await this.roleService.addRoles(
-                authContext,
+                permission,
                 user,
                 group.tenant,
                 oRole,
@@ -337,9 +322,8 @@ export class GroupService {
         }
     }
 
-    async removeRoles(authContext: AuthContext, group: Group, roles: string[]) {
-        this.securityService.isAuthorized(
-            authContext,
+    async removeRoles(permission: Permission, group: Group, roles: string[]) {
+        permission.isAuthorized(
             Action.Update,
             SubjectEnum.GROUP,
             {
@@ -350,20 +334,20 @@ export class GroupService {
         let oRole = [];
         for (let role_name of roles) {
             let role = await this.roleService.findByNameAndTenant(
-                authContext,
+                permission,
                 role_name,
                 group.tenant,
             );
-            if (await this.isRoleInGroup(authContext, group, role)) {
-                let gr = await this.findGroupRole(authContext, group, role);
+            if (await this.isRoleInGroup(permission, group, role)) {
+                let gr = await this.findGroupRole(permission, group, role);
                 await this.groupRoleRepository.remove(gr);
                 oRole.push(role);
             }
         }
-        let users = await this.findGroupUsers(authContext, group);
+        let users = await this.findGroupUsers(permission, group);
         for (const user of users) {
             await this.roleService.removeRoles(
-                authContext,
+                permission,
                 user,
                 group.tenant,
                 oRole,
@@ -372,9 +356,8 @@ export class GroupService {
         }
     }
 
-    async addUser(authContext: AuthContext, group: Group, users: string[]) {
-        this.securityService.isAuthorized(
-            authContext,
+    async addUser(permission: Permission, group: Group, users: string[]) {
+        permission.isAuthorized(
             Action.Update,
             SubjectEnum.GROUP,
             {
@@ -384,8 +367,8 @@ export class GroupService {
 
         let oUser = [];
         for (let email of users) {
-            let user = await this.usersService.findByEmail(authContext, email);
-            if (!(await this.isUserInGroup(authContext, group, user))) {
+            let user = await this.usersService.findByEmail(permission, email);
+            if (!(await this.isUserInGroup(permission, group, user))) {
                 let gu = this.groupUserRepository.create({
                     groupId: group.id,
                     tenantId: group.tenantId,
@@ -395,10 +378,10 @@ export class GroupService {
                 oUser.push(user);
             }
         }
-        let roles = await this.findGroupRoles(authContext, group);
+        let roles = await this.findGroupRoles(permission, group);
         for (let user of oUser) {
             await this.roleService.addRoles(
-                authContext,
+                permission,
                 user,
                 group.tenant,
                 roles,
@@ -407,9 +390,8 @@ export class GroupService {
         }
     }
 
-    async removeUser(authContext: AuthContext, group: Group, users: string[]) {
-        this.securityService.isAuthorized(
-            authContext,
+    async removeUser(permission: Permission, group: Group, users: string[]) {
+        permission.isAuthorized(
             Action.Update,
             SubjectEnum.GROUP,
             {
@@ -419,17 +401,17 @@ export class GroupService {
 
         let oUser = [];
         for (let email of users) {
-            let user = await this.usersService.findByEmail(authContext, email);
-            if (await this.isUserInGroup(authContext, group, user)) {
-                let gu = await this.findGroupUser(authContext, group, user);
+            let user = await this.usersService.findByEmail(permission, email);
+            if (await this.isUserInGroup(permission, group, user)) {
+                let gu = await this.findGroupUser(permission, group, user);
                 await this.groupUserRepository.remove(gu);
                 oUser.push(user);
             }
         }
-        let roles = await this.findGroupRoles(authContext, group);
+        let roles = await this.findGroupRoles(permission, group);
         for (let user of oUser) {
             await this.roleService.removeRoles(
-                authContext,
+                permission,
                 user,
                 group.tenant,
                 roles,
@@ -439,12 +421,11 @@ export class GroupService {
     }
 
     async updateGroup(
-        authContext: AuthContext,
+        permission: Permission,
         group: Group,
         body: { name: string },
     ) {
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Update,
             SubjectEnum.GROUP,
             {
@@ -454,7 +435,7 @@ export class GroupService {
 
         if (
             !(await this.existsByNameAndTenantId(
-                authContext,
+                permission,
                 body.name,
                 group.tenantId,
             ))

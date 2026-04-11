@@ -8,13 +8,11 @@ import {
     Param,
     Patch,
     Post,
-    Request,
     UseGuards,
     UseInterceptors,
 } from "@nestjs/common";
 import {Environment} from "../config/environment.service";
 import {SecurityService} from "../casl/security.service";
-import {AuthContext} from "../casl/contexts";
 import {JwtAuthGuard} from "../auth/jwt-auth.guard";
 import {PolicyService} from "../casl/policy.service";
 import {CaslAbilityFactory} from "../casl/casl-ability.factory";
@@ -78,13 +76,13 @@ export class PolicyController {
 
         if (customRoleNames.length === 0) return [];
 
-        const tenant = await this.tenantService.findById(permission.authContext, tenantToken.tenant.id);
+        const tenant = await this.tenantService.findById(permission, tenantToken.tenant.id);
 
         const policies: Policy[] = [];
         for (const roleName of customRoleNames) {
             try {
-                const role = await this.roleService.findByNameAndTenant(permission.authContext, roleName, tenant);
-                const rolePolicies = await this.policyService.findByRole(permission.authContext, role, role.tenant);
+                const role = await this.roleService.findByNameAndTenant(permission, roleName, tenant);
+                const rolePolicies = await this.policyService.findByRole(permission, role, role.tenant);
                 policies.push(...rolePolicies);
             } catch (e) {
                 if (e instanceof NotFoundException) continue;
@@ -97,18 +95,18 @@ export class PolicyController {
     @Post("/tenant-user/permissions")
     @UseGuards(JwtAuthGuard)
     async getUserPermissions(
-        @Request() request: AuthContext,
+        @CurrentPermission() permission: Permission,
         @Body("email") email: string,
     ): Promise<any> {
-        let token = this.securityService.getTechnicalToken(request);
+        let token = this.securityService.getTechnicalToken(permission.authContext);
         let tenant = await this.tenantService.findById(
-            request,
+            permission,
             token.tenant.id,
         );
 
-        let user = await this.tenantService.findMember(request, tenant, email);
+        let user = await this.tenantService.findMember(permission, tenant, email);
         let roles = await this.tenantService.getMemberRoles(
-            request,
+            permission,
             tenant.id,
             user,
         );
@@ -116,7 +114,7 @@ export class PolicyController {
         let policies = [];
         for (let role of roles) {
             let policiesOfRole = await this.policyService.findByRole(
-                request,
+                permission,
                 role,
                 tenant,
             );
@@ -128,7 +126,7 @@ export class PolicyController {
     @Post("/policy/create")
     @UseGuards(JwtAuthGuard)
     async createPermission(
-        @Request() request: Request,
+        @CurrentPermission() permission: Permission,
         @Body(new ValidationPipe(PolicyController.CreateSchema))
         body: {
             role: string;
@@ -138,10 +136,9 @@ export class PolicyController {
             conditions: { [string: string]: string } | null;
         },
     ): Promise<Policy> {
-        const authContext = request as any as AuthContext;
-        const role = await this.roleService.findById(authContext, body.role);
+        const role = await this.roleService.findById(permission, body.role);
         const policy = await this.policyService.createAuthorization(
-            authContext,
+            permission,
             role,
             body.effect,
             body.action,
@@ -154,23 +151,22 @@ export class PolicyController {
     @Get("/policy/:id")
     @UseGuards(JwtAuthGuard)
     async getAuthorization(
-        @Request() request: Request,
+        @CurrentPermission() permission: Permission,
         @Param("id") id: string,
     ) {
-        const authContext = request as any as AuthContext;
-        const auth = await this.policyService.findById(authContext, id);
+        const auth = await this.policyService.findById(permission, id);
         return auth;
     }
 
     @Get("/policy/byRole/:role_id")
     @UseGuards(JwtAuthGuard)
     async getAuthByRole(
-        @Request() authContext: AuthContext,
+        @CurrentPermission() permission: Permission,
         @Param("role_id") role_id: string,
     ) {
-        const role = await this.roleService.findById(authContext, role_id);
+        const role = await this.roleService.findById(permission, role_id);
         const auth = await this.policyService.findByRole(
-            authContext,
+            permission,
             role,
             role.tenant,
         );
@@ -180,7 +176,7 @@ export class PolicyController {
     @Patch("/policy/:id")
     @UseGuards(JwtAuthGuard)
     async updateAuthorization(
-        @Request() request: Request,
+        @CurrentPermission() permission: Permission,
         @Param("id") id: string,
         @Body(new ValidationPipe(PolicyController.UpdateSchema))
         body: {
@@ -190,9 +186,8 @@ export class PolicyController {
             conditions?: { [string: string]: string } | null;
         },
     ) {
-        const authContext = request as any as AuthContext;
         const auth = await this.policyService.updateAuthorization(
-            authContext,
+            permission,
             id,
             body,
         );
@@ -202,12 +197,11 @@ export class PolicyController {
     @Delete("/policy/:id")
     @UseGuards(JwtAuthGuard)
     async deleteAuthorization(
-        @Request() request: Request,
+        @CurrentPermission() permission: Permission,
         @Param("id") id: string,
     ) {
-        const authContext = request as any as AuthContext;
         const auth = await this.policyService.removeAuthorization(
-            authContext,
+            permission,
             id,
         );
         return auth;
