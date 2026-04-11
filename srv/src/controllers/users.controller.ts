@@ -6,7 +6,6 @@ import {
     Headers,
     InternalServerErrorException,
     Patch,
-    Request,
     UseGuards,
     UseInterceptors,
 } from "@nestjs/common";
@@ -20,10 +19,8 @@ import {ValidationPipe} from "../validation/validation.pipe";
 import {ValidationSchema} from "../validation/validation.schema";
 import {TenantService} from "../services/tenant.service";
 import {Tenant} from "../entity/tenant.entity";
-import {SecurityService} from "../casl/security.service";
-import {InjectRepository} from "@nestjs/typeorm";
-import {Repository} from "typeorm";
 import {Environment} from "../config/environment.service";
+import {CurrentPermission, CurrentUser, Permission} from "../auth/auth.decorator";
 
 @Controller("api/users")
 @UseInterceptors(ClassSerializerInterceptor)
@@ -33,36 +30,26 @@ export class UsersController {
         private readonly authService: AuthService,
         private readonly tenantService: TenantService,
         private readonly mailService: MailService,
-        private readonly securityService: SecurityService,
         private readonly configService: Environment,
-        @InjectRepository(User) private usersRepository: Repository<User>,
     ) {
     }
 
     @Get("/me")
     @UseGuards(JwtAuthGuard)
-    async getMyUser(@Request() request): Promise<User> {
-        const securityContext = this.securityService.getToken(request);
-        const user = await this.usersService.findByEmail(
-            request,
-            securityContext.email,
-        );
-        return this.usersService.findById(request, user.id);
+    async getMyUser(
+        @CurrentPermission() permission: Permission,
+        @CurrentUser() user: User,
+    ): Promise<User> {
+        return this.usersService.findById(permission.authContext, user.id);
     }
 
     @Patch("/me/email")
     @UseGuards(JwtAuthGuard)
     async updateMyEmail(
-        @Request() request,
-        @Headers() headers,
+        @CurrentUser() user: User,
         @Body(new ValidationPipe(ValidationSchema.UpdateMyEmailSchema))
         body: any,
     ): Promise<{ status: boolean }> {
-        const securityContext = this.securityService.getToken(request);
-        const user = await this.usersService.findByEmail(
-            request,
-            securityContext.email,
-        );
         const token = await this.authService.createChangeEmailToken(
             user,
             body.email,
@@ -84,17 +71,13 @@ export class UsersController {
     @Patch("/me/password")
     @UseGuards(JwtAuthGuard)
     async updateMyPassword(
-        @Request() request,
+        @CurrentPermission() permission: Permission,
+        @CurrentUser() user: User,
         @Body(new ValidationPipe(ValidationSchema.UpdateMyPasswordSchema))
         body: any,
     ): Promise<{ status: boolean }> {
-        const securityContext = this.securityService.getToken(request);
-        const user = await this.usersService.findByEmail(
-            request,
-            securityContext.email,
-        );
         await this.usersService.updatePasswordSecure(
-            request,
+            permission.authContext,
             user.id,
             body.currentPassword,
             body.newPassword,
@@ -105,26 +88,20 @@ export class UsersController {
     @Patch("/me/name")
     @UseGuards(JwtAuthGuard)
     async updateMyName(
-        @Request() request,
+        @CurrentPermission() permission: Permission,
+        @CurrentUser() user: User,
         @Body(new ValidationPipe(ValidationSchema.UpdateMyNameSchema))
         body: any,
     ): Promise<User> {
-        const securityContext = this.securityService.getToken(request);
-        const user = await this.usersService.findByEmail(
-            request,
-            securityContext.email,
-        );
-        return this.usersService.updateName(request, user.id, body.name);
+        return this.usersService.updateName(permission.authContext, user.id, body.name);
     }
 
     @Get("/me/tenants")
     @UseGuards(JwtAuthGuard)
-    async getTenants(@Request() request): Promise<Tenant[]> {
-        const securityContext = this.securityService.getToken(request);
-        const user = await this.usersService.findByEmail(
-            request,
-            securityContext.email,
-        );
-        return this.tenantService.findByViewership(request, user);
+    async getTenants(
+        @CurrentPermission() permission: Permission,
+        @CurrentUser() user: User,
+    ): Promise<Tenant[]> {
+        return this.tenantService.findByViewership(permission.authContext, user);
     }
 }

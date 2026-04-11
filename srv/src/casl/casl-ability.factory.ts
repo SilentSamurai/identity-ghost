@@ -81,6 +81,9 @@ export class CaslAbilityFactory {
                 can(Action.Manage, SubjectEnum.MEMBER, {
                     tenantId: tenantToken.tenant.id,
                 });
+                cannot(Action.Delete, SubjectEnum.MEMBER, {
+                    userId: tenantToken.userId,
+                });
                 can(Action.Manage, SubjectEnum.ROLE, {
                     tenantId: tenantToken.tenant.id,
                 });

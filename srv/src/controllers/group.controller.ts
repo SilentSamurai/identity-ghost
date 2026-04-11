@@ -17,7 +17,7 @@ import {ValidationSchema} from "../validation/validation.schema";
 import {TenantService} from "../services/tenant.service";
 import {GroupService} from "../services/group.service";
 import {JwtAuthGuard} from "../auth/jwt-auth.guard";
-import {CurrentTenantId} from "../auth/current-tenant.decorator";
+import {CurrentTenantId} from "../auth/auth.decorator";
 
 @Controller("/api")
 @UseInterceptors(ClassSerializerInterceptor)

@@ -28,7 +28,7 @@ import {subject} from "@casl/ability";
 import {SubjectEnum} from "../entity/subjectEnum";
 import {InjectRepository} from "@nestjs/typeorm";
 import {Repository} from "typeorm";
-import {CurrentTenantId} from "../auth/current-tenant.decorator";
+import {CurrentTenantId} from "../auth/auth.decorator";
 import * as yup from 'yup';
 
 // Local MemberOperationSchema for this controller

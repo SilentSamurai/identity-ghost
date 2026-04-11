@@ -8,7 +8,6 @@ import {
     Param,
     Post,
     Put,
-    Request,
     UseGuards,
     UseInterceptors,
 } from "@nestjs/common";
@@ -24,8 +23,7 @@ import {ValidationPipe} from "../validation/validation.pipe";
 import {PASSWORD_MESSAGE, PASSWORD_REGEXP, ValidationSchema} from "../validation/validation.schema";
 import {TenantService} from "../services/tenant.service";
 import {Tenant} from "../entity/tenant.entity";
-import {SecurityService} from "../casl/security.service";
-import {AuthContext} from "../casl/contexts";
+import {CurrentPermission, Permission} from "../auth/auth.decorator";
 
 // Local VerifyUserSchema for this controller
 const VerifyUserSchema = yup.object().shape({
@@ -52,61 +50,38 @@ export class UsersAdminController {
         private readonly authService: AuthService,
         private readonly tenantService: TenantService,
         private readonly mailService: MailService,
-        private readonly securityService: SecurityService,
     ) {
     }
 
     @Post("/create")
     @UseGuards(JwtAuthGuard)
     async createUser(
-        @Request() request,
+        @CurrentPermission() permission: Permission,
         @Body(new ValidationPipe(ValidationSchema.CreateUserSchema))
-        body: {
-            name: string;
-            email: string;
-            password: string;
-        },
+        body: { name: string; email: string; password: string },
     ): Promise<User> {
-        let user: User = await this.usersService.create(
-            request,
-            body.password,
-            body.email,
-            body.name,
-        );
-
-        await this.usersService.updateVerified(request, user.id, true);
+        const user = await this.usersService.create(permission.authContext, body.password, body.email, body.name);
+        await this.usersService.updateVerified(permission.authContext, user.id, true);
         return user;
     }
 
     @Put("/update")
     @UseGuards(JwtAuthGuard)
     async updateUser(
-        @Request() request,
+        @CurrentPermission() permission: Permission,
         @Body(new ValidationPipe(ValidationSchema.UpdateUserSchema))
-        body: {
-            id: string;
-            name: string;
-            email: string
-        },
+        body: { id: string; name: string; email: string },
     ): Promise<User> {
-        let user: User = await this.usersService.update(
-            request,
-            body.id,
-            body.name,
-            body.email
-        );
-
-        return user;
+        return this.usersService.update(permission.authContext, body.id, body.name, body.email);
     }
 
     @Get("/:userId")
     @UseGuards(JwtAuthGuard)
     async getUser(
-        @Request() request,
+        @CurrentPermission() permission: Permission,
         @Param("userId") userId: string,
     ): Promise<any> {
-        const user: User = await this.usersService.findById(request, userId);
-
+        const user = await this.usersService.findById(permission.authContext, userId);
         return {
             id: user.id,
             name: user.name,
@@ -119,75 +94,64 @@ export class UsersAdminController {
 
     @Get("")
     @UseGuards(JwtAuthGuard)
-    async getUsers(@Request() request): Promise<User[]> {
-        return await this.usersService.getAll(request);
+    async getUsers(@CurrentPermission() permission: Permission): Promise<User[]> {
+        return this.usersService.getAll(permission.authContext);
     }
 
     @Delete("/:id")
     @UseGuards(JwtAuthGuard)
     async deleteUser(
-        @Request() request,
+        @CurrentPermission() permission: Permission,
         @Param("id") id: string,
     ): Promise<User> {
-        return await this.usersService.delete(request, id);
+        return this.usersService.delete(permission.authContext, id);
     }
 
     @Get("/:userId/tenants")
     @UseGuards(JwtAuthGuard)
     async getTenants(
-        @Request() request,
+        @CurrentPermission() permission: Permission,
         @Param("userId") userId: string,
     ): Promise<Tenant[]> {
-        const user: User = await this.usersService.findById(request, userId);
-        return this.tenantService.findByMembership(request, user);
+        const user = await this.usersService.findById(permission.authContext, userId);
+        return this.tenantService.findByMembership(permission.authContext, user);
     }
 
     @Put("/verify-user")
     @UseGuards(JwtAuthGuard)
     async updateVerification(
-        @Request() request,
+        @CurrentPermission() permission: Permission,
         @Body(new ValidationPipe(VerifyUserSchema))
-        body: {
-            email: string;
-            verify: boolean;
-        },
+        body: { email: string; verify: boolean },
     ): Promise<User> {
-        let user: User = await this.usersService.findByEmail(
-            request,
-            body.email,
-        );
-
-        return await this.usersService.updateVerified(
-            request,
-            user.id,
-            body.verify,
-        );
+        const user = await this.usersService.findByEmail(permission.authContext, body.email);
+        return this.usersService.updateVerified(permission.authContext, user.id, body.verify);
     }
 
     @Put(":userId/lock")
     @UseGuards(JwtAuthGuard)
     async lockUser(
-        @Request() request,
+        @CurrentPermission() permission: Permission,
         @Param("userId") userId: string,
     ): Promise<any> {
-        const user = await this.usersService.lockUser(request, userId);
+        const user = await this.usersService.lockUser(permission.authContext, userId);
         return {id: user.id, locked: user.locked};
     }
 
     @Put(":userId/unlock")
     @UseGuards(JwtAuthGuard)
     async unlockUser(
-        @Request() request,
+        @CurrentPermission() permission: Permission,
         @Param("userId") userId: string,
     ): Promise<any> {
-        const user = await this.usersService.unlockUser(request, userId);
+        const user = await this.usersService.unlockUser(permission.authContext, userId);
         return {id: user.id, locked: user.locked};
     }
 
     @Put(":userId/password")
     @UseGuards(JwtAuthGuard)
     async updateUserPassword(
-        @Request() request: AuthContext,
+        @CurrentPermission() permission: Permission,
         @Param("userId") id: string,
         @Body(new ValidationPipe(UpdateUserPasswordSchema))
         body: { password: string; confirmPassword: string },
@@ -195,6 +159,6 @@ export class UsersAdminController {
         if (body.password !== body.confirmPassword) {
             throw new BadRequestException("Passwords do not match");
         }
-        return await this.usersService.updatePassword(request, id, body.password);
+        return this.usersService.updatePassword(permission.authContext, id, body.password);
     }
 }

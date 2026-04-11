@@ -18,6 +18,7 @@ import {
 } from "@nestjs/common";
 import {JwtAuthGuard} from "../auth/jwt-auth.guard";
 import {SuperAdminGuard} from "../auth/super-admin.guard";
+import {CurrentPermission, CurrentUser, Permission} from "../auth/auth.decorator";
 import {TenantService} from "../services/tenant.service";
 import {UsersService} from "../services/users.service";
 import {RoleService} from "../services/role.service";
@@ -240,21 +241,21 @@ export class AdminTenantController {
 
     @Delete("/:tenantId/members/delete")
     async removeMembers(
-        @Request() request,
+        @CurrentPermission() permission: Permission,
+        @CurrentUser() currentUser: User,
         @Param("tenantId", ParseUUIDPipe) tenantId: string,
         @Body(new ValidationPipe(AdminTenantController.MemberOperationSchema))
         body: { emails: string[] },
     ): Promise<Tenant> {
-        await this.tenantService.findById(request, tenantId);
+        await this.tenantService.findById(permission.authContext, tenantId);
         for (const email of body.emails) {
-            const user = await this.usersService.findByEmail(request, email);
-            const securityContext = this.securityService.getToken(request);
-            if (securityContext.email === email) {
+            if (currentUser.email === email) {
                 throw new ForbiddenException("cannot remove self");
             }
-            await this.tenantService.removeMember(request, tenantId, user);
+            const user = await this.usersService.findByEmail(permission.authContext, email);
+            await this.tenantService.removeMember(permission.authContext, tenantId, user);
         }
-        return this.tenantService.findById(request, tenantId);
+        return this.tenantService.findById(permission.authContext, tenantId);
     }
 
     // ─── Role operations ───

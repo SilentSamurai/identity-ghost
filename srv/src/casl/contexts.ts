@@ -126,7 +126,7 @@ export class InternalToken implements Token {
 }
 
 export class TenantToken implements Token {
-    sub: string;
+    sub: string; // user id 
     scopes: string[];
     roles: string[];
     grant_type: GRANT_TYPES;

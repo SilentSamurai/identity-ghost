@@ -2,7 +2,7 @@ import {Body, Controller, Header, HttpCode, Post, Res, UseGuards} from '@nestjs/
 import {Response} from 'express';
 import {TokenRevocationService} from '../auth/token-revocation.service';
 import {JwtAuthGuard} from '../auth/jwt-auth.guard';
-import {CurrentTenantId} from '../auth/current-tenant.decorator';
+import {CurrentTenantId} from '../auth/auth.decorator';
 import {OAuthException} from '../exceptions/oauth-exception';
 
 /**

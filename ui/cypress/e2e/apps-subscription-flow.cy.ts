@@ -77,7 +77,6 @@ describe('Apps & Subscription Flow', () => {
         });
 
         cy.url().should('include', '?code');
-        cy.get('#decodedToken').should('contain', TENANT_B_USER);
         cy.get('#decodedToken').should('contain', TENANT_B_DOMAIN);
     });
 

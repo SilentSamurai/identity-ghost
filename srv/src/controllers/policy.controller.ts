@@ -25,6 +25,7 @@ import {Action, Effect} from "../casl/actions.enum";
 import {Policy} from "../entity/authorization.entity";
 import {TenantService} from "../services/tenant.service";
 import {UsersService} from "../services/users.service";
+import {CurrentPermission, Permission} from "../auth/auth.decorator";
 
 @Controller("api/v1")
 @UseInterceptors(ClassSerializerInterceptor)
@@ -61,47 +62,32 @@ export class PolicyController {
 
     @Get("/my/internal-permissions")
     @UseGuards(JwtAuthGuard)
-    async getMyInternalPermissions(@Request() request: Request): Promise<any> {
-        const ability = this.securityService.getAbility(
-            request as unknown as AuthContext,
-        );
-        return ability.rules;
+    async getMyInternalPermissions(@CurrentPermission() permission: Permission): Promise<any> {
+        return permission.authContext.SCOPE_ABILITIES.rules;
     }
 
     @Get("/my/permissions")
     @UseGuards(JwtAuthGuard)
-    async getMyPermission(@Request() request: Request): Promise<Policy[]> {
-        const authContext = request as unknown as AuthContext;
-        const token = this.securityService.getToken(authContext);
-        const customRoleNames = token.roles.filter(
+    async getMyPermission(@CurrentPermission() permission: Permission): Promise<Policy[]> {
+        const token = permission.authContext.SECURITY_CONTEXT;
+        if (!token.isTenantToken()) return [];
+        const tenantToken = token as any;
+        const customRoleNames = tenantToken.roles.filter(
             (name) => !CaslAbilityFactory.isInternalRole(name),
         );
 
         if (customRoleNames.length === 0) return [];
 
-        const tenant = await this.tenantService.findById(
-            authContext,
-            token.tenant.id,
-        );
+        const tenant = await this.tenantService.findById(permission.authContext, tenantToken.tenant.id);
 
         const policies: Policy[] = [];
         for (const roleName of customRoleNames) {
             try {
-                const role = await this.roleService.findByNameAndTenant(
-                    authContext,
-                    roleName,
-                    tenant,
-                );
-                const rolePolicies = await this.policyService.findByRole(
-                    authContext,
-                    role,
-                    role.tenant,
-                );
+                const role = await this.roleService.findByNameAndTenant(permission.authContext, roleName, tenant);
+                const rolePolicies = await this.policyService.findByRole(permission.authContext, role, role.tenant);
                 policies.push(...rolePolicies);
             } catch (e) {
-                if (e instanceof NotFoundException) {
-                    continue;
-                }
+                if (e instanceof NotFoundException) continue;
                 throw e;
             }
         }

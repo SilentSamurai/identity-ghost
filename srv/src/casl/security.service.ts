@@ -23,6 +23,10 @@ export class SecurityService implements OnModuleInit {
     async onModuleInit() {
     }
 
+    /**
+     * @deprecated Use `@CurrentPermission()` or `@CurrentUser()` decorators in controllers instead.
+     * Internal service use only.
+     */
     getAbility(authContext: AuthContext): AnyAbility {
         if (authContext.SCOPE_ABILITIES) {
             return authContext.SCOPE_ABILITIES;
@@ -30,6 +34,10 @@ export class SecurityService implements OnModuleInit {
         throw new UnauthorizedException();
     }
 
+    /**
+     * @deprecated Use `Permission.isAuthorized()` in controllers instead.
+     * In services, call this directly only when no Permission object is available in the call chain.
+     */
     isAuthorized(
         authContext: AuthContext,
         action: Action,
@@ -42,6 +50,10 @@ export class SecurityService implements OnModuleInit {
         return this.check(authContext, action, subject(object, obj));
     }
 
+    /**
+     * @deprecated Use `Permission.isAuthorized()` in controllers instead.
+     * In services, prefer `isAuthorized()` over calling this directly.
+     */
     check(authContext: AuthContext, ...args: any): boolean {
         let ability = this.getAbility(authContext);
         if (!ability.can(...args)) {
@@ -50,6 +62,9 @@ export class SecurityService implements OnModuleInit {
         return true;
     }
 
+    /**
+     * @deprecated Use `@CurrentUser()` or `@CurrentPermission()` decorators in controllers instead.
+     */
     getToken(authContext: AuthContext): TenantToken {
         let payload = authContext.SECURITY_CONTEXT;
         if (!payload.isTenantToken()) {
@@ -74,6 +89,10 @@ export class SecurityService implements OnModuleInit {
         ) as TechnicalToken;
     }
 
+    /**
+     * @deprecated Use `@CurrentPermission()` or `@CurrentUser()` decorators in controllers instead.
+     * Internal service use only.
+     */
     getUserOrTechnicalSecurityContext(request: any): TenantToken {
         return request["SECURITY_CONTEXT"] as TenantToken;
     }

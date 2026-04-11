@@ -289,7 +289,10 @@ describe('Admin Key Management', () => {
             cy.wait('@getAllKeys');
 
             // Type the test tenant domain into the tenant filter
-            cy.get('#FILTER_TENANT').clear().type(TENANT_DOMAIN);
+            cy.get('#FILTER_FIELD_tenant').clear().type(TENANT_DOMAIN);
+
+            // Click Go to apply the filter
+            cy.get('[id$="_FILTER_BAR_GO_BTN"]').click();
 
             // All visible rows should belong to the test tenant
             // Note: first td in each row is the checkbox column, tenant domain is in the second td (eq(1))
@@ -304,7 +307,10 @@ describe('Admin Key Management', () => {
             cy.wait('@getAllKeys');
 
             // Filter by "Current" status
-            cy.get('#FILTER_STATUS').select('current');
+            cy.get('#FILTER_FIELD_status').select('current');
+
+            // Click Go to apply the filter
+            cy.get('[id$="_FILTER_BAR_GO_BTN"]').click();
 
             // All visible badges should be "Current"
             cy.get('app-table tbody tr').each(($row) => {

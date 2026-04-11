@@ -34,6 +34,7 @@ import {TokenIssuanceService} from "../auth/token-issuance.service";
 import {OAuthException} from "../exceptions/oauth-exception";
 import {OAuthExceptionFilter} from "../exceptions/filter/oauth-exception.filter";
 import {CryptUtil} from "../util/crypt.util";
+import {parseBasicAuthHeader} from "../util/http.util";
 import {InjectRepository} from "@nestjs/typeorm";
 import {Client} from "../entity/client.entity";
 import {Repository} from "typeorm";
@@ -153,16 +154,10 @@ export class OAuthTokenController {
     ): Promise<any> {
         let clientId = body.client_id;
         let clientSecret = body.client_secret;
-        if (req.headers.authorization && req.headers.authorization.startsWith("Basic ")) {
-            try {
-                const base64Credentials = req.headers.authorization.split(" ")[1];
-                const credentials = Buffer.from(base64Credentials, "base64").toString("utf-8");
-                const [id, secret] = credentials.split(":");
-                if (id) clientId = id;
-                if (secret) clientSecret = secret;
-            } catch (e) {
-                logger.error("Error decoding basic auth credentials", e);
-            }
+        const basicCredentials = parseBasicAuthHeader(req.headers.authorization);
+        if (basicCredentials) {
+            clientId = basicCredentials.username;
+            clientSecret = basicCredentials.password;
         }
         body.client_id = clientId;
         body.client_secret = clientSecret;

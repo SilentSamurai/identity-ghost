@@ -21,7 +21,7 @@ import {schemaPipe} from "../validation/validation.pipe";
 import * as yup from "yup";
 import {JwtAuthGuard} from "../auth/jwt-auth.guard";
 import {SecurityService} from "../casl/security.service";
-import {CurrentTenantId} from "../auth/current-tenant.decorator";
+import {CurrentTenantId} from "../auth/auth.decorator";
 
 @Controller('/api/apps')
 @UseInterceptors(ClassSerializerInterceptor)

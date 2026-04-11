@@ -32,6 +32,7 @@ import {InjectRepository} from "@nestjs/typeorm";
 import {Repository} from "typeorm";
 import * as yup from "yup";
 import {Environment} from "../config/environment.service";
+import {CurrentPermission, CurrentUser, Permission} from "../auth/auth.decorator";
 
 @Controller("api")
 @UseInterceptors(ClassSerializerInterceptor)
@@ -201,16 +202,12 @@ export class RegisterController {
     @Post("/signdown")
     @UseGuards(JwtAuthGuard)
     async signdown(
-        @Request() request,
+        @CurrentPermission() permission: Permission,
+        @CurrentUser() user: User,
         @Body(new ValidationPipe(ValidationSchema.SignDownSchema))
         body: { password: string },
     ): Promise<{ status: boolean }> {
-        const securityContext = this.securityService.getToken(request);
-        const user = await this.usersService.findByEmail(
-            request,
-            securityContext.email,
-        );
-        await this.usersService.deleteSecure(request, user.id, body.password);
+        await this.usersService.deleteSecure(permission.authContext, user.id, body.password);
 
         return {status: true};
     }

@@ -16,7 +16,7 @@ import {ClientService} from '../services/client.service';
 import {SecurityService} from '../casl/security.service';
 import {AuthContext} from '../casl/contexts';
 import {schemaPipe} from '../validation/validation.pipe';
-import {CurrentTenantId} from '../auth/current-tenant.decorator';
+import {CurrentTenantId} from '../auth/auth.decorator';
 import * as yup from 'yup';
 
 const CreateClientSchema = yup.object().shape({

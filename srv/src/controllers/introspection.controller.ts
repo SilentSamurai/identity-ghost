@@ -2,6 +2,7 @@ import {Body, Controller, Header, HttpCode, Logger, Post, Req} from '@nestjs/com
 import {Request} from 'express';
 import {TokenIntrospectionService, IntrospectionResponse} from '../auth/token-introspection.service';
 import {OAuthException} from '../exceptions/oauth-exception';
+import {parseBasicAuthHeader} from '../util/http.util';
 
 const logger = new Logger('IntrospectionController');
 
@@ -52,16 +53,10 @@ export class IntrospectionController {
 
         // Basic auth takes precedence over body credentials (RFC 7662 §2.1).
         // Decode the Base64 `client_id:client_secret` pair from the Authorization header.
-        if (req.headers.authorization && req.headers.authorization.startsWith('Basic ')) {
-            try {
-                const base64Credentials = req.headers.authorization.split(' ')[1];
-                const credentials = Buffer.from(base64Credentials, 'base64').toString('utf-8');
-                const [id, secret] = credentials.split(':');
-                if (id) clientId = id;
-                if (secret) clientSecret = secret;
-            } catch (e) {
-                logger.error('Error decoding basic auth credentials', e);
-            }
+        const basicCredentials = parseBasicAuthHeader(req.headers.authorization);
+        if (basicCredentials) {
+            clientId = basicCredentials.username;
+            clientSecret = basicCredentials.password;
         }
 
         // The `token` parameter is mandatory per RFC 7662 §2.1.

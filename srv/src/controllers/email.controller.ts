@@ -14,7 +14,6 @@ export class EmailController {
 
     @Get("/verify-email/:token")
     async verifyEmail(
-        @Request() request,
         @Param("token") token: string,
         @Response() response,
     ): Promise<any> {

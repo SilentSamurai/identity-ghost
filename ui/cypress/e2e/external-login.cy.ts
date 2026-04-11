@@ -41,7 +41,6 @@ describe('External Login', () => {
 
         cy.url().should('include', '?code');
 
-        cy.get('#decodedToken').should('contain', Cypress.env('shireTenantAdminEmail'));
         cy.get('#decodedToken').should('contain', Cypress.env('shireTenantAdminClientId'));
 
 
