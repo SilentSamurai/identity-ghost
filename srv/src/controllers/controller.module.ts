@@ -36,6 +36,7 @@ import {IntrospectionController} from "./introspection.controller";
 import {RevocationController} from "./revocation.controller";
 import {JwksController} from "./jwks.controller";
 import {AdminKeysController} from "./admin-keys.controller";
+import {UserInfoController} from "./userinfo.controller";
 
 @Module(
     {
@@ -71,7 +72,8 @@ import {AdminKeysController} from "./admin-keys.controller";
             IntrospectionController,
             RevocationController,
             JwksController,
-            AdminKeysController
+            AdminKeysController,
+            UserInfoController
         ],
         providers: [],
         exports: []

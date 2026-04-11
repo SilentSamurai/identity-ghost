@@ -3,6 +3,7 @@ import {RS256_TOKEN_GENERATOR, SIGNING_KEY_PROVIDER, SigningKeyProvider, TokenSe
 import {Environment} from "../config/environment.service";
 import {User} from "../entity/user.entity";
 import {createHash, randomUUID} from "crypto";
+import {ClaimsResolverService} from "./claims-resolver.service";
 
 export interface GenerateIdTokenParams {
     user: Pick<User, "id" | "email" | "name" | "verified">;
@@ -25,6 +26,7 @@ export class IdTokenService {
         @Inject(SIGNING_KEY_PROVIDER)
         private readonly signingKeyProvider: SigningKeyProvider,
         private readonly configService: Environment,
+        private readonly claimsResolverService: ClaimsResolverService,
     ) {}
 
     static computeAtHash(accessToken: string): string {
@@ -71,16 +73,10 @@ export class IdTokenService {
         // Compute at_hash from the access token
         claims.at_hash = IdTokenService.computeAtHash(params.accessToken);
 
-        // Add name claim when profile scope is granted
-        if (grantedScopes.includes("profile")) {
-            claims.name = user.name;
-        }
-
-        // Add email and email_verified when email scope is granted
-        if (grantedScopes.includes("email")) {
-            claims.email = user.email;
-            claims.email_verified = user.verified;
-        }
+        // Resolve identity claims via centralized scope-to-claims mapping
+        const identityClaims = this.claimsResolverService.resolveClaims(grantedScopes, user);
+        const { sub: _sub, ...additionalClaims } = identityClaims;
+        Object.assign(claims, additionalClaims);
 
         const { privateKey, kid } = await this.signingKeyProvider.getSigningKeyWithKid(tenantId);
         const idToken = await this.tokenGenerator.sign(claims, {

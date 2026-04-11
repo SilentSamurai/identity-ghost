@@ -1,5 +1,5 @@
 import {createParamDecorator, ExecutionContext, ForbiddenException, Inject, Injectable, PipeTransform, forwardRef} from "@nestjs/common";
-import {AuthContext, TenantToken} from "../casl/contexts";
+import {AuthContext, TenantToken, Token} from "../casl/contexts";
 import {AuthUserService} from "../casl/authUser.service";
 import {SecurityService} from "../casl/security.service";
 import {Action} from "../casl/actions.enum";
@@ -25,6 +25,18 @@ export const CurrentUserTenantId = createParamDecorator(
     (data: unknown, ctx: ExecutionContext): string => {
         const request = ctx.switchToHttp().getRequest();
         return request["RESOLVED_USER_TENANT_ID"];
+    },
+);
+
+/**
+ * Extracts the full Token (security context) from the request.
+ * Set by JwtAuthGuard. Returns the Token interface which can be
+ * narrowed via isTenantToken() / isTechnicalToken().
+ */
+export const CurrentToken = createParamDecorator(
+    (data: unknown, ctx: ExecutionContext): Token => {
+        const request = ctx.switchToHttp().getRequest();
+        return request["SECURITY_CONTEXT"];
     },
 );
 

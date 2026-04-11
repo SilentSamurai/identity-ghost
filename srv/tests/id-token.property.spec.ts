@@ -5,6 +5,7 @@ import { IdTokenService, GenerateIdTokenParams } from '../src/auth/id-token.serv
 import { TokenService, SigningKeyProvider } from '../src/core/token-abstraction';
 import { Environment } from '../src/config/environment.service';
 import { CryptUtil } from '../src/util/crypt.util';
+import { ClaimsResolverService } from '../src/auth/claims-resolver.service';
 
 /**
  * Feature: id-token-generation — Property-Based Tests (P1–P9)
@@ -62,10 +63,12 @@ beforeAll(() => {
         },
     } as TokenService;
     signingKeyProvider = createSigningKeyProvider();
+    const claimsResolverService = new ClaimsResolverService();
     idTokenService = new IdTokenService(
         tokenGenerator,
         signingKeyProvider,
         configService,
+        claimsResolverService,
     );
 });
 
@@ -304,15 +307,15 @@ describe('Feature: id-token-generation, Property 6: Scope-dependent identity cla
                 const hasProfile = params.grantedScopes.includes('profile');
                 const hasEmail = params.grantedScopes.includes('email');
 
-                // name claim
-                if (hasProfile) {
+                // name claim (voluntary omission: empty name → omitted)
+                if (hasProfile && params.user.name) {
                     expect(decoded.name).toBe(params.user.name);
                 } else {
                     expect(decoded.name).toBeUndefined();
                 }
 
-                // email and email_verified claims
-                if (hasEmail) {
+                // email and email_verified claims (voluntary omission: empty email → omitted)
+                if (hasEmail && params.user.email) {
                     expect(decoded.email).toBe(params.user.email);
                     expect(decoded.email_verified).toBe(params.user.verified);
                 } else {
@@ -394,10 +397,10 @@ describe('Feature: id-token-generation, Property 8: Sign-decode round-trip integ
                 if (params.acr !== undefined) {
                     expect(decoded.acr).toBe(params.acr);
                 }
-                if (params.grantedScopes.includes('profile')) {
+                if (params.grantedScopes.includes('profile') && params.user.name) {
                     expect(decoded.name).toBe(params.user.name);
                 }
-                if (params.grantedScopes.includes('email')) {
+                if (params.grantedScopes.includes('email') && params.user.email) {
                     expect(decoded.email).toBe(params.user.email);
                     expect(decoded.email_verified).toBe(params.user.verified);
                 }

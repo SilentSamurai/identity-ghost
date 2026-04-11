@@ -17,6 +17,7 @@ import {TokenIntrospectionService} from "./token-introspection.service";
 import {RefreshTokenService} from "./refresh-token.service";
 import {TokenRevocationService} from "./token-revocation.service";
 import {RefreshToken} from "../entity/refresh-token.entity";
+import {ClaimsResolverService} from "./claims-resolver.service";
 
 @Module({
     imports: [
@@ -27,8 +28,8 @@ import {RefreshToken} from "../entity/refresh-token.entity";
         TypeOrmModule.forFeature([AuthCode, User, RefreshToken]),
     ],
     controllers: [],
-    providers: [JwtAuthGuard, AuthService, AuthCodeService, TokenIssuanceService, TenantResolutionGuard, SuperAdminGuard, IdTokenService, TokenIntrospectionService, RefreshTokenService, TokenRevocationService],
-    exports: [JwtAuthGuard, AuthService, AuthCodeService, TokenIssuanceService, TenantResolutionGuard, SuperAdminGuard, IdTokenService, TokenIntrospectionService, RefreshTokenService, TokenRevocationService],
+    providers: [JwtAuthGuard, AuthService, AuthCodeService, TokenIssuanceService, TenantResolutionGuard, SuperAdminGuard, IdTokenService, TokenIntrospectionService, RefreshTokenService, TokenRevocationService, ClaimsResolverService],
+    exports: [JwtAuthGuard, AuthService, AuthCodeService, TokenIssuanceService, TenantResolutionGuard, SuperAdminGuard, IdTokenService, TokenIntrospectionService, RefreshTokenService, TokenRevocationService, ClaimsResolverService],
 })
 export class AuthModule {
 }
