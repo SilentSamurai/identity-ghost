@@ -67,6 +67,7 @@ export class OAuthTokenController {
             subscriber_tenant_hint?: string;
             redirect_uri?: string;
             scope?: string;
+            nonce?: string;
         },
     ) {
         const user: User = await this.authService.validate(
@@ -134,6 +135,7 @@ export class OAuthTokenController {
             result.resolvedHint,
             body.redirect_uri,
             body.scope,
+            body.nonce,
         );
 
         // Update pkceMethodUsed if client used S256 for the first time
@@ -237,7 +239,8 @@ export class OAuthTokenController {
 
         return this.tokenIssuanceService.issueToken(user, tenant, {
             subscriberTenantHint: authCode.subscriberTenantHint,
-            requestedScope: body.scope,
+            requestedScope: body.scope || authCode.scope,
+            nonce: authCode.nonce ?? undefined,
             grant_type: GRANT_TYPES.CODE,
         });
     }

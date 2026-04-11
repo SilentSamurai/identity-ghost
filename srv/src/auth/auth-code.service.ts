@@ -76,6 +76,7 @@ export class AuthCodeService {
         subscriberTenantHint?: string,
         redirectUri?: string,
         scope?: string,
+        nonce?: string,
     ): Promise<string> {
         let code = CryptUtil.generateOTP(6);
 
@@ -95,6 +96,7 @@ export class AuthCodeService {
             subscriberTenantHint: subscriberTenantHint || null,
             redirectUri: redirectUri || null,
             scope: scope || null,
+            nonce: nonce || null,
             used: false,
             expiresAt,
         });
@@ -174,6 +176,7 @@ export class AuthCodeService {
         authCode.subscriberTenantHint = row.subscriber_tenant_hint;
         authCode.redirectUri = row.redirect_uri;
         authCode.scope = row.scope;
+        authCode.nonce = row.nonce;
         authCode.used = row.used;
         authCode.usedAt = row.used_at;
         authCode.expiresAt = row.expires_at;

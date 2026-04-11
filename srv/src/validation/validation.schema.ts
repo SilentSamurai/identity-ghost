@@ -189,6 +189,7 @@ const LoginSchema = yup.object().shape({
     subscriber_tenant_hint: yup.string().optional().nullable(),
     redirect_uri: yup.string().optional(),
     scope: yup.string().optional(),
+    nonce: yup.string().optional().max(512),
 });
 
 const PasswordGrantSchema = yup.object().shape({

@@ -29,6 +29,9 @@ export class AuthCode {
     @Column({name: "scope", nullable: true})
     scope: string;
 
+    @Column({name: "nonce", nullable: true, length: 512})
+    nonce: string;
+
     @Column({name: "used", default: false})
     used: boolean;
 

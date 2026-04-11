@@ -16,6 +16,7 @@ import {IdTokenService} from "./id-token.service";
 import {RefreshTokenService} from "./refresh-token.service";
 import {UsersService} from "../services/users.service";
 import {OAuthException} from "../exceptions/oauth-exception";
+import {randomUUID} from "crypto";
 
 /**
  * TokenIssuanceService — Central orchestrator for OAuth 2.0 / OIDC token issuance.
@@ -80,6 +81,7 @@ export interface TokenResponse {
 export interface IssueTokenOptions {
     subscriberTenantHint?: string;
     authCode?: string;
+    nonce?: string;
     requestedScope?: string;
     grant_type?: GRANT_TYPES;
 }
@@ -141,11 +143,19 @@ export class TokenIssuanceService {
             scope: ScopeNormalizer.format(scopes),
         });
 
+        // Read nonce from options (passed by controller from the already-redeemed auth code)
+        const nonce = options?.nonce;
+
         const idToken = await this.idTokenService.generateIdToken({
-            user: {id: user.id, email: user.email, name: user.name},
+            user: {id: user.id, email: user.email, name: user.name, verified: user.verified},
             tenantId: tenant.id,
             clientId: tenant.clientId,
             grantedScopes: scopes,
+            accessToken,
+            nonce,
+            authTime: Math.floor(Date.now() / 1000),
+            sessionId: randomUUID(),
+            amr: ["pwd"],
         });
 
         return this.formatResponse(accessToken, refreshToken, scopes, idToken);
@@ -203,13 +213,14 @@ export class TokenIssuanceService {
         options?: IssueTokenOptions,
     ): Promise<TokenResponse> {
         let hint = options?.subscriberTenantHint;
+        const nonce = options?.nonce;
 
         // Check auth code for stored hint
-        if (!hint && options?.authCode) {
+        if (options?.authCode) {
             if (await this.authCodeService.hasAuthCodeWithHint(options.authCode)) {
                 const authCodeObj = await this.authCodeService.findByCode(options.authCode);
                 if (authCodeObj?.subscriberTenantHint) {
-                    hint = authCodeObj.subscriberTenantHint;
+                    hint = hint || authCodeObj.subscriberTenantHint;
                 }
             }
         }
@@ -243,10 +254,15 @@ export class TokenIssuanceService {
         });
 
         const idToken = await this.idTokenService.generateIdToken({
-            user: {id: user.id, email: user.email, name: user.name},
+            user: {id: user.id, email: user.email, name: user.name, verified: user.verified},
             tenantId: tenant.id,
             clientId: tenant.clientId,
             grantedScopes: scopes,
+            accessToken,
+            nonce,
+            authTime: Math.floor(Date.now() / 1000),
+            sessionId: randomUUID(),
+            amr: ["pwd"],
         });
 
         return this.formatResponse(accessToken, refreshToken, scopes, idToken);
@@ -285,10 +301,14 @@ export class TokenIssuanceService {
             await this.authService.createUserAccessToken(user, tenant, grantedScopes, roleNames, GRANT_TYPES.REFRESH_TOKEN);
 
         const idToken = await this.idTokenService.generateIdToken({
-            user: {id: user.id, email: user.email, name: user.name},
+            user: {id: user.id, email: user.email, name: user.name, verified: user.verified},
             tenantId: tenant.id,
             clientId: tenant.clientId,
             grantedScopes: scopes,
+            accessToken,
+            authTime: Math.floor(Date.now() / 1000),
+            sessionId: randomUUID(),
+            amr: ["pwd"],
         });
 
         return this.formatResponse(accessToken, newRefreshToken, scopes, idToken);
