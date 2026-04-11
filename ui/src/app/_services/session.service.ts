@@ -96,6 +96,14 @@ export class SessionService {
         }
     }
 
+    /**
+     * Decode an ID token JWT without verification (verification is server-side).
+     * Returns the decoded payload object.
+     */
+    public decodeIdToken(idToken: string): any {
+        return jwt_decode(idToken);
+    }
+
     public getUser(): DecodedToken | null {
         return this.getDecodedToken();
     }

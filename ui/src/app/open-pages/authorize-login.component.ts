@@ -1,6 +1,7 @@
 import {Component, OnInit} from '@angular/core';
 import {AuthService} from '../_services/auth.service';
 import {SessionService} from '../_services/session.service';
+import {NonceService} from '../_services/nonce.service';
 import {ActivatedRoute, Router} from '@angular/router';
 import {FormBuilder, FormGroup, Validators} from '@angular/forms';
 import {MessageService} from 'primeng/api';
@@ -215,7 +216,8 @@ export class AuthorizeLoginComponent implements OnInit {
         private route: ActivatedRoute,
         private fb: FormBuilder,
         private tokenStorage: SessionService,
-        private messageService: MessageService
+        private messageService: MessageService,
+        private nonceService: NonceService
     ) {
         this.loginForm = this.fb.group({
             username: ['', Validators.required],
@@ -290,6 +292,12 @@ export class AuthorizeLoginComponent implements OnInit {
             this.state = params['state'];
             this.scope = params['scope'];
             this.responseType = params['response_type'];
+
+            // Generate and store nonce for OIDC flows
+            if (this.scope && this.scope.split(' ').includes('openid')) {
+                const nonce = this.nonceService.generate();
+                this.nonceService.store(nonce);
+            }
         });
     }
 
@@ -303,6 +311,7 @@ export class AuthorizeLoginComponent implements OnInit {
     async onSubmit(subscriberTenantHint?: string): Promise<void> {
         this.loading = true;
         const {username, password, client_id} = this.loginForm.value;
+        const nonce = this.nonceService.retrieve();
         try {
             const data = await this.authService.login(
                 username,
@@ -311,6 +320,7 @@ export class AuthorizeLoginComponent implements OnInit {
                 this.code_challenge,
                 this.code_challenge_method,
                 subscriberTenantHint,
+                nonce || undefined,
             );
 
             if (data.requires_tenant_selection) {

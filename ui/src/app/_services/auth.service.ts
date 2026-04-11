@@ -22,6 +22,7 @@ export class AuthService {
         code_challenge: string,
         method: string,
         subscriber_tenant_hint?: string,
+        nonce?: string,
     ): Promise<any> {
         const body: any = {
             code_challenge: code_challenge,
@@ -32,6 +33,9 @@ export class AuthService {
         };
         if (subscriber_tenant_hint) {
             body.subscriber_tenant_hint = subscriber_tenant_hint;
+        }
+        if (nonce) {
+            body.nonce = nonce;
         }
         return await lastValueFrom(
             this.http.post(

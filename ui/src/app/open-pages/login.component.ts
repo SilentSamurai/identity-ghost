@@ -1,6 +1,7 @@
 import {Component, OnInit} from '@angular/core';
 import {AuthService} from '../_services/auth.service';
 import {SessionService} from '../_services/session.service';
+import {NonceService} from '../_services/nonce.service';
 import {ActivatedRoute, Router} from '@angular/router';
 import {lastValueFrom} from 'rxjs';
 import {FormBuilder, FormGroup, Validators} from '@angular/forms';
@@ -225,6 +226,7 @@ export class LoginComponent implements OnInit {
         private fb: FormBuilder,
         private tokenStorage: SessionService,
         private messageService: MessageService,
+        private nonceService: NonceService,
     ) {
         this.loginForm = this.fb.group({
             client_id: ['', Validators.required],
@@ -352,6 +354,51 @@ export class LoginComponent implements OnInit {
             const data = await lastValueFrom(
                 this.authService.fetchAccessToken(code, verifier, clientId),
             );
+
+            // Validate nonce in ID token if a nonce was sent in the authorization request
+            const storedNonce = this.nonceService.retrieve();
+            if (storedNonce) {
+                // A nonce was sent — the token response must contain an id_token
+                if (!data.id_token) {
+                    this.tokenStorage.clearSession();
+                    this.nonceService.clear();
+                    this.messageService.add({
+                        severity: 'error',
+                        summary: 'Authentication Error',
+                        detail: 'Authentication failed: missing ID token',
+                        life: 5000
+                    });
+                    return;
+                }
+
+                const decodedIdToken = this.tokenStorage.decodeIdToken(data.id_token);
+
+                // The ID token must contain a nonce claim
+                if (!decodedIdToken.nonce) {
+                    this.tokenStorage.clearSession();
+                    this.nonceService.clear();
+                    this.messageService.add({
+                        severity: 'error',
+                        summary: 'Authentication Error',
+                        detail: 'Authentication failed: missing nonce',
+                        life: 5000
+                    });
+                    return;
+                }
+
+                // Validate the nonce claim matches the stored nonce
+                if (!this.nonceService.validate(decodedIdToken.nonce)) {
+                    this.tokenStorage.clearSession();
+                    this.messageService.add({
+                        severity: 'error',
+                        summary: 'Authentication Error',
+                        detail: 'Authentication failed: nonce mismatch',
+                        life: 5000
+                    });
+                    return;
+                }
+            }
+
             this.tokenStorage.saveToken(data.access_token);
             if (data.refresh_token) {
                 this.tokenStorage.saveRefreshToken(data.refresh_token);
