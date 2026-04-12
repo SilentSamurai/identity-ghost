@@ -294,6 +294,12 @@ export class StartUpService implements OnModuleInit {
                             allowedScopes: "openid profile",
                             isPublic: true
                         },
+                        {
+                            name: "Shire Authorize Test",
+                            redirectUris: ["https://authorize-e2e.example.com/callback"],
+                            allowedScopes: "openid profile email",
+                            isPublic: true
+                        },
                     ],
                 },
                 {

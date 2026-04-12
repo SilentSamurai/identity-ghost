@@ -37,6 +37,10 @@ export class OAuthException extends HttpException {
     return new OAuthException('invalid_token', description, HttpStatus.UNAUTHORIZED);
   }
 
+  static unsupportedResponseType(description: string): OAuthException {
+    return new OAuthException('unsupported_response_type', description, HttpStatus.BAD_REQUEST);
+  }
+
   static serverError(): OAuthException {
     return new OAuthException('server_error', 'An unexpected error occurred', HttpStatus.BAD_REQUEST);
   }

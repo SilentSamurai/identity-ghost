@@ -14,13 +14,16 @@ import {
     Body,
     ClassSerializerInterceptor,
     Controller,
+    Get,
     Logger,
     Post,
+    Query,
     Req,
+    Res,
     UseFilters,
     UseInterceptors,
 } from "@nestjs/common";
-import {Request as ExpressRequest} from "express";
+import {Request as ExpressRequest, Response} from "express";
 
 import {User} from "../entity/user.entity";
 import {AuthService} from "../auth/auth.service";
@@ -32,7 +35,9 @@ import {GRANT_TYPES} from "../casl/contexts";
 import {AuthUserService} from "../casl/authUser.service";
 import {TokenIssuanceService} from "../auth/token-issuance.service";
 import {OAuthException} from "../exceptions/oauth-exception";
+import {AuthorizeRedirectException} from "../exceptions/authorize-redirect.exception";
 import {OAuthExceptionFilter} from "../exceptions/filter/oauth-exception.filter";
+import {AuthorizeService, AuthorizeQueryParams} from "../auth/authorize.service";
 import {CryptUtil} from "../util/crypt.util";
 import {parseBasicAuthHeader} from "../util/http.util";
 import {InjectRepository} from "@nestjs/typeorm";
@@ -50,9 +55,46 @@ export class OAuthTokenController {
         private readonly authCodeService: AuthCodeService,
         private readonly authUserService: AuthUserService,
         private readonly tokenIssuanceService: TokenIssuanceService,
+        private readonly authorizeService: AuthorizeService,
         @InjectRepository(Client)
         private readonly clientRepository: Repository<Client>,
     ) {
+    }
+
+    @Get("/authorize")
+    async authorize(@Query() query: AuthorizeQueryParams, @Res() res: Response): Promise<void> {
+        try {
+            const validated = await this.authorizeService.validateAuthorizeRequest(query);
+
+            const params = new URLSearchParams();
+            params.set('client_id', validated.clientId);
+            params.set('redirect_uri', validated.redirectUri);
+            params.set('scope', validated.scope);
+            params.set('state', validated.state);
+            if (validated.codeChallenge) {
+                params.set('code_challenge', validated.codeChallenge);
+            }
+            if (validated.codeChallenge) {
+                params.set('code_challenge_method', validated.codeChallengeMethod);
+            }
+            if (validated.nonce) {
+                params.set('nonce', validated.nonce);
+            }
+
+            res.redirect(302, `/authorize?${params.toString()}`);
+        } catch (error) {
+            if (error instanceof AuthorizeRedirectException) {
+                const params = new URLSearchParams();
+                params.set('error', error.errorCode);
+                params.set('error_description', error.errorDescription);
+                if (error.state) {
+                    params.set('state', error.state);
+                }
+                res.redirect(302, `${error.redirectUri}?${params.toString()}`);
+                return;
+            }
+            throw error;
+        }
     }
 
     @Post("/login")
