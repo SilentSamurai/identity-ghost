@@ -41,6 +41,9 @@ export class AuthCode {
     @Column({name: "expires_at", nullable: false})
     expiresAt: Date;
 
+    @Column({name: "sid", type: "varchar", length: 36, nullable: true})
+    sid: string | null;
+
     @CreateDateColumn({name: "created_at"})
     createdAt: Date;
 }

@@ -5,6 +5,7 @@ import {createHash} from 'crypto';
 import {RefreshTokenService} from './refresh-token.service';
 import {RefreshToken} from '../entity/refresh-token.entity';
 import {OAuthException} from '../exceptions/oauth-exception';
+import {LoginSessionService} from './login-session.service';
 
 /**
  * Owns the business logic for RFC 7009 Token Revocation and the logout sequence.
@@ -28,6 +29,7 @@ export class TokenRevocationService {
         private readonly refreshTokenService: RefreshTokenService,
         @InjectRepository(RefreshToken)
         private readonly refreshTokenRepo: Repository<RefreshToken>,
+        private readonly loginSessionService: LoginSessionService,
     ) {}
 
     /**
@@ -69,11 +71,14 @@ export class TokenRevocationService {
 
     /**
      * Logout sequence: revoke the refresh token family (if provided),
+     * invalidate the login session (if sid provided),
      * then return so the controller can clear session cookies.
-     *
-     * Session invalidation is skipped until the Login_Session entity is implemented.
      */
-    async logout(tenantId: string, refreshToken?: string): Promise<void> {
+    async logout(tenantId: string, refreshToken?: string, sid?: string): Promise<void> {
+        if (sid) {
+            await this.loginSessionService.invalidateSession(sid);
+            await this.refreshTokenService.revokeBySid(sid);
+        }
         if (refreshToken) {
             await this.revoke(tenantId, refreshToken);
         }

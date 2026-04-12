@@ -16,6 +16,7 @@ import {AddPkceMethodUsedToClients1752000000000} from "./1752000000000-AddPkceMe
 import {CreateRefreshTokensTable1753000000000} from "./1753000000000-CreateRefreshTokensTable";
 import {CreateTenantKeysAndDropLegacyColumns1754000000000} from "./1754000000000-CreateTenantKeysAndDropLegacyColumns";
 import {AddNonceToAuthCode1755000000000} from "./1755000000000-AddNonceToAuthCode";
+import {CreateLoginSessionsTable1756000000000} from "./1756000000000-CreateLoginSessionsTable";
 
 export const migrations = [
     CreateInitialTables1681147242561,
@@ -35,5 +36,6 @@ export const migrations = [
     AddPkceMethodUsedToClients1752000000000,
     CreateRefreshTokensTable1753000000000,
     CreateTenantKeysAndDropLegacyColumns1754000000000,
-    AddNonceToAuthCode1755000000000
+    AddNonceToAuthCode1755000000000,
+    CreateLoginSessionsTable1756000000000
 ];

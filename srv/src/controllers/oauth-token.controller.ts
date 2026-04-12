@@ -43,6 +43,7 @@ import {parseBasicAuthHeader} from "../util/http.util";
 import {InjectRepository} from "@nestjs/typeorm";
 import {Client} from "../entity/client.entity";
 import {Repository} from "typeorm";
+import {LoginSessionService} from "../auth/login-session.service";
 
 const logger = new Logger("OAuthTokenController");
 
@@ -56,6 +57,7 @@ export class OAuthTokenController {
         private readonly authUserService: AuthUserService,
         private readonly tokenIssuanceService: TokenIssuanceService,
         private readonly authorizeService: AuthorizeService,
+        private readonly loginSessionService: LoginSessionService,
         @InjectRepository(Client)
         private readonly clientRepository: Repository<Client>,
     ) {
@@ -171,6 +173,8 @@ export class OAuthTokenController {
             };
         }
 
+        const session = await this.loginSessionService.createSession(user.id, tenant.id);
+
         const auth_code = await this.authCodeService.createAuthToken(
             user,
             tenant,
@@ -181,6 +185,7 @@ export class OAuthTokenController {
             body.redirect_uri,
             body.scope,
             body.nonce,
+            session.sid,
         );
 
         // Update pkceMethodUsed if client used S256 for the first time
@@ -293,6 +298,7 @@ export class OAuthTokenController {
             subscriberTenantHint: authCode.subscriberTenantHint,
             requestedScope: body.scope || authCode.scope,
             nonce: authCode.nonce ?? undefined,
+            sid: authCode.sid ?? undefined,
             grant_type: GRANT_TYPES.CODE,
         });
     }

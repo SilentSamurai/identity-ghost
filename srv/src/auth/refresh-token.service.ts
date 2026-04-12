@@ -87,6 +87,7 @@ export class RefreshTokenService {
         clientId: string;
         tenantId: string;
         scope: string;
+        sid?: string;
     }): Promise<{ plaintext: string; record: RefreshToken }> {
         const plaintext = generateOpaqueToken();
         const tokenHash = hashToken(plaintext);
@@ -103,6 +104,7 @@ export class RefreshTokenService {
             clientId: params.clientId,
             tenantId: params.tenantId,
             scope: params.scope,
+            sid: params.sid || null,
             expiresAt,
             absoluteExpiresAt,
             revoked: false,
@@ -193,6 +195,7 @@ export class RefreshTokenService {
             clientId: existing.clientId,
             tenantId: existing.tenantId,
             scope: grantedScope,
+            sid: existing.sid || null,
             expiresAt: newExpiresAt,
             absoluteExpiresAt: existing.absoluteExpiresAt,
             revoked: false,
@@ -271,5 +274,17 @@ export class RefreshTokenService {
         if (record) {
             await this.revokeFamily(record.familyId);
         }
+    }
+
+    /**
+     * Revoke all refresh tokens that reference a given session sid.
+     */
+    async revokeBySid(sid: string): Promise<void> {
+        await this.repo
+            .createQueryBuilder()
+            .update(RefreshToken)
+            .set({ revoked: true })
+            .where("sid = :sid", { sid })
+            .execute();
     }
 }

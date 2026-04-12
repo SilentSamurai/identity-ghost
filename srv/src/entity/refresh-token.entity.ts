@@ -53,6 +53,10 @@ export class RefreshToken {
     @Column({name: "used_at", type: "datetime", nullable: true})
     usedAt: Date | null;
 
+    @Column({name: "sid", type: "varchar", length: 36, nullable: true})
+    @Index()
+    sid: string | null;
+
     @CreateDateColumn({name: "created_at"})
     createdAt: Date;
 }

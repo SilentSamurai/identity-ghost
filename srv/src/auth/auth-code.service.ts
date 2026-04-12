@@ -77,6 +77,7 @@ export class AuthCodeService {
         redirectUri?: string,
         scope?: string,
         nonce?: string,
+        sid?: string,
     ): Promise<string> {
         let code = CryptUtil.generateOTP(6);
 
@@ -97,6 +98,7 @@ export class AuthCodeService {
             redirectUri: redirectUri || null,
             scope: scope || null,
             nonce: nonce || null,
+            sid: sid || null,
             used: false,
             expiresAt,
         });
@@ -181,6 +183,7 @@ export class AuthCodeService {
         authCode.usedAt = row.used_at;
         authCode.expiresAt = row.expires_at;
         authCode.createdAt = row.created_at;
+        authCode.sid = row.sid;
         return authCode;
     }
 

@@ -17,6 +17,7 @@ import {RefreshTokenService} from "./refresh-token.service";
 import {UsersService} from "../services/users.service";
 import {OAuthException} from "../exceptions/oauth-exception";
 import {randomUUID} from "crypto";
+import {LoginSessionService} from "./login-session.service";
 
 /**
  * TokenIssuanceService — Central orchestrator for OAuth 2.0 / OIDC token issuance.
@@ -84,6 +85,7 @@ export interface IssueTokenOptions {
     nonce?: string;
     requestedScope?: string;
     grant_type?: GRANT_TYPES;
+    sid?: string;
 }
 
 @Injectable()
@@ -100,6 +102,7 @@ export class TokenIssuanceService {
         private readonly idTokenService: IdTokenService,
         private readonly refreshTokenService: RefreshTokenService,
         private readonly usersService: UsersService,
+        private readonly loginSessionService: LoginSessionService,
     ) {
     }
 
@@ -136,11 +139,28 @@ export class TokenIssuanceService {
         const {accessToken, scopes} =
             await this.authService.createUserAccessToken(user, tenant, grantedScopes, roleNames, options?.grant_type ?? GRANT_TYPES.PASSWORD);
 
+        // Resolve session: validate existing sid or create new session for password grant
+        let authTime: number;
+        let sessionId: string;
+        if (options?.sid) {
+            const session = await this.loginSessionService.validateSession(options.sid);
+            authTime = session.authTime;
+            sessionId = session.sid;
+        } else if (options?.grant_type === GRANT_TYPES.PASSWORD || !options?.grant_type) {
+            const session = await this.loginSessionService.createSession(user.id, tenant.id);
+            authTime = session.authTime;
+            sessionId = session.sid;
+        } else {
+            authTime = Math.floor(Date.now() / 1000);
+            sessionId = randomUUID();
+        }
+
         const {plaintext: refreshToken} = await this.refreshTokenService.create({
             userId: user.id,
             clientId: tenant.clientId,
             tenantId: tenant.id,
             scope: ScopeNormalizer.format(scopes),
+            sid: sessionId,
         });
 
         // Read nonce from options (passed by controller from the already-redeemed auth code)
@@ -153,8 +173,8 @@ export class TokenIssuanceService {
             grantedScopes: scopes,
             accessToken,
             nonce,
-            authTime: Math.floor(Date.now() / 1000),
-            sessionId: randomUUID(),
+            authTime,
+            sessionId,
             amr: ["pwd"],
         });
 
@@ -246,11 +266,28 @@ export class TokenIssuanceService {
                 user, tenant, subscribingTenant, grantedScopes, allRoleNames, options?.grant_type ?? GRANT_TYPES.PASSWORD,
             );
 
+        // Resolve session: validate existing sid or create new session for password grant
+        let authTime: number;
+        let sessionId: string;
+        if (options?.sid) {
+            const session = await this.loginSessionService.validateSession(options.sid);
+            authTime = session.authTime;
+            sessionId = session.sid;
+        } else if (options?.grant_type === GRANT_TYPES.PASSWORD || !options?.grant_type) {
+            const session = await this.loginSessionService.createSession(user.id, tenant.id);
+            authTime = session.authTime;
+            sessionId = session.sid;
+        } else {
+            authTime = Math.floor(Date.now() / 1000);
+            sessionId = randomUUID();
+        }
+
         const {plaintext: refreshToken} = await this.refreshTokenService.create({
             userId: user.id,
             clientId: tenant.clientId,
             tenantId: tenant.id,
             scope: ScopeNormalizer.format(scopes),
+            sid: sessionId,
         });
 
         const idToken = await this.idTokenService.generateIdToken({
@@ -260,8 +297,8 @@ export class TokenIssuanceService {
             grantedScopes: scopes,
             accessToken,
             nonce,
-            authTime: Math.floor(Date.now() / 1000),
-            sessionId: randomUUID(),
+            authTime,
+            sessionId,
             amr: ["pwd"],
         });
 
@@ -300,14 +337,26 @@ export class TokenIssuanceService {
         const {accessToken, scopes} =
             await this.authService.createUserAccessToken(user, tenant, grantedScopes, roleNames, GRANT_TYPES.REFRESH_TOKEN);
 
+        // Resolve session from the refresh token's sid
+        let authTime: number;
+        let sessionId: string;
+        if (record.sid) {
+            const session = await this.loginSessionService.validateSession(record.sid);
+            authTime = session.authTime;
+            sessionId = session.sid;
+        } else {
+            authTime = Math.floor(Date.now() / 1000);
+            sessionId = randomUUID();
+        }
+
         const idToken = await this.idTokenService.generateIdToken({
             user: {id: user.id, email: user.email, name: user.name, verified: user.verified},
             tenantId: tenant.id,
             clientId: tenant.clientId,
             grantedScopes: scopes,
             accessToken,
-            authTime: Math.floor(Date.now() / 1000),
-            sessionId: randomUUID(),
+            authTime,
+            sessionId,
             amr: ["pwd"],
         });
 

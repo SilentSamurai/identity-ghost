@@ -67,9 +67,9 @@ export class RevocationController {
     async logout(
         @CurrentTenantId() tenantId: string,
         @Res({passthrough: true}) res: Response,
-        @Body() body: { refresh_token?: string },
+        @Body() body: { refresh_token?: string; sid?: string },
     ): Promise<Record<string, never>> {
-        await this.revocationService.logout(tenantId, body.refresh_token);
+        await this.revocationService.logout(tenantId, body.refresh_token, body.sid);
 
         // Clear session cookies by setting Max-Age=0
         res.setHeader('Set-Cookie', [

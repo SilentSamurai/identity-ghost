@@ -14,6 +14,7 @@ import {TenantBits} from "./tenant-bits.entity";
 import {Client} from "./client.entity";
 import {RefreshToken} from "./refresh-token.entity";
 import {TenantKey} from "./tenant-key.entity";
+import {LoginSession} from "./login-session.entity";
 
 export const entities = [
     Tenant,
@@ -31,5 +32,6 @@ export const entities = [
     TenantBits,
     Client,
     RefreshToken,
-    TenantKey
+    TenantKey,
+    LoginSession
 ];
