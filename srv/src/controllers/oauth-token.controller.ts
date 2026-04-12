@@ -157,6 +157,9 @@ export class OAuthTokenController {
             }
         }
 
+        // Validate redirect_uri against registered URIs before proceeding
+        await this.authorizeService.validateRedirectUriForClient(body.client_id, body.redirect_uri);
+
         const result = await this.tokenIssuanceService.resolveLoginAccess(
             user, tenant, body.subscriber_tenant_hint,
         );
@@ -262,10 +265,17 @@ export class OAuthTokenController {
             throw OAuthException.invalidGrant("The authorization code was not issued to this client or the client_id is invalid.");
         }
 
-        // Verify redirect_uri binding
+        // Verify redirect_uri binding (RFC 6749 §4.1.3)
         if (authCode.redirectUri) {
-            if (!body.redirect_uri || body.redirect_uri !== authCode.redirectUri) {
-                throw OAuthException.invalidGrant("redirect_uri does not match");
+            if (!body.redirect_uri) {
+                throw OAuthException.invalidGrant(
+                    'The redirect_uri parameter is required when it was included in the authorization request'
+                );
+            }
+            if (body.redirect_uri !== authCode.redirectUri) {
+                throw OAuthException.invalidGrant(
+                    'The redirect_uri does not match the value used in the authorization request'
+                );
             }
         }
 

@@ -90,7 +90,7 @@ describe('redirect_uri binding in authorization code flow', () => {
 
         expect(response.status).toEqual(400);
         expect(response.body.error).toEqual("invalid_grant");
-        expect(response.body.error_description).toEqual("redirect_uri does not match");
+        expect(response.body.error_description).toEqual("The redirect_uri does not match the value used in the authorization request");
     });
 
     // Omission attack: login with a redirect_uri stored on the code, but omit it entirely
@@ -113,7 +113,7 @@ describe('redirect_uri binding in authorization code flow', () => {
 
         expect(response.status).toEqual(400);
         expect(response.body.error).toEqual("invalid_grant");
-        expect(response.body.error_description).toEqual("redirect_uri does not match");
+        expect(response.body.error_description).toEqual("The redirect_uri parameter is required when it was included in the authorization request");
     });
 
     // Backward compatibility: when no redirect_uri was provided during login, the server

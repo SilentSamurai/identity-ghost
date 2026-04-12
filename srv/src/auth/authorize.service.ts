@@ -112,7 +112,7 @@ export class AuthorizeService {
         }
     }
 
-    private validateRedirectUri(client: Client, redirectUri?: string): string {
+    public validateRedirectUri(client: Client, redirectUri?: string): string {
         const registeredUris: string[] = client.redirectUris || [];
 
         if (!redirectUri) {
@@ -133,6 +133,23 @@ export class AuthorizeService {
         }
 
         return redirectUri;
+    }
+
+    async validateRedirectUriForClient(clientId: string, redirectUri?: string): Promise<string | null> {
+        let client: Client;
+        try {
+            client = await this.clientService.findByClientId(clientId);
+        } catch (error) {
+            if (error instanceof NotFoundException) {
+                // Legacy tenant-based client — no Client entity, skip redirect URI validation
+                return redirectUri || null;
+            }
+            throw error;
+        }
+        if (!redirectUri) {
+            return null;
+        }
+        return this.validateRedirectUri(client, redirectUri);
     }
 
     private validateState(state: string | undefined, redirectUri: string): void {
