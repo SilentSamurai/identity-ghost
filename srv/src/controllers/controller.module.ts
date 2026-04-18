@@ -38,6 +38,7 @@ import {JwksController} from "./jwks.controller";
 import {AdminKeysController} from "./admin-keys.controller";
 import {UserInfoController} from "./userinfo.controller";
 import {UserConsent} from "../entity/user-consent.entity";
+import {DiscoveryController} from "./discovery.controller";
 
 @Module(
     {
@@ -74,7 +75,8 @@ import {UserConsent} from "../entity/user-consent.entity";
             RevocationController,
             JwksController,
             AdminKeysController,
-            UserInfoController
+            UserInfoController,
+            DiscoveryController
         ],
         providers: [],
         exports: []
