@@ -206,6 +206,36 @@ describe('UserInfo Endpoint Integration', () => {
         });
     });
 
+    // ── 7.5. Expired token (structurally valid JWT with past exp) → 401 + WWW-Authenticate ──
+
+    describe('expired token (structurally valid JWT)', () => {
+        it('should return 401 with WWW-Authenticate header containing invalid_token', async () => {
+            // Create a JWT with an exp claim in the past (expired)
+            const expiredToken = app.jwtService().sign(
+                {
+                    sub: 'test-user-id',
+                    scopes: ['openid', 'profile', 'email'],
+                    roles: [],
+                    iss: 'auth-server',
+                    aud: 'auth-server',
+                    exp: Math.floor(Date.now() / 1000) - 3600, // Expired 1 hour ago
+                    iat: Math.floor(Date.now() / 1000) - 7200, // Issued 2 hours ago
+                },
+                { secret: 'test-secret-that-wont-match' },
+            );
+
+            const res = await app.getHttpServer()
+                .get('/api/oauth/userinfo')
+                .set('Authorization', `Bearer ${expiredToken}`)
+                .set('Accept', 'application/json');
+
+            expect(res.status).toEqual(401);
+            expect(res.headers['www-authenticate']).toBeDefined();
+            expect(res.headers['www-authenticate']).toContain('Bearer');
+            expect(res.headers['www-authenticate']).toContain('invalid_token');
+        });
+    });
+
     // ── 8. Client credentials token → 401 (UserInfo requires user token) ──
 
     describe('client credentials token (TechnicalToken)', () => {
@@ -235,7 +265,7 @@ describe('UserInfo Endpoint Integration', () => {
         });
     });
 
-    // ── 9. Response headers include Cache-Control: no-store ──
+    // ── 9. Response headers include Cache-Control: no-store and Pragma: no-cache ──
 
     describe('response headers', () => {
         it('should include Cache-Control: no-store', async () => {
@@ -250,9 +280,87 @@ describe('UserInfo Endpoint Integration', () => {
             expect(res.headers['cache-control']).toBeDefined();
             expect(res.headers['cache-control']).toContain('no-store');
         });
+
+        it('should include Pragma: no-cache on GET endpoint', async () => {
+            const accessToken = await getAccessToken('openid profile email');
+
+            const res = await app.getHttpServer()
+                .get('/api/oauth/userinfo')
+                .set('Authorization', `Bearer ${accessToken}`)
+                .set('Accept', 'application/json');
+
+            expect(res.status).toEqual(200);
+            expect(res.headers['pragma']).toBeDefined();
+            expect(res.headers['pragma']).toEqual('no-cache');
+        });
+
+        it('should include Pragma: no-cache on POST endpoint', async () => {
+            const accessToken = await getAccessToken('openid profile email');
+
+            const res = await app.getHttpServer()
+                .post('/api/oauth/userinfo')
+                .set('Authorization', `Bearer ${accessToken}`)
+                .set('Accept', 'application/json');
+
+            expect(res.status).toEqual(200);
+            expect(res.headers['pragma']).toBeDefined();
+            expect(res.headers['pragma']).toEqual('no-cache');
+        });
     });
 
-    // ── 10. Consistency: ID Token identity claims match UserInfo response ──
+    // ── 10. Live data after profile update: UserInfo reflects updated name ──
+
+    describe('live data after profile update', () => {
+        it('should return updated name after user profile is modified', async () => {
+            // Step 1: Get an access token with openid profile email scope
+            const accessToken = await getAccessToken('openid profile email');
+
+            // Step 2: Call GET /api/oauth/userinfo and record the initial name
+            const initialRes = await app.getHttpServer()
+                .get('/api/oauth/userinfo')
+                .set('Authorization', `Bearer ${accessToken}`)
+                .set('Accept', 'application/json');
+
+            expect(initialRes.status).toEqual(200);
+            const initialName = initialRes.body.name;
+            expect(initialName).toBeDefined();
+
+            // Step 3: Update the user's name via PATCH /api/users/me/name
+            const updatedName = `Updated Name ${Date.now()}`;
+            const updateRes = await app.getHttpServer()
+                .patch('/api/users/me/name')
+                .set('Authorization', `Bearer ${accessToken}`)
+                .set('Accept', 'application/json')
+                .send({name: updatedName});
+
+            expect(updateRes.status).toEqual(200);
+            expect(updateRes.body.name).toEqual(updatedName);
+
+            // Step 4: Call GET /api/oauth/userinfo again with the same access token
+            const updatedRes = await app.getHttpServer()
+                .get('/api/oauth/userinfo')
+                .set('Authorization', `Bearer ${accessToken}`)
+                .set('Accept', 'application/json');
+
+            expect(updatedRes.status).toEqual(200);
+
+            // Step 5: Assert the returned name matches the updated value, not the original
+            expect(updatedRes.body.name).toEqual(updatedName);
+            expect(updatedRes.body.name).not.toEqual(initialName);
+
+            // Step 6: Restore the original name to avoid polluting other tests
+            const restoreRes = await app.getHttpServer()
+                .patch('/api/users/me/name')
+                .set('Authorization', `Bearer ${accessToken}`)
+                .set('Accept', 'application/json')
+                .send({name: initialName});
+
+            expect(restoreRes.status).toEqual(200);
+            expect(restoreRes.body.name).toEqual(initialName);
+        });
+    });
+
+    // ── 11. Consistency: ID Token identity claims match UserInfo response ──
 
     describe('consistency between ID Token and UserInfo response', () => {
         it('should return the same identity claims as the ID Token for the same user and scopes', async () => {
