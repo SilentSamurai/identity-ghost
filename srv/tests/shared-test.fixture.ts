@@ -46,8 +46,8 @@ export function readPortFile(filePath?: string): PortFile {
 }
 
 /**
- * Drop-in replacement for TestAppFixture that connects to the shared
- * global infrastructure over HTTP instead of bootstrapping its own app.
+ * Shared test fixture that connects to the global test infrastructure
+ * over HTTP instead of bootstrapping its own app.
  */
 export class SharedTestFixture {
     public readonly smtp: SmtpClientAdapter;

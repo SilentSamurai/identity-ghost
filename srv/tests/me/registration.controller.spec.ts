@@ -1,32 +1,55 @@
-// NOTE: This test suite uses TestAppFixture instead of SharedTestFixture because it requires
-// direct DI container access (app.nestApp.get()) to mock internal services (MailService, TenantService).
+// NOTE: This test suite uses an inline NestJS test module because it requires
+// jest.spyOn() to mock internal services (MailService, TenantService).
 // SharedTestFixture does not expose the NestJS app instance.
 
-import {TestAppFixture} from "../test-app.fixture";
+import {INestApplication} from "@nestjs/common";
+import {Test, TestingModule} from "@nestjs/testing";
+import {AppModule} from "../../src/app.module";
 import {MailService} from "../../src/mail/mail.service";
 import {TenantService} from "../../src/services/tenant.service";
-
+import {Environment} from "../../src/config/environment.service";
+import * as superTest from "supertest";
+import * as process from "node:process";
+import {setupConsole} from "../helper.fixture";
 
 describe('RegistrationController', () => {
-    let app: TestAppFixture;
+    let app: INestApplication;
+    let moduleRef: TestingModule;
     let mailService: MailService;
     let tenantService: TenantService;
 
+    setupConsole();
+
     beforeEach(async () => {
-        app = await new TestAppFixture().init();
-        mailService = app.nestApp.get<MailService>(MailService);
-        tenantService = app.nestApp.get<TenantService>(TenantService);
+        process.env.ENV_FILE = './envs/.env.testing';
+        process.env.ENABLE_FAKE_SMTP_SERVER = 'false';
+        Environment.setup();
+
+        moduleRef = await Test.createTestingModule({
+            imports: [AppModule],
+        }).compile();
+
+        app = moduleRef.createNestApplication();
+        await app.init();
+
+        mailService = app.get<MailService>(MailService);
+        tenantService = app.get<TenantService>(TenantService);
     });
 
     afterEach(async () => {
         await app.close();
+        await moduleRef.close();
     });
+
+    function getHttpServer() {
+        return superTest(app.getHttpServer());
+    }
 
     it('should fail when domain exists', async () => {
         // Setup existing domain
         jest.spyOn(tenantService, 'existByDomain').mockResolvedValue(true);
 
-        const response = await app.getHttpServer()
+        const response = await getHttpServer()
             .post('/api/register-domain')
             .send({
                 name: 'test',
@@ -44,7 +67,7 @@ describe('RegistrationController', () => {
         // Simulate mail service failure
         jest.spyOn(mailService, 'sendVerificationMail').mockResolvedValue(false);
 
-        const response = await app.getHttpServer()
+        const response = await getHttpServer()
             .post('/api/register-domain')
             .send({
                 name: 'test',
@@ -65,7 +88,7 @@ describe('RegistrationController', () => {
             allowSignUp: false
         } as any);
 
-        const response = await app.getHttpServer()
+        const response = await getHttpServer()
             .post('/api/signup')
             .send({
                 name: 'test',
@@ -81,7 +104,7 @@ describe('RegistrationController', () => {
     it('should handle existing user signup', async () => {
 
         // Setup existing user
-        const response = await app.getHttpServer()
+        const response = await getHttpServer()
             .post('/api/signup')
             .send({
                 name: 'legolas',
@@ -99,11 +122,11 @@ describe('RegistrationController', () => {
 
     it('should require valid password for deletion', async () => {
         // Setup authenticated user
-        const authResponse = await app.getHttpServer()
+        const authResponse = await getHttpServer()
             .post('/api/login')
             .send({email: 'user@test.com', password: 'ValidPass1!'});
 
-        const response = await app.getHttpServer()
+        const response = await getHttpServer()
             .post('/api/signdown')
             .set('Authorization', `Bearer ${authResponse.body.access_token}`)
             .send({password: 'wrong-password'});

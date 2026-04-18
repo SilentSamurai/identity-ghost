@@ -164,12 +164,4 @@ describe('Login Session Threading', () => {
         // Step 5: Verify all three ID tokens share the same sid
         expect(refresh2Decoded.sid).toEqual(originalSid);
     });
-
-    // SKIP: expired session rejects auth code exchange with invalid_grant
-    // We can't easily expire a session in integration tests without direct DB access or time manipulation
-    it.skip('expired session rejects auth code exchange with invalid_grant', () => {});
-
-    // SKIP: expired session rejects refresh with invalid_grant
-    // We can't easily expire a session in integration tests without direct DB access or time manipulation
-    it.skip('expired session rejects refresh with invalid_grant', () => {});
 });
