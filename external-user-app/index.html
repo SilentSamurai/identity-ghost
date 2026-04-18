@@ -64,12 +64,27 @@
 
     const code_verifier = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq";
 
+    /**
+     * Generate a cryptographically random state parameter (32 bytes, base64url-encoded).
+     * Per RFC 6749 §10.12, state protects against CSRF attacks on the redirect callback.
+     */
+    function generateState() {
+        const bytes = new Uint8Array(32);
+        window.crypto.getRandomValues(bytes);
+        return base64urlencode(bytes.buffer);
+    }
+
     async function refer() {
         const redirect_uri = window.location.origin + window.location.pathname
         const code_challenge = code_verifier
         const domain = "shire.local";
         const code_challenge_method = "plain";
-        window.location.href = `http://localhost:4200/authorize?redirect_uri=${redirect_uri}&code_challenge=${code_challenge}&client_id=${domain}&code_challenge_method=${code_challenge_method}`;
+        
+        // Generate and store state parameter for CSRF protection
+        const state = generateState();
+        sessionStorage.setItem('oauth-state', state);
+        
+        window.location.href = `http://localhost:4200/authorize?redirect_uri=${redirect_uri}&response_type=code&code_challenge=${code_challenge}&client_id=${domain}&code_challenge_method=${code_challenge_method}&state=${encodeURIComponent(state)}`;
     }
 
     async function getAuthToken(code, subscriber_tenant_hint) {
@@ -99,7 +114,19 @@
 
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.has('code')) {
-        getAuthToken(urlParams.get('code'), urlParams.get('subscriber_tenant_hint'))
+        const returnedState = urlParams.get('state');
+        const storedState = sessionStorage.getItem('oauth-state');
+        
+        // Validate state parameter to prevent CSRF attacks (RFC 6749 §10.12)
+        if (!storedState) {
+            document.getElementById('decodedToken').innerText = 'Error: No stored state found. Possible CSRF attack.';
+        } else if (!returnedState || returnedState !== storedState) {
+            document.getElementById('decodedToken').innerText = 'Error: State parameter mismatch. Possible CSRF attack.';
+        } else {
+            // State matches - clear it and proceed with token exchange
+            sessionStorage.removeItem('oauth-state');
+            getAuthToken(urlParams.get('code'), urlParams.get('subscriber_tenant_hint'));
+        }
     }
 
     function sha256(plain) {
