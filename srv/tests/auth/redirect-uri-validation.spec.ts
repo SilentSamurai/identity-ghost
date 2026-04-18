@@ -261,6 +261,22 @@ describe('Login endpoint redirect URI validation', () => {
             isPublic: true,
         });
         singleUriClientId = singleUri.client.clientId;
+
+        // Pre-grant consent so login returns auth codes instead of requires_consent
+        await app.getHttpServer()
+            .post('/api/oauth/consent')
+            .send({
+                email,
+                password,
+                client_id: singleUriClientId,
+                code_challenge: challenge,
+                code_challenge_method: 'plain',
+                approved_scopes: ['openid', 'profile', 'email'],
+                consent_action: 'approve',
+                scope: 'openid profile email',
+                redirect_uri: REDIRECT_URI,
+            })
+            .set('Accept', 'application/json');
     });
 
     afterAll(async () => {
@@ -396,6 +412,22 @@ describe('Token exchange redirect URI binding', () => {
             isPublic: true,
         });
         singleUriClientId = singleUri.client.clientId;
+
+        // Pre-grant consent so login returns auth codes instead of requires_consent
+        await app.getHttpServer()
+            .post('/api/oauth/consent')
+            .send({
+                email,
+                password,
+                client_id: singleUriClientId,
+                code_challenge: challenge,
+                code_challenge_method: 'plain',
+                approved_scopes: ['openid', 'profile', 'email'],
+                consent_action: 'approve',
+                scope: 'openid profile email',
+                redirect_uri: REDIRECT_URI,
+            })
+            .set('Accept', 'application/json');
     });
 
     afterAll(async () => {
@@ -544,6 +576,22 @@ describe('Error response format compliance', () => {
             isPublic: true,
         });
         singleUriClientId = singleUri.client.clientId;
+
+        // Pre-grant consent so login returns auth codes instead of requires_consent
+        await app.getHttpServer()
+            .post('/api/oauth/consent')
+            .send({
+                email,
+                password,
+                client_id: singleUriClientId,
+                code_challenge: challenge,
+                code_challenge_method: 'plain',
+                approved_scopes: ['openid', 'profile', 'email'],
+                consent_action: 'approve',
+                scope: 'openid profile email',
+                redirect_uri: REGISTERED_URI,
+            })
+            .set('Accept', 'application/json');
     });
 
     afterAll(async () => {

@@ -15,6 +15,7 @@ import {Client} from "./client.entity";
 import {RefreshToken} from "./refresh-token.entity";
 import {TenantKey} from "./tenant-key.entity";
 import {LoginSession} from "./login-session.entity";
+import {UserConsent} from "./user-consent.entity";
 
 export const entities = [
     Tenant,
@@ -33,5 +34,6 @@ export const entities = [
     Client,
     RefreshToken,
     TenantKey,
-    LoginSession
+    LoginSession,
+    UserConsent
 ];

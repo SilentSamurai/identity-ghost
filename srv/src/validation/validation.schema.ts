@@ -289,6 +289,33 @@ const VerifyAuthCodeSchema = yup.object().shape({
     client_id: yup.string().required("client_id is required"),
 });
 
+const ConsentSchema = yup.object().shape({
+    email: yup.string().email().required("Email is required").max(128),
+    password: yup
+        .string()
+        .required("Password is required")
+        .matches(PASSWORD_REGEXP, PASSWORD_MESSAGE)
+        .max(128),
+    client_id: yup.string().required("client_id is required"),
+    code_challenge: yup.string().required("code_challenge is required"),
+    code_challenge_method: yup
+        .string()
+        .required()
+        .matches(/^(plain|S256|OWH32)$/, "method is required"),
+    approved_scopes: yup
+        .array()
+        .of(yup.string())
+        .required("approved_scopes is required"),
+    consent_action: yup
+        .string()
+        .required()
+        .matches(/^(approve|deny)$/, "consent_action must be 'approve' or 'deny'"),
+    redirect_uri: yup.string().optional(),
+    scope: yup.string().optional(),
+    nonce: yup.string().optional().max(512),
+    subscriber_tenant_hint: yup.string().optional().nullable(),
+});
+
 export const ValidationSchema = {
     SignUpSchema,
     SignDownSchema,
@@ -325,4 +352,5 @@ export const ValidationSchema = {
     UpdateGroupUser,
     UpdateGroupSchema,
     VerifyAuthCodeSchema,
+    ConsentSchema,
 };

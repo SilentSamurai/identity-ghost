@@ -305,6 +305,22 @@ describe('GET /api/oauth/authorize', () => {
             const clientId = created.client.clientId;
 
             try {
+                // Pre-grant consent so login can proceed to set pkceMethodUsed
+                await app.getHttpServer()
+                    .post('/api/oauth/consent')
+                    .send({
+                        email: 'admin@auth.server.com',
+                        password: 'admin9000',
+                        client_id: clientId,
+                        code_challenge: 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
+                        code_challenge_method: 'S256',
+                        approved_scopes: ['openid', 'profile', 'email'],
+                        consent_action: 'approve',
+                        scope: 'openid profile email',
+                        redirect_uri: REDIRECT_URI,
+                    })
+                    .set('Accept', 'application/json');
+
                 // First, do a login with S256 to set pkceMethodUsed on the client
                 const loginResponse = await app.getHttpServer()
                     .post('/api/oauth/login')

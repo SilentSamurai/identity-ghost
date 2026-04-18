@@ -44,6 +44,8 @@ import {InjectRepository} from "@nestjs/typeorm";
 import {Client} from "../entity/client.entity";
 import {Repository} from "typeorm";
 import {LoginSessionService} from "../auth/login-session.service";
+import {ConsentService} from "../auth/consent.service";
+import {ScopeResolverService} from "../casl/scope-resolver.service";
 
 const logger = new Logger("OAuthTokenController");
 
@@ -58,6 +60,8 @@ export class OAuthTokenController {
         private readonly tokenIssuanceService: TokenIssuanceService,
         private readonly authorizeService: AuthorizeService,
         private readonly loginSessionService: LoginSessionService,
+        private readonly consentService: ConsentService,
+        private readonly scopeResolverService: ScopeResolverService,
         @InjectRepository(Client)
         private readonly clientRepository: Repository<Client>,
     ) {
@@ -173,6 +177,31 @@ export class OAuthTokenController {
             };
         }
 
+        // Consent check: only for registered Client entities (third-party)
+        // First-party (tenant-domain or tenant-clientId) logins skip consent
+        if (client) {
+            // This is a third-party client - check consent
+            const clientAllowedScopes = client.allowedScopes || 'openid profile email';
+            const resolvedScopes = this.scopeResolverService.resolveScopes(
+                body.scope,
+                clientAllowedScopes,
+            );
+
+            const consentCheck = await this.consentService.checkConsent(
+                user.id,
+                client.clientId,
+                resolvedScopes,
+            );
+
+            if (consentCheck.consentRequired) {
+                return {
+                    requires_consent: true,
+                    requested_scopes: consentCheck.requestedScopes,
+                    client_name: client.name || client.clientId,
+                };
+            }
+        }
+
         const session = await this.loginSessionService.createSession(user.id, tenant.id);
 
         const auth_code = await this.authCodeService.createAuthToken(
@@ -197,6 +226,97 @@ export class OAuthTokenController {
         return {
             authentication_code: auth_code,
         };
+    }
+
+    @Post("/consent")
+    async consent(
+        @Body(new ValidationPipe(ValidationSchema.ConsentSchema))
+        body: {
+            email: string;
+            password: string;
+            client_id: string;
+            code_challenge: string;
+            code_challenge_method: string;
+            approved_scopes: string[];
+            consent_action: 'approve' | 'deny';
+            redirect_uri?: string;
+            scope?: string;
+            nonce?: string;
+            subscriber_tenant_hint?: string;
+        },
+    ): Promise<any> {
+        // Re-authenticate the user
+        const user: User = await this.authService.validate(
+            body.email,
+            body.password,
+        );
+
+        // Handle deny action
+        if (body.consent_action === 'deny') {
+            return {
+                error: 'access_denied',
+                error_description: 'The resource owner denied the request',
+            };
+        }
+
+        // Handle approve action
+        if (body.consent_action === 'approve') {
+            // Load the client
+            const client = await this.clientRepository.findOne({
+                where: { clientId: body.client_id },
+            });
+
+            if (!client) {
+                throw OAuthException.invalidClient('Unknown client_id');
+            }
+
+            // Validate approved_scopes against client.allowedScopes
+            const clientAllowedScopes = client.allowedScopes || 'openid profile email';
+            const resolvedScopes = this.scopeResolverService.resolveScopes(
+                body.approved_scopes.join(' '),
+                clientAllowedScopes,
+            );
+
+            // Grant consent
+            await this.consentService.grantConsent(
+                user.id,
+                client.clientId,
+                resolvedScopes,
+            );
+
+            // Resolve tenant for auth code creation
+            let tenant: Tenant;
+            if (await this.authUserService.tenantExistsByDomain(body.client_id)) {
+                tenant = await this.authUserService.findTenantByDomain(body.client_id);
+            } else if (await this.authUserService.tenantExistsByClientId(body.client_id)) {
+                tenant = await this.authUserService.findTenantByClientId(body.client_id);
+            } else {
+                tenant = await this.authUserService.findTenantById(client.tenantId);
+            }
+
+            // Create session
+            const session = await this.loginSessionService.createSession(user.id, tenant.id);
+
+            // Create auth code
+            const auth_code = await this.authCodeService.createAuthToken(
+                user,
+                tenant,
+                body.client_id,
+                body.code_challenge,
+                body.code_challenge_method,
+                body.subscriber_tenant_hint,
+                body.redirect_uri,
+                body.scope,
+                body.nonce,
+                session.sid,
+            );
+
+            return {
+                authentication_code: auth_code,
+            };
+        }
+
+        throw OAuthException.invalidRequest('Invalid consent_action');
     }
 
     @Post("/token")

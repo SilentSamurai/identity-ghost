@@ -62,6 +62,23 @@ describe('S256 enforcement and downgrade prevention', () => {
             .set('Accept', 'application/json');
     }
 
+    /** Helper: pre-grant consent for a third-party client so login returns an auth code */
+    async function grantConsentFor(clientId: string, method: string, challenge: string) {
+        await app.getHttpServer()
+            .post('/api/oauth/consent')
+            .send({
+                email: adminEmail,
+                password: adminPassword,
+                client_id: clientId,
+                code_challenge: challenge,
+                code_challenge_method: method,
+                approved_scopes: ['openid', 'profile', 'email'],
+                consent_action: 'approve',
+                scope: 'openid profile email',
+            })
+            .set('Accept', 'application/json');
+    }
+
     it('rejects plain method when client has require_pkce=true', async () => {
         const created = await clientApi.createClient(testTenantId, 'PKCE Required Client', {
             requirePkce: true,
@@ -87,6 +104,7 @@ describe('S256 enforcement and downgrade prevention', () => {
         const clientId = created.client.clientId;
 
         try {
+            await grantConsentFor(clientId, 'S256', s256Challenge);
             const response = await loginWith(clientId, 'S256', s256Challenge);
             expect(response.status).toEqual(201);
             expect(response.body.authentication_code).toBeDefined();
@@ -103,6 +121,7 @@ describe('S256 enforcement and downgrade prevention', () => {
         const clientId = created.client.clientId;
 
         try {
+            await grantConsentFor(clientId, 'plain', plainVerifier);
             const response = await loginWith(clientId, 'plain', plainVerifier);
             expect(response.status).toEqual(201);
             expect(response.body.authentication_code).toBeDefined();
@@ -119,6 +138,9 @@ describe('S256 enforcement and downgrade prevention', () => {
         const clientId = created.client.clientId;
 
         try {
+            // Pre-grant consent so login can proceed to auth code
+            await grantConsentFor(clientId, 'S256', s256Challenge);
+
             // First login with S256 to set pkceMethodUsed
             const firstResponse = await loginWith(clientId, 'S256', s256Challenge);
             expect(firstResponse.status).toEqual(201);
@@ -146,6 +168,9 @@ describe('S256 enforcement and downgrade prevention', () => {
             const beforeLogin = await clientApi.getClient(clientId);
             expect(beforeLogin.pkceMethodUsed).toBeNull();
 
+            // Pre-grant consent so login can proceed to auth code
+            await grantConsentFor(clientId, 'S256', s256Challenge);
+
             // Login with S256
             const response = await loginWith(clientId, 'S256', s256Challenge);
             expect(response.status).toEqual(201);
@@ -167,6 +192,7 @@ describe('S256 enforcement and downgrade prevention', () => {
         const clientId = created.client.clientId;
 
         try {
+            await grantConsentFor(clientId, 'plain', plainVerifier);
             const response = await loginWith(clientId, 'plain', plainVerifier);
             expect(response.status).toEqual(201);
             expect(response.body.authentication_code).toBeDefined();

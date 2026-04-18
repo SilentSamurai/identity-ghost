@@ -21,6 +21,8 @@ import {ClaimsResolverService} from "./claims-resolver.service";
 import {AuthorizeService} from "./authorize.service";
 import {LoginSessionService} from "./login-session.service";
 import {LoginSession} from "../entity/login-session.entity";
+import {ConsentService} from "./consent.service";
+import {UserConsent} from "../entity/user-consent.entity";
 
 @Module({
     imports: [
@@ -28,11 +30,11 @@ import {LoginSession} from "../entity/login-session.entity";
         CoreModule,
         ServiceModule,
         PassportModule,
-        TypeOrmModule.forFeature([AuthCode, User, RefreshToken, LoginSession]),
+        TypeOrmModule.forFeature([AuthCode, User, RefreshToken, LoginSession, UserConsent]),
     ],
     controllers: [],
-    providers: [JwtAuthGuard, AuthService, AuthCodeService, TokenIssuanceService, TenantResolutionGuard, SuperAdminGuard, IdTokenService, TokenIntrospectionService, RefreshTokenService, TokenRevocationService, ClaimsResolverService, AuthorizeService, LoginSessionService],
-    exports: [JwtAuthGuard, AuthService, AuthCodeService, TokenIssuanceService, TenantResolutionGuard, SuperAdminGuard, IdTokenService, TokenIntrospectionService, RefreshTokenService, TokenRevocationService, ClaimsResolverService, AuthorizeService, LoginSessionService],
+    providers: [JwtAuthGuard, AuthService, AuthCodeService, TokenIssuanceService, TenantResolutionGuard, SuperAdminGuard, IdTokenService, TokenIntrospectionService, RefreshTokenService, TokenRevocationService, ClaimsResolverService, AuthorizeService, LoginSessionService, ConsentService],
+    exports: [JwtAuthGuard, AuthService, AuthCodeService, TokenIssuanceService, TenantResolutionGuard, SuperAdminGuard, IdTokenService, TokenIntrospectionService, RefreshTokenService, TokenRevocationService, ClaimsResolverService, AuthorizeService, LoginSessionService, ConsentService],
 })
 export class AuthModule {
 }

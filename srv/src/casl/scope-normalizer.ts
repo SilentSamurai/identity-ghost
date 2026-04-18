@@ -28,6 +28,13 @@ export class ScopeNormalizer {
         return Array.from(new Set(a.filter(x => setB.has(x)))).sort();
     }
 
+    /** Compute union of two scope arrays */
+    static union(a: string[], b: string[]): string[] {
+        return Array.from(new Set([...a, ...b]))
+            .filter(s => s.length > 0)
+            .sort();
+    }
+
     /** Validate that a scope string contains only valid NQSCHAR characters per RFC 6749 §3.3 */
     static validate(scopeString: string | null | undefined): boolean {
         if (!scopeString) {

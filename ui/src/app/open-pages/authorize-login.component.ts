@@ -340,6 +340,28 @@ export class AuthorizeLoginComponent implements OnInit {
                 return;
             }
 
+            if (data.requires_consent) {
+                // Consent required — navigate to consent screen
+                this.router.navigate(['/consent'], {
+                    state: {
+                        client_name: data.client_name,
+                        scopes: data.requested_scopes,
+                        client_id: data.client_id,
+                        loginParams: {
+                            username, password, client_id,
+                            code_challenge: this.code_challenge,
+                            code_challenge_method: this.code_challenge_method,
+                            redirect_uri: this.redirectUri,
+                            state: this.state,
+                            nonce: nonce || undefined,
+                        },
+                        redirectUri: this.redirectUri,
+                        state: this.state,
+                    }
+                });
+                return;
+            }
+
             let authenticationCode = data.authentication_code;
             this.isLoginFailed = false;
             this.isLoggedIn = true;

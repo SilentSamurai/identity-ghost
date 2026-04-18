@@ -15,6 +15,7 @@ import {CL01Component} from './secure/clients/CL01.component';
 import {CL02Component} from './secure/clients/CL02.component';
 import {AuthorizeLoginComponent} from "./open-pages/authorize-login.component";
 import {TenantSelectionComponent} from './open-pages/tenant-selection.component';
+import {ConsentScreenComponent} from './open-pages/consent-screen.component';
 import {ForgotPasswordComponent} from './open-pages/forgot-password.component';
 import {ResetPasswordComponent} from './open-pages/reset-password.component';
 import {WelcomeComponent} from './open-pages/welcome.component';
@@ -26,6 +27,7 @@ const routes: Routes = [
     {path: 'signup', component: SignUpComponent},
     {path: 'session-confirm', component: SessionConfirmationComponent},
     {path: 'authorize', component: AuthorizeLoginComponent},
+    {path: 'consent', component: ConsentScreenComponent},
     {path: 'login', component: LoginComponent},
     {path: 'register', component: RegisterComponent},
     {path: 'forgot-password', component: ForgotPasswordComponent},

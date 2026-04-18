@@ -152,4 +152,47 @@ export class AuthService {
         );
     }
 
+    async submitConsent(params: {
+        email: string;
+        password: string;
+        client_id: string;
+        code_challenge: string;
+        code_challenge_method: string;
+        approved_scopes: string[];
+        consent_action: 'approve' | 'deny';
+        redirect_uri?: string;
+        scope?: string;
+        nonce?: string;
+        subscriber_tenant_hint?: string;
+    }): Promise<any> {
+        const body: any = {
+            email: params.email,
+            password: params.password,
+            client_id: params.client_id,
+            code_challenge: params.code_challenge,
+            code_challenge_method: params.code_challenge_method,
+            approved_scopes: params.approved_scopes,
+            consent_action: params.consent_action,
+        };
+        if (params.redirect_uri) {
+            body.redirect_uri = params.redirect_uri;
+        }
+        if (params.scope) {
+            body.scope = params.scope;
+        }
+        if (params.nonce) {
+            body.nonce = params.nonce;
+        }
+        if (params.subscriber_tenant_hint) {
+            body.subscriber_tenant_hint = params.subscriber_tenant_hint;
+        }
+        return await lastValueFrom(
+            this.http.post(
+                `${AUTH_API}/consent`,
+                body,
+                httpOptions,
+            ),
+        );
+    }
+
 }

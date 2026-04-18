@@ -44,6 +44,22 @@ describe('Feature: redirect-uri-validation, Property 4: Token exchange binding a
             isPublic: true,
         });
         testClientId = created.client.clientId;
+
+        // Pre-grant consent so login returns auth codes instead of requires_consent
+        await app.getHttpServer()
+            .post('/api/oauth/consent')
+            .send({
+                email,
+                password,
+                client_id: testClientId,
+                code_challenge: challenge,
+                code_challenge_method: 'plain',
+                approved_scopes: ['openid', 'profile', 'email'],
+                consent_action: 'approve',
+                scope: 'openid profile email',
+                redirect_uri: REGISTERED_URI,
+            })
+            .set('Accept', 'application/json');
     });
 
     afterAll(async () => {
@@ -164,6 +180,22 @@ describe('Feature: redirect-uri-validation, Property 5: Null stored redirect_uri
             isPublic: true,
         });
         testClientId = created.client.clientId;
+
+        // Pre-grant consent so login returns auth codes instead of requires_consent
+        await app.getHttpServer()
+            .post('/api/oauth/consent')
+            .send({
+                email,
+                password,
+                client_id: testClientId,
+                code_challenge: challenge,
+                code_challenge_method: 'plain',
+                approved_scopes: ['openid', 'profile', 'email'],
+                consent_action: 'approve',
+                scope: 'openid profile email',
+                redirect_uri: REGISTERED_URI,
+            })
+            .set('Accept', 'application/json');
     });
 
     afterAll(async () => {
