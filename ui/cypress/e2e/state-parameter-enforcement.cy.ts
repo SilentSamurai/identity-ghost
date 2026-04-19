@@ -15,7 +15,7 @@ describe('State Parameter Enforcement', () => {
     const password = () => Cypress.env('shireTenantAdminPassword');
     const clientId = () => Cypress.env('shireTenantAdminClientId');
 
-    const CODE_CHALLENGE = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq';
+    const CODE_CHALLENGE = 'dp6NlaokagLZTUjEL7cYPlMchcQdWzRW3bkAEXEti9c';
     const REDIRECT_URI = 'http://localhost:3000/';
     const STATE_KEY = 'oauth-state';
 
@@ -27,7 +27,7 @@ describe('State Parameter Enforcement', () => {
             client_id: clientId(),
             redirect_uri: REDIRECT_URI,
             code_challenge: CODE_CHALLENGE,
-            code_challenge_method: 'plain',
+            code_challenge_method: 'S256',
             response_type: 'code',
         });
         if (state) {

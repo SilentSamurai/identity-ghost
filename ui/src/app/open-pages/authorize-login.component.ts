@@ -204,7 +204,7 @@ export class AuthorizeLoginComponent implements OnInit {
     redirectUri = '';
     code_challenge = '';
     isPasswordVisible = false;
-    code_challenge_method: string = 'plain';
+    code_challenge_method: string = 'S256';
     clientId: string = '';
     state: string = '';
     scope: string = '';

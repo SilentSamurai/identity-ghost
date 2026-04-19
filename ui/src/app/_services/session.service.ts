@@ -7,6 +7,7 @@ import {TokenVerificationService} from './token-verification.service';
 import {PKCEService} from './pkce.service';
 
 const TOKEN_KEY = 'auth-token';
+const ID_TOKEN_KEY = 'auth-id-token';
 const AUTH_CODE_KEY = 'auth-code';
 const PERMISSIONS_KEY = 'auth-permissions';
 const REFRESH_TOKEN_KEY = 'auth-refresh-token';
@@ -32,6 +33,7 @@ export class SessionService {
 
     public clearSession(): void {
         window.sessionStorage.removeItem(TOKEN_KEY);
+        window.sessionStorage.removeItem(ID_TOKEN_KEY);
         window.sessionStorage.removeItem(AUTH_CODE_KEY);
         window.sessionStorage.removeItem(PERMISSIONS_KEY);
         window.sessionStorage.removeItem(REFRESH_TOKEN_KEY);
@@ -69,6 +71,14 @@ export class SessionService {
 
     public getToken(): string | null {
         return window.sessionStorage.getItem(TOKEN_KEY);
+    }
+
+    public saveIdToken(token: string): void {
+        window.sessionStorage.setItem(ID_TOKEN_KEY, token);
+    }
+
+    public getIdToken(): string | null {
+        return window.sessionStorage.getItem(ID_TOKEN_KEY);
     }
 
     public getDecodedToken(): DecodedToken | null {

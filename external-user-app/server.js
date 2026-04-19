@@ -254,12 +254,19 @@ function parseJwt(token) {
 
 
 async function verifyToken(token) {
-    // Parse JWT manually
     const decoded = parseJwt(token);
+    assert(decoded != null, 'Failed to decode token');
+    assert(decoded.sub != undefined, 'Missing sub claim');
+    assert(decoded.exp != undefined, 'Missing exp claim');
+    assert(decoded.iat != undefined, 'Missing iat claim');
+    assert(decoded.iss != undefined, 'Missing iss claim');
+    assert(decoded.aud != undefined, 'Missing aud claim');
     assert(decoded.grant_type === "client_credentials", 'Invalid grant type');
-    assert(decoded.tenant != undefined, 'Missing tenant ID');
-    assert(decoded.tenant.domain != undefined, 'Missing tenant domain');
-    assert(decoded.tenant.domain === "shire.local", 'Invalid tenant domain');
+    assert(decoded.tenant_id != undefined, 'Missing tenant_id claim');
+    assert(decoded.scope != undefined, 'Missing scope claim');
+    // Verify token is not expired
+    const now = Math.floor(Date.now() / 1000);
+    assert(decoded.exp > now, 'Token is expired');
 }
 
 // Helper function to determine the content type based on file extension

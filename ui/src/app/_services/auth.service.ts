@@ -73,6 +73,10 @@ export class AuthService {
         return await lastValueFrom(this.http.get('/api/users/me'));
     }
 
+    async fetchUserInfo(): Promise<any> {
+        return await lastValueFrom(this.http.get(`${AUTH_API}/userinfo`));
+    }
+
     validateAuthCode(authCode: string, clientId: string): Promise<any> {
         return lastValueFrom(
             this.http.post(

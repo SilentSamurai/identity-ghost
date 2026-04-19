@@ -216,7 +216,7 @@ export class LoginComponent implements OnInit {
     errorMessage = '';
     freezeClientId = false;
     isPasswordVisible = false;
-    code_challenge_method: string = 'plain';
+    code_challenge_method: string = 'S256';
     client_id: string = '';
 
     constructor(

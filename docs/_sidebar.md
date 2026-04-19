@@ -4,3 +4,4 @@
 * [Token API](token-api.md)
 * [Token Revocation](token-revocation.md)
 * [Audience Model](audience-model.md)
+* [Database Schema](database-schema.md)
