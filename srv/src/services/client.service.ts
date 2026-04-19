@@ -82,6 +82,48 @@ export class ClientService {
         return client;
     }
 
+    async findByAlias(alias: string): Promise<Client> {
+        const client = await this.clientRepository.findOne({
+            where: {alias},
+            relations: ['tenant'],
+        });
+        if (!client) {
+            throw new NotFoundException(`Client with alias ${alias} not found`);
+        }
+        return client;
+    }
+
+    async findByClientIdOrAlias(value: string): Promise<Client> {
+        try {
+            return await this.findByClientId(value);
+        } catch (e) {
+            if (e instanceof NotFoundException) {
+                return await this.findByAlias(value);
+            }
+            throw e;
+        }
+    }
+
+    async createDefaultClient(tenantId: string, domain: string): Promise<Client> {
+        const client = this.clientRepository.create({
+            clientId: uuidv4(),
+            alias: domain,
+            isPublic: true,
+            allowPasswordGrant: false,
+            allowedScopes: 'openid profile email',
+            name: 'Default Client',
+            redirectUris: [],
+            grantTypes: 'authorization_code',
+            responseTypes: 'code',
+            tokenEndpointAuthMethod: 'none',
+            requirePkce: false,
+            allowRefreshToken: true,
+            clientSecrets: [],
+            tenantId,
+        });
+        return this.clientRepository.save(client);
+    }
+
     async findByTenantId(tenantId: string): Promise<Client[]> {
         return this.clientRepository.find({
             where: {tenant: {id: tenantId}},

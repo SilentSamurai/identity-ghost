@@ -11,6 +11,15 @@ export class SearchClient extends HttpClient {
         return this.searchApi("Tenants", query);
     }
 
+    public async searchTenantByDomain(domain: string): Promise<any[]> {
+        const where = [{field: 'domain', label: 'domain', value: domain, operator: 'equals'}];
+        const response = await this.post('/api/search/Tenants').send({pageNo: 0, pageSize: 50, where});
+        if (response.status >= 200 && response.status < 300) {
+            return response.body.data ?? [];
+        }
+        return [];
+    }
+
     async findByUser(query: any) {
         return this.searchApi("Users", query);
     }

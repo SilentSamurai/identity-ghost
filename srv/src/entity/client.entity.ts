@@ -45,6 +45,9 @@ export class Client {
     @Column({nullable: true})
     name: string;
 
+    @Column({nullable: true, unique: true, name: "alias"})
+    alias: string | null;
+
     @CreateDateColumn({name: "created_at"})
     createdAt: Date;
 

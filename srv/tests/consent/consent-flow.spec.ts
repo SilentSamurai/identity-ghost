@@ -30,7 +30,6 @@ describe('Consent Flow Integration Tests', () => {
     let accessToken: string;
     let testTenantId: string;
     let testTenantDomain: string;
-    let testTenantClientId: string;
 
     // Third-party registered Client entities used across tests
     let thirdPartyClientId: string;           // allowedScopes: openid profile email
@@ -59,9 +58,6 @@ describe('Consent Flow Integration Tests', () => {
         );
         testTenantId = tenant.id;
 
-        // Retrieve the tenant's own clientId (used for first-party login tests)
-        const creds = await tenantApi.getMyCredentials();
-        testTenantClientId = creds.clientId;
 
         // Create a third-party client with full OIDC scopes
         const fullScopesClient = await clientApi.createClient(testTenantId, 'Full Scopes App', {
@@ -258,10 +254,14 @@ describe('Consent Flow Integration Tests', () => {
             expect(response.body.requires_consent).toBeUndefined();
         });
 
-        it('should skip consent entirely for tenant-clientId client_id', async () => {
-            // testTenantClientId is the clientId of the tenant itself (first-party)
+        it('should skip consent entirely for tenant-domain alias client_id', async () => {
+            // testTenantDomain is the alias of the default Client for the test tenant.
+            // Using the domain as client_id resolves to the first-party default client,
+            // so consent is skipped (Req 8.1). Tenant.clientId (hex) is no longer a
+            // valid client_id for the login endpoint — only Client.clientId (UUID) or
+            // Client.alias (domain) are accepted.
             const response = await loginRequest({
-                client_id: testTenantClientId,
+                client_id: testTenantDomain,
                 scope: 'openid profile',
             });
 

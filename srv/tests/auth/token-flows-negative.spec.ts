@@ -209,7 +209,7 @@ describe('e2e negative token flow', () => {
             .set('Accept', 'application/json');
 
         console.log(response.body)
-        expect(response.status).toEqual(404);
+        expect(response.status).toEqual(400);
     });
 
     it(`/POST grant_type null Client Credentials`, async () => {

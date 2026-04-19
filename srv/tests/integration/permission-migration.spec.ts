@@ -11,6 +11,7 @@ import {SharedTestFixture} from "../shared-test.fixture";
 import {TokenFixture} from "../token.fixture";
 import {TenantClient} from "../api-client/tenant-client";
 import {AdminTenantClient} from "../api-client/admin-tenant-client";
+import {HelperFixture} from "../helper.fixture";
 
 describe('Permission migration — authorization preserved', () => {
     let app: SharedTestFixture;
@@ -35,6 +36,10 @@ describe('Permission migration — authorization preserved', () => {
         const superTenantClient = new TenantClient(app, superAdminToken.accessToken);
 
         tenant = await superTenantClient.createTenant("perm-mig-tenant", tenantDomain);
+
+        // Enable password grant on the default client
+        const helper = new HelperFixture(app, superAdminToken.accessToken);
+        await helper.enablePasswordGrant(tenant.id, tenantDomain);
 
         // Add legolas as a member, promote to TENANT_ADMIN
         const addResult = await superAdminClient.addMembers(tenant.id, ["legolas@mail.com"]);

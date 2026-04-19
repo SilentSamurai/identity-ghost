@@ -15,6 +15,8 @@ import {UsersClient} from "../api-client/user-client";
 import {TokenFixture} from "../token.fixture";
 import {TenantClient} from "../api-client/tenant-client";
 import {SearchClient} from "../api-client/search-client";
+import {HelperFixture} from "../helper.fixture";
+import {AdminTenantClient} from "../api-client/admin-tenant-client";
 
 
 describe('UsersController (e2e)', () => {
@@ -116,6 +118,19 @@ describe('UsersController (e2e)', () => {
         });
 
         it('should authenticate the user', async () => {
+            // Enable password grant on the self-registered tenant's default client.
+            // Uses a direct search call (not findTenantBy which asserts >= 1 result)
+            // so this is safe when the test runs in isolation without prior registration.
+            const superAdminToken = await tokenFixture.fetchAccessToken(
+                "admin@auth.server.com", "admin9000", "auth.server.com"
+            );
+            const adminSearchClient = new SearchClient(app, superAdminToken.accessToken);
+            const searchResponse = await adminSearchClient.searchTenantByDomain(tenantDomain);
+            if (searchResponse && searchResponse.length > 0) {
+                const helper = new HelperFixture(app, superAdminToken.accessToken);
+                await helper.enablePasswordGrant(searchResponse[0].id, tenantDomain);
+            }
+
             // Test login to get access token
             const authResponse = await tokenFixture.fetchAccessToken(
                 testUserEmail,

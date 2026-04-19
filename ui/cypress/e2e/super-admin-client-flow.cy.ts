@@ -190,7 +190,7 @@ describe('Super Admin — Client Cross-Tenant CRUD Flow', () => {
         cy.contains('td', BREE_CLIENT)
             .parent('tr')
             .find('button.btn-danger')
-            .click();
+            .click({scrollBehavior: 'center'});
 
         cy.get('#CONFIRMATION_YES_BTN').click();
 

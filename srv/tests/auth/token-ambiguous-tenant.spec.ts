@@ -19,6 +19,7 @@ import {SearchClient} from '../api-client/search-client';
 import {TokenFixture} from '../token.fixture';
 import {UsersClient} from '../api-client/user-client';
 import {AdminTenantClient} from '../api-client/admin-tenant-client';
+import {HelperFixture} from '../helper.fixture';
 
 describe('Ambiguous Subscription Tenant Flow', () => {
     let app: SharedTestFixture;
@@ -43,6 +44,11 @@ describe('Ambiguous Subscription Tenant Flow', () => {
         appClient = new AppClient(app, superAdminToken);
         usersClient = new UsersClient(app, superAdminToken);
         adminTenantClient = new AdminTenantClient(app, superAdminToken);
+
+        // Enable password grant on seeded tenants used by these tests
+        const helper = new HelperFixture(app, superAdminToken);
+        const shireTenant = await searchClient.findTenantBy({domain: 'shire.local'});
+        await helper.enablePasswordGrant(shireTenant.id, 'shire.local');
     });
 
     afterAll(async () => {
@@ -86,7 +92,7 @@ describe('Ambiguous Subscription Tenant Flow', () => {
             await tokenFixture.fetchAccessToken(
                 testUserEmail,
                 testUserPassword,
-                appOwnerTenant.clientId
+                appOwnerTenant.domain
             );
             fail('Expected BadRequestException for ambiguous tenants');
         } catch (error) {
@@ -133,7 +139,7 @@ describe('Ambiguous Subscription Tenant Flow', () => {
                 grant_type: 'password',
                 username: testUserEmail,
                 password: testUserPassword,
-                client_id: appOwnerTenant.clientId,
+                client_id: appOwnerTenant.domain,
                 subscriber_tenant_hint: subscriber1.domain,
             })
             .set('Accept', 'application/json');
@@ -180,7 +186,7 @@ describe('Ambiguous Subscription Tenant Flow', () => {
         const loginResponse = await tokenFixture.login(
             testUserEmail,
             testUserPassword,
-            appOwnerTenant.clientId
+            appOwnerTenant.domain
         );
 
         // 6. Assert the response indicates tenant selection is required
@@ -234,7 +240,7 @@ describe('Ambiguous Subscription Tenant Flow', () => {
         const loginResponse = await tokenFixture.login(
             testUserEmail,
             testUserPassword,
-            appOwnerTenant.clientId
+            appOwnerTenant.domain
         );
 
         // 6. Assert the response contains an auth code, not a tenant selection
@@ -269,7 +275,7 @@ describe('Ambiguous Subscription Tenant Flow', () => {
         const loginResponse = await tokenFixture.login(
             testUserEmail,
             testUserPassword,
-            appOwnerTenant.clientId
+            appOwnerTenant.domain
         );
 
         // 5. Assert the response contains an auth code
@@ -293,7 +299,7 @@ describe('Ambiguous Subscription Tenant Flow', () => {
             const loginResponse = await tokenFixture.login(
                 testUserEmail,
                 testUserPassword,
-                appOwnerTenant.clientId
+                appOwnerTenant.domain
             );
             expect(loginResponse.authentication_code).toBeDefined();
         } catch (error) {
@@ -337,7 +343,7 @@ describe('Ambiguous Subscription Tenant Flow', () => {
         const ambiguousResponse = await tokenFixture.login(
             testUserEmail,
             testUserPassword,
-            appOwnerTenant.clientId
+            appOwnerTenant.domain
         );
         expect(ambiguousResponse.requires_tenant_selection).toBe(true);
 
@@ -345,7 +351,7 @@ describe('Ambiguous Subscription Tenant Flow', () => {
         const resolvedResponse = await tokenFixture.login(
             testUserEmail,
             testUserPassword,
-            appOwnerTenant.clientId,
+            appOwnerTenant.domain,
             'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq',
             subscriber1.domain
         );
@@ -354,7 +360,7 @@ describe('Ambiguous Subscription Tenant Flow', () => {
         // 7. Exchange the auth code for a token — hint is baked in, no ambiguity
         const tokenResponse = await tokenFixture.exchangeCodeForToken(
             resolvedResponse.authentication_code,
-            appOwnerTenant.clientId,
+            appOwnerTenant.domain,
         );
         expect(tokenResponse.access_token).toBeDefined();
         expect(tokenResponse.refresh_token).toBeDefined();

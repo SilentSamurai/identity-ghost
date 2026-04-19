@@ -10,6 +10,7 @@ import {SharedTestFixture} from "../shared-test.fixture";
 import {TokenFixture} from "../token.fixture";
 import {TenantClient} from "../api-client/tenant-client";
 import {AdminTenantClient} from "../api-client/admin-tenant-client";
+import {HelperFixture} from "../helper.fixture";
 
 describe('e2e tenant viewer', () => {
     let app: SharedTestFixture;
@@ -30,6 +31,10 @@ describe('e2e tenant viewer', () => {
         const superAdminTenant = new TenantClient(app, superAdminResponse.accessToken);
 
         tenant = await superAdminTenant.createTenant("tenant-1", uniqueDomain);
+
+        // Enable password grant on the default client
+        const helper = new HelperFixture(app, superAdminResponse.accessToken);
+        await helper.enablePasswordGrant(tenant.id, uniqueDomain);
 
         const addResult = await superAdmin.addMembers(tenant.id, ["legolas@mail.com"]);
         const legolasId = addResult.members.find((m: any) => m.email === "legolas@mail.com").id;

@@ -1,6 +1,8 @@
 import {SharedTestFixture} from "./shared-test.fixture";
 import {TokenFixture} from "./token.fixture";
 import {expect2xx} from "./api-client/client";
+import {HelperFixture} from "./helper.fixture";
+import {SearchClient} from "./api-client/search-client";
 
 /**
  * Integration tests for admin key management endpoints.
@@ -35,6 +37,12 @@ describe('Admin key management endpoints', () => {
             "auth.server.com",
         );
         adminAccessToken = adminResult.accessToken;
+
+        // Enable password grant on shire.local for the non-super-admin test
+        const searchClient = new SearchClient(app, adminAccessToken);
+        const shireTenant = await searchClient.findTenantBy({domain: 'shire.local'});
+        const helper = new HelperFixture(app, adminAccessToken);
+        await helper.enablePasswordGrant(shireTenant.id, 'shire.local');
 
         // Create two tenants for isolation and cross-tenant tests
         const ts = Date.now().toString(36);

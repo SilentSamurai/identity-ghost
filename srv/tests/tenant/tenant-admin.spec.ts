@@ -10,6 +10,7 @@ import {SharedTestFixture} from "../shared-test.fixture";
 import {TokenFixture} from "../token.fixture";
 import {TenantClient} from "../api-client/tenant-client";
 import {AdminTenantClient} from "../api-client/admin-tenant-client";
+import {HelperFixture} from "../helper.fixture";
 
 describe('e2e tenant admin', () => {
     let app: SharedTestFixture;
@@ -28,6 +29,10 @@ describe('e2e tenant admin', () => {
         const superAdminTenant = new TenantClient(app, superAdminResponse.accessToken);
 
         tenant = await superAdminTenant.createTenant("tenant-1", "test-wesite.com");
+
+        // Enable password grant on the default client so fetchAccessToken works
+        const helper = new HelperFixture(app, superAdminResponse.accessToken);
+        await helper.enablePasswordGrant(tenant.id, "test-wesite.com");
 
         const addResult = await superAdmin.addMembers(tenant.id, ["legolas@mail.com"]);
         const legolasId = addResult.members.find((m: any) => m.email === "legolas@mail.com").id;

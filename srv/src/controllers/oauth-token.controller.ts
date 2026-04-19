@@ -46,6 +46,7 @@ import {Repository} from "typeorm";
 import {LoginSessionService} from "../auth/login-session.service";
 import {ConsentService} from "../auth/consent.service";
 import {ScopeResolverService} from "../casl/scope-resolver.service";
+import {ClientService} from "../services/client.service";
 
 const logger = new Logger("OAuthTokenController");
 
@@ -64,6 +65,7 @@ export class OAuthTokenController {
         private readonly scopeResolverService: ScopeResolverService,
         @InjectRepository(Client)
         private readonly clientRepository: Repository<Client>,
+        private readonly clientService: ClientService,
     ) {
     }
 
@@ -123,44 +125,25 @@ export class OAuthTokenController {
             body.password,
         );
 
-        let tenant: Tenant;
-        let client: Client | null = null;
-
-        if (await this.authUserService.tenantExistsByDomain(body.client_id)) {
-            tenant = await this.authUserService.findTenantByDomain(
-                body.client_id,
-            );
-        } else if (
-            await this.authUserService.tenantExistsByClientId(body.client_id)
-        ) {
-            tenant = await this.authUserService.findTenantByClientId(
-                body.client_id,
-            );
-        } else {
-            // Check if client_id refers to a registered Client entity
-            client = await this.clientRepository.findOne({
-                where: {clientId: body.client_id},
-                relations: ['tenant'],
-            });
-            if (client) {
-                tenant = await this.authUserService.findTenantById(client.tenantId);
-            } else {
-                throw OAuthException.invalidClient("Unknown client_id");
-            }
+        // Resolve Client entity by clientId or alias (Requirements 3.1, 3.2, 3.3)
+        let client: Client;
+        try {
+            client = await this.clientService.findByClientIdOrAlias(body.client_id);
+        } catch {
+            throw OAuthException.invalidClient('Unknown client_id');
         }
+        const tenant = client.tenant;
+
+        // Determine first-party status: when the caller used the alias (domain) as client_id,
+        // it is a first-party login and consent should be skipped (Requirements 8.1, 8.2)
+        const isFirstParty = client.alias === body.client_id;
 
         // PKCE S256 enforcement and downgrade prevention
-        // Load Client entity if not already loaded (for tenant-based lookups, try matching by client_id)
-        if (!client) {
-            client = await this.clientRepository.findOne({where: {clientId: body.client_id}});
+        if (client.requirePkce && body.code_challenge_method === 'plain') {
+            throw OAuthException.invalidRequest('S256 code_challenge_method is required for this client');
         }
-        if (client) {
-            if (client.requirePkce && body.code_challenge_method === 'plain') {
-                throw OAuthException.invalidRequest('S256 code_challenge_method is required for this client');
-            }
-            if (client.pkceMethodUsed === 'S256' && body.code_challenge_method === 'plain') {
-                throw OAuthException.invalidRequest('PKCE downgrade not allowed: this client has previously used S256');
-            }
+        if (client.pkceMethodUsed === 'S256' && body.code_challenge_method === 'plain') {
+            throw OAuthException.invalidRequest('PKCE downgrade not allowed: this client has previously used S256');
         }
 
         // Validate redirect_uri against registered URIs before proceeding
@@ -177,16 +160,16 @@ export class OAuthTokenController {
             };
         }
 
-        // Consent check: only for registered Client entities (third-party)
-        // First-party (tenant-domain or tenant-clientId) logins skip consent
-        if (client) {
-            // This is a third-party client - check consent
+        // Consent check: only for third-party clients (non-first-party)
+        // First-party (alias-resolved) logins skip consent (Requirements 8.1, 8.2)
+        if (!isFirstParty) {
             const clientAllowedScopes = client.allowedScopes || 'openid profile email';
             const resolvedScopes = this.scopeResolverService.resolveScopes(
                 body.scope,
                 clientAllowedScopes,
             );
 
+            // Use client.clientId (UUID) for consent records, not body.client_id (Requirements 10.1, 10.2)
             const consentCheck = await this.consentService.checkConsent(
                 user.id,
                 client.clientId,
@@ -218,7 +201,7 @@ export class OAuthTokenController {
         );
 
         // Update pkceMethodUsed if client used S256 for the first time
-        if (client && body.code_challenge_method === 'S256' && client.pkceMethodUsed !== 'S256') {
+        if (body.code_challenge_method === 'S256' && client.pkceMethodUsed !== 'S256') {
             client.pkceMethodUsed = 'S256';
             await this.clientRepository.save(client);
         }
@@ -261,12 +244,11 @@ export class OAuthTokenController {
 
         // Handle approve action
         if (body.consent_action === 'approve') {
-            // Load the client
-            const client = await this.clientRepository.findOne({
-                where: { clientId: body.client_id },
-            });
-
-            if (!client) {
+            // Resolve Client entity by clientId or alias (Requirements 10.1, 10.2)
+            let client: Client;
+            try {
+                client = await this.clientService.findByClientIdOrAlias(body.client_id);
+            } catch {
                 throw OAuthException.invalidClient('Unknown client_id');
             }
 
@@ -277,22 +259,15 @@ export class OAuthTokenController {
                 clientAllowedScopes,
             );
 
-            // Grant consent
+            // Grant consent using client.clientId (UUID), not body.client_id (Requirements 10.1, 10.2)
             await this.consentService.grantConsent(
                 user.id,
                 client.clientId,
                 resolvedScopes,
             );
 
-            // Resolve tenant for auth code creation
-            let tenant: Tenant;
-            if (await this.authUserService.tenantExistsByDomain(body.client_id)) {
-                tenant = await this.authUserService.findTenantByDomain(body.client_id);
-            } else if (await this.authUserService.tenantExistsByClientId(body.client_id)) {
-                tenant = await this.authUserService.findTenantByClientId(body.client_id);
-            } else {
-                tenant = await this.authUserService.findTenantById(client.tenantId);
-            }
+            // Resolve tenant from the client entity
+            const tenant = client.tenant;
 
             // Create session
             const session = await this.loginSessionService.createSession(user.id, tenant.id);
@@ -428,18 +403,31 @@ export class OAuthTokenController {
             ValidationSchema.PasswordGrantSchema,
         );
         await validationPipe.transform(body, null);
+
+        // Log deprecation warning for every password grant request (Requirement 6.1, 6.2, 6.3)
+        logger.warn(`Password grant requested by client_id '${body.client_id}'. The password grant is deprecated per OAuth 2.1.`);
+
+        // Resolve Client entity by clientId or alias (Requirement 4.1)
+        let client: Client;
+        try {
+            client = await this.clientService.findByClientIdOrAlias(body.client_id);
+        } catch {
+            throw OAuthException.unauthorizedClient('The password grant is not permitted for this client');
+        }
+
+        // Reject if allowPasswordGrant is false (Requirement 4.3, 5.1, 5.2, 5.3)
+        if (!client.allowPasswordGrant) {
+            throw OAuthException.unauthorizedClient('The password grant is not permitted for this client');
+        }
+
+        // Validate credentials only after client is authorized (Requirement 5.3)
         const user: User = await this.authService.validate(
             body.username,
             body.password
         );
-        let tenant: Tenant;
-        if (await this.authUserService.tenantExistsByDomain(body.client_id)) {
-            tenant = await this.authUserService.findTenantByDomain(body.client_id);
-        } else if (await this.authUserService.tenantExistsByClientId(body.client_id)) {
-            tenant = await this.authUserService.findTenantByClientId(body.client_id);
-        } else {
-            throw OAuthException.invalidRequest("client_id is required");
-        }
+
+        // Use the loaded client's tenant (Requirement 4.2)
+        const tenant = client.tenant;
 
         return this.tokenIssuanceService.issueToken(user, tenant, {
             subscriberTenantHint: body.subscriber_tenant_hint,
@@ -473,18 +461,34 @@ export class OAuthTokenController {
 
         // Authenticate the client: confidential clients must provide a secret,
         // public clients only need a valid client_id (RFC 6749 §6).
-        if (body.client_secret) {
-            await this.authService.validateClientCredentials(
-                body.client_id,
-                body.client_secret,
-            );
-        } else {
-            await this.authService.validatePublicClient(body.client_id);
+        // Try the standard tenant-level auth path first (body.client_id is Tenant.clientId hex).
+        // If that fails, fall back to alias resolution: body.client_id may be a Client.alias
+        // (e.g. a tenant domain like "shire.local"), in which case we resolve the Client entity
+        // and use client.tenant.clientId (the hex string) for refresh token binding verification.
+        let resolvedClientId = body.client_id;
+        try {
+            if (body.client_secret) {
+                await this.authService.validateClientCredentials(
+                    body.client_id,
+                    body.client_secret,
+                );
+            } else {
+                await this.authService.validatePublicClient(body.client_id);
+            }
+        } catch {
+            // Fallback: resolve via Client alias → use tenant.clientId for binding
+            const client = await this.clientService.findByClientIdOrAlias(body.client_id);
+            if (!client.isPublic && body.client_secret) {
+                if (!this.clientService.validateClientSecret(client, body.client_secret)) {
+                    throw OAuthException.invalidClient('Client authentication failed');
+                }
+            }
+            resolvedClientId = client.tenant.clientId;
         }
 
         return this.tokenIssuanceService.refreshToken(
             body.refresh_token,
-            body.client_id,
+            resolvedClientId,
             body.scope,
         );
     }

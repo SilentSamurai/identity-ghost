@@ -18,6 +18,7 @@ import {AppClient} from '../api-client/app-client';
 import {TokenFixture} from '../token.fixture';
 import {TenantClient} from '../api-client/tenant-client';
 import {AdminTenantClient} from '../api-client/admin-tenant-client';
+import {HelperFixture} from '../helper.fixture';
 
 describe('AppController', () => {
     let fixture: SharedTestFixture;
@@ -57,6 +58,11 @@ describe('AppController', () => {
         const subscriberTenant = await superAdminTenantClient.createTenant('app-subscriber', subscriberDomain);
         creatorTenantId = creatorTenant.id;
         subscriberTenantId = subscriberTenant.id;
+
+        // Enable password grant on both default clients
+        const helper = new HelperFixture(fixture, superAdmin.accessToken);
+        await helper.enablePasswordGrant(creatorTenantId, creatorDomain);
+        await helper.enablePasswordGrant(subscriberTenantId, subscriberDomain);
 
         // Add dedicated users as TENANT_ADMIN to each tenant
         const creatorMembers = await adminClient.addMembers(creatorTenantId, [creatorEmail]);

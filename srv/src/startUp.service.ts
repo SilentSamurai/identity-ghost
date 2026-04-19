@@ -158,6 +158,18 @@ export class StartUpService implements OnModuleInit {
                     "Admin user used for ownership:",
                     adminUser.email,
                 );
+
+                // Enable password grant
+                // test fixtures can authenticate via the password grant.
+                try {
+                    const defaultClient = await this.clientService.findByAlias(domain);
+                    await this.clientService.updateClient(permission, defaultClient.clientId, {
+                        allowPasswordGrant: true,
+                    });
+                    this.logger.log(`Enabled allowPasswordGrant on default client for ${domain}`);
+                } catch (e) {
+                    this.logger.warn(`Could not enable allowPasswordGrant on default client for ${domain}: ${e}`);
+                }
             }
         } catch (error) {
             this.logger.error("Error creating multiple dummy tenants:", error);
@@ -254,6 +266,20 @@ export class StartUpService implements OnModuleInit {
                         tenant,
                         normalUser,
                     );
+                }
+
+                // Enable password grant on the super tenant's default client so that
+                // admin tooling and test fixtures can authenticate via the password grant.
+                try {
+                    const defaultClient = await this.clientService.findByAlias(
+                        this.configService.get("SUPER_TENANT_DOMAIN"),
+                    );
+                    await this.clientService.updateClient(permission, defaultClient.clientId, {
+                        allowPasswordGrant: true,
+                    });
+                    this.logger.log(`Enabled allowPasswordGrant on default client for ${this.configService.get("SUPER_TENANT_DOMAIN")}`);
+                } catch (e) {
+                    this.logger.warn(`Could not enable allowPasswordGrant on super tenant default client: ${e}`);
                 }
             }
         } catch (e) {

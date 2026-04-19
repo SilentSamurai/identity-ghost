@@ -18,6 +18,7 @@ import {CreateTenantKeysAndDropLegacyColumns1754000000000} from "./1754000000000
 import {AddNonceToAuthCode1755000000000} from "./1755000000000-AddNonceToAuthCode";
 import {CreateLoginSessionsTable1756000000000} from "./1756000000000-CreateLoginSessionsTable";
 import {CreateUserConsentsTable1757000000000} from "./1757000000000-CreateUserConsentsTable";
+import {AddAliasToClients1758000000000} from "./1758000000000-AddAliasToClients";
 
 export const migrations = [
     CreateInitialTables1681147242561,
@@ -39,5 +40,6 @@ export const migrations = [
     CreateTenantKeysAndDropLegacyColumns1754000000000,
     AddNonceToAuthCode1755000000000,
     CreateLoginSessionsTable1756000000000,
-    CreateUserConsentsTable1757000000000
+    CreateUserConsentsTable1757000000000,
+    AddAliasToClients1758000000000
 ];

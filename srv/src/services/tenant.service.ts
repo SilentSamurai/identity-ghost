@@ -22,6 +22,8 @@ import {Action} from "../casl/actions.enum";
 import {SubjectEnum} from "../entity/subjectEnum";
 import {SIGNING_KEY_PROVIDER, SigningKeyProvider} from "../core/token-abstraction";
 import {KeyManagementService} from "./key-management.service";
+import {Client} from "../entity/client.entity";
+import {v4 as uuidv4} from "uuid";
 
 @Injectable()
 export class TenantService implements OnModuleInit {
@@ -36,6 +38,7 @@ export class TenantService implements OnModuleInit {
         @InjectRepository(TenantMember)
         private tenantMemberRepository: Repository<TenantMember>,
         @InjectRepository(User) private userRepository: Repository<User>,
+        @InjectRepository(Client) private clientRepository: Repository<Client>,
     ) {
     }
 
@@ -75,6 +78,8 @@ export class TenantService implements OnModuleInit {
 
         tenant = await this.tenantRepository.save(tenant);
 
+        await this.createDefaultClient(tenant.id, domain);
+
         const {privateKey, publicKey} = this.signingKeyProvider.generateKeyPair();
         await this.keyManagementService.createInitialKey(tenant.id, publicKey, privateKey);
 
@@ -107,6 +112,26 @@ export class TenantService implements OnModuleInit {
         );
 
         return tenant;
+    }
+
+    private async createDefaultClient(tenantId: string, domain: string): Promise<Client> {
+        const client = this.clientRepository.create({
+            clientId: uuidv4(),
+            alias: domain,
+            isPublic: true,
+            allowPasswordGrant: false,
+            allowedScopes: 'openid profile email',
+            name: 'Default Client',
+            redirectUris: [],
+            grantTypes: 'authorization_code',
+            responseTypes: 'code',
+            tokenEndpointAuthMethod: 'none',
+            requirePkce: false,
+            allowRefreshToken: true,
+            clientSecrets: [],
+            tenantId,
+        });
+        return this.clientRepository.save(client);
     }
 
     async updateKeys(permission: Permission, id: string): Promise<Tenant> {

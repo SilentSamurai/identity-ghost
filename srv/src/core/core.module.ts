@@ -10,6 +10,7 @@ import {Role} from "../entity/role.entity";
 import {UserRole} from "../entity/user.roles.entity";
 import {App} from "../entity/app.entity";
 import {Subscription} from "../entity/subscription.entity";
+import {Client} from "../entity/client.entity";
 import {UsersService} from "../services/users.service";
 import {TenantService} from "../services/tenant.service";
 import {RoleService} from "../services/role.service";
@@ -34,7 +35,7 @@ import {
     imports: [
         ConfigModule,
         CaslModule,
-        TypeOrmModule.forFeature([User, Tenant, TenantKey, TenantMember, Role, UserRole, App, Subscription]),
+        TypeOrmModule.forFeature([User, Tenant, TenantKey, TenantMember, Role, UserRole, App, Subscription, Client]),
     ],
     providers: [
         UsersService,
