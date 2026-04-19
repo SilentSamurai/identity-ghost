@@ -4,6 +4,7 @@ import { ScopeResolverService } from '../casl/scope-resolver.service';
 import { OAuthException } from '../exceptions/oauth-exception';
 import { AuthorizeRedirectException } from '../exceptions/authorize-redirect.exception';
 import { Client } from '../entity/client.entity';
+import { ValidationSchema } from '../validation/validation.schema';
 
 export interface AuthorizeQueryParams {
     response_type?: string;
@@ -14,6 +15,9 @@ export interface AuthorizeQueryParams {
     code_challenge?: string;
     code_challenge_method?: string;
     nonce?: string;
+    prompt?: string;
+    max_age?: number;
+    resource?: string;
 }
 
 export interface ValidatedAuthorizeRequest {
@@ -24,6 +28,9 @@ export interface ValidatedAuthorizeRequest {
     codeChallenge?: string;
     codeChallengeMethod: string;
     nonce?: string;
+    prompt?: string;
+    maxAge?: number;
+    resource?: string;
 }
 
 @Injectable()
@@ -39,19 +46,20 @@ export class AuthorizeService {
         this.logRequest(params);
 
         try {
-            // 1. Validate response_type
-            this.validateResponseType(params.response_type);
+            // Phase 1: Schema validation
+            await this.validateSchema(params);
 
-            // 2. Validate client_id and retrieve client
+            // Phase 2: Business validation
+            // 1. Validate client_id and retrieve client
             const client = await this.validateClientId(params.client_id);
 
-            // 3. Validate redirect_uri
+            // 2. Validate redirect_uri
             const redirectUri = this.validateRedirectUri(client, params.redirect_uri);
 
-            // 4. Validate state (post-redirect from here)
+            // 3. Validate state (post-redirect from here)
             this.validateState(params.state, redirectUri);
 
-            // 5. Validate PKCE
+            // 4. Validate PKCE
             const { codeChallenge, codeChallengeMethod } = this.validatePkce(
                 client,
                 params.code_challenge,
@@ -60,10 +68,10 @@ export class AuthorizeService {
                 params.state,
             );
 
-            // 6. Validate nonce length
+            // 5. Validate nonce length
             this.validateNonce(params.nonce, redirectUri, params.state);
 
-            // 7. Resolve scope
+            // 6. Resolve scope
             const resolvedScopes = this.scopeResolver.resolveScopes(
                 params.scope || null,
                 client.allowedScopes,
@@ -78,6 +86,9 @@ export class AuthorizeService {
                 codeChallenge,
                 codeChallengeMethod,
                 nonce: params.nonce,
+                prompt: params.prompt,
+                maxAge: params.max_age,
+                resource: params.resource,
             };
         } catch (error) {
             if (error instanceof OAuthException || error instanceof AuthorizeRedirectException) {
@@ -90,11 +101,25 @@ export class AuthorizeService {
         }
     }
 
-    private validateResponseType(responseType?: string): void {
-        if (!responseType || responseType !== 'code') {
-            throw OAuthException.unsupportedResponseType(
-                'The response_type parameter must be "code"',
+    private async validateSchema(params: AuthorizeQueryParams): Promise<void> {
+        try {
+            await ValidationSchema.AuthorizeSchema.validate(params, { abortEarly: true });
+        } catch (error) {
+            // Log with client_id but never sensitive param values
+            this.logger.warn(
+                `Schema validation failed: client_id=${params.client_id || 'missing'}, ` +
+                `error=${error.message}`,
             );
+
+            // RFC 6749 §4.1.2.1: both missing and unsupported response_type
+            // use the unsupported_response_type error code
+            if (error.path === 'response_type') {
+                throw OAuthException.unsupportedResponseType(
+                    'The response_type parameter must be "code"',
+                );
+            }
+
+            throw OAuthException.invalidRequest(error.message);
         }
     }
 

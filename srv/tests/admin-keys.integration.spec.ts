@@ -27,6 +27,10 @@ describe('Admin key management endpoints', () => {
     let tenantA: { id: string; domain: string };
     let tenantB: { id: string; domain: string };
 
+    // Non-super-admin token for 403 tests — uses admin@bree.local which is
+    // seeded but never locked/unlocked by other specs (unlike admin@shire.local).
+    let nonSuperAdminToken: string;
+
     beforeAll(async () => {
         app = new SharedTestFixture();
         tokenFixture = new TokenFixture(app);
@@ -38,11 +42,17 @@ describe('Admin key management endpoints', () => {
         );
         adminAccessToken = adminResult.accessToken;
 
-        // Enable password grant on shire.local for the non-super-admin test
+        // Enable password grant on bree.local for the non-super-admin 403 tests.
+        // bree.local is seeded but never locked/unlocked by other specs, avoiding
+        // the race condition with user-lock-unlock.spec.ts that affects shire.local.
         const searchClient = new SearchClient(app, adminAccessToken);
-        const shireTenant = await searchClient.findTenantBy({domain: 'shire.local'});
+        const breeTenant = await searchClient.findTenantBy({domain: 'bree.local'});
         const helper = new HelperFixture(app, adminAccessToken);
-        await helper.enablePasswordGrant(shireTenant.id, 'shire.local');
+        await helper.enablePasswordGrant(breeTenant.id, 'bree.local');
+        const nonSuperAdminResult = await tokenFixture.fetchAccessToken(
+            'admin@bree.local', 'admin9000', 'bree.local',
+        );
+        nonSuperAdminToken = nonSuperAdminResult.accessToken;
 
         // Create two tenants for isolation and cross-tenant tests
         const ts = Date.now().toString(36);
@@ -148,16 +158,9 @@ describe('Admin key management endpoints', () => {
         });
 
         it('should return 403 for non-super-admin', async () => {
-            // Authenticate as a tenant admin (not super admin)
-            const nonSuperAdmin = await tokenFixture.fetchAccessToken(
-                "admin@shire.local",
-                "admin9000",
-                "shire.local",
-            );
-
             const res = await app.getHttpServer()
                 .get(`/api/admin/tenant/${tenantA.id}/keys`)
-                .set('Authorization', `Bearer ${nonSuperAdmin.accessToken}`)
+                .set('Authorization', `Bearer ${nonSuperAdminToken}`)
                 .set('Accept', 'application/json');
 
             expect(res.status).toEqual(403);
@@ -251,15 +254,9 @@ describe('Admin key management endpoints', () => {
         });
 
         it('should return 403 for non-super-admin', async () => {
-            const nonSuperAdmin = await tokenFixture.fetchAccessToken(
-                "admin@shire.local",
-                "admin9000",
-                "shire.local",
-            );
-
             const res = await app.getHttpServer()
                 .get('/api/admin/keys')
-                .set('Authorization', `Bearer ${nonSuperAdmin.accessToken}`)
+                .set('Authorization', `Bearer ${nonSuperAdminToken}`)
                 .set('Accept', 'application/json');
 
             expect(res.status).toEqual(403);

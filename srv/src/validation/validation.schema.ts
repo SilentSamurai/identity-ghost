@@ -316,6 +316,54 @@ const ConsentSchema = yup.object().shape({
     subscriber_tenant_hint: yup.string().optional().nullable(),
 });
 
+const AuthorizeSchema = yup.object().shape({
+    // RFC 6749 §4.1.2.1: missing or unsupported response_type → unsupported_response_type.
+    // required() catches missing values, oneOf() catches wrong values.
+    // The service maps both (any error on path 'response_type') to unsupported_response_type.
+    response_type: yup
+        .string()
+        .required("response_type is required")
+        .oneOf(["code"], "The response_type parameter must be \"code\""),
+    client_id: yup
+        .string()
+        .required("client_id is required"),
+    redirect_uri: yup
+        .string()
+        .optional(),
+    // RFC 6749 §3.3: scope is optional; when omitted the server defaults to the client's allowedScopes.
+    scope: yup
+        .string()
+        .optional(),
+    // RFC 6749 §4.1.2.1: missing state is a post-redirect error (redirect with error params),
+    // not a pre-redirect JSON error. Validated in the service after redirect_uri is confirmed.
+    state: yup
+        .string()
+        .optional(),
+    code_challenge: yup
+        .string()
+        .optional(),
+    code_challenge_method: yup
+        .string()
+        .optional()
+        .oneOf(["plain", "S256", "OWH32"], "code_challenge_method must be one of: plain, S256, OWH32"),
+    // Nonce length is a post-redirect error per OIDC Core §3.1.2.6, validated in the service.
+    nonce: yup
+        .string()
+        .optional(),
+    prompt: yup
+        .string()
+        .optional()
+        .oneOf(["none", "login", "consent"], "prompt must be one of: none, login, consent"),
+    max_age: yup
+        .number()
+        .optional()
+        .integer("max_age must be an integer")
+        .min(0, "max_age must be a non-negative integer"),
+    resource: yup
+        .string()
+        .optional(),
+});
+
 export const ValidationSchema = {
     SignUpSchema,
     SignDownSchema,
@@ -353,4 +401,5 @@ export const ValidationSchema = {
     UpdateGroupSchema,
     VerifyAuthCodeSchema,
     ConsentSchema,
+    AuthorizeSchema,
 };

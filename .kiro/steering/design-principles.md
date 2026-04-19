@@ -2,6 +2,19 @@
 
 This is an authorization and authentication server. Every decision must reflect that.
 
+## 0. RFC Compliance
+
+This server implements OAuth 2.0 and OpenID Connect. The RFCs are the source of truth for protocol behavior — not convenience, not internal consistency preferences.
+
+- Follow RFC 6749 (OAuth 2.0), RFC 7636 (PKCE), and OpenID Connect Core 1.0 for all protocol-facing behavior: error codes, error delivery method (JSON vs redirect), parameter requirements, and default values.
+- The authorize endpoint error model has two phases per RFC 6749 §4.1.2.1:
+  - **Pre-redirect errors** (JSON 400, never redirect): unknown `client_id`, unregistered `redirect_uri`. These fire before we have a safe URI to redirect to.
+  - **Post-redirect errors** (302 redirect with error params): everything else — missing `state`, invalid `scope`, PKCE violations, nonce violations. Once the `redirect_uri` is confirmed safe, errors go there.
+- `scope` is optional per RFC 6749 §3.3. When omitted, default to the client's `allowedScopes`.
+- `redirect_uri` is optional per RFC 6749 §3.1.2.3 when the client has exactly one registered URI.
+- `response_type` missing or unsupported both use the `unsupported_response_type` error code per RFC 6749 §4.1.2.1.
+- When a spec requirement conflicts with an RFC, the RFC wins. Update the spec to match.
+
 ## 1. Safety First
 
 Security is the top priority — above convenience, speed of delivery, or elegance.

@@ -121,6 +121,7 @@ describe('GET /api/oauth/authorize', () => {
                 response_type: 'code',
                 client_id: 'totally-unknown-client-id',
                 redirect_uri: REDIRECT_URI,
+                scope: 'openid',
                 state: 'abc',
             });
 
@@ -133,6 +134,7 @@ describe('GET /api/oauth/authorize', () => {
             const response = await authorizeRequest({
                 response_type: 'code',
                 redirect_uri: REDIRECT_URI,
+                scope: 'openid',
                 state: 'abc',
             });
 
@@ -145,6 +147,7 @@ describe('GET /api/oauth/authorize', () => {
                 response_type: 'code',
                 client_id: singleUriClientId,
                 redirect_uri: 'https://evil.example.com/steal',
+                scope: 'openid',
                 state: 'abc',
             });
 
@@ -157,10 +160,12 @@ describe('GET /api/oauth/authorize', () => {
             const response = await authorizeRequest({
                 client_id: singleUriClientId,
                 redirect_uri: REDIRECT_URI,
+                scope: 'openid',
                 state: 'abc',
             });
 
             expect(response.status).toEqual(400);
+            // RFC 6749 §4.1.2.1: missing response_type → unsupported_response_type
             expect(response.body.error).toEqual('unsupported_response_type');
         });
 
@@ -169,6 +174,7 @@ describe('GET /api/oauth/authorize', () => {
                 response_type: 'token',
                 client_id: singleUriClientId,
                 redirect_uri: REDIRECT_URI,
+                scope: 'openid',
                 state: 'abc',
             });
 
@@ -181,10 +187,13 @@ describe('GET /api/oauth/authorize', () => {
 
     describe('post-redirect errors (redirect with error params)', () => {
         it('should redirect with error when state is missing (Req 3.1, 8.1)', async () => {
+            // RFC 6749 §4.1.2.1: missing state is a post-redirect error.
+            // redirect_uri is valid, so the error is communicated via redirect.
             const response = await authorizeRequest({
                 response_type: 'code',
                 client_id: singleUriClientId,
                 redirect_uri: REDIRECT_URI,
+                scope: 'openid',
             });
 
             expect(response.status).toEqual(302);
@@ -199,6 +208,7 @@ describe('GET /api/oauth/authorize', () => {
                 response_type: 'code',
                 client_id: pkceRequiredClientId,
                 redirect_uri: REDIRECT_URI,
+                scope: 'openid',
                 state: 'pkce-test',
             });
 
@@ -215,6 +225,7 @@ describe('GET /api/oauth/authorize', () => {
                 response_type: 'code',
                 client_id: pkceRequiredClientId,
                 redirect_uri: REDIRECT_URI,
+                scope: 'openid',
                 state: 'pkce-plain',
                 code_challenge: 'some-challenge-value',
                 code_challenge_method: 'plain',
@@ -233,9 +244,11 @@ describe('GET /api/oauth/authorize', () => {
 
     describe('redirect URI resolution', () => {
         it('should use single registered URI when redirect_uri is omitted (Req 2.3)', async () => {
+            // RFC 6749 §3.1.2.3: when client has one registered URI, it's used as default
             const response = await authorizeRequest({
                 response_type: 'code',
                 client_id: singleUriClientId,
+                scope: 'openid',
                 state: 'single-uri',
                 code_challenge: 'test-challenge',
                 code_challenge_method: 'S256',
@@ -243,7 +256,6 @@ describe('GET /api/oauth/authorize', () => {
 
             expect(response.status).toEqual(302);
             const location = new URL(response.headers.location, 'http://localhost');
-            // Should redirect to login UI, not to the client redirect URI
             expect(location.pathname).toEqual('/authorize');
             expect(location.searchParams.get('redirect_uri')).toEqual(REDIRECT_URI);
         });
@@ -252,6 +264,7 @@ describe('GET /api/oauth/authorize', () => {
             const response = await authorizeRequest({
                 response_type: 'code',
                 client_id: multiUriClientId,
+                scope: 'openid',
                 state: 'multi-uri',
             });
 
@@ -269,6 +282,7 @@ describe('GET /api/oauth/authorize', () => {
                 response_type: 'code',
                 client_id: pkceRequiredClientId,
                 redirect_uri: REDIRECT_URI,
+                scope: 'openid',
                 state: 'no-challenge',
             });
 
@@ -283,6 +297,7 @@ describe('GET /api/oauth/authorize', () => {
                 response_type: 'code',
                 client_id: pkceRequiredClientId,
                 redirect_uri: REDIRECT_URI,
+                scope: 'openid',
                 state: 'plain-method',
                 code_challenge: 'some-challenge',
                 code_challenge_method: 'plain',
@@ -339,6 +354,7 @@ describe('GET /api/oauth/authorize', () => {
                     response_type: 'code',
                     client_id: clientId,
                     redirect_uri: REDIRECT_URI,
+                    scope: 'openid',
                     state: 'downgrade-test',
                     code_challenge: 'some-challenge',
                     code_challenge_method: 'plain',
@@ -369,6 +385,7 @@ describe('GET /api/oauth/authorize', () => {
                     response_type: 'code',
                     client_id: clientId,
                     redirect_uri: REDIRECT_URI,
+                    scope: 'openid',
                     state: 'default-method',
                     code_challenge: 'some-challenge-value',
                     // code_challenge_method intentionally omitted
@@ -404,6 +421,7 @@ describe('GET /api/oauth/authorize', () => {
         });
 
         it('should use client default scopes when scope is omitted (Req 6.2)', async () => {
+            // RFC 6749 §3.3: when scope is omitted, default to client's allowedScopes
             const response = await authorizeRequest({
                 response_type: 'code',
                 client_id: singleUriClientId,
@@ -414,7 +432,6 @@ describe('GET /api/oauth/authorize', () => {
             expect(response.status).toEqual(302);
             const location = new URL(response.headers.location, 'http://localhost');
             expect(location.pathname).toEqual('/authorize');
-            // Client was created with allowedScopes: 'openid profile email'
             const scope = location.searchParams.get('scope');
             expect(scope).toBeDefined();
             expect(scope).toContain('openid');
@@ -431,6 +448,7 @@ describe('GET /api/oauth/authorize', () => {
                 response_type: 'code',
                 client_id: singleUriClientId,
                 redirect_uri: REDIRECT_URI,
+                scope: 'openid',
                 state: 'nonce-test',
                 nonce: 'my-nonce-value',
             });
@@ -446,6 +464,7 @@ describe('GET /api/oauth/authorize', () => {
                 response_type: 'code',
                 client_id: singleUriClientId,
                 redirect_uri: REDIRECT_URI,
+                scope: 'openid',
                 state: 'nonce-boundary',
                 nonce: nonce512,
             });
@@ -462,10 +481,12 @@ describe('GET /api/oauth/authorize', () => {
                 response_type: 'code',
                 client_id: singleUriClientId,
                 redirect_uri: REDIRECT_URI,
+                scope: 'openid',
                 state: 'nonce-too-long',
                 nonce: nonce513,
             });
 
+            // OIDC Core §3.1.2.6: nonce too long is a post-redirect error
             expect(response.status).toEqual(302);
             const location = new URL(response.headers.location);
             expect(location.origin + location.pathname).toEqual(REDIRECT_URI);
@@ -484,6 +505,7 @@ describe('GET /api/oauth/authorize', () => {
                 response_type: 'code',
                 client_id: singleUriClientId,
                 redirect_uri: REDIRECT_URI,
+                scope: 'openid',
                 state: stateValue,
             });
 
@@ -500,6 +522,7 @@ describe('GET /api/oauth/authorize', () => {
                 response_type: 'code',
                 client_id: pkceRequiredClientId,
                 redirect_uri: REDIRECT_URI,
+                scope: 'openid',
                 state: stateValue,
             });
 

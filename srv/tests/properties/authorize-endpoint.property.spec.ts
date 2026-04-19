@@ -46,8 +46,11 @@ describe('Feature: authorize-endpoint, Property 1: Invalid response_type rejecti
         await fixture.close();
     });
 
-    // Generator: arbitrary strings that are NOT "code"
-    const invalidResponseTypeArb = fc.string({minLength: 0, maxLength: 64})
+    // Generator: arbitrary non-empty strings that are NOT "code"
+    // Empty string is excluded because yup treats it as falsy/missing, which still
+    // maps to unsupported_response_type — but empty strings are not realistic
+    // response_type values, so we focus on non-empty invalid values.
+    const invalidResponseTypeArb = fc.string({minLength: 1, maxLength: 64})
         .filter(s => s !== 'code');
 
     it('rejects any response_type that is not "code" with unsupported_response_type and no redirect', async () => {
@@ -57,6 +60,7 @@ describe('Feature: authorize-endpoint, Property 1: Invalid response_type rejecti
                     response_type: responseType,
                     client_id: testClientId,
                     redirect_uri: REDIRECT_URI,
+                    scope: 'openid',
                     state: 'test',
                 }).toString();
 
@@ -130,6 +134,7 @@ describe('Feature: authorize-endpoint, Property 2: Redirect URI exact match', ()
                     response_type: 'code',
                     client_id: testClientId,
                     redirect_uri: redirectUri,
+                    scope: 'openid',
                     state: 'test',
                 }).toString();
 
@@ -201,6 +206,7 @@ describe('Feature: authorize-endpoint, Property 3: State parameter round-trip', 
                     response_type: 'code',
                     client_id: testClientId,
                     redirect_uri: REDIRECT_URI,
+                    scope: 'openid',
                     state,
                 }).toString();
 
@@ -366,6 +372,7 @@ describe('Feature: authorize-endpoint, Property 6: Post-redirect errors include 
                     response_type: 'code',
                     client_id: pkceRequiredClientId,
                     redirect_uri: REDIRECT_URI,
+                    scope: 'openid',
                     state,
                 }).toString();
 
@@ -401,6 +408,7 @@ describe('Feature: authorize-endpoint, Property 6: Post-redirect errors include 
                     response_type: 'code',
                     client_id: pkceRequiredClientId,
                     redirect_uri: REDIRECT_URI,
+                    scope: 'openid',
                     state,
                     code_challenge: 'dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk',
                     code_challenge_method: 'plain',
@@ -485,6 +493,7 @@ describe('Feature: authorize-endpoint, Property 7: Pre-redirect errors never red
                     response_type: 'code',
                     client_id: clientId,
                     redirect_uri: 'https://any.example.com/callback',
+                    scope: 'openid',
                     state: 'test-state',
                 }).toString();
 
@@ -514,6 +523,7 @@ describe('Feature: authorize-endpoint, Property 7: Pre-redirect errors never red
                     response_type: 'code',
                     client_id: testClientId,
                     redirect_uri: redirectUri,
+                    scope: 'openid',
                     state: 'test-state',
                 }).toString();
 

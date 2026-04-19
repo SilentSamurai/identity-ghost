@@ -81,12 +81,20 @@ export class OAuthTokenController {
             params.set('state', validated.state);
             if (validated.codeChallenge) {
                 params.set('code_challenge', validated.codeChallenge);
-            }
-            if (validated.codeChallenge) {
                 params.set('code_challenge_method', validated.codeChallengeMethod);
             }
             if (validated.nonce) {
                 params.set('nonce', validated.nonce);
+            }
+            // Forward new OIDC parameters
+            if (validated.prompt) {
+                params.set('prompt', validated.prompt);
+            }
+            if (validated.maxAge !== undefined) {
+                params.set('max_age', String(validated.maxAge));
+            }
+            if (validated.resource) {
+                params.set('resource', validated.resource);
             }
 
             res.redirect(302, `/authorize?${params.toString()}`);

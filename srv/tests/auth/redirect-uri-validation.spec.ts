@@ -91,6 +91,7 @@ describe('Authorization endpoint redirect URI validation', () => {
             response_type: 'code',
             client_id: singleUriClientId,
             redirect_uri: REDIRECT_URI,
+            scope: 'openid',
             state: 'valid-uri-test',
             code_challenge: 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
             code_challenge_method: 'S256',
@@ -120,9 +121,11 @@ describe('Authorization endpoint redirect URI validation', () => {
     // ─── Req 1.3: Omitted redirect_uri with single registered URI ────
 
     it('should 302 redirect using the single registered URI when redirect_uri is omitted (Req 1.3)', async () => {
+        // RFC 6749 §3.1.2.3: when client has exactly one registered URI, it's used as default
         const response = await authorizeRequest({
             response_type: 'code',
             client_id: singleUriClientId,
+            scope: 'openid',
             state: 'omitted-single-test',
             code_challenge: 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
             code_challenge_method: 'S256',
