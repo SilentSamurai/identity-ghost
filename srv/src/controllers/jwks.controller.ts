@@ -1,4 +1,4 @@
-import {Controller, Get, Param, Req, Res} from "@nestjs/common";
+import {Controller, Get, Options, Param, Req, Res} from "@nestjs/common";
 import {Request, Response} from "express";
 import {JwksService} from "../services/jwks.service";
 import {TenantService} from "../services/tenant.service";
@@ -33,6 +33,18 @@ export class JwksController {
         res.set("Content-Type", "application/json");
         res.set("Cache-Control", "no-cache");
         res.set("ETag", etag);
+        res.set("Access-Control-Allow-Origin", "*");
         res.status(200).send(body);
+    }
+
+    /**
+     * Handles CORS preflight requests for the JWKS endpoint.
+     * Returns wildcard CORS headers to allow any origin to fetch the signing keys.
+     */
+    @Options("jwks.json")
+    async optionsJwks(@Res() res: Response): Promise<void> {
+        res.set("Access-Control-Allow-Origin", "*");
+        res.set("Access-Control-Allow-Methods", "GET, OPTIONS");
+        res.status(204).end();
     }
 }

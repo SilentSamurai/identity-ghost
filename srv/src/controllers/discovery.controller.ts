@@ -1,4 +1,4 @@
-import {Controller, Get, Param, Req, Res} from "@nestjs/common";
+import {Controller, Get, Options, Param, Req, Res} from "@nestjs/common";
 import {Request, Response} from "express";
 import {DiscoveryService} from "../services/discovery.service";
 import {TenantService} from "../services/tenant.service";
@@ -57,7 +57,19 @@ export class DiscoveryController {
         res.set("Content-Type", "application/json");
         res.set("Cache-Control", "max-age=3600");
         res.set("ETag", etag);
+        res.set("Access-Control-Allow-Origin", "*");
 
         res.status(200).send(body);
+    }
+
+    /**
+     * Handles CORS preflight requests for the OpenID Configuration endpoint.
+     * Returns wildcard CORS headers to allow any origin to fetch the discovery document.
+     */
+    @Options("openid-configuration")
+    async optionsOpenIdConfiguration(@Res() res: Response): Promise<void> {
+        res.set("Access-Control-Allow-Origin", "*");
+        res.set("Access-Control-Allow-Methods", "GET, OPTIONS");
+        res.status(204).end();
     }
 }

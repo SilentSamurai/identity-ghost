@@ -8,6 +8,7 @@ import {HttpExceptionFilter} from "./exceptions/filter/http-exception.filter";
 import * as express from "express";
 import * as process from "node:process";
 import type {FakeSmtpServer} from "./mail/FakeSmtpServer";
+import {CorsOriginService} from "./services/cors-origin.service";
 
 // Hold reference to SMTP server (if started) so we can close it on shutdown
 let smtpServerRef: FakeSmtpServer | null = null;
@@ -65,7 +66,28 @@ export async function prepareApp() {
     });
 
     if (Environment.get("ENABLE_CORS")) {
-        app.enableCors();
+        const corsOriginService = app.get(CorsOriginService);
+        app.enableCors({
+            origin: async (origin, callback) => {
+                // Non-browser requests (server-to-server) — allow
+                if (!origin) {
+                    callback(null, true);
+                    return;
+                }
+                
+                try {
+                    const allowed = await corsOriginService.isAllowedOrigin(origin);
+                    callback(null, allowed ? origin : false);
+                } catch (error) {
+                    // Fail-closed: on error, reject the origin
+                    console.warn(`CORS origin validation error for origin "${origin}":`, error);
+                    callback(null, false);
+                }
+            },
+            methods: ['GET', 'POST', 'OPTIONS'],
+            allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+            credentials: true,
+        });
     }
 
     app.use(

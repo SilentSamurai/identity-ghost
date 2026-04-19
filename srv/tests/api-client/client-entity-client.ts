@@ -20,7 +20,6 @@ export class ClientEntityClient extends HttpClient {
         const response = await this.post('/api/clients/create')
             .send({tenantId, name, ...opts});
 
-        console.log("Create Client Response:", response.body);
         expect2xx(response);
         return response.body;
     }
