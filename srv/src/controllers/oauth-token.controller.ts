@@ -115,6 +115,7 @@ export class OAuthTokenController {
 
     @Post("/login")
     async login(
+        @Req() req: ExpressRequest,
         @Body(new ValidationPipe(ValidationSchema.LoginSchema))
         body: {
             client_id: string;

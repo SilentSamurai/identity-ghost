@@ -23,12 +23,14 @@ import {LoginSessionService} from "./login-session.service";
 import {LoginSession} from "../entity/login-session.entity";
 import {ConsentService} from "./consent.service";
 import {UserConsent} from "../entity/user-consent.entity";
+import {SecurityModule} from "../security/security.module";
 
 @Module({
     imports: [
         CaslModule,
         CoreModule,
         ServiceModule,
+        SecurityModule,
         PassportModule,
         TypeOrmModule.forFeature([AuthCode, User, RefreshToken, LoginSession, UserConsent]),
     ],

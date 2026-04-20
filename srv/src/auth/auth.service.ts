@@ -82,7 +82,7 @@ export class AuthService {
             throw OAuthException.invalidGrant('Invalid email or password');
         }
         if (user.locked) {
-            throw OAuthException.invalidGrant('Invalid email or password');
+            throw OAuthException.invalidGrant('Account is locked');
         }
         return user;
     }

@@ -39,6 +39,8 @@ import {AdminKeysController} from "./admin-keys.controller";
 import {UserInfoController} from "./userinfo.controller";
 import {UserConsent} from "../entity/user-consent.entity";
 import {DiscoveryController} from "./discovery.controller";
+import {SecurityModule} from "../security/security.module";
+import {OAuthExceptionFilter} from "../exceptions/filter/oauth-exception.filter";
 
 @Module(
     {
@@ -49,6 +51,7 @@ import {DiscoveryController} from "./discovery.controller";
                 MailModule,
                 CaslModule,
                 ServiceModule,
+                SecurityModule,
                 TypeOrmModule.forFeature([User, Tenant, Role, TenantMember, Group, App, Client, TenantKey, UserConsent])
             ],
         controllers: [
@@ -78,7 +81,7 @@ import {DiscoveryController} from "./discovery.controller";
             UserInfoController,
             DiscoveryController
         ],
-        providers: [],
+        providers: [OAuthExceptionFilter],
         exports: []
     })
 export class ControllersModule {

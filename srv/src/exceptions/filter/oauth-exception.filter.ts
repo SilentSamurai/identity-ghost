@@ -18,6 +18,11 @@
  *   5. Everything else       → "server_error" (safe fallback)
  *
  * Response headers follow RFC 6749 §5.1: no-store cache, UTF-8 JSON content type.
+ *
+ * Security event logging: When a login endpoint request fails with invalid_grant,
+ * the filter logs the appropriate security event (login_failure or login_locked_account)
+ * via SecurityEventLogger. This centralizes login failure logging in one place
+ * (controller-advice pattern) rather than scattering try/catch blocks in controllers.
  */
 import {
   ArgumentsHost,
@@ -25,18 +30,25 @@ import {
   Catch,
   ExceptionFilter,
   HttpException,
+  Injectable,
   Logger,
   UnauthorizedException,
 } from '@nestjs/common';
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { OAuthException } from '../oauth-exception';
+import { SecurityEventLogger } from '../../security/security-event-logger.service';
 
+@Injectable()
 @Catch()
 export class OAuthExceptionFilter implements ExceptionFilter {
   private static readonly LOGGER = new Logger(OAuthExceptionFilter.name);
 
+  constructor(private readonly securityEventLogger: SecurityEventLogger) {}
+
   catch(exception: Error, host: ArgumentsHost): void {
-    const response = host.switchToHttp().getResponse<Response>();
+    const ctx = host.switchToHttp();
+    const response = ctx.getResponse<Response>();
+    const request = ctx.getRequest<Request>();
 
     let error: string;
     let errorDescription: string;
@@ -86,11 +98,21 @@ export class OAuthExceptionFilter implements ExceptionFilter {
       statusCode = 400;
     }
 
+    // Log login failure security events (Requirements 3.1, 3.2, 3.3)
+    this.logLoginFailureIfApplicable(request, exception, error);
+
     // Full error detail logged server-side for debugging; never sent to the client
     OAuthExceptionFilter.LOGGER.error(
       `OAuth error [${error}]: ${exception.message}`,
       exception.stack,
     );
+
+    // Security: Never reveal "Account is locked" to the client
+    // Replace with generic message to prevent account enumeration
+    const clientErrorDescription =
+      errorDescription === 'Account is locked'
+        ? 'Invalid email or password'
+        : errorDescription;
 
     // RFC 6749 §5.2: error response with no-store caching
     response
@@ -98,6 +120,34 @@ export class OAuthExceptionFilter implements ExceptionFilter {
       .set('Content-Type', 'application/json;charset=UTF-8')
       .set('Cache-Control', 'no-store')
       .set('Pragma', 'no-cache')
-      .json({ error, error_description: errorDescription });
+      .json({ error, error_description: clientErrorDescription });
+  }
+
+  /**
+   * Detect login endpoint failures and log the appropriate security event.
+   * Only fires for POST /api/oauth/login with OAuthException invalid_grant.
+   */
+  private logLoginFailureIfApplicable(
+    request: Request,
+    exception: Error,
+    errorCode: string,
+  ): void {
+    if (!request.url?.startsWith('/api/oauth/login')) {
+      return;
+    }
+
+    if (!(exception instanceof OAuthException) || exception.errorCode !== 'invalid_grant') {
+      return;
+    }
+
+    const email = request.body?.email || 'unknown';
+    const clientId = request.body?.client_id || 'unknown';
+    const sourceIp = request.ip || request.socket?.remoteAddress || 'unknown';
+
+    if (exception.errorDescription === 'Account is locked') {
+      this.securityEventLogger.loginLockedAccount({ email, clientId, sourceIp });
+    } else {
+      this.securityEventLogger.loginFailure({ email, clientId, sourceIp });
+    }
   }
 }

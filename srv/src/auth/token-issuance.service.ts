@@ -18,6 +18,7 @@ import {UsersService} from "../services/users.service";
 import {OAuthException} from "../exceptions/oauth-exception";
 import {randomUUID} from "crypto";
 import {LoginSessionService} from "./login-session.service";
+import {SecurityEventLogger} from "../security/security-event-logger.service";
 
 /**
  * TokenIssuanceService — Central orchestrator for OAuth 2.0 / OIDC token issuance.
@@ -103,6 +104,7 @@ export class TokenIssuanceService {
         private readonly refreshTokenService: RefreshTokenService,
         private readonly usersService: UsersService,
         private readonly loginSessionService: LoginSessionService,
+        private readonly securityEventLogger: SecurityEventLogger,
     ) {
     }
 
@@ -178,7 +180,18 @@ export class TokenIssuanceService {
             amr: ["pwd"],
         });
 
-        return this.formatResponse(accessToken, refreshToken, scopes, idToken);
+        const response = this.formatResponse(accessToken, refreshToken, scopes, idToken);
+
+        // Log token issuance event (Requirements 4.1, 4.2)
+        this.securityEventLogger.tokenIssued({
+            grantType: options?.grant_type ?? GRANT_TYPES.PASSWORD,
+            clientId: tenant.clientId,
+            tenantId: tenant.id,
+            scope: response.scope,
+            userId: user.id,
+        });
+
+        return response;
     }
 
     /**
@@ -302,7 +315,18 @@ export class TokenIssuanceService {
             amr: ["pwd"],
         });
 
-        return this.formatResponse(accessToken, refreshToken, scopes, idToken);
+        const response = this.formatResponse(accessToken, refreshToken, scopes, idToken);
+
+        // Log token issuance event (Requirements 4.1, 4.2)
+        this.securityEventLogger.tokenIssued({
+            grantType: options?.grant_type ?? GRANT_TYPES.PASSWORD,
+            clientId: tenant.clientId,
+            tenantId: tenant.id,
+            scope: response.scope,
+            userId: user.id,
+        });
+
+        return response;
     }
 
     /**
@@ -360,7 +384,18 @@ export class TokenIssuanceService {
             amr: ["pwd"],
         });
 
-        return this.formatResponse(accessToken, newRefreshToken, scopes, idToken);
+        const response = this.formatResponse(accessToken, newRefreshToken, scopes, idToken);
+
+        // Log token issuance event (Requirements 4.1, 4.2)
+        this.securityEventLogger.tokenIssued({
+            grantType: 'refresh_token',
+            clientId: tenant.clientId,
+            tenantId: tenant.id,
+            scope: response.scope,
+            userId: user.id,
+        });
+
+        return response;
     }
 
     /**
@@ -381,7 +416,17 @@ export class TokenIssuanceService {
             tenant,
             grantedScopes,
         );
-        return this.formatResponse(accessToken, undefined, grantedScopes);
+        const response = this.formatResponse(accessToken, undefined, grantedScopes);
+
+        // Log token issuance event (Requirements 4.1, 4.3)
+        this.securityEventLogger.tokenIssued({
+            grantType: 'client_credentials',
+            clientId: tenant.clientId,
+            tenantId: tenant.id,
+            scope: response.scope,
+        });
+
+        return response;
     }
 
     private formatResponse(

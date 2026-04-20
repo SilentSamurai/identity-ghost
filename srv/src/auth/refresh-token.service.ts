@@ -6,6 +6,7 @@ import * as ms from "ms";
 import {RefreshToken} from "../entity/refresh-token.entity";
 import {Environment} from "../config/environment.service";
 import {OAuthException} from "../exceptions/oauth-exception";
+import {SecurityEventLogger} from "../security/security-event-logger.service";
 
 const logger = new Logger("RefreshTokenService");
 
@@ -57,6 +58,7 @@ export class RefreshTokenService {
         @InjectRepository(RefreshToken)
         private readonly repo: Repository<RefreshToken>,
         private readonly configService: Environment,
+        private readonly securityEventLogger: SecurityEventLogger,
     ) {}
 
     private getSlidingExpiryMs(): number {
@@ -241,12 +243,11 @@ export class RefreshTokenService {
         }
 
         // Grace window elapsed or not enabled — revoke the entire family
-        logger.warn({
-            event: "refresh_token_replay_detected",
-            family_id: existing.familyId,
-            user_id: existing.userId,
-            client_id: existing.clientId,
-            tenant_id: existing.tenantId,
+        this.securityEventLogger.refreshTokenReplayDetected({
+            familyId: existing.familyId,
+            clientId: existing.clientId,
+            userId: existing.userId,
+            tenantId: existing.tenantId,
         });
 
         await this.revokeFamily(existing.familyId);

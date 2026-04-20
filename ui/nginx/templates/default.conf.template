@@ -1,5 +1,31 @@
+# ============================================================================
+# Rate Limiting Zones for OAuth Endpoints
+# ============================================================================
+# Each zone uses 10MB of shared memory, capable of tracking ~160,000 IP addresses
+# Rate limits are per-IP and designed to prevent brute-force and credential attacks
+# while allowing legitimate traffic spikes through the burst parameter.
 
+# Token endpoint: 30 requests/minute per IP
+# Purpose: Protects the token issuance endpoint from token grinding attacks
+# Allows burst of 5 requests for legitimate multi-tab/multi-device scenarios
+limit_req_zone $binary_remote_addr zone=oauth_token:10m rate=30r/m;
 
+# Login endpoint: 10 requests/minute per IP (strictest - credential attacks)
+# Purpose: Protects against credential stuffing and brute-force password attacks
+# Lower rate due to higher security risk; allows burst of 3 requests
+limit_req_zone $binary_remote_addr zone=oauth_login:10m rate=10r/m;
+
+# Authorize endpoint: 20 requests/minute per IP
+# Purpose: Protects the authorization flow from abuse
+# Allows burst of 5 requests for legitimate multi-tab scenarios
+limit_req_zone $binary_remote_addr zone=oauth_authorize:10m rate=20r/m;
+
+# ============================================================================
+# Custom 429 Error Response (RFC 6585 §4 compliant)
+# ============================================================================
+# Returns a JSON error response when rate limits are exceeded
+# Headers ensure the response is not cached per OAuth security best practices
+error_page 429 = @rate_limit_exceeded;
 
 server {
     listen ${PORT};
@@ -8,18 +34,70 @@ server {
     root /home/static/;
     index index.html;
 
+    # ------------------------------------------------------------------------
+    # Rate Limit Exceeded Handler
+    # ------------------------------------------------------------------------
+    location @rate_limit_exceeded {
+        default_type application/json;
+        add_header Cache-Control "no-store" always;
+        add_header Pragma "no-cache" always;
+        return 429 '{"error":"temporarily_unavailable","error_description":"Too many requests. Please slow down."}';
+    }
+
+    # ------------------------------------------------------------------------
+    # OAuth Token Endpoint - Rate Limited
+    # ------------------------------------------------------------------------
+    # Token issuance endpoint with rate limiting
+    # burst=5 allows short spikes, nodelay rejects excess immediately
+    location = /api/oauth/token {
+        limit_req zone=oauth_token burst=5 nodelay;
+        proxy_pass ${AUTH_SERVER};
+    }
+
+    # ------------------------------------------------------------------------
+    # OAuth Login Endpoint - Rate Limited (Strictest)
+    # ------------------------------------------------------------------------
+    # Login endpoint with stricter rate limiting for credential attack prevention
+    # burst=3 allows minimal spike tolerance, nodelay rejects excess immediately
+    location = /api/oauth/login {
+        limit_req zone=oauth_login burst=3 nodelay;
+        proxy_pass ${AUTH_SERVER};
+    }
+
+    # ------------------------------------------------------------------------
+    # OAuth Authorize Endpoint - Rate Limited
+    # ------------------------------------------------------------------------
+    # Authorization endpoint with rate limiting
+    # burst=5 allows short spikes, nodelay rejects excess immediately
+    location = /api/oauth/authorize {
+        limit_req zone=oauth_authorize burst=5 nodelay;
+        proxy_pass ${AUTH_SERVER};
+    }
+
+    # ------------------------------------------------------------------------
+    # General API Proxy (Non-Rate-Limited Endpoints)
+    # ------------------------------------------------------------------------
     location ^~ /api {
         proxy_pass ${AUTH_SERVER};
     }
 
+    # ------------------------------------------------------------------------
+    # Well-Known Discovery Endpoints
+    # ------------------------------------------------------------------------
     location ~* ^/[^/]+/\.well-known/ {
         proxy_pass ${AUTH_SERVER};
     }
 
+    # ------------------------------------------------------------------------
+    # Static File Serving (Angular SPA)
+    # ------------------------------------------------------------------------
     location / {
         try_files $uri$args $uri$args/ /index.html;
     }
 
+    # ------------------------------------------------------------------------
+    # Compression Settings
+    # ------------------------------------------------------------------------
     # Optional: serve compressed files when available
     gzip on;
     gzip_types text/plain application/javascript application/x-javascript text/javascript text/css application/json;

@@ -11,6 +11,7 @@ import {ControllersModule} from "./controllers/controller.module";
 import {ServiceModule} from "./services/service.module";
 import {migrations} from "./migrations/migrations";
 import {entities} from "./entity/entities";
+import {SecurityModule} from "./security/security.module";
 
 @Module({
     imports: [
@@ -62,6 +63,7 @@ import {entities} from "./entity/entities";
         ServiceModule,
         AuthModule,
         ControllersModule,
+        SecurityModule,
     ],
     controllers: [],
     providers: [StartUpService],
