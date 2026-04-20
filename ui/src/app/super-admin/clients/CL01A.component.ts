@@ -1,5 +1,5 @@
 import {Component, OnInit, ViewChild} from '@angular/core';
-import {ClientService, Client} from '../../_services/client.service';
+import {Client, ClientService} from '../../_services/client.service';
 import {AppTableComponent} from '../../component/table/app-table.component';
 import {Filter} from '../../component/model/Filters';
 import {AuthDefaultService} from '../../_services/auth.default.service';

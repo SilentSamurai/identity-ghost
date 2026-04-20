@@ -116,21 +116,27 @@ function sha256Fallback(message: Uint8Array): Uint8Array {
     function rotr(n: number, x: number): number {
         return (x >>> n) | (x << (32 - n));
     }
+
     function ch(x: number, y: number, z: number): number {
         return (x & y) ^ (~x & z);
     }
+
     function maj(x: number, y: number, z: number): number {
         return (x & y) ^ (x & z) ^ (y & z);
     }
+
     function sigma0(x: number): number {
         return rotr(2, x) ^ rotr(13, x) ^ rotr(22, x);
     }
+
     function sigma1(x: number): number {
         return rotr(6, x) ^ rotr(11, x) ^ rotr(25, x);
     }
+
     function gamma0(x: number): number {
         return rotr(7, x) ^ rotr(18, x) ^ (x >>> 3);
     }
+
     function gamma1(x: number): number {
         return rotr(17, x) ^ rotr(19, x) ^ (x >>> 10);
     }
@@ -173,9 +179,13 @@ function sha256Fallback(message: Uint8Array): Uint8Array {
         for (let t = 0; t < 64; t++) {
             const T1 = (h + sigma1(e) + ch(e, f, g) + K[t] + W[t]) | 0;
             const T2 = (sigma0(a) + maj(a, b, c)) | 0;
-            h = g; g = f; f = e;
+            h = g;
+            g = f;
+            f = e;
             e = (d + T1) | 0;
-            d = c; c = b; b = a;
+            d = c;
+            c = b;
+            b = a;
             a = (T1 + T2) | 0;
         }
 

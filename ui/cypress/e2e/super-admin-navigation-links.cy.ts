@@ -13,7 +13,7 @@ describe('Super Admin — Admin Navigation Links', () => {
 
     /**
      * Property 1: Bug Condition — Admin components use correct routes
-     * Validates: Requirements 2.2, 2.7 
+     * Validates: Requirements 2.2, 2.7
      *
      * Navigates to /admin/TN01, clicks a tenant domain link,
      * and asserts the URL contains /admin/TN02/.
@@ -22,7 +22,7 @@ describe('Super Admin — Admin Navigation Links', () => {
         cy.goToAdminPage('TN01');
 
         // Wait for the tenant table to load with at least one row
-        cy.get('app-table tbody tr', { timeout: 10000 }).should('have.length.greaterThan', 0);
+        cy.get('app-table tbody tr', {timeout: 10000}).should('have.length.greaterThan', 0);
 
         // Click the first tenant domain link
         cy.get('app-table tbody tr').first().find('a[href]').first().click();
@@ -43,7 +43,7 @@ describe('Super Admin — Admin Navigation Links', () => {
         cy.goToAdminPage('RL01');
 
         // Wait for the roles table to load with at least one row
-        cy.get('app-table tbody tr', { timeout: 10000 }).should('have.length.greaterThan', 0);
+        cy.get('app-table tbody tr', {timeout: 10000}).should('have.length.greaterThan', 0);
 
         // The first <a> in each row is the role name link (routes to /admin/RL02/)
         cy.get('app-table tbody tr').first().find('td').eq(1).find('a').click();
@@ -55,7 +55,7 @@ describe('Super Admin — Admin Navigation Links', () => {
         cy.goToAdminPage('RL01');
 
         // Wait for the roles table to load again
-        cy.get('app-table tbody tr', { timeout: 10000 }).should('have.length.greaterThan', 0);
+        cy.get('app-table tbody tr', {timeout: 10000}).should('have.length.greaterThan', 0);
 
         // The second <a> in each row is the tenant domain link (routes to /admin/TN02/)
         cy.get('app-table tbody tr').first().find('td').eq(2).find('a').click();

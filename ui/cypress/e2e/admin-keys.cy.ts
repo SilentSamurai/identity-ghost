@@ -44,7 +44,7 @@ describe('Admin Key Management', () => {
         cy.adminGoToTenantObjectPage(TENANT_DOMAIN);
         cy.intercept('GET', '**/api/admin/tenant/*/keys').as('getKeys');
         cy.get('#KEYS_SECTION_NAV').click();
-        cy.wait('@getKeys').should(({ response }) => {
+        cy.wait('@getKeys').should(({response}) => {
             expect(response?.statusCode).to.be.oneOf([200, 304]);
         });
     }
@@ -107,7 +107,7 @@ describe('Admin Key Management', () => {
             cy.window().then((win) => {
                 const stub = cy.stub().resolves();
                 Object.defineProperty(win.navigator, 'clipboard', {
-                    value: { writeText: stub },
+                    value: {writeText: stub},
                     writable: true,
                     configurable: true,
                 });
@@ -125,7 +125,7 @@ describe('Admin Key Management', () => {
             cy.get('#ROTATE_KEY_BTN').should('be.visible').click();
 
             // Confirmation dialog should appear with the tenant name
-            cy.contains('rotate the signing key', { matchCase: false }).should('be.visible');
+            cy.contains('rotate the signing key', {matchCase: false}).should('be.visible');
             cy.contains(TENANT_NAME).should('be.visible');
 
             // Dismiss without confirming
@@ -143,12 +143,12 @@ describe('Admin Key Management', () => {
                 cy.get('#ROTATE_KEY_BTN').click();
                 cy.get('#CONFIRMATION_YES_BTN').click();
 
-                cy.wait('@rotateKey').should(({ response }) => {
+                cy.wait('@rotateKey').should(({response}) => {
                     expect(response?.statusCode).to.be.oneOf([200, 201]);
                 });
 
                 // Key list should refresh — new key appears
-                cy.wait('@refreshKeys').should(({ response }) => {
+                cy.wait('@refreshKeys').should(({response}) => {
                     expect(response?.statusCode).to.be.oneOf([200, 304]);
                 });
 
@@ -215,7 +215,7 @@ describe('Admin Key Management', () => {
             // Intercept the rotation call and force a 500 failure
             cy.intercept('PUT', '**/api/admin/tenant/*/keys', {
                 statusCode: 500,
-                body: { message: 'Internal Server Error' },
+                body: {message: 'Internal Server Error'},
             }).as('rotateKeyFail');
 
             cy.get('#ROTATE_KEY_BTN').click();
@@ -233,7 +233,7 @@ describe('Admin Key Management', () => {
         it('page loads at /admin/KY01', () => {
             cy.intercept('GET', '**/api/admin/keys*').as('getAllKeys');
             cy.goToAdminPage('KY01');
-            cy.wait('@getAllKeys').should(({ response }) => {
+            cy.wait('@getAllKeys').should(({response}) => {
                 expect(response?.statusCode).to.be.oneOf([200, 304]);
             });
             cy.url().should('include', '/admin/KY01');

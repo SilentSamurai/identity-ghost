@@ -25,6 +25,7 @@ function normalizeDevLink(link: string): string {
         return link;
     }
 }
+
 /**
  * Forgot/Reset Password Flow Test
  *
@@ -54,14 +55,14 @@ describe("Forgot/Reset Password (UI)", () => {
                 password: originalPassword,
                 client_id: "shire.local",
             },
-            headers: { Accept: "application/json" },
+            headers: {Accept: "application/json"},
         }).its("status").should("be.oneOf", [200, 201]);
 
         // 2) Verify email via SMTP control (get latest verification mail and open link)
         cy.request({
             method: "GET",
             url: `http://127.0.0.1:8899/__test__/emails/latest`,
-            qs: { to: email, subject: "Thank you for signing up" },
+            qs: {to: email, subject: "Thank you for signing up"},
             failOnStatusCode: false,
         }).then((res) => {
             expect(res.status).to.be.oneOf([200, 201]);
@@ -69,8 +70,8 @@ describe("Forgot/Reset Password (UI)", () => {
             const verificationUrl = normalizeDevLink(String(link));
             expect(verificationUrl, "verification link").to.match(/^https?:\/\//);
             // Always hit verification via API request, then continue the flow in the UI
-            cy.request({ method: 'GET', url: verificationUrl, followRedirect: false, failOnStatusCode: false })
-              .its('status').should('eq', 302);
+            cy.request({method: 'GET', url: verificationUrl, followRedirect: false, failOnStatusCode: false})
+                .its('status').should('eq', 302);
             // After API verification, go to login UI to proceed
             cy.visit('/login?client_id=shire.local');
             cy.url().should('include', '/login');
@@ -88,7 +89,7 @@ describe("Forgot/Reset Password (UI)", () => {
         cy.request({
             method: "GET",
             url: `http://127.0.0.1:8899/__test__/emails/latest`,
-            qs: { to: email, subject: "Reset your password" },
+            qs: {to: email, subject: "Reset your password"},
             failOnStatusCode: false,
         }).then((res) => {
             expect(res.status).to.be.oneOf([200, 201]);

@@ -55,7 +55,8 @@ export class TenantSelectionComponent implements OnInit {
         private authService: AuthService,
         private tokenStorage: SessionService,
         private messageService: MessageService
-    ) {}
+    ) {
+    }
 
     ngOnInit() {
         const state = history.state;

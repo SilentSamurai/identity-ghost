@@ -185,7 +185,7 @@ describe('Consent Screen Flow', () => {
 
             cy.intercept('POST', '**/api/oauth/consent*', {
                 statusCode: 200,
-                body: { authentication_code: AUTH_CODE },
+                body: {authentication_code: AUTH_CODE},
             }).as('consentPayload');
 
             // Intercept the external redirect to prevent cross-origin navigation

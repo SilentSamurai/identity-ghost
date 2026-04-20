@@ -82,6 +82,7 @@ export class TextInputComponent implements OnInit, ControlValueAccessor {
     formControl!: UntypedFormControl;
     @ContentChildren(InputErrorComponent)
     inputErrors!: QueryList<InputErrorComponent>;
+    @Input() readonly: boolean = false;
     private _destroy$ = new Subject<void>();
 
     constructor(@Inject(Injector) private injector: Injector) {
@@ -104,8 +105,6 @@ export class TextInputComponent implements OnInit, ControlValueAccessor {
 
     onChange = (value: any) => {
     };
-
-    @Input() readonly: boolean = false;
 
     async ngOnInit(): Promise<void> {
         // console.log("pool: ", this.disabled)

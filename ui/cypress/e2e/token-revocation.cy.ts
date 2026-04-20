@@ -50,7 +50,7 @@ describe('Token Revocation — Sign Out', () => {
     it('Sign out with server error still redirects to login', () => {
         cy.login(email(), password(), domain());
 
-        cy.intercept('POST', '**/api/oauth/logout', { statusCode: 500 }).as('logoutError');
+        cy.intercept('POST', '**/api/oauth/logout', {statusCode: 500}).as('logoutError');
 
         cy.get('#dropdownUser1').click();
         cy.contains('a.dropdown-item', 'Sign Out').click();

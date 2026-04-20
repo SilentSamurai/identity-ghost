@@ -1,15 +1,15 @@
-import { Component, OnInit } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
-import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
-import { EditUserModalComponent } from './dialogs/edit-user.modal.component';
-import { UserService } from '../../_services/user.service';
-import { lastValueFrom } from 'rxjs';
-import { ConfirmationService } from '../../component/dialogs/confirmation.service';
-import { MessageService } from 'primeng/api';
-import { Location } from '@angular/common';
-import { AuthDefaultService } from '../../_services/auth.default.service';
-import { StaticSource } from "../../component/model/StaticSource";
-import { ChangePasswordModalComponent } from './dialogs/change-password.modal.component';
+import {Component, OnInit} from '@angular/core';
+import {ActivatedRoute} from '@angular/router';
+import {NgbModal} from '@ng-bootstrap/ng-bootstrap';
+import {EditUserModalComponent} from './dialogs/edit-user.modal.component';
+import {UserService} from '../../_services/user.service';
+import {lastValueFrom} from 'rxjs';
+import {ConfirmationService} from '../../component/dialogs/confirmation.service';
+import {MessageService} from 'primeng/api';
+import {Location} from '@angular/common';
+import {AuthDefaultService} from '../../_services/auth.default.service';
+import {StaticSource} from "../../component/model/StaticSource";
+import {ChangePasswordModalComponent} from './dialogs/change-password.modal.component';
 
 @Component({
     selector: 'app-UR02A',
@@ -131,6 +131,7 @@ export class UR02AComponent implements OnInit {
     };
     tenants: any = [];
     tenantsDM = new StaticSource<any>(['id']);
+
     constructor(
         private userService: UserService,
         private actRoute: ActivatedRoute,

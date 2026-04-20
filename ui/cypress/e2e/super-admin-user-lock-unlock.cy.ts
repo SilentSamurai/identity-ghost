@@ -70,7 +70,7 @@ describe('Admin User Lock/Unlock', () => {
 
         cy.intercept('POST', '**/users/create*').as('createUser');
         cy.get('#CREATE_USER_SUBMIT_BTN').click();
-        cy.wait('@createUser').should(({ response }) => {
+        cy.wait('@createUser').should(({response}) => {
             expect(response!.statusCode).to.be.oneOf([200, 201]);
         });
     });
@@ -116,7 +116,7 @@ describe('Admin User Lock/Unlock', () => {
         cy.contains(TEST_USER_EMAIL).should('be.visible');
         cy.get('#CONFIRMATION_YES_BTN').click();
 
-        cy.wait('@lockUser').should(({ response }) => {
+        cy.wait('@lockUser').should(({response}) => {
             expect(response!.statusCode).to.equal(200);
             expect(response!.body.locked).to.equal(true);
         });
@@ -148,7 +148,7 @@ describe('Admin User Lock/Unlock', () => {
         cy.contains(TEST_USER_EMAIL).should('be.visible');
         cy.get('#CONFIRMATION_YES_BTN').click();
 
-        cy.wait('@unlockUser').should(({ response }) => {
+        cy.wait('@unlockUser').should(({response}) => {
             expect(response!.statusCode).to.equal(200);
             expect(response!.body.locked).to.equal(false);
         });
@@ -197,7 +197,7 @@ describe('Admin User Lock/Unlock', () => {
         cy.contains('button', 'Lock').click();
         cy.get('#CONFIRMATION_YES_BTN').click();
 
-        cy.wait('@lockSuperAdmin').should(({ response }) => {
+        cy.wait('@lockSuperAdmin').should(({response}) => {
             expect(response!.statusCode).to.equal(403);
         });
 
@@ -240,7 +240,7 @@ describe('Admin User Lock/Unlock', () => {
         cy.intercept('PUT', '**/users/*/lock').as('lockSeeded');
         cy.contains('button', 'Lock').click();
         cy.get('#CONFIRMATION_YES_BTN').click();
-        cy.wait('@lockSeeded').should(({ response }) => {
+        cy.wait('@lockSeeded').should(({response}) => {
             expect(response!.statusCode).to.equal(200);
             expect(response!.body.locked).to.equal(true);
         });
@@ -262,7 +262,7 @@ describe('Admin User Lock/Unlock', () => {
         cy.get('#login-btn').click();
 
         // Backend validates credentials then checks user.locked → 400 (invalid_grant per RFC 6749)
-        cy.wait('@lockedLogin').should(({ response }) => {
+        cy.wait('@lockedLogin').should(({response}) => {
             expect(response!.statusCode).to.equal(400);
         });
 
@@ -275,7 +275,7 @@ describe('Admin User Lock/Unlock', () => {
         cy.intercept('PUT', '**/users/*/unlock').as('unlockSeeded');
         cy.contains('button', 'Unlock').click();
         cy.get('#CONFIRMATION_YES_BTN').click();
-        cy.wait('@unlockSeeded').should(({ response }) => {
+        cy.wait('@unlockSeeded').should(({response}) => {
             expect(response!.statusCode).to.equal(200);
             expect(response!.body.locked).to.equal(false);
         });
@@ -296,12 +296,12 @@ describe('Admin User Lock/Unlock', () => {
         cy.get('#login-btn').click();
 
         // First leg: POST /api/oauth/login returns an auth code
-        cy.wait('@unlockedLogin').should(({ response }) => {
+        cy.wait('@unlockedLogin').should(({response}) => {
             expect(response!.statusCode).to.be.oneOf([200, 201]);
         });
 
         // Second leg: auth code exchanged for a JWT at POST /api/oauth/token
-        cy.wait('@unlockedToken').should(({ response }) => {
+        cy.wait('@unlockedToken').should(({response}) => {
             expect(response!.statusCode).to.be.oneOf([200, 201]);
         });
 

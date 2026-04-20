@@ -7,7 +7,8 @@ export class SelectionModel<T = any> {
     constructor(
         private keyFn: (row: T) => string,
         private multi: boolean = true,
-    ) {}
+    ) {
+    }
 
     get isAllSelected$(): Observable<boolean> {
         return this.allSelected$.asObservable();

@@ -145,4 +145,5 @@ import {KY01AComponent} from './keys/KY01A.component';
     ],
     providers: [ConfirmationService, MessageService],
 })
-export class AdminModule {}
+export class AdminModule {
+}

@@ -11,7 +11,6 @@ import {Location} from '@angular/common';
 import {StaticSource} from '../../component/model/StaticSource';
 import {AppService} from '../../_services/app.service';
 import {CreateAppComponent} from '../apps/dialogs/create-app.component';
-import {UpdateAppComponent} from '../apps/dialogs/update-app.component';
 import {ModalService} from '../../component/dialogs/modal.service';
 
 @Component({
@@ -251,12 +250,15 @@ export class TN02AComponent implements OnInit {
     loading = false;
     tenant_id = '';
     tenant: any = {};
-    credentials: any = { clientId: 'NA', clientSecret: 'NA', publicKey: 'NA' };
+    credentials: any = {clientId: 'NA', clientSecret: 'NA', publicKey: 'NA'};
     memberDataModel: StaticSource<any>;
     rolesDataModel: StaticSource<any>;
     createdAppsDataModel: StaticSource<any>;
     keysDataModel: StaticSource<any>;
-    keyMetadata: { maxActiveKeys: number; tokenExpirationSeconds: number } = { maxActiveKeys: 3, tokenExpirationSeconds: 3600 };
+    keyMetadata: { maxActiveKeys: number; tokenExpirationSeconds: number } = {
+        maxActiveKeys: 3,
+        tokenExpirationSeconds: 3600
+    };
     activeKeyCount = 0;
 
     constructor(
@@ -298,21 +300,6 @@ export class TN02AComponent implements OnInit {
         }
     }
 
-    private async loadKeys() {
-        try {
-            const result: any = await this.adminTenantService.getKeys(this.tenant_id);
-            const keys = Array.isArray(result.keys) ? result.keys : [];
-            this.keysDataModel.setData(keys);
-            this.keyMetadata = {
-                maxActiveKeys: result.maxActiveKeys ?? 3,
-                tokenExpirationSeconds: result.tokenExpirationSeconds ?? 3600,
-            };
-            this.activeKeyCount = keys.filter((k: any) => !k.deactivatedAt).length;
-        } catch (e) {
-            this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to load keys' });
-        }
-    }
-
     getOverlapCountdown(key: any): string {
         if (!key.supersededAt) return '';
         const supersededAt = new Date(key.supersededAt).getTime();
@@ -331,9 +318,9 @@ export class TN02AComponent implements OnInit {
         const url = '/' + this.tenant.domain + '/.well-known/jwks.json';
         try {
             await navigator.clipboard.writeText(url);
-            this.messageService.add({ severity: 'success', summary: 'Copied', detail: 'JWKS URL copied to clipboard' });
+            this.messageService.add({severity: 'success', summary: 'Copied', detail: 'JWKS URL copied to clipboard'});
         } catch (e) {
-            this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Copy not supported' });
+            this.messageService.add({severity: 'error', summary: 'Error', detail: 'Copy not supported'});
         }
     }
 
@@ -345,10 +332,14 @@ export class TN02AComponent implements OnInit {
             accept: async () => {
                 try {
                     await this.adminTenantService.rotateKeys(this.tenant_id);
-                    this.messageService.add({ severity: 'success', summary: 'Success', detail: 'Key rotated successfully' });
+                    this.messageService.add({
+                        severity: 'success',
+                        summary: 'Success',
+                        detail: 'Key rotated successfully'
+                    });
                     return true;
                 } catch (e) {
-                    this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Key rotation failed' });
+                    this.messageService.add({severity: 'error', summary: 'Error', detail: 'Key rotation failed'});
                 }
                 return null;
             },
@@ -361,7 +352,7 @@ export class TN02AComponent implements OnInit {
 
     async onUpdateTenant() {
         const modalRef = await this.modalService.open(UpdateTenantAdminComponent, {
-            initData: { tenant: this.tenant, tenantId: this.tenant_id }
+            initData: {tenant: this.tenant, tenantId: this.tenant_id}
         });
         if (modalRef.is_ok()) {
             await this.ngOnInit();
@@ -370,7 +361,7 @@ export class TN02AComponent implements OnInit {
 
     async onAddMember() {
         const modalRef = await this.modalService.open(AddMemberAdminComponent, {
-            initData: { tenant: this.tenant }
+            initData: {tenant: this.tenant}
         });
         if (modalRef.is_ok()) {
             await this.ngOnInit();
@@ -379,7 +370,7 @@ export class TN02AComponent implements OnInit {
 
     async onAddRole() {
         const modalRef = await this.modalService.open(AddRoleAdminComponent, {
-            initData: { tenant: this.tenant }
+            initData: {tenant: this.tenant}
         });
         if (modalRef.is_ok()) {
             await this.ngOnInit();
@@ -394,10 +385,10 @@ export class TN02AComponent implements OnInit {
             accept: async () => {
                 try {
                     await this.adminTenantService.deleteRole(this.tenant_id, role.name);
-                    this.messageService.add({ severity: 'success', summary: 'Success', detail: 'Role Deleted' });
+                    this.messageService.add({severity: 'success', summary: 'Success', detail: 'Role Deleted'});
                     return true;
                 } catch (e) {
-                    this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Role Deletion Failed' });
+                    this.messageService.add({severity: 'error', summary: 'Error', detail: 'Role Deletion Failed'});
                 }
                 return null;
             },
@@ -416,10 +407,10 @@ export class TN02AComponent implements OnInit {
                 try {
                     // Admin member removal — use the admin endpoint
                     await this.adminTenantService.removeMember(this.tenant_id, user.email);
-                    this.messageService.add({ severity: 'success', summary: 'Success', detail: 'Member Removed' });
+                    this.messageService.add({severity: 'success', summary: 'Success', detail: 'Member Removed'});
                     return true;
                 } catch (e) {
-                    this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to remove member' });
+                    this.messageService.add({severity: 'error', summary: 'Error', detail: 'Failed to remove member'});
                 }
                 return null;
             },
@@ -437,10 +428,10 @@ export class TN02AComponent implements OnInit {
             accept: async () => {
                 try {
                     await this.adminTenantService.deleteTenant(this.tenant_id);
-                    this.messageService.add({ severity: 'success', summary: 'Success', detail: 'Tenant Deleted' });
+                    this.messageService.add({severity: 'success', summary: 'Success', detail: 'Tenant Deleted'});
                     return true;
                 } catch (e) {
-                    this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Tenant Deletion Failed' });
+                    this.messageService.add({severity: 'error', summary: 'Error', detail: 'Tenant Deletion Failed'});
                 }
                 return null;
             },
@@ -455,7 +446,7 @@ export class TN02AComponent implements OnInit {
             return;
         }
         const modalRef = await this.modalService.open(CreateAppComponent, {
-            initData: { tenantId: this.tenant.id }
+            initData: {tenantId: this.tenant.id}
         });
         if (modalRef.is_ok()) {
             await this.ngOnInit();
@@ -470,16 +461,31 @@ export class TN02AComponent implements OnInit {
             accept: async () => {
                 try {
                     await this.appService.deleteApp(app.id);
-                    this.messageService.add({ severity: 'success', summary: 'Success', detail: 'App Deleted' });
+                    this.messageService.add({severity: 'success', summary: 'Success', detail: 'App Deleted'});
                     return true;
                 } catch (e) {
-                    this.messageService.add({ severity: 'error', summary: 'Error', detail: 'App Deletion Failed' });
+                    this.messageService.add({severity: 'error', summary: 'Error', detail: 'App Deletion Failed'});
                 }
                 return null;
             },
         });
         if (deleted) {
             await this.ngOnInit();
+        }
+    }
+
+    private async loadKeys() {
+        try {
+            const result: any = await this.adminTenantService.getKeys(this.tenant_id);
+            const keys = Array.isArray(result.keys) ? result.keys : [];
+            this.keysDataModel.setData(keys);
+            this.keyMetadata = {
+                maxActiveKeys: result.maxActiveKeys ?? 3,
+                tokenExpirationSeconds: result.tokenExpirationSeconds ?? 3600,
+            };
+            this.activeKeyCount = keys.filter((k: any) => !k.deactivatedAt).length;
+        } catch (e) {
+            this.messageService.add({severity: 'error', summary: 'Error', detail: 'Failed to load keys'});
         }
     }
 }

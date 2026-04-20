@@ -1,7 +1,8 @@
-import { Component, OnInit } from '@angular/core';
-import { FormBuilder, FormGroup, Validators } from '@angular/forms';
-import { MessageService } from 'primeng/api';
-import { HttpClient } from '@angular/common/http';
+import {Component, OnInit} from '@angular/core';
+import {FormBuilder, FormGroup, Validators} from '@angular/forms';
+import {MessageService} from 'primeng/api';
+import {HttpClient} from '@angular/common/http';
+
 const API_URL = '/api/oauth';
 
 @Component({
@@ -114,7 +115,8 @@ export class ForgotPasswordComponent implements OnInit {
         });
     }
 
-    ngOnInit(): void {}
+    ngOnInit(): void {
+    }
 
     async onSubmit() {
         if (this.forgotPasswordForm.invalid) return;

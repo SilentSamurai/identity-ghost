@@ -237,7 +237,7 @@ export class LoginComponent implements OnInit {
 
     async ngOnInit(): Promise<void> {
         let params = this.route.snapshot.queryParamMap;
-        
+
         // Check if user was redirected after email verification
         if (params.has('verified')) {
             const verified = params.get('verified') === 'true';
@@ -255,7 +255,7 @@ export class LoginComponent implements OnInit {
                 });
             }
         }
-        
+
         if (params.has('client_id')) {
             this.client_id = params.get('client_id')!;
             this.loginForm.get('client_id')?.setValue(this.client_id);
@@ -318,7 +318,7 @@ export class LoginComponent implements OnInit {
     async redirect(code: string, clientId: string) {
         await this.setAccessToken(code, clientId);
         await this.router.navigate(["/home"], {
-            queryParams: { client_id: clientId },
+            queryParams: {client_id: clientId},
         });
     }
 
@@ -334,7 +334,7 @@ export class LoginComponent implements OnInit {
         // Update URL with client_id without reloading the component
         this.router.navigate([], {
             relativeTo: this.route,
-            queryParams: { client_id: clientId },
+            queryParams: {client_id: clientId},
             queryParamsHandling: 'merge',
         });
     }

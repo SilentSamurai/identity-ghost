@@ -1,8 +1,8 @@
-import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
-import { UserService } from '../../../_services/user.service';
-import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
-import { MessageService } from 'primeng/api';
-import {FormBuilder, UntypedFormBuilder, UntypedFormGroup, Validators} from '@angular/forms';
+import {Component, EventEmitter, Input, OnInit, Output} from '@angular/core';
+import {UserService} from '../../../_services/user.service';
+import {NgbActiveModal} from '@ng-bootstrap/ng-bootstrap';
+import {MessageService} from 'primeng/api';
+import {FormBuilder, UntypedFormGroup, Validators} from '@angular/forms';
 
 @Component({
     selector: 'change-password-modal',
@@ -64,9 +64,11 @@ export class ChangePasswordModalComponent implements OnInit {
         private messageService: MessageService,
         private formBuilder: FormBuilder,
         public activeModal: NgbActiveModal,
-    ) {}
+    ) {
+    }
 
-    ngOnInit() {}
+    ngOnInit() {
+    }
 
     togglePassword() {
         this.showPassword = !this.showPassword;
@@ -112,7 +114,7 @@ export class ChangePasswordModalComponent implements OnInit {
                 return;
             }
             if (control.value !== matchingControl.value) {
-                matchingControl.setErrors({ confirmedValidator: true });
+                matchingControl.setErrors({confirmedValidator: true});
             } else {
                 matchingControl.setErrors(null);
             }

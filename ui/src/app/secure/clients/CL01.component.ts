@@ -1,6 +1,6 @@
 import {Component, OnInit, ViewChild} from '@angular/core';
 import {ActivatedRoute} from '@angular/router';
-import {ClientService, Client} from '../../_services/client.service';
+import {Client, ClientService} from '../../_services/client.service';
 import {AppTableComponent} from '../../component/table/app-table.component';
 import {Filter} from '../../component/model/Filters';
 import {StaticSource} from '../../component/model/StaticSource';
@@ -124,7 +124,10 @@ export class CL01Component implements OnInit {
             alert('Error: Tenant information is not available. Please log in again.');
             return;
         }
-        const result = await this.modalService.open<{ client: Client; clientSecret: string | null }>(CreateClientComponent, {
+        const result = await this.modalService.open<{
+            client: Client;
+            clientSecret: string | null
+        }>(CreateClientComponent, {
             initData: {
                 tenantId: this.tenantId
             }

@@ -1,8 +1,8 @@
-import { Component, OnInit } from '@angular/core';
-import { FormBuilder, FormGroup, Validators } from '@angular/forms';
-import { MessageService } from 'primeng/api';
-import { HttpClient } from '@angular/common/http';
-import { ActivatedRoute, Router } from '@angular/router';
+import {Component, OnInit} from '@angular/core';
+import {FormBuilder, FormGroup, Validators} from '@angular/forms';
+import {MessageService} from 'primeng/api';
+import {HttpClient} from '@angular/common/http';
+import {ActivatedRoute, Router} from '@angular/router';
 
 const API_URL = '/api/oauth';
 
@@ -175,7 +175,7 @@ export class ResetPasswordComponent implements OnInit {
         const confirmPassword = form.get('confirmPassword');
 
         if (password?.value !== confirmPassword?.value) {
-            confirmPassword?.setErrors({ passwordMismatch: true });
+            confirmPassword?.setErrors({passwordMismatch: true});
         } else {
             confirmPassword?.setErrors(null);
         }
@@ -190,7 +190,7 @@ export class ResetPasswordComponent implements OnInit {
         try {
             const response = await this.http.post(
                 `${API_URL}/reset-password/${this.token}`,
-                { password: this.resetPasswordForm.value.password }
+                {password: this.resetPasswordForm.value.password}
             ).toPromise();
 
             this.isPasswordReset = true;

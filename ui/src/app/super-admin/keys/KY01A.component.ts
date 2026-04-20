@@ -69,10 +69,10 @@ export class KY01AComponent implements OnInit {
     deactivatedCount = 0;
 
     statusOptions: FilterSelectOption[] = [
-        { label: 'All', value: 'all' },
-        { label: 'Current', value: 'current' },
-        { label: 'Active', value: 'active' },
-        { label: 'Deactivated', value: 'deactivated' },
+        {label: 'All', value: 'all'},
+        {label: 'Current', value: 'current'},
+        {label: 'Active', value: 'active'},
+        {label: 'Deactivated', value: 'deactivated'},
     ];
 
     constructor(
@@ -88,22 +88,22 @@ export class KY01AComponent implements OnInit {
         await this.loadKeys();
     }
 
-    private async loadKeys() {
-        try {
-            const result: any = await this.adminTenantService.getAllKeys();
-            this.allKeys = Array.isArray(result.keys) ? result.keys : [];
-            this.applyFilters('', 'all');
-        } catch (e) {
-            this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to load keys' });
-        }
-    }
-
     onFilter(event: Filter[]) {
         const tenantFilter = event.find(f => f.field === 'tenant');
         const statusFilter = event.find(f => f.field === 'status');
         const tenant = typeof tenantFilter?.value === 'string' ? tenantFilter.value : '';
         const status = typeof statusFilter?.value === 'string' ? statusFilter.value : 'all';
         this.applyFilters(tenant, status);
+    }
+
+    private async loadKeys() {
+        try {
+            const result: any = await this.adminTenantService.getAllKeys();
+            this.allKeys = Array.isArray(result.keys) ? result.keys : [];
+            this.applyFilters('', 'all');
+        } catch (e) {
+            this.messageService.add({severity: 'error', summary: 'Error', detail: 'Failed to load keys'});
+        }
     }
 
     private applyFilters(filterTenant: string, filterStatus: string) {

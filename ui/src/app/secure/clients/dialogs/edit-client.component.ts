@@ -1,6 +1,6 @@
 import {Component, Input, OnInit} from '@angular/core';
 import {NgbActiveModal} from '@ng-bootstrap/ng-bootstrap';
-import {ClientService, Client, UpdateClientRequest} from '../../../_services/client.service';
+import {Client, ClientService, UpdateClientRequest} from '../../../_services/client.service';
 
 @Component({
     selector: 'app-edit-client',

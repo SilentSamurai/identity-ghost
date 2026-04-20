@@ -3,7 +3,7 @@ import {FormBuilder, FormGroup, Validators} from '@angular/forms';
 import {ActivatedRoute} from '@angular/router';
 import {MessageService} from 'primeng/api';
 import {AuthService} from '../_services/auth.service';
- 
+
 
 @Component({
     selector: 'app-signup',

@@ -109,7 +109,7 @@ export class UserService {
         return lastValueFrom(
             this.http.put(
                 `${API_URL}/users/${userId}/password`,
-                { password, confirmPassword },
+                {password, confirmPassword},
                 this.getHttpOptions(),
             ),
         );

@@ -1,7 +1,7 @@
 import {Component, OnInit} from '@angular/core';
 import {ActivatedRoute, Router} from '@angular/router';
 import {MessageService} from 'primeng/api';
-import {ClientService, Client} from '../../_services/client.service';
+import {Client, ClientService} from '../../_services/client.service';
 import {AuthDefaultService} from '../../_services/auth.default.service';
 import {SessionService} from '../../_services/session.service';
 import {ConfirmationService} from '../../component/dialogs/confirmation.service';

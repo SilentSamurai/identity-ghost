@@ -53,7 +53,7 @@ export class AuthService {
             code_verifier: verifier,
             client_id
         };
-        
+
         if (subscriber_tenant_hint) {
             body.subscriber_tenant_hint = subscriber_tenant_hint;
         }

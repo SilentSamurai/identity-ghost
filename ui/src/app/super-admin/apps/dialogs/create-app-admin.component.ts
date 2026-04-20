@@ -56,23 +56,6 @@ export class CreateAppAdminComponent implements OnInit {
         await this.loadTenants();
     }
 
-    private async loadTenants() {
-        try {
-            const result = await lastValueFrom(
-                this.http.post<{ data: any[] }>('/api/search/Tenants', {
-                    pageNo: 0,
-                    pageSize: 1000,
-                    where: [],
-                    orderBy: [],
-                    expand: [],
-                }, {headers: new HttpHeaders({'Content-Type': 'application/json'})})
-            );
-            this.tenants = result.data || [];
-        } catch (e) {
-            console.error('Failed to load tenants', e);
-        }
-    }
-
     async onSubmit() {
         try {
             if (!this.tenantId) {
@@ -89,6 +72,23 @@ export class CreateAppAdminComponent implements OnInit {
         } catch (error) {
             console.error('Error creating app:', error);
             this.activeModal.dismiss();
+        }
+    }
+
+    private async loadTenants() {
+        try {
+            const result = await lastValueFrom(
+                this.http.post<{ data: any[] }>('/api/search/Tenants', {
+                    pageNo: 0,
+                    pageSize: 1000,
+                    where: [],
+                    orderBy: [],
+                    expand: [],
+                }, {headers: new HttpHeaders({'Content-Type': 'application/json'})})
+            );
+            this.tenants = result.data || [];
+        } catch (e) {
+            console.error('Failed to load tenants', e);
         }
     }
 }

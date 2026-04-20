@@ -1,4 +1,4 @@
-import type { Interception } from 'cypress/types/net-stubbing';
+import type {Interception} from 'cypress/types/net-stubbing';
 
 /**
  * Apps & Subscription Flow Tests

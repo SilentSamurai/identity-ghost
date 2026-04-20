@@ -127,7 +127,7 @@ describe('Nonce Replay Protection', () => {
         cy.intercept('POST', '**/api/oauth/token*', (req) => {
             req.continue((res) => {
                 // Build a fake ID token with a wrong nonce claim
-                const header = btoa(JSON.stringify({ alg: 'none', typ: 'JWT' }))
+                const header = btoa(JSON.stringify({alg: 'none', typ: 'JWT'}))
                     .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
                 const payload = btoa(JSON.stringify({
                     sub: 'fake-user',

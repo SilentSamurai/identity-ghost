@@ -33,7 +33,7 @@ describe('GET /api/oauth/authorize', () => {
             cy.request({
                 method: 'GET',
                 url: '/api/clients/my/clients',
-                headers: { Authorization: `Bearer ${token}` },
+                headers: {Authorization: `Bearer ${token}`},
             }).then((resp) => {
                 expect(resp.status).to.eq(200);
                 const client = resp.body.find((c: any) => c.name === CLIENT_NAME);

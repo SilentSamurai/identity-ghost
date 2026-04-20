@@ -28,7 +28,7 @@ describe('Sign Up', () => {
         cy.get('input#password').type('testpass123');
         cy.intercept('POST', '**/api/signup*').as('signUp');
         cy.contains('button', 'Sign Up').click();
-        cy.wait('@signUp').should(({ response }) => {
+        cy.wait('@signUp').should(({response}) => {
             expect(response, 'response').to.exist;
             expect(response!.statusCode).to.be.oneOf([201, 200]);
         });
@@ -54,7 +54,7 @@ describe('Sign Up', () => {
         cy.get('input#password').type(password);
         cy.intercept('POST', '**/api/signup*').as('signUp');
         cy.contains('button', 'Sign Up').click();
-        cy.wait('@signUp').should(({ response }) => {
+        cy.wait('@signUp').should(({response}) => {
             expect(response, 'response').to.exist;
             expect(response!.statusCode).to.be.oneOf([201, 200]);
         });
@@ -62,15 +62,15 @@ describe('Sign Up', () => {
         // Fetch latest email and visit verification link (normalize https->http locally)
         cy.request({
             url: `${SMTP_SERVER}/latest`,
-            qs: { to: email, subject: 'Thank you for signing up', timeoutMs: 15000 }
-        }).then(({ body }) => {
+            qs: {to: email, subject: 'Thank you for signing up', timeoutMs: 15000}
+        }).then(({body}) => {
             expect(body.links && body.links.length).to.be.greaterThan(0);
             const raw = body.links.find((l: string) => !l.endsWith(']')) || body.links[0];
             const verifyUrl = (raw || '').replace(/\]$/, '');
             const normalized = verifyUrl.replace(/^https:\/\//, 'http://');
-            cy.request({ url: normalized, followRedirect: false, failOnStatusCode: false })
-              .its('status')
-              .should('eq', 302);
+            cy.request({url: normalized, followRedirect: false, failOnStatusCode: false})
+                .its('status')
+                .should('eq', 302);
         });
 
         // Now login

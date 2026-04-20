@@ -10,6 +10,7 @@ describe('Register', () => {
     function uniqueEmail() {
         return `testuser_${Date.now()}@mail.com`;
     }
+
     function uniqueDomain() {
         return `testdomain${Date.now()}.com`;
     }

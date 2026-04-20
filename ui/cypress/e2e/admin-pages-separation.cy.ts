@@ -35,7 +35,7 @@ describe('Admin Pages Separation — super-admin can access all admin routes', (
             cy.url().should('include', `/admin/${route}`);
 
             // Admin navbar is rendered
-            cy.get('admin-nav-bar', { timeout: 10000 }).should('exist').and('be.visible');
+            cy.get('admin-nav-bar', {timeout: 10000}).should('exist').and('be.visible');
 
             // No error page content
             cy.url().should('not.include', '/error/');
@@ -56,19 +56,19 @@ describe('Admin Pages Separation — admin layout renders correctly', () => {
     beforeEach(() => {
         cy.adminLogin(Cypress.env('superAdminEmail'), Cypress.env('superAdminPassword'));
         cy.visit('/admin/TN01');
-        cy.get('admin-nav-bar', { timeout: 10000 }).should('be.visible');
+        cy.get('admin-nav-bar', {timeout: 10000}).should('be.visible');
     });
 
     it('should display navigation links to Tenants, Users, Roles, Groups, and Apps', () => {
         const expectedLinks = [
-            { label: 'Tenants', href: '/admin/TN01' },
-            { label: 'Users', href: '/admin/UR01' },
-            { label: 'Roles', href: '/admin/RL01' },
-            { label: 'Groups', href: '/admin/GP01' },
-            { label: 'Apps', href: '/admin/AP01' },
+            {label: 'Tenants', href: '/admin/TN01'},
+            {label: 'Users', href: '/admin/UR01'},
+            {label: 'Roles', href: '/admin/RL01'},
+            {label: 'Groups', href: '/admin/GP01'},
+            {label: 'Apps', href: '/admin/AP01'},
         ];
 
-        expectedLinks.forEach(({ label, href }) => {
+        expectedLinks.forEach(({label, href}) => {
             cy.get('admin-nav-bar')
                 .find(`a.nav-link[href="${href}"]`)
                 .should('be.visible')

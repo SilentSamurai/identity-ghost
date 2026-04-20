@@ -18,16 +18,6 @@ export class AdminTenantService {
     constructor(private http: HttpClient) {
     }
 
-    private getHttpOptions() {
-        return {
-            headers: new HttpHeaders({
-                'Content-Type': 'application/json',
-            }),
-        };
-    }
-
-    // ─── Tenant ───
-
     async getAllTenants(): Promise<any[]> {
         return lastValueFrom(
             this.http.get<any[]>(
@@ -36,6 +26,8 @@ export class AdminTenantService {
             ),
         );
     }
+
+    // ─── Tenant ───
 
     async getTenantDetails(tenantId: string) {
         return lastValueFrom(
@@ -74,8 +66,6 @@ export class AdminTenantService {
         );
     }
 
-    // ─── Members ───
-
     async getMembers(tenantId: string): Promise<any[]> {
         return lastValueFrom(
             this.http.get(
@@ -84,6 +74,8 @@ export class AdminTenantService {
             ),
         ) as Promise<any[]>;
     }
+
+    // ─── Members ───
 
     async getMemberDetails(tenantId: string, userId: string) {
         return lastValueFrom(
@@ -113,8 +105,6 @@ export class AdminTenantService {
         );
     }
 
-    // ─── Roles ───
-
     async getTenantRoles(tenantId: string): Promise<any> {
         return lastValueFrom(
             this.http.get(
@@ -123,6 +113,8 @@ export class AdminTenantService {
             ),
         );
     }
+
+    // ─── Roles ───
 
     async createRole(tenantId: string, name: string) {
         return lastValueFrom(
@@ -143,8 +135,6 @@ export class AdminTenantService {
         );
     }
 
-    // ─── Groups ───
-
     async getGroups(tenantId: string): Promise<any[]> {
         return lastValueFrom(
             this.http.get(
@@ -154,7 +144,7 @@ export class AdminTenantService {
         ) as Promise<any[]>;
     }
 
-    // ─── Clients ───
+    // ─── Groups ───
 
     async getClients(tenantId: string) {
         return lastValueFrom(
@@ -165,7 +155,7 @@ export class AdminTenantService {
         );
     }
 
-    // ─── Apps ───
+    // ─── Clients ───
 
     async getCreatedApps(tenantId: string) {
         return lastValueFrom(
@@ -176,6 +166,8 @@ export class AdminTenantService {
         ) as Promise<any[]>;
     }
 
+    // ─── Apps ───
+
     async getSubscriptions(tenantId: string) {
         return lastValueFrom(
             this.http.get(
@@ -184,8 +176,6 @@ export class AdminTenantService {
             ),
         ) as Promise<any[]>;
     }
-
-    // ─── Member mutations ───
 
     async addMember(tenantId: string, emails: string[]) {
         return lastValueFrom(
@@ -196,6 +186,8 @@ export class AdminTenantService {
             ),
         );
     }
+
+    // ─── Member mutations ───
 
     async removeMember(tenantId: string, email: string) {
         return lastValueFrom(
@@ -208,8 +200,6 @@ export class AdminTenantService {
         );
     }
 
-    // ─── Keys ───
-
     async getKeys(tenantId: string) {
         return lastValueFrom(
             this.http.get(
@@ -218,6 +208,8 @@ export class AdminTenantService {
             ),
         );
     }
+
+    // ─── Keys ───
 
     async rotateKeys(tenantId: string) {
         return lastValueFrom(
@@ -238,5 +230,13 @@ export class AdminTenantService {
         return lastValueFrom(
             this.http.get(url, this.getHttpOptions()),
         );
+    }
+
+    private getHttpOptions() {
+        return {
+            headers: new HttpHeaders({
+                'Content-Type': 'application/json',
+            }),
+        };
     }
 }

@@ -97,7 +97,8 @@ export class ConsentScreenComponent implements OnInit {
         private authService: AuthService,
         private tokenStorage: SessionService,
         private messageService: MessageService
-    ) {}
+    ) {
+    }
 
     ngOnInit() {
         const state = history.state;

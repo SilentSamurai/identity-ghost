@@ -10,6 +10,7 @@ describe('External Sign Up', () => {
     function uniqueEmail() {
         return `testuser_${Date.now()}@mail.com`;
     }
+
     function uniqueDomain() {
         return `testdomain${Date.now()}.com`;
     }
@@ -57,15 +58,15 @@ describe('External Sign Up', () => {
         // Fetch latest email and verify
         cy.request({
             url: `${SMTP_SERVER}/latest`,
-            qs: { to: email, subject: 'Thank you for signing up', timeoutMs: 15000 }
-        }).then(({ body }) => {
+            qs: {to: email, subject: 'Thank you for signing up', timeoutMs: 15000}
+        }).then(({body}) => {
             expect(body.links && body.links.length).to.be.greaterThan(0);
             const raw = body.links.find((l: string) => !l.endsWith(']')) || body.links[0];
             const verifyUrl = (raw || '').replace(/\]$/, '');
             const normalized = verifyUrl.replace(/^https:\/\//, 'http://');
-            cy.request({ url: normalized, followRedirect: false, failOnStatusCode: false })
-              .its('status')
-              .should('eq', 302);
+            cy.request({url: normalized, followRedirect: false, failOnStatusCode: false})
+                .its('status')
+                .should('eq', 302);
         });
 
         // Login after verification

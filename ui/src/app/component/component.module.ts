@@ -46,7 +46,7 @@ import {AppTableComponent} from './table/app-table.component';
 import {InfiniteScrollDirective} from './table/infinite-scroll.directive';
 import {ThemeToggleComponent} from './theme/theme-toggle.component';
 import {LoaderComponent} from "./loader/loader.component";
-import { PasswordInputComponent } from './inputs/password-input.component';
+import {PasswordInputComponent} from './inputs/password-input.component';
 
 @NgModule({
     declarations: [

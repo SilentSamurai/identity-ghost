@@ -94,23 +94,6 @@ export class CreateClientAdminComponent implements OnInit {
         await this.loadTenants();
     }
 
-    private async loadTenants() {
-        try {
-            const result = await lastValueFrom(
-                this.http.post<{ data: any[] }>('/api/search/Tenants', {
-                    pageNo: 0,
-                    pageSize: 1000,
-                    where: [],
-                    orderBy: [],
-                    expand: [],
-                }, {headers: new HttpHeaders({'Content-Type': 'application/json'})})
-            );
-            this.tenants = result.data || [];
-        } catch (e) {
-            console.error('Failed to load tenants', e);
-        }
-    }
-
     async onSubmit() {
         try {
             this.errorMessage = '';
@@ -147,6 +130,23 @@ export class CreateClientAdminComponent implements OnInit {
         } catch (error: any) {
             console.error('Error creating client:', error);
             this.errorMessage = error?.error?.message || error?.message || 'An error occurred while creating the client.';
+        }
+    }
+
+    private async loadTenants() {
+        try {
+            const result = await lastValueFrom(
+                this.http.post<{ data: any[] }>('/api/search/Tenants', {
+                    pageNo: 0,
+                    pageSize: 1000,
+                    where: [],
+                    orderBy: [],
+                    expand: [],
+                }, {headers: new HttpHeaders({'Content-Type': 'application/json'})})
+            );
+            this.tenants = result.data || [];
+        } catch (e) {
+            console.error('Failed to load tenants', e);
         }
     }
 }

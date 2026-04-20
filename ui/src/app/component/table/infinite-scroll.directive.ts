@@ -1,12 +1,4 @@
-import {
-    Directive,
-    ElementRef,
-    EventEmitter,
-    NgZone,
-    AfterViewInit,
-    OnDestroy,
-    Output,
-} from '@angular/core';
+import {AfterViewInit, Directive, ElementRef, EventEmitter, NgZone, OnDestroy, Output,} from '@angular/core';
 
 /**
  * Attach to a scrollable container. Emits `reachedEnd` when the user
@@ -23,7 +15,8 @@ export class InfiniteScrollDirective implements AfterViewInit, OnDestroy {
     constructor(
         private el: ElementRef<HTMLElement>,
         private zone: NgZone,
-    ) {}
+    ) {
+    }
 
     ngAfterViewInit(): void {
         const container = this.el.nativeElement;
