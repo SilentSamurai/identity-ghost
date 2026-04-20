@@ -14,7 +14,8 @@ export class KeyManagementService {
     constructor(
         @InjectRepository(TenantKey)
         private readonly tenantKeyRepository: Repository<TenantKey>,
-    ) {}
+    ) {
+    }
 
     async createInitialKey(tenantId: string, publicKey: string, privateKey: string): Promise<TenantKey> {
         const key = this.tenantKeyRepository.create({

@@ -1,5 +1,5 @@
 import * as fc from 'fast-check';
-import {GRANT_TYPES, TenantToken, TechnicalToken} from '../../src/casl/contexts';
+import {GRANT_TYPES, TechnicalToken, TenantToken} from '../../src/casl/contexts';
 import {ScopeNormalizer} from '../../src/casl/scope-normalizer';
 import {RoleEnum} from '../../src/entity/roleEnum';
 

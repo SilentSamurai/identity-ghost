@@ -36,10 +36,16 @@ describe('Feature: db-refresh-token-rotation, Property 8: Dual expiry enforcemen
     const now = new Date(baseTime);
 
     // expiresAt can be in the past or future relative to now
-    const expiresAtArb = fc.integer({min: baseTime - 365 * 24 * 60 * 60 * 1000, max: baseTime + 365 * 24 * 60 * 60 * 1000})
+    const expiresAtArb = fc.integer({
+        min: baseTime - 365 * 24 * 60 * 60 * 1000,
+        max: baseTime + 365 * 24 * 60 * 60 * 1000
+    })
         .map(ts => new Date(ts));
 
-    const absoluteExpiresAtArb = fc.integer({min: baseTime - 365 * 24 * 60 * 60 * 1000, max: baseTime + 365 * 24 * 60 * 60 * 1000})
+    const absoluteExpiresAtArb = fc.integer({
+        min: baseTime - 365 * 24 * 60 * 60 * 1000,
+        max: baseTime + 365 * 24 * 60 * 60 * 1000
+    })
         .map(ts => new Date(ts));
 
     it('token is rejected when current time exceeds sliding expires_at', () => {

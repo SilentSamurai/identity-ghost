@@ -1,6 +1,5 @@
 import * as fc from 'fast-check';
-import { ClaimsResolverService } from '../../src/auth/claims-resolver.service';
-import { SCOPE_CLAIMS_MAP } from '../../src/auth/scope-claims-map';
+import {ClaimsResolverService} from '../../src/auth/claims-resolver.service';
 
 /**
  * Feature: userinfo-endpoint — Property-Based Tests
@@ -24,10 +23,10 @@ beforeAll(() => {
 
 const uuidArb = fc.uuid();
 const emailArb = fc.emailAddress();
-const nameArb = fc.string({ minLength: 0, maxLength: 80 });
+const nameArb = fc.string({minLength: 0, maxLength: 80});
 
 // Scope set that explicitly excludes 'openid' (subsets of ['profile', 'email'])
-const scopeSetWithoutOpenidArb = fc.subarray(['profile', 'email'], { minLength: 0 });
+const scopeSetWithoutOpenidArb = fc.subarray(['profile', 'email'], {minLength: 0});
 
 const userArb = fc.record({
     id: uuidArb,
@@ -63,7 +62,7 @@ describe('Feature: userinfo-endpoint, Property 5: Sub safety net fallback', () =
                 // Property 5.2: sub claim equals user.id
                 expect(result.sub).toBe(user.id);
             }),
-            { numRuns: 100 },
+            {numRuns: 100},
         );
     });
 });

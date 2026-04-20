@@ -1,6 +1,6 @@
-import { SharedTestFixture } from '../shared-test.fixture';
-import { TokenFixture } from '../token.fixture';
-import { randomUUID } from 'crypto';
+import {SharedTestFixture} from '../shared-test.fixture';
+import {TokenFixture} from '../token.fixture';
+import {randomUUID} from 'crypto';
 
 /**
  * Integration tests for Logout and Session Invalidation (Requirement 6).
@@ -67,7 +67,7 @@ describe('Login Session Logout', () => {
         expect(response.body.access_token).toBeDefined();
         expect(response.body.refresh_token).toBeDefined();
 
-        const decoded = app.jwtService().decode(response.body.id_token, { json: true }) as any;
+        const decoded = app.jwtService().decode(response.body.id_token, {json: true}) as any;
         expect(decoded.sid).toBeDefined();
 
         return {
@@ -98,17 +98,17 @@ describe('Login Session Logout', () => {
             })
             .set('Accept', 'application/json');
 
-        return { status: response.status, body: response.body };
+        return {status: response.status, body: response.body};
     }
 
     // ── Tests ────────────────────────────────────────────────────────
 
     it('logout with sid succeeds and invalidates the session', async () => {
         // Get tokens + sid via password grant
-        const { accessToken, sid } = await getTokensWithSid();
+        const {accessToken, sid} = await getTokensWithSid();
 
         // Logout with the sid
-        const response = await logout(accessToken, { sid });
+        const response = await logout(accessToken, {sid});
 
         expect(response.status).toEqual(200);
         expect(response.body).toEqual({});
@@ -116,10 +116,10 @@ describe('Login Session Logout', () => {
 
     it('invalidated session rejects refresh with invalid_grant', async () => {
         // Get tokens + sid
-        const { accessToken, refreshToken, sid } = await getTokensWithSid();
+        const {accessToken, refreshToken, sid} = await getTokensWithSid();
 
         // Logout to invalidate the session
-        const logoutResponse = await logout(accessToken, { sid });
+        const logoutResponse = await logout(accessToken, {sid});
         expect(logoutResponse.status).toEqual(200);
 
         // Try to refresh — should fail because the session is invalidated
@@ -130,7 +130,7 @@ describe('Login Session Logout', () => {
 
     it('logout revokes all refresh tokens with matching sid', async () => {
         // Get tokens + sid
-        const { accessToken, refreshToken, sid } = await getTokensWithSid();
+        const {accessToken, refreshToken, sid} = await getTokensWithSid();
 
         // Rotate the refresh token to create a second token in the family
         const rotateResponse = await app.getHttpServer()
@@ -148,7 +148,7 @@ describe('Login Session Logout', () => {
         expect(rotatedRefreshToken).toBeDefined();
 
         // Logout with sid — should revoke ALL refresh tokens for this session
-        const logoutResponse = await logout(accessToken, { sid });
+        const logoutResponse = await logout(accessToken, {sid});
         expect(logoutResponse.status).toEqual(200);
 
         // Try to refresh with the rotated token — should fail
@@ -159,10 +159,10 @@ describe('Login Session Logout', () => {
 
     it('logout with unknown sid succeeds silently (idempotent)', async () => {
         // Get a valid access token for auth
-        const { accessToken } = await getTokensWithSid();
+        const {accessToken} = await getTokensWithSid();
 
         // Logout with a random UUID that doesn't match any session
-        const response = await logout(accessToken, { sid: randomUUID() });
+        const response = await logout(accessToken, {sid: randomUUID()});
 
         expect(response.status).toEqual(200);
         expect(response.body).toEqual({});
@@ -170,14 +170,14 @@ describe('Login Session Logout', () => {
 
     it('logout with already-invalidated session succeeds silently (idempotent)', async () => {
         // Get tokens + sid
-        const { accessToken, sid } = await getTokensWithSid();
+        const {accessToken, sid} = await getTokensWithSid();
 
         // First logout — invalidates the session
-        const first = await logout(accessToken, { sid });
+        const first = await logout(accessToken, {sid});
         expect(first.status).toEqual(200);
 
         // Second logout with the same sid — should still succeed
-        const second = await logout(accessToken, { sid });
+        const second = await logout(accessToken, {sid});
         expect(second.status).toEqual(200);
         expect(second.body).toEqual({});
     });

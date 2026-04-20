@@ -30,7 +30,12 @@ describe('Permissions Endpoints (e2e)', () => {
 
     // --- Helpers ----------------------------------------------------
 
-    async function setupCustomRoleWithPolicy(email: string, pass: string, domain: string, roleName: string, policy: { subject: string, action: Action, effect: Effect, conditions: any }) {
+    async function setupCustomRoleWithPolicy(email: string, pass: string, domain: string, roleName: string, policy: {
+        subject: string,
+        action: Action,
+        effect: Effect,
+        conditions: any
+    }) {
         const adminToken = await tokenFixture.fetchAccessToken(email, pass, domain);
         const tenantClient = new TenantClient(app, adminToken.accessToken);
         const usersClient = new UsersClient(app, adminToken.accessToken);
@@ -180,7 +185,7 @@ describe('Permissions Endpoints (e2e)', () => {
             const state = await setupCustomRoleWithPolicy(
                 "admin@auth.server.com", "admin9000", "auth.server.com",
                 customRoleName,
-                { subject: "invoices", action: Action.Read, effect: Effect.ALLOW, conditions: { region: "EU" } }
+                {subject: "invoices", action: Action.Read, effect: Effect.ALLOW, conditions: {region: "EU"}}
             );
 
             // Re-fetch token so it includes the new custom role
@@ -259,7 +264,7 @@ describe('Permissions Endpoints (e2e)', () => {
             const state = await setupCustomRoleWithPolicy(
                 "admin@perm-test.local", "admin9000", "perm-test.local",
                 "CustomTestRole",
-                { subject: "secure-resource", action: Action.Read, effect: Effect.ALLOW, conditions: { public: false } }
+                {subject: "secure-resource", action: Action.Read, effect: Effect.ALLOW, conditions: {public: false}}
             );
 
             // Get client credentials for the tenant

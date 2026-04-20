@@ -308,8 +308,12 @@ describe('Token Response RFC 6749 Compliance', () => {
                 .buffer(true)
                 .parse((res, callback) => {
                     let data = '';
-                    res.on('data', (chunk: any) => { data += chunk; });
-                    res.on('end', () => { callback(null, data); });
+                    res.on('data', (chunk: any) => {
+                        data += chunk;
+                    });
+                    res.on('end', () => {
+                        callback(null, data);
+                    });
                 });
 
             expect2xx(response);

@@ -16,7 +16,8 @@ export class DiscoveryController {
     constructor(
         private readonly discoveryService: DiscoveryService,
         private readonly tenantService: TenantService,
-    ) {}
+    ) {
+    }
 
     /**
      * Returns the OIDC Discovery document for the requested tenant.

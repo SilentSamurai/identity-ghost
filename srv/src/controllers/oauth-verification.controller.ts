@@ -1,21 +1,14 @@
 /**
  * OAuthVerificationController - Handles OAuth authorization code verification.
- * 
+ *
  * This controller provides endpoints for:
  * - Verifying authorization codes before token issuance
  * - Validating that auth codes belong to the correct client
  * - Token verification for protected resources
- * 
+ *
  * It works with OAuthTokenController to complete the authorization code flow.
  */
-import {
-    Body,
-    ClassSerializerInterceptor,
-    Controller,
-    Post,
-    UseFilters,
-    UseInterceptors,
-} from "@nestjs/common";
+import {Body, ClassSerializerInterceptor, Controller, Post, UseFilters, UseInterceptors,} from "@nestjs/common";
 
 import {AuthService} from "../auth/auth.service";
 import {ValidationPipe} from "../validation/validation.pipe";

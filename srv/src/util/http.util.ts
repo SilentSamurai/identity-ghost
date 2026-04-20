@@ -21,7 +21,7 @@ export function parseBasicAuthHeader(
         const username = decoded.substring(0, colonIndex);
         const password = decoded.substring(colonIndex + 1);
         if (!username || !password) return null;
-        return { username, password };
+        return {username, password};
     } catch {
         return null;
     }

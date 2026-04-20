@@ -3,7 +3,6 @@ import {TokenFixture} from '../token.fixture';
 import {ClientEntityClient} from '../api-client/client-entity-client';
 import {TenantClient} from '../api-client/tenant-client';
 import {AdminTenantClient} from '../api-client/admin-tenant-client';
-import {UsersClient} from '../api-client/user-client';
 import {expect2xx} from '../api-client/client';
 
 /**
@@ -70,9 +69,12 @@ describe('Authorization endpoint redirect URI validation', () => {
     });
 
     afterAll(async () => {
-        await clientApi.deleteClient(singleUriClientId).catch(() => {});
-        await clientApi.deleteClient(multiUriClientId).catch(() => {});
-        await clientApi.deleteClient(noUriClientId).catch(() => {});
+        await clientApi.deleteClient(singleUriClientId).catch(() => {
+        });
+        await clientApi.deleteClient(multiUriClientId).catch(() => {
+        });
+        await clientApi.deleteClient(noUriClientId).catch(() => {
+        });
         await app.close();
     });
 
@@ -283,7 +285,8 @@ describe('Login endpoint redirect URI validation', () => {
     });
 
     afterAll(async () => {
-        await clientApi.deleteClient(singleUriClientId).catch(() => {});
+        await clientApi.deleteClient(singleUriClientId).catch(() => {
+        });
         await app.close();
     });
 
@@ -434,7 +437,8 @@ describe('Token exchange redirect URI binding', () => {
     });
 
     afterAll(async () => {
-        await clientApi.deleteClient(singleUriClientId).catch(() => {});
+        await clientApi.deleteClient(singleUriClientId).catch(() => {
+        });
         await app.close();
     });
 
@@ -480,8 +484,8 @@ describe('Token exchange redirect URI binding', () => {
     // ─── Req 4.1, 4.3: Stored redirect_uri + matching request → tokens issued ──
 
     it('should issue tokens when request redirect_uri matches stored redirect_uri (Req 4.1, 4.3)', async () => {
-        const code = await getAuthCode({ redirect_uri: REDIRECT_URI });
-        const res = await tokenRequest(code, { redirect_uri: REDIRECT_URI });
+        const code = await getAuthCode({redirect_uri: REDIRECT_URI});
+        const res = await tokenRequest(code, {redirect_uri: REDIRECT_URI});
 
         expect2xx(res);
         expect(res.body.access_token).toBeDefined();
@@ -491,7 +495,7 @@ describe('Token exchange redirect URI binding', () => {
     // ─── Req 4.2, 5.2: Stored redirect_uri + missing request → 400 invalid_grant ──
 
     it('should return 400 invalid_grant when request omits redirect_uri but auth code has one stored (Req 4.2, 5.2)', async () => {
-        const code = await getAuthCode({ redirect_uri: REDIRECT_URI });
+        const code = await getAuthCode({redirect_uri: REDIRECT_URI});
         const res = await tokenRequest(code); // no redirect_uri
 
         expect(res.status).toEqual(400);
@@ -502,8 +506,8 @@ describe('Token exchange redirect URI binding', () => {
     // ─── Req 4.4, 5.2: Stored redirect_uri + mismatched request → 400 invalid_grant ──
 
     it('should return 400 invalid_grant when request redirect_uri does not match stored value (Req 4.4, 5.2)', async () => {
-        const code = await getAuthCode({ redirect_uri: REDIRECT_URI });
-        const res = await tokenRequest(code, { redirect_uri: 'https://wrong.example.com/callback' });
+        const code = await getAuthCode({redirect_uri: REDIRECT_URI});
+        const res = await tokenRequest(code, {redirect_uri: 'https://wrong.example.com/callback'});
 
         expect(res.status).toEqual(400);
         expect(res.body.error).toEqual('invalid_grant');
@@ -525,7 +529,7 @@ describe('Token exchange redirect URI binding', () => {
 
     it('should issue tokens when auth code has null redirect_uri even if request includes a redirect_uri (Req 4.5)', async () => {
         const code = await getAuthCode(); // no redirect_uri → null stored
-        const res = await tokenRequest(code, { redirect_uri: 'https://any.example.com/callback' });
+        const res = await tokenRequest(code, {redirect_uri: 'https://any.example.com/callback'});
 
         expect2xx(res);
         expect(res.body.access_token).toBeDefined();
@@ -598,7 +602,8 @@ describe('Error response format compliance', () => {
     });
 
     afterAll(async () => {
-        await clientApi.deleteClient(singleUriClientId).catch(() => {});
+        await clientApi.deleteClient(singleUriClientId).catch(() => {
+        });
         await app.close();
     });
 

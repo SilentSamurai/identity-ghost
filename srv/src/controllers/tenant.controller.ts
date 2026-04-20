@@ -18,7 +18,6 @@ import {Tenant} from "../entity/tenant.entity";
 import {JwtAuthGuard} from "../auth/jwt-auth.guard";
 import {SubjectEnum} from "../entity/subjectEnum";
 import {Action} from "../casl/actions.enum";
-import {subject} from "@casl/ability";
 import {CurrentPermission, CurrentTenantId, CurrentUser, Permission} from "../auth/auth.decorator";
 import {SIGNING_KEY_PROVIDER, SigningKeyProvider} from "../core/token-abstraction";
 import {User} from "../entity/user.entity";

@@ -59,25 +59,7 @@ export class RefreshTokenService {
         private readonly repo: Repository<RefreshToken>,
         private readonly configService: Environment,
         private readonly securityEventLogger: SecurityEventLogger,
-    ) {}
-
-    private getSlidingExpiryMs(): number {
-        const raw = this.configService.get("REFRESH_TOKEN_SLIDING_EXPIRY", "7d");
-        return ms(raw);
-    }
-
-    private getAbsoluteExpiryMs(): number {
-        const raw = this.configService.get("REFRESH_TOKEN_ABSOLUTE_EXPIRY", "30d");
-        return ms(raw);
-    }
-
-    private getGraceWindowSeconds(): number {
-        const raw = parseInt(
-            this.configService.get("REFRESH_TOKEN_GRACE_WINDOW_SECONDS", "0"),
-            10,
-        );
-        if (isNaN(raw) || raw < 0) return 0;
-        return Math.min(raw, 30);
+    ) {
     }
 
     /**
@@ -114,7 +96,7 @@ export class RefreshTokenService {
         });
 
         const saved = await this.repo.save(record);
-        return { plaintext, record: saved };
+        return {plaintext, record: saved};
     }
 
     /**
@@ -129,7 +111,7 @@ export class RefreshTokenService {
         const tokenHash = hashToken(params.plaintextToken);
 
         // Look up by token hash
-        const existing = await this.repo.findOne({ where: { tokenHash } });
+        const existing = await this.repo.findOne({where: {tokenHash}});
         if (!existing) {
             throw OAuthException.invalidGrant("The refresh token is invalid or has expired");
         }
@@ -166,11 +148,11 @@ export class RefreshTokenService {
         await this.repo
             .createQueryBuilder()
             .update(RefreshToken)
-            .set({ usedAt: now })
-            .where("id = :id AND used_at IS NULL", { id: existing.id })
+            .set({usedAt: now})
+            .where("id = :id AND used_at IS NULL", {id: existing.id})
             .execute();
 
-        const afterUpdate = await this.repo.findOne({ where: { id: existing.id } });
+        const afterUpdate = await this.repo.findOne({where: {id: existing.id}});
         if (!afterUpdate || afterUpdate.usedAt === null || afterUpdate.usedAt === undefined) {
             // Update did not land — another concurrent caller consumed it first
             return this.handleReplay(existing, params.plaintextToken);
@@ -205,7 +187,61 @@ export class RefreshTokenService {
         });
 
         const saved = await this.repo.save(newRecord);
-        return { plaintext, record: saved };
+        return {plaintext, record: saved};
+    }
+
+    /**
+     * Revoke all tokens in a family.
+     */
+    async revokeFamily(familyId: string): Promise<void> {
+        await this.repo
+            .createQueryBuilder()
+            .update(RefreshToken)
+            .set({revoked: true})
+            .where("family_id = :familyId", {familyId})
+            .execute();
+    }
+
+    /**
+     * Revoke by plaintext token — hash, look up, revoke the family.
+     */
+    async revokeByToken(plaintextToken: string): Promise<void> {
+        const tokenHash = hashToken(plaintextToken);
+        const record = await this.repo.findOne({where: {tokenHash}});
+        if (record) {
+            await this.revokeFamily(record.familyId);
+        }
+    }
+
+    /**
+     * Revoke all refresh tokens that reference a given session sid.
+     */
+    async revokeBySid(sid: string): Promise<void> {
+        await this.repo
+            .createQueryBuilder()
+            .update(RefreshToken)
+            .set({revoked: true})
+            .where("sid = :sid", {sid})
+            .execute();
+    }
+
+    private getSlidingExpiryMs(): number {
+        const raw = this.configService.get("REFRESH_TOKEN_SLIDING_EXPIRY", "7d");
+        return ms(raw);
+    }
+
+    private getAbsoluteExpiryMs(): number {
+        const raw = this.configService.get("REFRESH_TOKEN_ABSOLUTE_EXPIRY", "30d");
+        return ms(raw);
+    }
+
+    private getGraceWindowSeconds(): number {
+        const raw = parseInt(
+            this.configService.get("REFRESH_TOKEN_GRACE_WINDOW_SECONDS", "0"),
+            10,
+        );
+        if (isNaN(raw) || raw < 0) return 0;
+        return Math.min(raw, 30);
     }
 
     /**
@@ -233,11 +269,11 @@ export class RefreshTokenService {
         if (graceWindowSeconds > 0 && existing.usedAt) {
             const graceDeadline = new Date(existing.usedAt.getTime() + graceWindowSeconds * 1000);
             if (new Date() <= graceDeadline) {
-                const child = await this.repo.findOne({ where: { parentId: existing.id } });
+                const child = await this.repo.findOne({where: {parentId: existing.id}});
                 if (child) {
                     // Return the child record for its metadata, but the caller's own plaintext
                     // so we don't invalidate the first caller's token.
-                    return { plaintext: callerPlaintext, record: child };
+                    return {plaintext: callerPlaintext, record: child};
                 }
             }
         }
@@ -252,40 +288,5 @@ export class RefreshTokenService {
 
         await this.revokeFamily(existing.familyId);
         throw OAuthException.invalidGrant("The refresh token is invalid or has expired");
-    }
-
-    /**
-     * Revoke all tokens in a family.
-     */
-    async revokeFamily(familyId: string): Promise<void> {
-        await this.repo
-            .createQueryBuilder()
-            .update(RefreshToken)
-            .set({ revoked: true })
-            .where("family_id = :familyId", { familyId })
-            .execute();
-    }
-
-    /**
-     * Revoke by plaintext token — hash, look up, revoke the family.
-     */
-    async revokeByToken(plaintextToken: string): Promise<void> {
-        const tokenHash = hashToken(plaintextToken);
-        const record = await this.repo.findOne({ where: { tokenHash } });
-        if (record) {
-            await this.revokeFamily(record.familyId);
-        }
-    }
-
-    /**
-     * Revoke all refresh tokens that reference a given session sid.
-     */
-    async revokeBySid(sid: string): Promise<void> {
-        await this.repo
-            .createQueryBuilder()
-            .update(RefreshToken)
-            .set({ revoked: true })
-            .where("sid = :sid", { sid })
-            .execute();
     }
 }

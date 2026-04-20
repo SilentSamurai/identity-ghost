@@ -1,8 +1,8 @@
 import * as fc from 'fast-check';
-import { SharedTestFixture } from '../shared-test.fixture';
-import { TokenFixture } from '../token.fixture';
-import { ClientEntityClient } from '../api-client/client-entity-client';
-import { TenantClient } from '../api-client/tenant-client';
+import {SharedTestFixture} from '../shared-test.fixture';
+import {TokenFixture} from '../token.fixture';
+import {ClientEntityClient} from '../api-client/client-entity-client';
+import {TenantClient} from '../api-client/tenant-client';
 
 /**
  * Feature: user-consent-tracking, Property 2: Consent required iff requested scopes exceed granted scopes
@@ -24,7 +24,7 @@ describe('Feature: user-consent-tracking, Property 2: Consent required iff reque
     beforeAll(async () => {
         fixture = new SharedTestFixture();
         const tokenFixture = new TokenFixture(fixture);
-        const { accessToken } = await tokenFixture.fetchAccessToken(
+        const {accessToken} = await tokenFixture.fetchAccessToken(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com',
@@ -98,9 +98,9 @@ describe('Feature: user-consent-tracking, Property 2: Consent required iff reque
         await fc.assert(
             fc.asyncProperty(
                 // G: granted scopes (non-empty subset of OIDC scopes)
-                fc.subarray(['openid', 'profile', 'email'], { minLength: 1 }),
+                fc.subarray(['openid', 'profile', 'email'], {minLength: 1}),
                 // R: requested scopes (non-empty subset of OIDC scopes)
-                fc.subarray(['openid', 'profile', 'email'], { minLength: 1 }),
+                fc.subarray(['openid', 'profile', 'email'], {minLength: 1}),
                 async (grantedScopes, requestedScopes) => {
                     // Create a fresh client for this iteration
                     const uniqueSuffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -130,18 +130,19 @@ describe('Feature: user-consent-tracking, Property 2: Consent required iff reque
                         // Biconditional: consentRequired = false ↔ R ⊆ G
                         expect(consentRequired).toBe(!rSubsetOfG);
                     } finally {
-                        await clientApi.deleteClient(clientId).catch(() => {});
+                        await clientApi.deleteClient(clientId).catch(() => {
+                        });
                     }
                 },
             ),
-            { numRuns: 20 },
+            {numRuns: 20},
         );
     }, 300_000);
 
     it('consentRequired = false when R = G (equal sets)', async () => {
         await fc.assert(
             fc.asyncProperty(
-                fc.subarray(['openid', 'profile', 'email'], { minLength: 1 }),
+                fc.subarray(['openid', 'profile', 'email'], {minLength: 1}),
                 async (scopes) => {
                     const uniqueSuffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
                     const client = await clientApi.createClient(
@@ -166,11 +167,12 @@ describe('Feature: user-consent-tracking, Property 2: Consent required iff reque
                         // R = G → R ⊆ G → consentRequired = false
                         expect(consentRequired).toBe(false);
                     } finally {
-                        await clientApi.deleteClient(clientId).catch(() => {});
+                        await clientApi.deleteClient(clientId).catch(() => {
+                        });
                     }
                 },
             ),
-            { numRuns: 15 },
+            {numRuns: 15},
         );
     }, 300_000);
 
@@ -178,7 +180,7 @@ describe('Feature: user-consent-tracking, Property 2: Consent required iff reque
         await fc.assert(
             fc.asyncProperty(
                 // G must have at least 2 elements so we can derive a strict subset R
-                fc.subarray(['openid', 'profile', 'email'], { minLength: 2 }),
+                fc.subarray(['openid', 'profile', 'email'], {minLength: 2}),
                 async (grantedScopes) => {
                     // R = strict subset of G (take all but the last element)
                     const requestedScopes = grantedScopes.slice(0, grantedScopes.length - 1);
@@ -207,11 +209,12 @@ describe('Feature: user-consent-tracking, Property 2: Consent required iff reque
                         // R ⊂ G → R ⊆ G → consentRequired = false
                         expect(consentRequired).toBe(false);
                     } finally {
-                        await clientApi.deleteClient(clientId).catch(() => {});
+                        await clientApi.deleteClient(clientId).catch(() => {
+                        });
                     }
                 },
             ),
-            { numRuns: 10 },
+            {numRuns: 10},
         );
     }, 300_000);
 
@@ -219,7 +222,7 @@ describe('Feature: user-consent-tracking, Property 2: Consent required iff reque
         await fc.assert(
             fc.asyncProperty(
                 // G: granted scopes (non-empty, but not all 3 scopes so R can exceed G)
-                fc.subarray(['openid', 'profile', 'email'], { minLength: 1, maxLength: 2 }),
+                fc.subarray(['openid', 'profile', 'email'], {minLength: 1, maxLength: 2}),
                 async (grantedScopes) => {
                     // R: all 3 scopes — guaranteed to exceed G since G has at most 2
                     const requestedScopes = ['openid', 'profile', 'email'];
@@ -250,11 +253,12 @@ describe('Feature: user-consent-tracking, Property 2: Consent required iff reque
                         // R ⊄ G → consentRequired = true
                         expect(consentRequired).toBe(true);
                     } finally {
-                        await clientApi.deleteClient(clientId).catch(() => {});
+                        await clientApi.deleteClient(clientId).catch(() => {
+                        });
                     }
                 },
             ),
-            { numRuns: 10 },
+            {numRuns: 10},
         );
     }, 300_000);
 });

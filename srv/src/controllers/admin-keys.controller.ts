@@ -1,11 +1,4 @@
-import {
-    ClassSerializerInterceptor,
-    Controller,
-    Get,
-    Query,
-    UseGuards,
-    UseInterceptors,
-} from "@nestjs/common";
+import {ClassSerializerInterceptor, Controller, Get, Query, UseGuards, UseInterceptors,} from "@nestjs/common";
 import {InjectRepository} from "@nestjs/typeorm";
 import {Repository} from "typeorm";
 import {JwtAuthGuard} from "../auth/jwt-auth.guard";
@@ -23,7 +16,8 @@ export class AdminKeysController {
     constructor(
         @InjectRepository(TenantKey)
         private readonly tenantKeyRepository: Repository<TenantKey>,
-    ) {}
+    ) {
+    }
 
     @Get("")
     async getAllKeys(
@@ -55,7 +49,7 @@ export class AdminKeysController {
             qb.andWhere("key.isCurrent = :isCurrent", {isCurrent: true});
         } else if (status === "active") {
             qb.andWhere("key.deactivatedAt IS NULL")
-              .andWhere("key.isCurrent = :isCurrent", {isCurrent: false});
+                .andWhere("key.isCurrent = :isCurrent", {isCurrent: false});
         } else if (status === "deactivated") {
             qb.andWhere("key.deactivatedAt IS NOT NULL");
         }

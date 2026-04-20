@@ -238,97 +238,6 @@ export class TokenIssuanceService {
         };
     }
 
-    private async issueSubscribedToken(
-        permission: Permission,
-        user: User,
-        tenant: Tenant,
-        clientAllowedScopes: string,
-        options?: IssueTokenOptions,
-    ): Promise<TokenResponse> {
-        let hint = options?.subscriberTenantHint;
-        const nonce = options?.nonce;
-
-        // Check auth code for stored hint
-        if (options?.authCode) {
-            if (await this.authCodeService.hasAuthCodeWithHint(options.authCode)) {
-                const authCodeObj = await this.authCodeService.findByCode(options.authCode);
-                if (authCodeObj?.subscriberTenantHint) {
-                    hint = hint || authCodeObj.subscriberTenantHint;
-                }
-            }
-        }
-
-        const ambiguityResult = await this.subscriptionService
-            .resolveSubscriptionTenantAmbiguity(permission, user, tenant, hint);
-
-        if (ambiguityResult.ambiguousTenants) {
-            throw new BadRequestException("Multiple subscription tenants found. Please specify a subscriber_tenant_hint.");
-        }
-
-        const subscribingTenant = ambiguityResult.resolvedTenant!;
-        let additionalRoles = await this.tenantService.getMemberRoles(permission, subscribingTenant.id, user);
-        const allRoleNames = additionalRoles.map(r => r.name);
-
-        const grantedScopes = this.scopeResolverService.resolveScopes(
-            options?.requestedScope ?? null,
-            clientAllowedScopes,
-        );
-
-        const {accessToken, scopes} =
-            await this.authService.createSubscribedUserAccessToken(
-                user, tenant, subscribingTenant, grantedScopes, allRoleNames, options?.grant_type ?? GRANT_TYPES.PASSWORD,
-            );
-
-        // Resolve session: validate existing sid or create new session for password grant
-        let authTime: number;
-        let sessionId: string;
-        if (options?.sid) {
-            const session = await this.loginSessionService.validateSession(options.sid);
-            authTime = session.authTime;
-            sessionId = session.sid;
-        } else if (options?.grant_type === GRANT_TYPES.PASSWORD || !options?.grant_type) {
-            const session = await this.loginSessionService.createSession(user.id, tenant.id);
-            authTime = session.authTime;
-            sessionId = session.sid;
-        } else {
-            authTime = Math.floor(Date.now() / 1000);
-            sessionId = randomUUID();
-        }
-
-        const {plaintext: refreshToken} = await this.refreshTokenService.create({
-            userId: user.id,
-            clientId: tenant.clientId,
-            tenantId: tenant.id,
-            scope: ScopeNormalizer.format(scopes),
-            sid: sessionId,
-        });
-
-        const idToken = await this.idTokenService.generateIdToken({
-            user: {id: user.id, email: user.email, name: user.name, verified: user.verified},
-            tenantId: tenant.id,
-            clientId: tenant.clientId,
-            grantedScopes: scopes,
-            accessToken,
-            nonce,
-            authTime,
-            sessionId,
-            amr: ["pwd"],
-        });
-
-        const response = this.formatResponse(accessToken, refreshToken, scopes, idToken);
-
-        // Log token issuance event (Requirements 4.1, 4.2)
-        this.securityEventLogger.tokenIssued({
-            grantType: options?.grant_type ?? GRANT_TYPES.PASSWORD,
-            clientId: tenant.clientId,
-            tenantId: tenant.id,
-            scope: response.scope,
-            userId: user.id,
-        });
-
-        return response;
-    }
-
     /**
      * Orchestrates the refresh_token grant:
      * consume + rotate → resolve user/tenant → check locked → re-fetch roles → issue access token → format response.
@@ -424,6 +333,97 @@ export class TokenIssuanceService {
             clientId: tenant.clientId,
             tenantId: tenant.id,
             scope: response.scope,
+        });
+
+        return response;
+    }
+
+    private async issueSubscribedToken(
+        permission: Permission,
+        user: User,
+        tenant: Tenant,
+        clientAllowedScopes: string,
+        options?: IssueTokenOptions,
+    ): Promise<TokenResponse> {
+        let hint = options?.subscriberTenantHint;
+        const nonce = options?.nonce;
+
+        // Check auth code for stored hint
+        if (options?.authCode) {
+            if (await this.authCodeService.hasAuthCodeWithHint(options.authCode)) {
+                const authCodeObj = await this.authCodeService.findByCode(options.authCode);
+                if (authCodeObj?.subscriberTenantHint) {
+                    hint = hint || authCodeObj.subscriberTenantHint;
+                }
+            }
+        }
+
+        const ambiguityResult = await this.subscriptionService
+            .resolveSubscriptionTenantAmbiguity(permission, user, tenant, hint);
+
+        if (ambiguityResult.ambiguousTenants) {
+            throw new BadRequestException("Multiple subscription tenants found. Please specify a subscriber_tenant_hint.");
+        }
+
+        const subscribingTenant = ambiguityResult.resolvedTenant!;
+        let additionalRoles = await this.tenantService.getMemberRoles(permission, subscribingTenant.id, user);
+        const allRoleNames = additionalRoles.map(r => r.name);
+
+        const grantedScopes = this.scopeResolverService.resolveScopes(
+            options?.requestedScope ?? null,
+            clientAllowedScopes,
+        );
+
+        const {accessToken, scopes} =
+            await this.authService.createSubscribedUserAccessToken(
+                user, tenant, subscribingTenant, grantedScopes, allRoleNames, options?.grant_type ?? GRANT_TYPES.PASSWORD,
+            );
+
+        // Resolve session: validate existing sid or create new session for password grant
+        let authTime: number;
+        let sessionId: string;
+        if (options?.sid) {
+            const session = await this.loginSessionService.validateSession(options.sid);
+            authTime = session.authTime;
+            sessionId = session.sid;
+        } else if (options?.grant_type === GRANT_TYPES.PASSWORD || !options?.grant_type) {
+            const session = await this.loginSessionService.createSession(user.id, tenant.id);
+            authTime = session.authTime;
+            sessionId = session.sid;
+        } else {
+            authTime = Math.floor(Date.now() / 1000);
+            sessionId = randomUUID();
+        }
+
+        const {plaintext: refreshToken} = await this.refreshTokenService.create({
+            userId: user.id,
+            clientId: tenant.clientId,
+            tenantId: tenant.id,
+            scope: ScopeNormalizer.format(scopes),
+            sid: sessionId,
+        });
+
+        const idToken = await this.idTokenService.generateIdToken({
+            user: {id: user.id, email: user.email, name: user.name, verified: user.verified},
+            tenantId: tenant.id,
+            clientId: tenant.clientId,
+            grantedScopes: scopes,
+            accessToken,
+            nonce,
+            authTime,
+            sessionId,
+            amr: ["pwd"],
+        });
+
+        const response = this.formatResponse(accessToken, refreshToken, scopes, idToken);
+
+        // Log token issuance event (Requirements 4.1, 4.2)
+        this.securityEventLogger.tokenIssued({
+            grantType: options?.grant_type ?? GRANT_TYPES.PASSWORD,
+            clientId: tenant.clientId,
+            tenantId: tenant.id,
+            scope: response.scope,
+            userId: user.id,
         });
 
         return response;

@@ -1,9 +1,9 @@
 import * as fc from 'fast-check';
-import { SharedTestFixture } from '../shared-test.fixture';
-import { TokenFixture } from '../token.fixture';
-import { ClientEntityClient } from '../api-client/client-entity-client';
-import { TenantClient } from '../api-client/tenant-client';
-import { ScopeNormalizer } from '../../src/casl/scope-normalizer';
+import {SharedTestFixture} from '../shared-test.fixture';
+import {TokenFixture} from '../token.fixture';
+import {ClientEntityClient} from '../api-client/client-entity-client';
+import {TenantClient} from '../api-client/tenant-client';
+import {ScopeNormalizer} from '../../src/casl/scope-normalizer';
 
 /**
  * Feature: user-consent-tracking, Property 5: Narrower requests do not modify the consent record
@@ -25,7 +25,7 @@ describe('Feature: user-consent-tracking, Property 5: Narrower requests do not m
     beforeAll(async () => {
         fixture = new SharedTestFixture();
         const tokenFixture = new TokenFixture(fixture);
-        const { accessToken } = await tokenFixture.fetchAccessToken(
+        const {accessToken} = await tokenFixture.fetchAccessToken(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com',
@@ -123,7 +123,7 @@ describe('Feature: user-consent-tracking, Property 5: Narrower requests do not m
         await fc.assert(
             fc.asyncProperty(
                 // G: granted scopes (at least 1 scope)
-                fc.subarray(['openid', 'profile', 'email'], { minLength: 1 }),
+                fc.subarray(['openid', 'profile', 'email'], {minLength: 1}),
                 async (grantedScopes) => {
                     // Derive R as a subset of G: take a non-empty prefix of G
                     // We use fc.subarray on the actual grantedScopes to get a subset
@@ -163,11 +163,12 @@ describe('Feature: user-consent-tracking, Property 5: Narrower requests do not m
                         // Step 3: Verify stored scopes are still G (unchanged)
                         await verifyGrantedScopesUnchanged(clientId, grantedScopes);
                     } finally {
-                        await clientApi.deleteClient(clientId).catch(() => {});
+                        await clientApi.deleteClient(clientId).catch(() => {
+                        });
                     }
                 },
             ),
-            { numRuns: 15 },
+            {numRuns: 15},
         );
     }, 300_000);
 
@@ -175,7 +176,7 @@ describe('Feature: user-consent-tracking, Property 5: Narrower requests do not m
         await fc.assert(
             fc.asyncProperty(
                 // G must have at least 2 scopes so we can derive multiple strict subsets
-                fc.subarray(['openid', 'profile', 'email'], { minLength: 2 }),
+                fc.subarray(['openid', 'profile', 'email'], {minLength: 2}),
                 async (grantedScopes) => {
                     const uniqueSuffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
                     const client = await clientApi.createClient(
@@ -206,18 +207,19 @@ describe('Feature: user-consent-tracking, Property 5: Narrower requests do not m
                         // After all checkConsent calls, stored scopes must still equal G
                         await verifyGrantedScopesUnchanged(clientId, grantedScopes);
                     } finally {
-                        await clientApi.deleteClient(clientId).catch(() => {});
+                        await clientApi.deleteClient(clientId).catch(() => {
+                        });
                     }
                 },
             ),
-            { numRuns: 10 },
+            {numRuns: 10},
         );
     }, 300_000);
 
     it('checkConsent with R = G does not modify the record (equal set is a subset)', async () => {
         await fc.assert(
             fc.asyncProperty(
-                fc.subarray(['openid', 'profile', 'email'], { minLength: 1 }),
+                fc.subarray(['openid', 'profile', 'email'], {minLength: 1}),
                 async (scopes) => {
                     const uniqueSuffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
                     const client = await clientApi.createClient(
@@ -244,11 +246,12 @@ describe('Feature: user-consent-tracking, Property 5: Narrower requests do not m
                         // Stored scopes must still equal G
                         await verifyGrantedScopesUnchanged(clientId, scopes);
                     } finally {
-                        await clientApi.deleteClient(clientId).catch(() => {});
+                        await clientApi.deleteClient(clientId).catch(() => {
+                        });
                     }
                 },
             ),
-            { numRuns: 10 },
+            {numRuns: 10},
         );
     }, 300_000);
 
@@ -283,7 +286,8 @@ describe('Feature: user-consent-tracking, Property 5: Narrower requests do not m
             // Stored scopes must still be the full set
             await verifyGrantedScopesUnchanged(clientId, fullScopes);
         } finally {
-            await clientApi.deleteClient(clientId).catch(() => {});
+            await clientApi.deleteClient(clientId).catch(() => {
+            });
         }
     }, 60_000);
 });

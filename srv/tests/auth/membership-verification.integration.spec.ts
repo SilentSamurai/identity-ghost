@@ -434,7 +434,7 @@ describe('Membership Verification Integration Tests', () => {
         it('returns HTTP 401 for JWT with invalid signature', async () => {
             // Create a JWT-like string that looks valid but has invalid signature
             const fakeJwt = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c';
-            
+
             const response = await fixture.getHttpServer()
                 .get('/api/users/me')
                 .set('Authorization', `Bearer ${fakeJwt}`)

@@ -1,11 +1,11 @@
 /**
  * Integration tests for AuthCodeService.
- * 
+ *
  * Tests the authorization code lifecycle:
  * - Creating authorization codes
  * - Validating authorization codes with PKCE
  * - Error handling for invalid/expired codes
- * 
+ *
  * These are integration tests that test the full service with real database operations.
  */
 import {Test, TestingModule} from '@nestjs/testing';
@@ -17,7 +17,7 @@ import {Environment} from '../../src/config/environment.service';
 import {JwtService} from '@nestjs/jwt';
 import {TenantService} from '../../src/services/tenant.service';
 import {AuthUserService} from '../../src/casl/authUser.service';
-import {Repository, DataSource} from 'typeorm';
+import {DataSource, Repository} from 'typeorm';
 import {OAuthException} from '../../src/exceptions/oauth-exception';
 import {CryptUtil} from '../../src/util/crypt.util';
 
@@ -106,7 +106,7 @@ describe('AuthCodeService', () => {
                 {
                     provide: DataSource,
                     useValue: {
-                        options: { type: 'postgres' },
+                        options: {type: 'postgres'},
                     },
                 },
             ],
@@ -172,9 +172,9 @@ describe('AuthCodeService', () => {
 
     describe('deleteExpiredAuthCodes', () => {
         it('should delete expired and used auth codes via query builder', async () => {
-            const mockExecute = jest.fn().mockResolvedValue({ affected: 2 });
-            const mockWhere = jest.fn().mockReturnValue({ execute: mockExecute });
-            const mockDelete = jest.fn().mockReturnValue({ where: mockWhere });
+            const mockExecute = jest.fn().mockResolvedValue({affected: 2});
+            const mockWhere = jest.fn().mockReturnValue({execute: mockExecute});
+            const mockDelete = jest.fn().mockReturnValue({where: mockWhere});
             jest.spyOn(authCodeRepository, 'createQueryBuilder').mockReturnValue({
                 delete: mockDelete,
             } as any);

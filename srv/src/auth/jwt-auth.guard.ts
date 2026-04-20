@@ -1,12 +1,12 @@
 /**
  * JwtAuthGuard - Authentication guard that validates JWT and Basic auth tokens.
- * 
+ *
  * This guard implements RFC 6750 Bearer Token usage for protected resources:
  * - Validates Bearer tokens (JWT) from Authorization header
  * - Validates Basic auth credentials for client authentication
  * - Sets up security context with CASL abilities for authorization
  * - Adds WWW-Authenticate headers for 401 responses per RFC 6750
- * 
+ *
  * The guard extracts tokens, validates them via AuthService, and builds
  * the CASL ability context for authorization decisions.
  */
@@ -14,7 +14,7 @@ import {CanActivate, ExecutionContext, HttpException, Injectable, Logger, Unauth
 import {ExtractJwt} from "passport-jwt";
 import {AuthService} from "./auth.service";
 import {CaslAbilityFactory} from "../casl/casl-ability.factory";
-import {GRANT_TYPES, TechnicalToken, TenantToken, Token} from "../casl/contexts";
+import {TechnicalToken, TenantToken, Token} from "../casl/contexts";
 import {Response} from "express";
 import {parseBasicAuthHeader} from "../util/http.util";
 

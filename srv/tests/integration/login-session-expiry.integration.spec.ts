@@ -1,5 +1,5 @@
-import { SharedTestFixture } from '../shared-test.fixture';
-import { TokenFixture } from '../token.fixture';
+import {SharedTestFixture} from '../shared-test.fixture';
+import {TokenFixture} from '../token.fixture';
 
 /**
  * Integration tests for login session expiry behavior.
@@ -107,7 +107,7 @@ describe('Login Session Expiry', () => {
             .set('Accept', 'application/json');
 
         expect(response.status).toEqual(201);
-        const decoded = app.jwtService().decode(response.body.id_token, { json: true }) as any;
+        const decoded = app.jwtService().decode(response.body.id_token, {json: true}) as any;
         const sid = decoded.sid;
         expect(sid).toBeDefined();
 

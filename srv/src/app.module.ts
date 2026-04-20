@@ -69,7 +69,8 @@ import {SecurityModule} from "./security/security.module";
     providers: [StartUpService],
 })
 export class AppModule implements NestModule, OnModuleInit {
-    constructor(private readonly configService: Environment) {}
+    constructor(private readonly configService: Environment) {
+    }
 
     onModuleInit() {
         const lifetime = parseInt(this.configService.get("TOKEN_EXPIRATION_TIME_IN_SECONDS", "3600"), 10);

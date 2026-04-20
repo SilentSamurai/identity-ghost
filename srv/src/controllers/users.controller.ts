@@ -3,7 +3,6 @@ import {
     ClassSerializerInterceptor,
     Controller,
     Get,
-    Headers,
     InternalServerErrorException,
     Patch,
     UseGuards,

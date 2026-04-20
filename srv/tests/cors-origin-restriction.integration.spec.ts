@@ -38,7 +38,7 @@ describe('CORS origin restriction', () => {
         // Create test tenant
         const tenantClient = new TenantClient(app, adminAccessToken);
         const tenantRes = await tenantClient.createTenant("cors-test-tenant", `cors-test-${Date.now()}.com`);
-        tenant = { id: tenantRes.id, domain: tenantRes.domain };
+        tenant = {id: tenantRes.id, domain: tenantRes.domain};
 
         // Register a Client entity with redirect URIs — this populates the CORS origin cache
         await clientApi.createClient(tenant.id, "CORS Test Client", {
@@ -53,7 +53,7 @@ describe('CORS origin restriction', () => {
         // Get the tenant's built-in credentials for client_credentials grant
         const adminTenantClient = new AdminTenantClient(app, adminAccessToken);
         const creds = await adminTenantClient.getTenantCredentials(tenant.id);
-        tenantCredentials = { clientId: creds.clientId, clientSecret: creds.clientSecret };
+        tenantCredentials = {clientId: creds.clientId, clientSecret: creds.clientSecret};
     });
 
     afterAll(async () => {

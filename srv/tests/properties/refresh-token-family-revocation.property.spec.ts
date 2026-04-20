@@ -1,6 +1,5 @@
 import * as fc from 'fast-check';
 import * as crypto from 'crypto';
-import {hashToken} from '../../src/auth/refresh-token.service';
 
 /**
  * Feature: db-refresh-token-rotation, Property 11: Family revocation marks all tokens

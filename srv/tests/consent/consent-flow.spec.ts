@@ -14,10 +14,10 @@
  *
  * Requirements: 2.1, 2.2, 3.1, 3.2, 3.3, 5.1, 6.1, 6.2, 6.3, 6.4
  */
-import { SharedTestFixture } from '../shared-test.fixture';
-import { TokenFixture } from '../token.fixture';
-import { ClientEntityClient } from '../api-client/client-entity-client';
-import { TenantClient } from '../api-client/tenant-client';
+import {SharedTestFixture} from '../shared-test.fixture';
+import {TokenFixture} from '../token.fixture';
+import {ClientEntityClient} from '../api-client/client-entity-client';
+import {TenantClient} from '../api-client/tenant-client';
 
 const CODE_CHALLENGE = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq';
 const CODE_VERIFIER = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq';
@@ -77,8 +77,10 @@ describe('Consent Flow Integration Tests', () => {
     });
 
     afterAll(async () => {
-        await clientApi.deleteClient(thirdPartyClientId).catch(() => {});
-        await clientApi.deleteClient(narrowScopesClientId).catch(() => {});
+        await clientApi.deleteClient(thirdPartyClientId).catch(() => {
+        });
+        await clientApi.deleteClient(narrowScopesClientId).catch(() => {
+        });
         await app.close();
     });
 
@@ -162,7 +164,8 @@ describe('Consent Flow Integration Tests', () => {
                 expect(response.body.requires_consent).toBe(true);
                 expect(response.body.client_name).toBe('Named App For Consent');
             } finally {
-                await clientApi.deleteClient(freshClient.client.clientId).catch(() => {});
+                await clientApi.deleteClient(freshClient.client.clientId).catch(() => {
+                });
             }
         });
     });
@@ -200,7 +203,8 @@ describe('Consent Flow Integration Tests', () => {
                 expect(loginResponse.body.authentication_code).toBeDefined();
                 expect(loginResponse.body.requires_consent).toBeUndefined();
             } finally {
-                await clientApi.deleteClient(clientId).catch(() => {});
+                await clientApi.deleteClient(clientId).catch(() => {
+                });
             }
         });
 
@@ -233,7 +237,8 @@ describe('Consent Flow Integration Tests', () => {
                 expect(loginResponse.body.authentication_code).toBeDefined();
                 expect(loginResponse.body.requires_consent).toBeUndefined();
             } finally {
-                await clientApi.deleteClient(clientId).catch(() => {});
+                await clientApi.deleteClient(clientId).catch(() => {
+                });
             }
         });
     });
@@ -323,7 +328,8 @@ describe('Consent Flow Integration Tests', () => {
                 expect(loginResponse.body.authentication_code).toBeDefined();
                 expect(loginResponse.body.requires_consent).toBeUndefined();
             } finally {
-                await clientApi.deleteClient(clientId).catch(() => {});
+                await clientApi.deleteClient(clientId).catch(() => {
+                });
             }
         });
     });
@@ -354,7 +360,8 @@ describe('Consent Flow Integration Tests', () => {
                 // Must not return an error
                 expect(response.body.error).toBeUndefined();
             } finally {
-                await clientApi.deleteClient(clientId).catch(() => {});
+                await clientApi.deleteClient(clientId).catch(() => {
+                });
             }
         });
 
@@ -386,7 +393,8 @@ describe('Consent Flow Integration Tests', () => {
                 expect(loginResponse.body.authentication_code).toBeDefined();
                 expect(loginResponse.body.requires_consent).toBeUndefined();
             } finally {
-                await clientApi.deleteClient(clientId).catch(() => {});
+                await clientApi.deleteClient(clientId).catch(() => {
+                });
             }
         });
 
@@ -424,7 +432,8 @@ describe('Consent Flow Integration Tests', () => {
                 expect(tokenResponse.body.access_token).toBeDefined();
                 expect(tokenResponse.body.token_type).toEqual('Bearer');
             } finally {
-                await clientApi.deleteClient(clientId).catch(() => {});
+                await clientApi.deleteClient(clientId).catch(() => {
+                });
             }
         });
     });
@@ -454,7 +463,8 @@ describe('Consent Flow Integration Tests', () => {
                 // Must not return an auth code
                 expect(response.body.authentication_code).toBeUndefined();
             } finally {
-                await clientApi.deleteClient(clientId).catch(() => {});
+                await clientApi.deleteClient(clientId).catch(() => {
+                });
             }
         });
 
@@ -485,7 +495,8 @@ describe('Consent Flow Integration Tests', () => {
                 expect(loginResponse.body.requires_consent).toBe(true);
                 expect(loginResponse.body.authentication_code).toBeUndefined();
             } finally {
-                await clientApi.deleteClient(clientId).catch(() => {});
+                await clientApi.deleteClient(clientId).catch(() => {
+                });
             }
         });
     });
@@ -515,7 +526,8 @@ describe('Consent Flow Integration Tests', () => {
                 expect(response.status).toBeLessThan(500);
                 expect(response.body.authentication_code).toBeUndefined();
             } finally {
-                await clientApi.deleteClient(clientId).catch(() => {});
+                await clientApi.deleteClient(clientId).catch(() => {
+                });
             }
         });
 
@@ -540,7 +552,8 @@ describe('Consent Flow Integration Tests', () => {
                 expect(response.status).toBeLessThan(500);
                 expect(response.body.authentication_code).toBeUndefined();
             } finally {
-                await clientApi.deleteClient(clientId).catch(() => {});
+                await clientApi.deleteClient(clientId).catch(() => {
+                });
             }
         });
     });
@@ -581,7 +594,7 @@ describe('Consent Flow Integration Tests', () => {
                     .set('Accept', 'application/json');
 
                 expect(tokenResponse.status).toEqual(201);
-                const decoded = app.jwtService().decode(tokenResponse.body.access_token, { json: true }) as any;
+                const decoded = app.jwtService().decode(tokenResponse.body.access_token, {json: true}) as any;
                 // email scope must not be present — it was outside client.allowedScopes
                 if (decoded?.scopes) {
                     expect(decoded.scopes).not.toContain('email');
@@ -610,7 +623,8 @@ describe('Consent Flow Integration Tests', () => {
                 expect(response.body.authentication_code).toBeDefined();
                 expect(response.body.error).toBeUndefined();
             } finally {
-                await clientApi.deleteClient(clientId).catch(() => {});
+                await clientApi.deleteClient(clientId).catch(() => {
+                });
             }
         });
 
@@ -660,7 +674,8 @@ describe('Consent Flow Integration Tests', () => {
                 expect(loginResponse.body.requested_scopes).toContain('profile');
                 expect(loginResponse.body.authentication_code).toBeUndefined();
             } finally {
-                await clientApi.deleteClient(clientId).catch(() => {});
+                await clientApi.deleteClient(clientId).catch(() => {
+                });
             }
         });
     });

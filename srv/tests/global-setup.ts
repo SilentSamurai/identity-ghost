@@ -1,13 +1,13 @@
 /**
  * Global test setup for integration tests.
- * 
+ *
  * This file sets up the shared test application instance that runs once
  * for all integration tests. It:
  * - Creates a test NestJS application
  * - Starts a fake SMTP server for email testing
  * - Starts a webhook server for subscription testing
  * - Applies the HttpExceptionFilter globally for consistent error handling
- * 
+ *
  * The app is reused across all tests for performance (avoids startup overhead).
  */
 import * as process from 'node:process';

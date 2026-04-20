@@ -1,5 +1,5 @@
 import * as fc from 'fast-check';
-import {GRANT_TYPES, TenantToken, TechnicalToken} from '../../src/casl/contexts';
+import {GRANT_TYPES, TechnicalToken, TenantToken} from '../../src/casl/contexts';
 import {RoleEnum} from '../../src/entity/roleEnum';
 
 /**
@@ -18,10 +18,10 @@ describe('Property 9: Tenant object retained', () => {
     const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
     const uuidArb = fc.uuid();
-    const nameArb = fc.string({ minLength: 1, maxLength: 50 });
+    const nameArb = fc.string({minLength: 1, maxLength: 50});
     const domainArb = fc.domain();
-    const scopesArb = fc.subarray(VALID_OIDC_SCOPES, { minLength: 0 });
-    const rolesArb = fc.subarray(VALID_ROLES, { minLength: 0 });
+    const scopesArb = fc.subarray(VALID_OIDC_SCOPES, {minLength: 0});
+    const rolesArb = fc.subarray(VALID_ROLES, {minLength: 0});
     const grantTypeArb = fc.constantFrom(...TENANT_GRANT_TYPES);
 
     describe('TenantToken', () => {
@@ -33,7 +33,7 @@ describe('Property 9: Tenant object retained', () => {
                     (userId, tenantId, tenantName, tenantDomain, clientId, scopes, roles, grantType) => {
                         const token = TenantToken.create({
                             sub: userId,
-                            tenant: { id: tenantId, name: tenantName, domain: tenantDomain },
+                            tenant: {id: tenantId, name: tenantName, domain: tenantDomain},
                             roles,
                             grant_type: grantType,
                             aud: ['https://auth.example.com'],
@@ -68,7 +68,7 @@ describe('Property 9: Tenant object retained', () => {
                         expect(payload.tenant.domain).toBe(tenantDomain);
                     },
                 ),
-                { numRuns: 100 },
+                {numRuns: 100},
             );
         });
     });
@@ -81,7 +81,7 @@ describe('Property 9: Tenant object retained', () => {
                     (tenantId, tenantName, tenantDomain, clientId, scopes) => {
                         const token = TechnicalToken.create({
                             sub: 'oauth',
-                            tenant: { id: tenantId, name: tenantName, domain: tenantDomain },
+                            tenant: {id: tenantId, name: tenantName, domain: tenantDomain},
                             scope: scopes.join(' '),
                             aud: ['https://auth.example.com'],
                             jti: crypto.randomUUID(),
@@ -114,7 +114,7 @@ describe('Property 9: Tenant object retained', () => {
                         expect(payload.tenant.domain).toBe(tenantDomain);
                     },
                 ),
-                { numRuns: 100 },
+                {numRuns: 100},
             );
         });
     });

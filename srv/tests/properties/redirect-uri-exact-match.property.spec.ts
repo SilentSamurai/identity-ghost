@@ -1,7 +1,7 @@
 import * as fc from 'fast-check';
-import { AuthorizeService } from '../../src/auth/authorize.service';
-import { Client } from '../../src/entity/client.entity';
-import { OAuthException } from '../../src/exceptions/oauth-exception';
+import {AuthorizeService} from '../../src/auth/authorize.service';
+import {Client} from '../../src/entity/client.entity';
+import {OAuthException} from '../../src/exceptions/oauth-exception';
 
 /**
  * Feature: redirect-uri-validation, Property 1: Redirect URI validation accepts iff URI is in registered set
@@ -19,11 +19,11 @@ describe('Feature: redirect-uri-validation, Property 1: Redirect URI validation 
     // Generator: arbitrary URI-like strings for redirect URIs
     const uriArb = fc.oneof(
         fc.webUrl(),
-        fc.string({ minLength: 1, maxLength: 200 }),
+        fc.string({minLength: 1, maxLength: 200}),
     );
 
     // Generator: a non-empty array of unique URI strings (the registered set)
-    const registeredUrisArb = fc.uniqueArray(uriArb, { minLength: 1, maxLength: 10 });
+    const registeredUrisArb = fc.uniqueArray(uriArb, {minLength: 1, maxLength: 10});
 
     // Build a minimal Client object with the given redirectUris
     function makeClient(redirectUris: string[]): Client {
@@ -36,7 +36,7 @@ describe('Feature: redirect-uri-validation, Property 1: Redirect URI validation 
         fc.assert(
             fc.property(
                 registeredUrisArb,
-                fc.nat({ max: 9 }),
+                fc.nat({max: 9}),
                 (registeredUris, indexRaw) => {
                     // Pick a URI from the registered set using modular index
                     const chosenUri = registeredUris[indexRaw % registeredUris.length];
@@ -45,7 +45,7 @@ describe('Feature: redirect-uri-validation, Property 1: Redirect URI validation 
                     expect(result).toEqual(chosenUri);
                 },
             ),
-            { numRuns: 200 },
+            {numRuns: 200},
         );
     });
 
@@ -67,7 +67,7 @@ describe('Feature: redirect-uri-validation, Property 1: Redirect URI validation 
                     }
                 },
             ),
-            { numRuns: 200 },
+            {numRuns: 200},
         );
     });
 
@@ -98,7 +98,7 @@ describe('Feature: redirect-uri-validation, Property 1: Redirect URI validation 
                     }
                 },
             ),
-            { numRuns: 200 },
+            {numRuns: 200},
         );
     });
 });
@@ -118,7 +118,7 @@ describe('Feature: redirect-uri-validation, Property 2: Omitted redirect_uri res
     // Generator: arbitrary URI-like strings
     const uriArb = fc.oneof(
         fc.webUrl(),
-        fc.string({ minLength: 1, maxLength: 200 }),
+        fc.string({minLength: 1, maxLength: 200}),
     );
 
     function makeClient(redirectUris: string[]): Client {
@@ -137,7 +137,7 @@ describe('Feature: redirect-uri-validation, Property 2: Omitted redirect_uri res
                     expect(result).toEqual(singleUri);
                 },
             ),
-            { numRuns: 200 },
+            {numRuns: 200},
         );
     });
 
@@ -154,7 +154,7 @@ describe('Feature: redirect-uri-validation, Property 2: Omitted redirect_uri res
     it('throws invalid_request when client has more than one registered URI and redirect_uri is omitted', () => {
         fc.assert(
             fc.property(
-                fc.uniqueArray(uriArb, { minLength: 2, maxLength: 10 }),
+                fc.uniqueArray(uriArb, {minLength: 2, maxLength: 10}),
                 (registeredUris) => {
                     const client = makeClient(registeredUris);
                     expect(() => service.validateRedirectUri(client, undefined)).toThrow(OAuthException);
@@ -165,14 +165,14 @@ describe('Feature: redirect-uri-validation, Property 2: Omitted redirect_uri res
                     }
                 },
             ),
-            { numRuns: 200 },
+            {numRuns: 200},
         );
     });
 
     it('biconditional: omitted redirect_uri succeeds iff client has exactly one registered URI', () => {
         fc.assert(
             fc.property(
-                fc.uniqueArray(uriArb, { minLength: 0, maxLength: 10 }),
+                fc.uniqueArray(uriArb, {minLength: 0, maxLength: 10}),
                 (registeredUris) => {
                     const client = makeClient(registeredUris);
                     const hasExactlyOne = registeredUris.length === 1;
@@ -195,7 +195,7 @@ describe('Feature: redirect-uri-validation, Property 2: Omitted redirect_uri res
                     }
                 },
             ),
-            { numRuns: 200 },
+            {numRuns: 200},
         );
     });
 });
@@ -227,7 +227,7 @@ describe('Feature: redirect-uri-validation, Property 7: No URI normalization —
             const url = new URL(uri);
             // Uppercase the scheme portion and host
             return uri.replace(url.protocol, url.protocol.toUpperCase())
-                      .replace(url.hostname, url.hostname.toUpperCase());
+                .replace(url.hostname, url.hostname.toUpperCase());
         } catch {
             // Fallback: just uppercase the whole thing
             return uri.toUpperCase();
@@ -309,10 +309,10 @@ describe('Feature: redirect-uri-validation, Property 7: No URI normalization —
 
     // Transformation descriptor: name + function
     const transformations: Array<{ name: string; fn: (uri: string) => string }> = [
-        { name: 'case change', fn: applyCaseChange },
-        { name: 'trailing slash toggle', fn: toggleTrailingSlash },
-        { name: 'unnecessary percent-encoding', fn: addUnnecessaryPercentEncoding },
-        { name: 'query param reorder', fn: reorderQueryParams },
+        {name: 'case change', fn: applyCaseChange},
+        {name: 'trailing slash toggle', fn: toggleTrailingSlash},
+        {name: 'unnecessary percent-encoding', fn: addUnnecessaryPercentEncoding},
+        {name: 'query param reorder', fn: reorderQueryParams},
     ];
 
     // Generator: well-formed web URLs that give transformations something to work with
@@ -324,7 +324,7 @@ describe('Feature: redirect-uri-validation, Property 7: No URI normalization —
     );
 
     // Generator: pick a transformation index
-    const transformIndexArb = fc.nat({ max: transformations.length - 1 });
+    const transformIndexArb = fc.nat({max: transformations.length - 1});
 
     it('rejects semantically equivalent but textually different URIs (all transformations)', () => {
         fc.assert(
@@ -349,7 +349,7 @@ describe('Feature: redirect-uri-validation, Property 7: No URI normalization —
                     }
                 },
             ),
-            { numRuns: 200 },
+            {numRuns: 200},
         );
     });
 
@@ -365,7 +365,7 @@ describe('Feature: redirect-uri-validation, Property 7: No URI normalization —
                     expect(() => service.validateRedirectUri(client, transformed)).toThrow(OAuthException);
                 },
             ),
-            { numRuns: 200 },
+            {numRuns: 200},
         );
     });
 
@@ -381,7 +381,7 @@ describe('Feature: redirect-uri-validation, Property 7: No URI normalization —
                     expect(() => service.validateRedirectUri(client, transformed)).toThrow(OAuthException);
                 },
             ),
-            { numRuns: 200 },
+            {numRuns: 200},
         );
     });
 
@@ -397,7 +397,7 @@ describe('Feature: redirect-uri-validation, Property 7: No URI normalization —
                     expect(() => service.validateRedirectUri(client, transformed)).toThrow(OAuthException);
                 },
             ),
-            { numRuns: 200 },
+            {numRuns: 200},
         );
     });
 
@@ -414,7 +414,7 @@ describe('Feature: redirect-uri-validation, Property 7: No URI normalization —
                     expect(() => service.validateRedirectUri(client, transformed)).toThrow(OAuthException);
                 },
             ),
-            { numRuns: 200 },
+            {numRuns: 200},
         );
     });
 });

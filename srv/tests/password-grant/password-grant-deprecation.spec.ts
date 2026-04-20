@@ -14,12 +14,12 @@
  *
  * Requirements: 1.1-1.6, 3.1-3.3, 4.1-4.4, 5.1-5.3, 8.1-8.2, 9.1-9.2, 10.1-10.2
  */
-import { SharedTestFixture } from '../shared-test.fixture';
-import { TokenFixture } from '../token.fixture';
-import { ClientEntityClient } from '../api-client/client-entity-client';
-import { TenantClient } from '../api-client/tenant-client';
-import { AdminTenantClient } from '../api-client/admin-tenant-client';
-import { HelperFixture } from '../helper.fixture';
+import {SharedTestFixture} from '../shared-test.fixture';
+import {TokenFixture} from '../token.fixture';
+import {ClientEntityClient} from '../api-client/client-entity-client';
+import {TenantClient} from '../api-client/tenant-client';
+import {AdminTenantClient} from '../api-client/admin-tenant-client';
+import {HelperFixture} from '../helper.fixture';
 
 const CODE_CHALLENGE = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq';
 const CODE_VERIFIER = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq';
@@ -38,7 +38,7 @@ describe('Password Grant Deprecation Integration Tests', () => {
     beforeAll(async () => {
         app = new SharedTestFixture();
         const tokenFixture = new TokenFixture(app);
-        
+
         // Get super-admin access token using the default first-party client
         const tokenResponse = await tokenFixture.fetchAccessToken(
             'admin@auth.server.com',
@@ -178,11 +178,12 @@ describe('Password Grant Deprecation Integration Tests', () => {
                 expect(response.body.expires_in).toBeDefined();
 
                 // Verify the JWT contains expected claims
-                const decoded = app.jwtService().decode(response.body.access_token, { json: true }) as any;
+                const decoded = app.jwtService().decode(response.body.access_token, {json: true}) as any;
                 expect(decoded.sub).toBeDefined();
                 expect(decoded.grant_type).toEqual('password');
             } finally {
-                await clientApi.deleteClient(clientId).catch(() => {});
+                await clientApi.deleteClient(clientId).catch(() => {
+                });
             }
         });
     });
@@ -222,8 +223,8 @@ describe('Password Grant Deprecation Integration Tests', () => {
             expect(uuidResponse.status).toEqual(201);
 
             // Both should return valid tokens with same structure
-            const aliasDecoded = app.jwtService().decode(aliasResponse.body.access_token, { json: true }) as any;
-            const uuidDecoded = app.jwtService().decode(uuidResponse.body.access_token, { json: true }) as any;
+            const aliasDecoded = app.jwtService().decode(aliasResponse.body.access_token, {json: true}) as any;
+            const uuidDecoded = app.jwtService().decode(uuidResponse.body.access_token, {json: true}) as any;
 
             // Same tenant, same user, same grant type
             expect(aliasDecoded.tenant.id).toEqual(uuidDecoded.tenant.id);
@@ -254,7 +255,8 @@ describe('Password Grant Deprecation Integration Tests', () => {
                 expect(response.body.error).toEqual('unauthorized_client');
                 expect(response.body.error_description).toContain('password grant is not permitted');
             } finally {
-                await clientApi.deleteClient(clientId).catch(() => {});
+                await clientApi.deleteClient(clientId).catch(() => {
+                });
             }
         });
 
@@ -327,7 +329,8 @@ describe('Password Grant Deprecation Integration Tests', () => {
                 expect(response.body.error).toEqual('unauthorized_client');
                 expect(response.body.error).not.toEqual('invalid_grant');
             } finally {
-                await clientApi.deleteClient(clientId).catch(() => {});
+                await clientApi.deleteClient(clientId).catch(() => {
+                });
             }
         });
 
@@ -353,7 +356,8 @@ describe('Password Grant Deprecation Integration Tests', () => {
                 expect(response.status).toEqual(400);
                 expect(response.body.error).toEqual('unauthorized_client');
             } finally {
-                await clientApi.deleteClient(clientId).catch(() => {});
+                await clientApi.deleteClient(clientId).catch(() => {
+                });
             }
         });
     });
@@ -504,7 +508,8 @@ describe('Password Grant Deprecation Integration Tests', () => {
                 expect(response.body.requires_consent).toBe(true);
                 expect(response.body.authentication_code).toBeUndefined();
             } finally {
-                await clientApi.deleteClient(clientId).catch(() => {});
+                await clientApi.deleteClient(clientId).catch(() => {
+                });
             }
         });
     });
@@ -622,7 +627,8 @@ describe('Password Grant Deprecation Integration Tests', () => {
                 expect(secondLogin.body.authentication_code).toBeDefined();
                 expect(secondLogin.body.requires_consent).toBeUndefined();
             } finally {
-                await clientApi.deleteClient(clientId).catch(() => {});
+                await clientApi.deleteClient(clientId).catch(() => {
+                });
             }
         });
 

@@ -25,129 +25,130 @@
  * (controller-advice pattern) rather than scattering try/catch blocks in controllers.
  */
 import {
-  ArgumentsHost,
-  BadRequestException,
-  Catch,
-  ExceptionFilter,
-  HttpException,
-  Injectable,
-  Logger,
-  UnauthorizedException,
+    ArgumentsHost,
+    BadRequestException,
+    Catch,
+    ExceptionFilter,
+    HttpException,
+    Injectable,
+    Logger,
+    UnauthorizedException,
 } from '@nestjs/common';
-import { Request, Response } from 'express';
-import { OAuthException } from '../oauth-exception';
-import { SecurityEventLogger } from '../../security/security-event-logger.service';
+import {Request, Response} from 'express';
+import {OAuthException} from '../oauth-exception';
+import {SecurityEventLogger} from '../../security/security-event-logger.service';
 
 @Injectable()
 @Catch()
 export class OAuthExceptionFilter implements ExceptionFilter {
-  private static readonly LOGGER = new Logger(OAuthExceptionFilter.name);
+    private static readonly LOGGER = new Logger(OAuthExceptionFilter.name);
 
-  constructor(private readonly securityEventLogger: SecurityEventLogger) {}
-
-  catch(exception: Error, host: ArgumentsHost): void {
-    const ctx = host.switchToHttp();
-    const response = ctx.getResponse<Response>();
-    const request = ctx.getRequest<Request>();
-
-    let error: string;
-    let errorDescription: string;
-    let statusCode: number;
-
-    // First-class OAuth errors — already carry the correct code and description
-    if (exception instanceof OAuthException) {
-      error = exception.errorCode;
-      errorDescription = exception.errorDescription;
-      statusCode = exception.getStatus();
-
-    // NestJS HttpExceptions that weren't thrown as OAuthException
-    } else if (exception instanceof HttpException) {
-      const body = exception.getResponse();
-
-      // Validation failures and malformed requests → invalid_request
-      if (exception instanceof BadRequestException) {
-        const msg = typeof body === 'string' ? body : (body as any)?.message;
-        error = 'invalid_request';
-        errorDescription = typeof msg === 'string' ? msg : 'Bad request';
-        statusCode = 400;
-
-      // Legacy errors already shaped as { error, error_description } — pass through
-      } else if (typeof body === 'object' && body !== null && 'error' in body) {
-        const shaped = body as Record<string, unknown>;
-        error = String(shaped.error);
-        errorDescription = shaped.error_description != null ? String(shaped.error_description) : '';
-        statusCode = exception.getStatus();
-
-      // Auth failures without explicit OAuth shaping → invalid_client
-      } else if (exception instanceof UnauthorizedException) {
-        error = 'invalid_client';
-        errorDescription = 'Client authentication failed';
-        statusCode = 401;
-
-      // Any other HttpException — safe generic fallback
-      } else {
-        error = 'server_error';
-        errorDescription = 'An unexpected error occurred';
-        statusCode = 400;
-      }
-
-    // Non-HTTP exceptions (e.g. TypeORM, runtime errors) — never leak details
-    } else {
-      error = 'server_error';
-      errorDescription = 'An unexpected error occurred';
-      statusCode = 400;
+    constructor(private readonly securityEventLogger: SecurityEventLogger) {
     }
 
-    // Log login failure security events (Requirements 3.1, 3.2, 3.3)
-    this.logLoginFailureIfApplicable(request, exception, error);
+    catch(exception: Error, host: ArgumentsHost): void {
+        const ctx = host.switchToHttp();
+        const response = ctx.getResponse<Response>();
+        const request = ctx.getRequest<Request>();
 
-    // Full error detail logged server-side for debugging; never sent to the client
-    OAuthExceptionFilter.LOGGER.error(
-      `OAuth error [${error}]: ${exception.message}`,
-      exception.stack,
-    );
+        let error: string;
+        let errorDescription: string;
+        let statusCode: number;
 
-    // Security: Never reveal "Account is locked" to the client
-    // Replace with generic message to prevent account enumeration
-    const clientErrorDescription =
-      errorDescription === 'Account is locked'
-        ? 'Invalid email or password'
-        : errorDescription;
+        // First-class OAuth errors — already carry the correct code and description
+        if (exception instanceof OAuthException) {
+            error = exception.errorCode;
+            errorDescription = exception.errorDescription;
+            statusCode = exception.getStatus();
 
-    // RFC 6749 §5.2: error response with no-store caching
-    response
-      .status(statusCode)
-      .set('Content-Type', 'application/json;charset=UTF-8')
-      .set('Cache-Control', 'no-store')
-      .set('Pragma', 'no-cache')
-      .json({ error, error_description: clientErrorDescription });
-  }
+            // NestJS HttpExceptions that weren't thrown as OAuthException
+        } else if (exception instanceof HttpException) {
+            const body = exception.getResponse();
 
-  /**
-   * Detect login endpoint failures and log the appropriate security event.
-   * Only fires for POST /api/oauth/login with OAuthException invalid_grant.
-   */
-  private logLoginFailureIfApplicable(
-    request: Request,
-    exception: Error,
-    errorCode: string,
-  ): void {
-    if (!request.url?.startsWith('/api/oauth/login')) {
-      return;
+            // Validation failures and malformed requests → invalid_request
+            if (exception instanceof BadRequestException) {
+                const msg = typeof body === 'string' ? body : (body as any)?.message;
+                error = 'invalid_request';
+                errorDescription = typeof msg === 'string' ? msg : 'Bad request';
+                statusCode = 400;
+
+                // Legacy errors already shaped as { error, error_description } — pass through
+            } else if (typeof body === 'object' && body !== null && 'error' in body) {
+                const shaped = body as Record<string, unknown>;
+                error = String(shaped.error);
+                errorDescription = shaped.error_description != null ? String(shaped.error_description) : '';
+                statusCode = exception.getStatus();
+
+                // Auth failures without explicit OAuth shaping → invalid_client
+            } else if (exception instanceof UnauthorizedException) {
+                error = 'invalid_client';
+                errorDescription = 'Client authentication failed';
+                statusCode = 401;
+
+                // Any other HttpException — safe generic fallback
+            } else {
+                error = 'server_error';
+                errorDescription = 'An unexpected error occurred';
+                statusCode = 400;
+            }
+
+            // Non-HTTP exceptions (e.g. TypeORM, runtime errors) — never leak details
+        } else {
+            error = 'server_error';
+            errorDescription = 'An unexpected error occurred';
+            statusCode = 400;
+        }
+
+        // Log login failure security events (Requirements 3.1, 3.2, 3.3)
+        this.logLoginFailureIfApplicable(request, exception, error);
+
+        // Full error detail logged server-side for debugging; never sent to the client
+        OAuthExceptionFilter.LOGGER.error(
+            `OAuth error [${error}]: ${exception.message}`,
+            exception.stack,
+        );
+
+        // Security: Never reveal "Account is locked" to the client
+        // Replace with generic message to prevent account enumeration
+        const clientErrorDescription =
+            errorDescription === 'Account is locked'
+                ? 'Invalid email or password'
+                : errorDescription;
+
+        // RFC 6749 §5.2: error response with no-store caching
+        response
+            .status(statusCode)
+            .set('Content-Type', 'application/json;charset=UTF-8')
+            .set('Cache-Control', 'no-store')
+            .set('Pragma', 'no-cache')
+            .json({error, error_description: clientErrorDescription});
     }
 
-    if (!(exception instanceof OAuthException) || exception.errorCode !== 'invalid_grant') {
-      return;
-    }
+    /**
+     * Detect login endpoint failures and log the appropriate security event.
+     * Only fires for POST /api/oauth/login with OAuthException invalid_grant.
+     */
+    private logLoginFailureIfApplicable(
+        request: Request,
+        exception: Error,
+        errorCode: string,
+    ): void {
+        if (!request.url?.startsWith('/api/oauth/login')) {
+            return;
+        }
 
-    const email = request.body?.email || 'unknown';
-    const clientId = request.body?.client_id || 'unknown';
-    const sourceIp = request.ip || request.socket?.remoteAddress || 'unknown';
+        if (!(exception instanceof OAuthException) || exception.errorCode !== 'invalid_grant') {
+            return;
+        }
 
-    if (exception.errorDescription === 'Account is locked') {
-      this.securityEventLogger.loginLockedAccount({ email, clientId, sourceIp });
-    } else {
-      this.securityEventLogger.loginFailure({ email, clientId, sourceIp });
+        const email = request.body?.email || 'unknown';
+        const clientId = request.body?.client_id || 'unknown';
+        const sourceIp = request.ip || request.socket?.remoteAddress || 'unknown';
+
+        if (exception.errorDescription === 'Account is locked') {
+            this.securityEventLogger.loginLockedAccount({email, clientId, sourceIp});
+        } else {
+            this.securityEventLogger.loginFailure({email, clientId, sourceIp});
+        }
     }
-  }
 }

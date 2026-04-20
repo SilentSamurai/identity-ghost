@@ -9,8 +9,8 @@
  *
  * These are integration tests using SharedTestFixture with the full running app and real database.
  */
-import { SharedTestFixture } from '../shared-test.fixture';
-import { TokenFixture } from '../token.fixture';
+import {SharedTestFixture} from '../shared-test.fixture';
+import {TokenFixture} from '../token.fixture';
 
 describe('ConsentService Integration Tests', () => {
     let app: SharedTestFixture;

@@ -3,7 +3,7 @@ import {SecurityService} from '../../src/casl/security.service';
 import {Environment} from '../../src/config/environment.service';
 import {AuthUserService} from '../../src/casl/authUser.service';
 import {CaslAbilityFactory} from '../../src/casl/casl-ability.factory';
-import {AuthContext, GRANT_TYPES, InternalToken, TechnicalToken, TenantToken} from '../../src/casl/contexts';
+import {AuthContext, GRANT_TYPES, TechnicalToken, TenantToken} from '../../src/casl/contexts';
 import {ForbiddenException, UnauthorizedException} from '@nestjs/common';
 import {RoleEnum} from '../../src/entity/roleEnum';
 import {Action} from '../../src/casl/actions.enum';

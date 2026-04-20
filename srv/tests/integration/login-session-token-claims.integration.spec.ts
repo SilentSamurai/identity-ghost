@@ -1,5 +1,5 @@
-import { SharedTestFixture } from '../shared-test.fixture';
-import { TokenFixture } from '../token.fixture';
+import {SharedTestFixture} from '../shared-test.fixture';
+import {TokenFixture} from '../token.fixture';
 
 const UUID_V4_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -42,7 +42,7 @@ describe('Login Session Token Claims', () => {
         expect(tokenResult.id_token).toBeDefined();
 
         // Decode the ID token
-        const decoded = app.jwtService().decode(tokenResult.id_token, { json: true }) as any;
+        const decoded = app.jwtService().decode(tokenResult.id_token, {json: true}) as any;
 
         // auth_time must be an integer (Unix epoch seconds)
         expect(decoded.auth_time).toBeDefined();
@@ -68,7 +68,7 @@ describe('Login Session Token Claims', () => {
         expect(response.status).toEqual(201);
         expect(response.body.id_token).toBeDefined();
 
-        const decoded = app.jwtService().decode(response.body.id_token, { json: true }) as any;
+        const decoded = app.jwtService().decode(response.body.id_token, {json: true}) as any;
 
         // auth_time must be an integer (Unix epoch seconds)
         expect(decoded.auth_time).toBeDefined();
@@ -98,7 +98,7 @@ describe('Login Session Token Claims', () => {
         expect(passwordResponse.body.access_token).toBeDefined();
 
         // Decode the original ID token
-        const originalDecoded = app.jwtService().decode(passwordResponse.body.id_token, { json: true }) as any;
+        const originalDecoded = app.jwtService().decode(passwordResponse.body.id_token, {json: true}) as any;
         expect(originalDecoded.auth_time).toBeDefined();
         expect(originalDecoded.sid).toBeDefined();
 
@@ -128,7 +128,7 @@ describe('Login Session Token Claims', () => {
         expect(refreshResponse.body.id_token).toBeDefined();
 
         // Step 4: Decode the refreshed ID token
-        const refreshedDecoded = app.jwtService().decode(refreshResponse.body.id_token, { json: true }) as any;
+        const refreshedDecoded = app.jwtService().decode(refreshResponse.body.id_token, {json: true}) as any;
 
         // Step 5: Verify auth_time and sid are preserved from the original session
         expect(refreshedDecoded.auth_time).toEqual(originalDecoded.auth_time);
@@ -149,7 +149,7 @@ describe('Login Session Token Claims', () => {
         expect(response.status).toEqual(201);
         expect(response.body.id_token).toBeDefined();
 
-        const decoded = app.jwtService().decode(response.body.id_token, { json: true }) as any;
+        const decoded = app.jwtService().decode(response.body.id_token, {json: true}) as any;
 
         expect(decoded.auth_time).toBeDefined();
         expect(Number.isInteger(decoded.auth_time)).toBe(true);
@@ -169,7 +169,7 @@ describe('Login Session Token Claims', () => {
         expect(response.status).toEqual(201);
         expect(response.body.id_token).toBeDefined();
 
-        const decoded = app.jwtService().decode(response.body.id_token, { json: true }) as any;
+        const decoded = app.jwtService().decode(response.body.id_token, {json: true}) as any;
 
         expect(decoded.sid).toBeDefined();
         expect(typeof decoded.sid).toBe('string');

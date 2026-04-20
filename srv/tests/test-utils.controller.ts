@@ -1,4 +1,4 @@
-import {Body, Controller, Get, Param, Post, HttpCode} from "@nestjs/common";
+import {Body, Controller, Get, HttpCode, Param, Post} from "@nestjs/common";
 import {InjectRepository} from "@nestjs/typeorm";
 import {Repository} from "typeorm";
 import {LoginSession} from "../src/entity/login-session.entity";
@@ -23,7 +23,8 @@ export class TestUtilsController {
         private readonly authCodeRepo: Repository<AuthCode>,
         @InjectRepository(User)
         private readonly userRepo: Repository<User>,
-    ) {}
+    ) {
+    }
 
     /**
      * Force-expire a login session by setting its expiresAt to the past.

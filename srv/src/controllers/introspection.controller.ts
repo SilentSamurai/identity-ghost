@@ -1,6 +1,6 @@
 import {Body, Controller, Header, HttpCode, Logger, Post, Req} from '@nestjs/common';
 import {Request} from 'express';
-import {TokenIntrospectionService, IntrospectionResponse} from '../auth/token-introspection.service';
+import {IntrospectionResponse, TokenIntrospectionService} from '../auth/token-introspection.service';
 import {OAuthException} from '../exceptions/oauth-exception';
 import {parseBasicAuthHeader} from '../util/http.util';
 
@@ -23,7 +23,8 @@ const logger = new Logger('IntrospectionController');
  */
 @Controller('api/oauth')
 export class IntrospectionController {
-    constructor(private readonly introspectionService: TokenIntrospectionService) {}
+    constructor(private readonly introspectionService: TokenIntrospectionService) {
+    }
 
     /**
      * POST /api/oauth/introspect

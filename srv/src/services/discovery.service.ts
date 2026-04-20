@@ -1,5 +1,5 @@
-import { Injectable } from "@nestjs/common";
-import { createHash } from "crypto";
+import {Injectable} from "@nestjs/common";
+import {createHash} from "crypto";
 
 /**
  * OIDC Discovery Document metadata as defined by OpenID Connect Discovery 1.0 §4.
@@ -41,7 +41,7 @@ export class DiscoveryService {
 
     /**
      * Builds the OIDC Discovery document for a given base URL and tenant domain.
-     * 
+     *
      * @param baseUrl - The base URL derived from request headers (protocol + host)
      * @param tenantDomain - The tenant domain from the URL path parameter
      * @returns An object containing the JSON body and SHA-256 ETag
@@ -66,6 +66,6 @@ export class DiscoveryService {
         const body = JSON.stringify(document);
         const etag = `"${createHash("sha256").update(body).digest("hex")}"`;
 
-        return { body, etag };
+        return {body, etag};
     }
 }

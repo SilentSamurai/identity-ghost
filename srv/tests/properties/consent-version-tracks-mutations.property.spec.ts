@@ -1,8 +1,8 @@
 import * as fc from 'fast-check';
-import { SharedTestFixture } from '../shared-test.fixture';
-import { TokenFixture } from '../token.fixture';
-import { ClientEntityClient } from '../api-client/client-entity-client';
-import { TenantClient } from '../api-client/tenant-client';
+import {SharedTestFixture} from '../shared-test.fixture';
+import {TokenFixture} from '../token.fixture';
+import {ClientEntityClient} from '../api-client/client-entity-client';
+import {TenantClient} from '../api-client/tenant-client';
 
 /**
  * Feature: user-consent-tracking, Property 1: Consent version tracks mutation count
@@ -25,7 +25,7 @@ describe('Feature: user-consent-tracking, Property 1: Consent version tracks mut
     beforeAll(async () => {
         fixture = new SharedTestFixture();
         const tokenFixture = new TokenFixture(fixture);
-        const { accessToken } = await tokenFixture.fetchAccessToken(
+        const {accessToken} = await tokenFixture.fetchAccessToken(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com',
@@ -85,8 +85,8 @@ describe('Feature: user-consent-tracking, Property 1: Consent version tracks mut
             fc.asyncProperty(
                 // Generate a sequence of 1–10 scope arrays, each representing one grant operation
                 fc.array(
-                    fc.subarray(['openid', 'profile', 'email'], { minLength: 1 }),
-                    { minLength: 1, maxLength: 10 },
+                    fc.subarray(['openid', 'profile', 'email'], {minLength: 1}),
+                    {minLength: 1, maxLength: 10},
                 ),
                 async (scopeSequence) => {
                     // Create a fresh client for this iteration to avoid DB state leakage
@@ -146,18 +146,19 @@ describe('Feature: user-consent-tracking, Property 1: Consent version tracks mut
                         expect(loginResponse.body.authentication_code).toBeDefined();
                         expect(loginResponse.body.requires_consent).toBeUndefined();
                     } finally {
-                        await clientApi.deleteClient(clientId).catch(() => {});
+                        await clientApi.deleteClient(clientId).catch(() => {
+                        });
                     }
                 },
             ),
-            { numRuns: 10 },
+            {numRuns: 10},
         );
     }, 300_000);
 
     it('first grant sets consent_version to 1 (single grant produces a valid consent record)', async () => {
         await fc.assert(
             fc.asyncProperty(
-                fc.subarray(['openid', 'profile', 'email'], { minLength: 1 }),
+                fc.subarray(['openid', 'profile', 'email'], {minLength: 1}),
                 async (scopes) => {
                     const uniqueSuffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
                     const client = await clientApi.createClient(
@@ -212,11 +213,12 @@ describe('Feature: user-consent-tracking, Property 1: Consent version tracks mut
                         expect(afterResponse.body.authentication_code).toBeDefined();
                         expect(afterResponse.body.requires_consent).toBeUndefined();
                     } finally {
-                        await clientApi.deleteClient(clientId).catch(() => {});
+                        await clientApi.deleteClient(clientId).catch(() => {
+                        });
                     }
                 },
             ),
-            { numRuns: 10 },
+            {numRuns: 10},
         );
     }, 300_000);
 
@@ -224,8 +226,8 @@ describe('Feature: user-consent-tracking, Property 1: Consent version tracks mut
         await fc.assert(
             fc.asyncProperty(
                 fc.array(
-                    fc.subarray(['openid', 'profile', 'email'], { minLength: 1 }),
-                    { minLength: 2, maxLength: 5 },
+                    fc.subarray(['openid', 'profile', 'email'], {minLength: 1}),
+                    {minLength: 2, maxLength: 5},
                 ),
                 async (scopeSequence) => {
                     const uniqueSuffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -271,11 +273,12 @@ describe('Feature: user-consent-tracking, Property 1: Consent version tracks mut
                             expect(loginResponse.body.requires_consent).toBeUndefined();
                         }
                     } finally {
-                        await clientApi.deleteClient(clientId).catch(() => {});
+                        await clientApi.deleteClient(clientId).catch(() => {
+                        });
                     }
                 },
             ),
-            { numRuns: 10 },
+            {numRuns: 10},
         );
     }, 300_000);
 });

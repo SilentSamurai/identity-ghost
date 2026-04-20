@@ -1,5 +1,5 @@
-import { SharedTestFixture } from '../shared-test.fixture';
-import { TokenFixture } from '../token.fixture';
+import {SharedTestFixture} from '../shared-test.fixture';
+import {TokenFixture} from '../token.fixture';
 
 const UUID_V4_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -42,7 +42,7 @@ describe('Login Session Threading', () => {
         expect(tokenResult.id_token).toBeDefined();
 
         // Step 3: Decode the ID token and verify sid is a UUID v4
-        const decoded = app.jwtService().decode(tokenResult.id_token, { json: true }) as any;
+        const decoded = app.jwtService().decode(tokenResult.id_token, {json: true}) as any;
         expect(decoded.sid).toBeDefined();
         expect(typeof decoded.sid).toBe('string');
         expect(decoded.sid).toMatch(UUID_V4_REGEX);
@@ -66,7 +66,7 @@ describe('Login Session Threading', () => {
         expect(passwordResponse.body.access_token).toBeDefined();
 
         // Decode the original ID token
-        const originalDecoded = app.jwtService().decode(passwordResponse.body.id_token, { json: true }) as any;
+        const originalDecoded = app.jwtService().decode(passwordResponse.body.id_token, {json: true}) as any;
         expect(originalDecoded.sid).toBeDefined();
         expect(originalDecoded.sid).toMatch(UUID_V4_REGEX);
 
@@ -77,7 +77,7 @@ describe('Login Session Threading', () => {
             .set('Accept', 'application/json');
 
         expect(credentialsResponse.status).toEqual(200);
-        const { clientId, clientSecret } = credentialsResponse.body;
+        const {clientId, clientSecret} = credentialsResponse.body;
         expect(clientSecret).toBeDefined();
 
         // Step 3: Refresh the token
@@ -95,7 +95,7 @@ describe('Login Session Threading', () => {
         expect(refreshResponse.body.id_token).toBeDefined();
 
         // Step 4: Decode the refreshed ID token and verify sid matches the original
-        const refreshedDecoded = app.jwtService().decode(refreshResponse.body.id_token, { json: true }) as any;
+        const refreshedDecoded = app.jwtService().decode(refreshResponse.body.id_token, {json: true}) as any;
         expect(refreshedDecoded.sid).toBeDefined();
         expect(refreshedDecoded.sid).toEqual(originalDecoded.sid);
     });
@@ -113,7 +113,7 @@ describe('Login Session Threading', () => {
             .set('Accept', 'application/json');
 
         expect(passwordResponse.status).toEqual(201);
-        const originalDecoded = app.jwtService().decode(passwordResponse.body.id_token, { json: true }) as any;
+        const originalDecoded = app.jwtService().decode(passwordResponse.body.id_token, {json: true}) as any;
         const originalSid = originalDecoded.sid;
         expect(originalSid).toBeDefined();
         expect(originalSid).toMatch(UUID_V4_REGEX);
@@ -125,7 +125,7 @@ describe('Login Session Threading', () => {
             .set('Accept', 'application/json');
 
         expect(credentialsResponse.status).toEqual(200);
-        const { clientId, clientSecret } = credentialsResponse.body;
+        const {clientId, clientSecret} = credentialsResponse.body;
 
         // Step 3: First refresh (rotation #1)
         const refresh1Response = await app.getHttpServer()
@@ -142,7 +142,7 @@ describe('Login Session Threading', () => {
         expect(refresh1Response.body.refresh_token).toBeDefined();
         expect(refresh1Response.body.id_token).toBeDefined();
 
-        const refresh1Decoded = app.jwtService().decode(refresh1Response.body.id_token, { json: true }) as any;
+        const refresh1Decoded = app.jwtService().decode(refresh1Response.body.id_token, {json: true}) as any;
         expect(refresh1Decoded.sid).toEqual(originalSid);
 
         // Step 4: Second refresh (rotation #2) — uses the rotated refresh token
@@ -159,7 +159,7 @@ describe('Login Session Threading', () => {
         expect(refresh2Response.status).toEqual(201);
         expect(refresh2Response.body.id_token).toBeDefined();
 
-        const refresh2Decoded = app.jwtService().decode(refresh2Response.body.id_token, { json: true }) as any;
+        const refresh2Decoded = app.jwtService().decode(refresh2Response.body.id_token, {json: true}) as any;
 
         // Step 5: Verify all three ID tokens share the same sid
         expect(refresh2Decoded.sid).toEqual(originalSid);

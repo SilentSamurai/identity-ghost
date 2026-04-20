@@ -1,9 +1,16 @@
-import {createParamDecorator, ExecutionContext, ForbiddenException, Inject, Injectable, PipeTransform, forwardRef} from "@nestjs/common";
+import {
+    createParamDecorator,
+    ExecutionContext,
+    ForbiddenException,
+    forwardRef,
+    Inject,
+    Injectable,
+    PipeTransform
+} from "@nestjs/common";
 import {AuthContext, TenantToken, Token} from "../casl/contexts";
 import {AuthUserService} from "../casl/authUser.service";
 import {SecurityService} from "../casl/security.service";
 import {Action} from "../casl/actions.enum";
-import {subject} from "@casl/ability";
 import {User} from "../entity/user.entity";
 
 /**
@@ -45,7 +52,8 @@ export const CurrentToken = createParamDecorator(
  */
 @Injectable()
 export class ResolveUserPipe implements PipeTransform<string, Promise<User>> {
-    constructor(private readonly authUserService: AuthUserService) {}
+    constructor(private readonly authUserService: AuthUserService) {
+    }
 
     async transform(userId: string): Promise<User> {
         return this.authUserService.findUserById(userId);
@@ -87,7 +95,8 @@ export class Permission {
         /** @deprecated Use Permission methods directly instead of accessing authContext. Pass `permission.authContext` to services only when required by existing service signatures. */
         readonly authContext: AuthContext,
         private readonly securityService: SecurityService,
-    ) {}
+    ) {
+    }
 
     /**
      * Check if the current user is authorized to perform the given action on the subject.
@@ -116,7 +125,8 @@ const CurrentAuthContext = createParamDecorator(
  */
 @Injectable()
 export class ResolvePermissionPipe implements PipeTransform<AuthContext, Permission> {
-    constructor(@Inject(forwardRef(() => SecurityService)) private readonly securityService: SecurityService) {}
+    constructor(@Inject(forwardRef(() => SecurityService)) private readonly securityService: SecurityService) {
+    }
 
     transform(authContext: AuthContext): Permission {
         return new Permission(authContext, this.securityService);

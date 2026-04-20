@@ -83,7 +83,7 @@ describe('Property 7: Tenant isolation prevents cross-tenant revocation', () => 
                 // Attempt revocation using the cross-tenant Bearer token
                 const revokeResponse = await fixture.getHttpServer()
                     .post('/api/oauth/revoke')
-                    .send({ token: result.refreshToken })
+                    .send({token: result.refreshToken})
                     .set('Authorization', `Bearer ${crossTenantAccessToken}`)
                     .set('Accept', 'application/json');
 

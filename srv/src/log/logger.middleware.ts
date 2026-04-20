@@ -1,6 +1,6 @@
 import {Injectable, Logger, NestMiddleware} from "@nestjs/common";
 import {NextFunction, Request, Response} from "express";
-import {redactBody, redactAuthorizationHeader} from "./redaction.util";
+import {redactAuthorizationHeader, redactBody} from "./redaction.util";
 
 const WHITE_COLOR: string = "\x1b[0m";
 const GREEN_COLOR: string = "\x1b[32m";
@@ -63,13 +63,13 @@ export class LoggerMiddleware implements NestMiddleware {
             let message: string = METHOD_TAG(method, originalUrl);
             message += ` (${STATUS_TAG(statusCode)})`;
             message += ` <${ip}> <${userAgent}>`;
-            
+
             // Redact Authorization header if present
             const authHeader = request.get("authorization");
             if (authHeader) {
                 message += ` <Authorization: ${redactAuthorizationHeader(authHeader)}>`;
             }
-            
+
             this.logger.log(message);
 
             if (Object.keys(request.body).length !== 0) {

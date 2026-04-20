@@ -42,7 +42,8 @@ describe('Feature: authorize-endpoint, Property 1: Invalid response_type rejecti
     });
 
     afterAll(async () => {
-        await clientApi.deleteClient(testClientId).catch(() => {});
+        await clientApi.deleteClient(testClientId).catch(() => {
+        });
         await fixture.close();
     });
 
@@ -117,7 +118,8 @@ describe('Feature: authorize-endpoint, Property 2: Redirect URI exact match', ()
     });
 
     afterAll(async () => {
-        await clientApi.deleteClient(testClientId).catch(() => {});
+        await clientApi.deleteClient(testClientId).catch(() => {
+        });
         await fixture.close();
     });
 
@@ -192,7 +194,8 @@ describe('Feature: authorize-endpoint, Property 3: State parameter round-trip', 
     });
 
     afterAll(async () => {
-        await clientApi.deleteClient(testClientId).catch(() => {});
+        await clientApi.deleteClient(testClientId).catch(() => {
+        });
         await fixture.close();
     });
 
@@ -269,7 +272,8 @@ describe('Feature: authorize-endpoint, Property 5: Scope excludes role names', (
     });
 
     afterAll(async () => {
-        await clientApi.deleteClient(testClientId).catch(() => {});
+        await clientApi.deleteClient(testClientId).catch(() => {
+        });
         await fixture.close();
     });
 
@@ -357,7 +361,8 @@ describe('Feature: authorize-endpoint, Property 6: Post-redirect errors include 
     });
 
     afterAll(async () => {
-        await clientApi.deleteClient(pkceRequiredClientId).catch(() => {});
+        await clientApi.deleteClient(pkceRequiredClientId).catch(() => {
+        });
         await fixture.close();
     });
 
@@ -478,7 +483,8 @@ describe('Feature: authorize-endpoint, Property 7: Pre-redirect errors never red
     });
 
     afterAll(async () => {
-        await clientApi.deleteClient(testClientId).catch(() => {});
+        await clientApi.deleteClient(testClientId).catch(() => {
+        });
         await fixture.close();
     });
 
@@ -591,7 +597,8 @@ describe('Feature: authorize-endpoint, Property 8: Error codes are standard OAut
     });
 
     afterAll(async () => {
-        await clientApi.deleteClient(testClientId).catch(() => {});
+        await clientApi.deleteClient(testClientId).catch(() => {
+        });
         await fixture.close();
     });
 

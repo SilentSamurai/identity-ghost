@@ -80,7 +80,8 @@ describe('S256 end-to-end verification', () => {
 
     afterAll(async () => {
         if (isolatedClientId) {
-            await clientApi.deleteClient(isolatedClientId).catch(() => {});
+            await clientApi.deleteClient(isolatedClientId).catch(() => {
+            });
         }
         await app.close();
     });
@@ -188,7 +189,8 @@ describe('S256 end-to-end verification', () => {
             expect(tokenResponse.body.access_token).toBeDefined();
             expect(tokenResponse.body.token_type).toEqual('Bearer');
         } finally {
-            await clientApi.deleteClient(freshClientId).catch(() => {});
+            await clientApi.deleteClient(freshClientId).catch(() => {
+            });
         }
     });
 });

@@ -44,7 +44,7 @@ export class TechnicalTokenService {
     ): Promise<string> {
         additionalScopes = additionalScopes instanceof Array ? additionalScopes : [];
         const payload = this.createTechnicalToken(tenant, additionalScopes);
-        const { privateKey, kid } = await this.signingKeyProvider.getSigningKeyWithKid(tenant.id);
+        const {privateKey, kid} = await this.signingKeyProvider.getSigningKeyWithKid(tenant.id);
         return this.tokenGenerator.sign(payload.asPlainObject(), {
             privateKey,
             keyid: kid,

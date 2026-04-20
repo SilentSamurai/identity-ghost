@@ -16,7 +16,6 @@ import {TokenFixture} from "../token.fixture";
 import {TenantClient} from "../api-client/tenant-client";
 import {SearchClient} from "../api-client/search-client";
 import {HelperFixture} from "../helper.fixture";
-import {AdminTenantClient} from "../api-client/admin-tenant-client";
 
 
 describe('UsersController (e2e)', () => {

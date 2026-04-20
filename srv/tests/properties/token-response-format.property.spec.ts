@@ -18,7 +18,7 @@ describe('TokenResponse Format Properties', () => {
     it('expires_in should be a finite positive integer (Property 1)', () => {
         // Generate positive integers (representing seconds until token expiration)
         // Filter to ensure we only get positive values
-        const positiveIntArb = fc.integer({ min: 1, max: 999999999 }).map(n => n.toString());
+        const positiveIntArb = fc.integer({min: 1, max: 999999999}).map(n => n.toString());
 
         fc.assert(
             fc.property(positiveIntArb, (configValue: string) => {
@@ -35,7 +35,7 @@ describe('TokenResponse Format Properties', () => {
 
                 return isFinite && isInteger && isPositive;
             }),
-            { numRuns: 200 }
+            {numRuns: 200}
         );
     });
 
@@ -63,16 +63,16 @@ describe('TokenResponse Format Properties', () => {
         const userArb = fc.record({
             id: fc.uuid(),
             email: fc.emailAddress(),
-            name: fc.string({ minLength: 1, maxLength: 100 }),
+            name: fc.string({minLength: 1, maxLength: 100}),
         });
 
         // Arbitrary for valid tenant params (private key)
         const tenantArb = fc.record({
-            privateKey: fc.string({ minLength: 100, maxLength: 500 }), // mock RSA private key
+            privateKey: fc.string({minLength: 100, maxLength: 500}), // mock RSA private key
         });
 
         // Arbitrary for client ID
-        const clientIdArb = fc.string({ minLength: 1, maxLength: 100 });
+        const clientIdArb = fc.string({minLength: 1, maxLength: 100});
 
         fc.assert(
             fc.property(
@@ -80,7 +80,9 @@ describe('TokenResponse Format Properties', () => {
                 userArb,
                 tenantArb,
                 clientIdArb,
-                (scopes: string[], user: { id: string; email: string; name: string }, tenant: { privateKey: string }, clientId: string) => {
+                (scopes: string[], user: { id: string; email: string; name: string }, tenant: {
+                    privateKey: string
+                }, clientId: string) => {
                     // Simulate the biconditional logic from IdTokenService
                     const hasOpenid = scopes.includes('openid');
                     const wouldReturnIdToken = hasOpenid;
@@ -93,7 +95,7 @@ describe('TokenResponse Format Properties', () => {
                     return biconditionalHolds;
                 },
             ),
-            { numRuns: 200 }
+            {numRuns: 200}
         );
     });
 
@@ -120,16 +122,16 @@ describe('TokenResponse Format Properties', () => {
         const userArb = fc.record({
             id: fc.uuid(),
             email: fc.emailAddress(),
-            name: fc.string({ minLength: 1, maxLength: 100 }),
+            name: fc.string({minLength: 1, maxLength: 100}),
         });
 
         // Arbitrary for valid tenant params (private key)
         const tenantArb = fc.record({
-            privateKey: fc.string({ minLength: 100, maxLength: 500 }),
+            privateKey: fc.string({minLength: 100, maxLength: 500}),
         });
 
         // Arbitrary for client ID
-        const clientIdArb = fc.string({ minLength: 1, maxLength: 100 });
+        const clientIdArb = fc.string({minLength: 1, maxLength: 100});
 
         // Mock config service for issuer
         const mockIssuer = 'https://auth.example.com';
@@ -140,7 +142,9 @@ describe('TokenResponse Format Properties', () => {
                 userArb,
                 tenantArb,
                 clientIdArb,
-                (scopes: string[], user: { id: string; email: string; name: string }, tenant: { privateKey: string }, clientId: string) => {
+                (scopes: string[], user: { id: string; email: string; name: string }, tenant: {
+                    privateKey: string
+                }, clientId: string) => {
                     // Simulate the IdTokenService.generateIdToken logic
                     const hasOpenid = scopes.includes('openid');
                     const hasEmail = scopes.includes('email');
@@ -186,7 +190,7 @@ describe('TokenResponse Format Properties', () => {
                     return emailBiconditional && nameBiconditional && allRequiredClaims;
                 },
             ),
-            { numRuns: 200 }
+            {numRuns: 200}
         );
     });
 });

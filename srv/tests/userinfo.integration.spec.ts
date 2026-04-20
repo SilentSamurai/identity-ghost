@@ -221,7 +221,7 @@ describe('UserInfo Endpoint Integration', () => {
                     exp: Math.floor(Date.now() / 1000) - 3600, // Expired 1 hour ago
                     iat: Math.floor(Date.now() / 1000) - 7200, // Issued 2 hours ago
                 },
-                { secret: 'test-secret-that-wont-match' },
+                {secret: 'test-secret-that-wont-match'},
             );
 
             const res = await app.getHttpServer()

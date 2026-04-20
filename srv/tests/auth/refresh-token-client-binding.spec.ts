@@ -1,6 +1,5 @@
 import {SharedTestFixture} from "../shared-test.fixture";
 import {TokenFixture} from "../token.fixture";
-import {ClientEntityClient} from "../api-client/client-entity-client";
 
 /**
  * Integration tests for refresh token client binding.

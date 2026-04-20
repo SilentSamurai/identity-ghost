@@ -1,15 +1,16 @@
-import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { UserConsent } from '../entity/user-consent.entity';
-import { ScopeNormalizer } from '../casl/scope-normalizer';
+import {Injectable} from '@nestjs/common';
+import {InjectRepository} from '@nestjs/typeorm';
+import {Repository} from 'typeorm';
+import {UserConsent} from '../entity/user-consent.entity';
+import {ScopeNormalizer} from '../casl/scope-normalizer';
 
 @Injectable()
 export class ConsentService {
     constructor(
         @InjectRepository(UserConsent)
         private readonly userConsentRepository: Repository<UserConsent>,
-    ) {}
+    ) {
+    }
 
     /**
      * Check if the user has already consented to the requested scopes for this client.
@@ -22,11 +23,11 @@ export class ConsentService {
         requestedScopes: string[],
     ): Promise<{ consentRequired: boolean; requestedScopes?: string[] }> {
         const consent = await this.userConsentRepository.findOne({
-            where: { userId, clientId },
+            where: {userId, clientId},
         });
 
         if (!consent) {
-            return { consentRequired: true, requestedScopes };
+            return {consentRequired: true, requestedScopes};
         }
 
         const grantedScopes = ScopeNormalizer.parse(consent.grantedScopes);
@@ -38,10 +39,10 @@ export class ConsentService {
         );
 
         if (allGranted) {
-            return { consentRequired: false };
+            return {consentRequired: false};
         }
 
-        return { consentRequired: true, requestedScopes };
+        return {consentRequired: true, requestedScopes};
     }
 
     /**
@@ -55,7 +56,7 @@ export class ConsentService {
         approvedScopes: string[],
     ): Promise<UserConsent> {
         let consent = await this.userConsentRepository.findOne({
-            where: { userId, clientId },
+            where: {userId, clientId},
         });
 
         if (!consent) {
@@ -89,7 +90,7 @@ export class ConsentService {
         clientId: string,
     ): Promise<UserConsent | null> {
         return this.userConsentRepository.findOne({
-            where: { userId, clientId },
+            where: {userId, clientId},
         });
     }
 }

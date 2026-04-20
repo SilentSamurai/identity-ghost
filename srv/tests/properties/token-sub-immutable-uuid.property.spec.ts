@@ -16,10 +16,10 @@ describe('Property 5: Immutable subject identifier', () => {
     const TENANT_GRANT_TYPES = [GRANT_TYPES.PASSWORD, GRANT_TYPES.CODE, GRANT_TYPES.REFRESH_TOKEN];
 
     const uuidArb = fc.uuid();
-    const nameArb = fc.string({ minLength: 1, maxLength: 50 });
+    const nameArb = fc.string({minLength: 1, maxLength: 50});
     const domainArb = fc.domain();
-    const scopesArb = fc.subarray(VALID_OIDC_SCOPES, { minLength: 0 });
-    const rolesArb = fc.subarray(VALID_ROLES, { minLength: 0 });
+    const scopesArb = fc.subarray(VALID_OIDC_SCOPES, {minLength: 0});
+    const rolesArb = fc.subarray(VALID_ROLES, {minLength: 0});
     const grantTypeArb = fc.constantFrom(...TENANT_GRANT_TYPES);
 
     // RFC 5322 email pattern — simple check for @ sign
@@ -35,7 +35,7 @@ describe('Property 5: Immutable subject identifier', () => {
                 (userId, tenantId, tenantName, tenantDomain, clientId, scopes, roles, grantType) => {
                     const token = TenantToken.create({
                         sub: userId,
-                        tenant: { id: tenantId, name: tenantName, domain: tenantDomain },
+                        tenant: {id: tenantId, name: tenantName, domain: tenantDomain},
                         roles,
                         grant_type: grantType,
                         aud: ['https://auth.example.com'],
@@ -52,7 +52,7 @@ describe('Property 5: Immutable subject identifier', () => {
                     expect(payload.sub).toBe(userId);
                 },
             ),
-            { numRuns: 100 },
+            {numRuns: 100},
         );
     });
 
@@ -64,7 +64,7 @@ describe('Property 5: Immutable subject identifier', () => {
                 (userId, tenantId, tenantName, tenantDomain, clientId, scopes, roles, grantType) => {
                     const token = TenantToken.create({
                         sub: userId,
-                        tenant: { id: tenantId, name: tenantName, domain: tenantDomain },
+                        tenant: {id: tenantId, name: tenantName, domain: tenantDomain},
                         roles,
                         grant_type: grantType,
                         aud: ['https://auth.example.com'],
@@ -83,7 +83,7 @@ describe('Property 5: Immutable subject identifier', () => {
                     expect(payload.sub).not.toMatch(EMAIL_REGEX);
                 },
             ),
-            { numRuns: 100 },
+            {numRuns: 100},
         );
     });
 });

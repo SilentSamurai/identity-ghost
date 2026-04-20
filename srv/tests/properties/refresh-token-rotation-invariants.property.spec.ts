@@ -1,6 +1,6 @@
 import * as fc from 'fast-check';
 import * as crypto from 'crypto';
-import {generateOpaqueToken, hashToken, clampExpiry} from '../../src/auth/refresh-token.service';
+import {clampExpiry, generateOpaqueToken, hashToken} from '../../src/auth/refresh-token.service';
 
 /**
  * Feature: db-refresh-token-rotation, Property 4: Rotation preserves family invariants

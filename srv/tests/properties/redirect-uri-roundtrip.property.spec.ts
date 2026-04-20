@@ -1,9 +1,9 @@
 import * as fc from 'fast-check';
-import { SharedTestFixture } from '../shared-test.fixture';
-import { TokenFixture } from '../token.fixture';
-import { ClientEntityClient } from '../api-client/client-entity-client';
-import { TenantClient } from '../api-client/tenant-client';
-import { expect2xx } from '../api-client/client';
+import {SharedTestFixture} from '../shared-test.fixture';
+import {TokenFixture} from '../token.fixture';
+import {ClientEntityClient} from '../api-client/client-entity-client';
+import {TenantClient} from '../api-client/tenant-client';
+import {expect2xx} from '../api-client/client';
 
 /**
  * Feature: redirect-uri-validation, Property 3: Auth code stores redirect_uri as a round-trip
@@ -34,7 +34,7 @@ describe('Feature: redirect-uri-validation, Property 3: Auth code stores redirec
     beforeAll(async () => {
         app = new SharedTestFixture();
         const tokenFixture = new TokenFixture(app);
-        const { accessToken } = await tokenFixture.fetchAccessToken(email, password, 'auth.server.com');
+        const {accessToken} = await tokenFixture.fetchAccessToken(email, password, 'auth.server.com');
 
         clientApi = new ClientEntityClient(app, accessToken);
         const tenantClient = new TenantClient(app, accessToken);
@@ -65,7 +65,8 @@ describe('Feature: redirect-uri-validation, Property 3: Auth code stores redirec
     });
 
     afterAll(async () => {
-        await clientApi.deleteClient(testClientId).catch(() => {});
+        await clientApi.deleteClient(testClientId).catch(() => {
+        });
         await app.close();
     });
 
@@ -109,7 +110,7 @@ describe('Feature: redirect-uri-validation, Property 3: Auth code stores redirec
             .send(payload)
             .set('Accept', 'application/json');
 
-        return { status: res.status, body: res.body };
+        return {status: res.status, body: res.body};
     }
 
     it('stored redirect_uri exactly equals the provided value (round-trip via token exchange)', async () => {
@@ -131,7 +132,7 @@ describe('Feature: redirect-uri-validation, Property 3: Auth code stores redirec
                     expect(matchResult.body.access_token).toBeDefined();
                 },
             ),
-            { numRuns: 20 },
+            {numRuns: 20},
         );
     }, 120_000);
 
@@ -171,7 +172,7 @@ describe('Feature: redirect-uri-validation, Property 3: Auth code stores redirec
                     }
                 },
             ),
-            { numRuns: 30 },
+            {numRuns: 30},
         );
     }, 120_000);
 });

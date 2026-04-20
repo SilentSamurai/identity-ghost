@@ -1,5 +1,5 @@
 import * as fc from 'fast-check';
-import {GRANT_TYPES, TenantToken, TechnicalToken, Token} from '../../src/casl/contexts';
+import {GRANT_TYPES, TechnicalToken, TenantToken, Token} from '../../src/casl/contexts';
 import {ScopeNormalizer} from '../../src/casl/scope-normalizer';
 import {IntrospectionResponse} from '../../src/auth/token-introspection.service';
 

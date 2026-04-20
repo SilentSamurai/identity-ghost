@@ -1,8 +1,8 @@
 import * as fc from 'fast-check';
-import { SharedTestFixture } from '../shared-test.fixture';
-import { TokenFixture } from '../token.fixture';
-import { ClientEntityClient } from '../api-client/client-entity-client';
-import { TenantClient } from '../api-client/tenant-client';
+import {SharedTestFixture} from '../shared-test.fixture';
+import {TokenFixture} from '../token.fixture';
+import {ClientEntityClient} from '../api-client/client-entity-client';
+import {TenantClient} from '../api-client/tenant-client';
 
 /**
  * Feature: password-grant-deprecation, Property 1: Disallowed clients always rejected
@@ -26,7 +26,7 @@ describe('Feature: password-grant-deprecation, Property 1: Disallowed clients al
     beforeAll(async () => {
         fixture = new SharedTestFixture();
         const tokenFixture = new TokenFixture(fixture);
-        const { accessToken } = await tokenFixture.fetchAccessToken(
+        const {accessToken} = await tokenFixture.fetchAccessToken(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com',
@@ -68,7 +68,7 @@ describe('Feature: password-grant-deprecation, Property 1: Disallowed clients al
                         fc.stringMatching(/^[a-zA-Z][a-zA-Z0-9]{7,19}$/),
                     ),
                 }),
-                async ({ username, password }) => {
+                async ({username, password}) => {
                     // Create a fresh client with allowPasswordGrant: false
                     const uniqueSuffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
                     const client = await clientApi.createClient(
@@ -104,11 +104,12 @@ describe('Feature: password-grant-deprecation, Property 1: Disallowed clients al
                         // Must NOT be invalid_grant (which would indicate credential validation ran first)
                         expect(response.body.error).not.toEqual('invalid_grant');
                     } finally {
-                        await clientApi.deleteClient(clientId).catch(() => {});
+                        await clientApi.deleteClient(clientId).catch(() => {
+                        });
                     }
                 },
             ),
-            { numRuns: 100 },
+            {numRuns: 100},
         );
     }, 300_000);
 
@@ -143,7 +144,8 @@ describe('Feature: password-grant-deprecation, Property 1: Disallowed clients al
             expect(response.status).toEqual(400);
             expect(response.body.error).toEqual('unauthorized_client');
         } finally {
-            await clientApi.deleteClient(clientId).catch(() => {});
+            await clientApi.deleteClient(clientId).catch(() => {
+            });
         }
     });
 
@@ -178,7 +180,8 @@ describe('Feature: password-grant-deprecation, Property 1: Disallowed clients al
             expect(response.status).toEqual(400);
             expect(response.body.error).toEqual('unauthorized_client');
         } finally {
-            await clientApi.deleteClient(clientId).catch(() => {});
+            await clientApi.deleteClient(clientId).catch(() => {
+            });
         }
     });
 
@@ -212,7 +215,8 @@ describe('Feature: password-grant-deprecation, Property 1: Disallowed clients al
             expect(response.status).toBeGreaterThanOrEqual(400);
             expect(response.status).toBeLessThan(500);
         } finally {
-            await clientApi.deleteClient(clientId).catch(() => {});
+            await clientApi.deleteClient(clientId).catch(() => {
+            });
         }
     });
 });

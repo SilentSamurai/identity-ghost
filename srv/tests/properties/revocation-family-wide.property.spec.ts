@@ -80,7 +80,7 @@ describe('Property 4: Family-wide revocation', () => {
                 // Revoke via the revocation endpoint using Bearer auth
                 const revokeResponse = await fixture.getHttpServer()
                     .post('/api/oauth/revoke')
-                    .send({ token: tokenToRevoke })
+                    .send({token: tokenToRevoke})
                     .set('Authorization', `Bearer ${result.accessToken}`)
                     .set('Accept', 'application/json');
 

@@ -27,7 +27,8 @@ export class UserInfoController {
     constructor(
         private readonly claimsResolverService: ClaimsResolverService,
         private readonly authUserService: AuthUserService,
-    ) {}
+    ) {
+    }
 
     /**
      * GET /api/oauth/userinfo

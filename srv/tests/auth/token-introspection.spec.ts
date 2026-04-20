@@ -83,7 +83,7 @@ describe('Token Introspection Endpoint (RFC 7662)', () => {
         const basic = Buffer.from(`${id}:${secret}`).toString('base64');
         return app.getHttpServer()
             .post('/api/oauth/introspect')
-            .send({ token, ...extraBody })
+            .send({token, ...extraBody})
             .set('Authorization', `Basic ${basic}`)
             .set('Accept', 'application/json');
     }
@@ -100,7 +100,7 @@ describe('Token Introspection Endpoint (RFC 7662)', () => {
                 client_id: clientId,
                 client_secret: clientSecret,
             });
-            decodedToken = app.jwtService().decode(userAccessToken, { json: true }) as any;
+            decodedToken = app.jwtService().decode(userAccessToken, {json: true}) as any;
         });
 
         it('returns 200 with active: true', () => {
@@ -167,7 +167,7 @@ describe('Token Introspection Endpoint (RFC 7662)', () => {
                 client_id: clientId,
                 client_secret: clientSecret,
             });
-            decodedToken = app.jwtService().decode(technicalAccessToken, { json: true }) as any;
+            decodedToken = app.jwtService().decode(technicalAccessToken, {json: true}) as any;
         });
 
         it('returns 200 with active: true and all required fields', () => {
@@ -270,7 +270,7 @@ describe('Token Introspection Endpoint (RFC 7662)', () => {
         it('returns 401 with error=invalid_client', async () => {
             const response = await app.getHttpServer()
                 .post('/api/oauth/introspect')
-                .send({ token: userAccessToken })
+                .send({token: userAccessToken})
                 .set('Accept', 'application/json');
 
             expect(response.status).toEqual(401);
@@ -328,7 +328,7 @@ describe('Token Introspection Endpoint (RFC 7662)', () => {
                 userAccessToken,
                 clientId,
                 clientSecret,
-                { client_id: 'wrong-client-id', client_secret: 'wrong-secret' },
+                {client_id: 'wrong-client-id', client_secret: 'wrong-secret'},
             );
 
             expect(response.status).toEqual(200);
@@ -360,14 +360,14 @@ describe('Token Introspection Endpoint (RFC 7662)', () => {
             const expiredJwt = app.jwtService().sign(
                 {
                     sub: 'admin@auth.server.com',
-                    tenant: { id: 'fake', name: 'fake', domain: 'auth.server.com' },
+                    tenant: {id: 'fake', name: 'fake', domain: 'auth.server.com'},
                     scopes: ['openid', 'profile', 'email'],
                     roles: [],
                     grant_type: 'password',
                     exp: Math.floor(Date.now() / 1000) - 3600,
                     iat: Math.floor(Date.now() / 1000) - 7200,
                 },
-                { secret: 'test-secret-that-wont-match' },
+                {secret: 'test-secret-that-wont-match'},
             );
 
             const response = await introspect({
@@ -377,7 +377,7 @@ describe('Token Introspection Endpoint (RFC 7662)', () => {
             });
 
             expect(response.status).toEqual(200);
-            expect(response.body).toEqual({ active: false });
+            expect(response.body).toEqual({active: false});
         });
     });
 
@@ -392,7 +392,7 @@ describe('Token Introspection Endpoint (RFC 7662)', () => {
             });
 
             expect(response.status).toEqual(200);
-            expect(response.body).toEqual({ active: false });
+            expect(response.body).toEqual({active: false});
         });
 
         it('returns 200 with { active: false } for empty-ish token', async () => {
@@ -403,7 +403,7 @@ describe('Token Introspection Endpoint (RFC 7662)', () => {
             });
 
             expect(response.status).toEqual(200);
-            expect(response.body).toEqual({ active: false });
+            expect(response.body).toEqual({active: false});
         });
     });
 

@@ -40,7 +40,7 @@ describe('Property 1: Empty or whitespace tokens are rejected', () => {
             fc.asyncProperty(whitespaceArb, async (token) => {
                 const response = await fixture.getHttpServer()
                     .post('/api/oauth/revoke')
-                    .send({ token })
+                    .send({token})
                     .set('Authorization', `Bearer ${accessToken}`)
                     .set('Accept', 'application/json');
 

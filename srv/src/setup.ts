@@ -74,7 +74,7 @@ export async function prepareApp() {
                     callback(null, true);
                     return;
                 }
-                
+
                 try {
                     const allowed = await corsOriginService.isAllowedOrigin(origin);
                     callback(null, allowed ? origin : false);

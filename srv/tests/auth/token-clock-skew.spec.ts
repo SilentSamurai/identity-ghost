@@ -42,7 +42,10 @@ describe('Clock Skew and Startup Validation', () => {
             );
 
             // Clean up the app if it somehow didn't throw
-            try { await app.close(); } catch { /* ignore */ }
+            try {
+                await app.close();
+            } catch { /* ignore */
+            }
         } finally {
             // Restore original env vars
             if (originalExpiration !== undefined) {

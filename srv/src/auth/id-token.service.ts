@@ -27,7 +27,8 @@ export class IdTokenService {
         private readonly signingKeyProvider: SigningKeyProvider,
         private readonly configService: Environment,
         private readonly claimsResolverService: ClaimsResolverService,
-    ) {}
+    ) {
+    }
 
     static computeAtHash(accessToken: string): string {
         const hash = createHash('sha256').update(accessToken, 'ascii').digest();
@@ -75,10 +76,10 @@ export class IdTokenService {
 
         // Resolve identity claims via centralized scope-to-claims mapping
         const identityClaims = this.claimsResolverService.resolveClaims(grantedScopes, user);
-        const { sub: _sub, ...additionalClaims } = identityClaims;
+        const {sub: _sub, ...additionalClaims} = identityClaims;
         Object.assign(claims, additionalClaims);
 
-        const { privateKey, kid } = await this.signingKeyProvider.getSigningKeyWithKid(tenantId);
+        const {privateKey, kid} = await this.signingKeyProvider.getSigningKeyWithKid(tenantId);
         const idToken = await this.tokenGenerator.sign(claims, {
             privateKey,
             keyid: kid,

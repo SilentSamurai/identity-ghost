@@ -1,5 +1,5 @@
 import * as fc from 'fast-check';
-import { redactBody, maskAuthCode, SENSITIVE_FIELDS } from '../../src/log/redaction.util';
+import {maskAuthCode, redactBody, SENSITIVE_FIELDS} from '../../src/log/redaction.util';
 
 /**
  * Feature: security-logging-monitoring — Property-Based Tests for Redaction Utilities
@@ -38,12 +38,12 @@ describe('Feature: security-logging-monitoring, Property 1: Sensitive field reda
     // Arbitrary for non-sensitive field names (any string that's not in SENSITIVE_FIELDS)
     // Also filter out __proto__ which is a special JavaScript property that causes issues
     const nonSensitiveFieldArb = fc
-        .string({ minLength: 1, maxLength: 20 })
+        .string({minLength: 1, maxLength: 20})
         .filter((s) => !SENSITIVE_FIELDS.has(s) && s !== '__proto__');
 
     // Arbitrary for any value (string, number, boolean, null)
     const valueArb = fc.oneof(
-        fc.string({ maxLength: 50 }),
+        fc.string({maxLength: 50}),
         fc.integer(),
         fc.boolean(),
         fc.constantFrom(null as null),
@@ -58,7 +58,7 @@ describe('Feature: security-logging-monitoring, Property 1: Sensitive field reda
                 fc.dictionary(nonSensitiveFieldArb, valueArb),
                 (sensitiveFields, nonSensitiveFields) => {
                     // Combine both into a single body object
-                    const body = { ...sensitiveFields, ...nonSensitiveFields };
+                    const body = {...sensitiveFields, ...nonSensitiveFields};
 
                     // Apply redaction
                     const result = redactBody(body);
@@ -74,7 +74,7 @@ describe('Feature: security-logging-monitoring, Property 1: Sensitive field reda
                     }
                 },
             ),
-            { numRuns: 100 },
+            {numRuns: 100},
         );
     });
 
@@ -90,7 +90,7 @@ describe('Feature: security-logging-monitoring, Property 1: Sensitive field reda
                 const result = redactBody(body);
                 expect(result).toEqual(body);
             }),
-            { numRuns: 100 },
+            {numRuns: 100},
         );
     });
 
@@ -102,7 +102,7 @@ describe('Feature: security-logging-monitoring, Property 1: Sensitive field reda
                     expect(result[key]).toBe('[REDACTED]');
                 }
             }),
-            { numRuns: 100 },
+            {numRuns: 100},
         );
     });
 });
@@ -120,7 +120,7 @@ describe('Feature: security-logging-monitoring, Property 1: Sensitive field reda
  */
 describe('Feature: security-logging-monitoring, Property 2: Authorization code masking format', () => {
     // Arbitrary for non-empty strings (authorization codes)
-    const nonEmptyStringArb = fc.string({ minLength: 1, maxLength: 100 });
+    const nonEmptyStringArb = fc.string({minLength: 1, maxLength: 100});
 
     it('output format is first min(4, length) chars followed by ****', () => {
         fc.assert(
@@ -133,7 +133,7 @@ describe('Feature: security-logging-monitoring, Property 2: Authorization code m
 
                 expect(result).toBe(expectedOutput);
             }),
-            { numRuns: 100 },
+            {numRuns: 100},
         );
     });
 
@@ -145,29 +145,29 @@ describe('Feature: security-logging-monitoring, Property 2: Authorization code m
                 const expectedLength = Math.min(4, code.length) + 4;
                 expect(result.length).toBe(expectedLength);
             }),
-            { numRuns: 100 },
+            {numRuns: 100},
         );
     });
 
     it('codes of length 1-4 return the full code plus ****', () => {
         fc.assert(
-            fc.property(fc.string({ minLength: 1, maxLength: 4 }), (code) => {
+            fc.property(fc.string({minLength: 1, maxLength: 4}), (code) => {
                 const result = maskAuthCode(code);
                 expect(result).toBe(`${code}****`);
                 expect(result.length).toBe(code.length + 4);
             }),
-            { numRuns: 100 },
+            {numRuns: 100},
         );
     });
 
     it('codes longer than 4 characters return first 4 chars plus ****', () => {
         fc.assert(
-            fc.property(fc.string({ minLength: 5, maxLength: 100 }), (code) => {
+            fc.property(fc.string({minLength: 5, maxLength: 100}), (code) => {
                 const result = maskAuthCode(code);
                 expect(result).toBe(`${code.substring(0, 4)}****`);
                 expect(result.length).toBe(8);
             }),
-            { numRuns: 100 },
+            {numRuns: 100},
         );
     });
 
@@ -178,7 +178,7 @@ describe('Feature: security-logging-monitoring, Property 2: Authorization code m
                 const result2 = maskAuthCode(code);
                 expect(result1).toBe(result2);
             }),
-            { numRuns: 100 },
+            {numRuns: 100},
         );
     });
 });

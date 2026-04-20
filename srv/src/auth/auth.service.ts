@@ -1,12 +1,12 @@
 /**
  * AuthService - Core authentication service handling user and client authentication.
- * 
+ *
  * This service is responsible for:
  * - Validating user credentials (email/password)
  * - Validating client credentials (client_id/client_secret)
  * - Creating access tokens (JWT) for users and technical clients
  * - Creating security context from tokens
- * 
+ *
  * It implements OAuth 2.0 token validation per RFC 6749 and JWT token handling.
  */
 import {randomUUID} from "crypto";
@@ -24,7 +24,6 @@ import {
     ChangeEmailToken,
     EmailVerificationToken,
     GRANT_TYPES,
-    InternalToken,
     ResetPasswordToken,
     TechnicalToken,
     TenantToken,
@@ -33,7 +32,13 @@ import {
 import {AuthUserService} from "../casl/authUser.service";
 import * as yup from "yup";
 import {TechnicalTokenService} from "../core/technical-token.service";
-import {HS256_TOKEN_GENERATOR, RS256_TOKEN_GENERATOR, SIGNING_KEY_PROVIDER, SigningKeyProvider, TokenService} from "../core/token-abstraction";
+import {
+    HS256_TOKEN_GENERATOR,
+    RS256_TOKEN_GENERATOR,
+    SIGNING_KEY_PROVIDER,
+    SigningKeyProvider,
+    TokenService
+} from "../core/token-abstraction";
 import {SubscriptionService} from "../services/subscription.service";
 
 const SecurityContextSchema = yup.object().shape({
@@ -109,7 +114,7 @@ export class AuthService {
                 null,
             );
 
-            const { header } = this.tokenGenerator.decodeComplete(token);
+            const {header} = this.tokenGenerator.decodeComplete(token);
             const publicKey = await this.signingKeyProvider.getPublicKeyByKid(header.kid);
 
             // Apply clock skew tolerance for time-based claim validation
@@ -257,7 +262,7 @@ export class AuthService {
             tenant_id: tenant.id,
         });
 
-        const { privateKey, kid } = await this.signingKeyProvider.getSigningKeyWithKid(tenant.id);
+        const {privateKey, kid} = await this.signingKeyProvider.getSigningKeyWithKid(tenant.id);
         const accessToken = await this.tokenGenerator.sign(accessTokenPayload.asPlainObject(), {
                 privateKey,
                 keyid: kid,
@@ -308,7 +313,10 @@ export class AuthService {
             domain: userTenant.domain,
         };
 
-        const { privateKey: issuingPrivateKey, kid: issuingKid } = await this.signingKeyProvider.getSigningKeyWithKid(issuingTenant.id);
+        const {
+            privateKey: issuingPrivateKey,
+            kid: issuingKid
+        } = await this.signingKeyProvider.getSigningKeyWithKid(issuingTenant.id);
         const accessToken = await this.tokenGenerator.sign(accessTokenPayload.asPlainObject(), {
                 privateKey: issuingPrivateKey,
                 keyid: issuingKid,
@@ -482,6 +490,10 @@ export class AuthService {
         return true;
     }
 
+    public decodeToken(token: string): any {
+        return this.tokenGenerator.decode(token);
+    }
+
     /**
      * Check if a user has subscription-based access to a tenant.
      * This is used as a fallback when the user is not a direct member of the tenant.
@@ -493,9 +505,5 @@ export class AuthService {
         const tenant = await this.authUserService.findTenantById(tenantId);
         const permission = this.securityService.createPermissionForTokenIssuance(tenantId);
         return this.subscriptionService.isUserSubscribedToTenant(permission, user, tenant);
-    }
-
-    public decodeToken(token: string): any {
-        return this.tokenGenerator.decode(token);
     }
 }

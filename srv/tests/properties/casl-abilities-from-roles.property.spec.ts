@@ -1,6 +1,6 @@
 import * as fc from 'fast-check';
 import {CaslAbilityFactory} from '../../src/casl/casl-ability.factory';
-import {GRANT_TYPES, TenantToken, TechnicalToken} from '../../src/casl/contexts';
+import {GRANT_TYPES, TechnicalToken, TenantToken} from '../../src/casl/contexts';
 import {Action} from '../../src/casl/actions.enum';
 import {SubjectEnum} from '../../src/entity/subjectEnum';
 import {RoleEnum} from '../../src/entity/roleEnum';

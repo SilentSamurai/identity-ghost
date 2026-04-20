@@ -1,4 +1,4 @@
-import { User } from '../entity/user.entity';
+import {User} from '../entity/user.entity';
 
 /**
  * OIDC scope-to-claims mapping per OIDC Core §5.4.
@@ -16,9 +16,9 @@ import { User } from '../entity/user.entity';
  *   No changes to IdTokenService or UserInfoController are needed.
  */
 export const SCOPE_CLAIMS_MAP: Readonly<Record<string, readonly string[]>> = {
-  openid: ['sub'],
-  profile: ['name'],
-  email: ['email', 'email_verified'],
+    openid: ['sub'],
+    profile: ['name'],
+    email: ['email', 'email_verified'],
 } as const;
 
 export type ClaimResolver = (user: Pick<User, 'id' | 'email' | 'name' | 'verified'>) => unknown;
@@ -28,8 +28,8 @@ export type ClaimResolver = (user: Pick<User, 'id' | 'email' | 'name' | 'verifie
  * Returns undefined when the user has no data for the claim (voluntary omission).
  */
 export const USER_CLAIM_RESOLVERS: Readonly<Record<string, ClaimResolver>> = {
-  sub: (user) => user.id,
-  name: (user) => user.name || undefined,
-  email: (user) => user.email || undefined,
-  email_verified: (user) => (user.email ? user.verified : undefined),
+    sub: (user) => user.id,
+    name: (user) => user.name || undefined,
+    email: (user) => user.email || undefined,
+    email_verified: (user) => (user.email ? user.verified : undefined),
 } as const;

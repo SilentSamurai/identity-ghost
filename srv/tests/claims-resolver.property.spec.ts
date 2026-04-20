@@ -1,6 +1,6 @@
 import * as fc from 'fast-check';
-import { ClaimsResolverService } from '../src/auth/claims-resolver.service';
-import { SCOPE_CLAIMS_MAP, USER_CLAIM_RESOLVERS } from '../src/auth/scope-claims-map';
+import {ClaimsResolverService} from '../src/auth/claims-resolver.service';
+import {SCOPE_CLAIMS_MAP, USER_CLAIM_RESOLVERS} from '../src/auth/scope-claims-map';
 
 /**
  * Feature: oidc-scope-claims-mapping — Property-Based Tests
@@ -24,8 +24,8 @@ const OIDC_SCOPES = ['openid', 'profile', 'email'];
 
 const uuidArb = fc.uuid();
 const emailArb = fc.emailAddress();
-const nameArb = fc.string({ minLength: 0, maxLength: 80 });
-const scopeSetArb = fc.subarray(OIDC_SCOPES, { minLength: 0 });
+const nameArb = fc.string({minLength: 0, maxLength: 80});
+const scopeSetArb = fc.subarray(OIDC_SCOPES, {minLength: 0});
 const userArb = fc.record({
     id: uuidArb,
     email: emailArb,
@@ -68,7 +68,7 @@ describe('Feature: oidc-scope-claims-mapping, Property 1: Scope-authorized claim
                     }
                 }
             }),
-            { numRuns: 100 },
+            {numRuns: 100},
         );
     });
 });
@@ -111,7 +111,7 @@ describe('Feature: oidc-scope-claims-mapping, Property 2: Non-granted scope clai
                     }
                 }
             }),
-            { numRuns: 100 },
+            {numRuns: 100},
         );
     });
 });
@@ -149,7 +149,7 @@ describe('Feature: oidc-scope-claims-mapping, Property 3: Voluntary claim omissi
                     expect(value).not.toBe('');
                 }
             }),
-            { numRuns: 100 },
+            {numRuns: 100},
         );
     });
 });
@@ -177,7 +177,7 @@ describe('Feature: oidc-scope-claims-mapping, Property 4: Claim resolution consi
 
                 expect(result1).toEqual(result2);
             }),
-            { numRuns: 100 },
+            {numRuns: 100},
         );
     });
 });

@@ -1,5 +1,5 @@
-import { SharedTestFixture } from '../shared-test.fixture';
-import { TokenFixture } from '../token.fixture';
+import {SharedTestFixture} from '../shared-test.fixture';
+import {TokenFixture} from '../token.fixture';
 
 const UUID_V4_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -45,7 +45,7 @@ describe('Login Session Creation', () => {
         expect(tokenResult.id_token).toBeDefined();
 
         // Decode the ID token to verify session claims
-        const decoded = app.jwtService().decode(tokenResult.id_token, { json: true }) as any;
+        const decoded = app.jwtService().decode(tokenResult.id_token, {json: true}) as any;
 
         expect(decoded.auth_time).toBeDefined();
         expect(Number.isInteger(decoded.auth_time)).toBe(true);
@@ -68,7 +68,7 @@ describe('Login Session Creation', () => {
         expect(response.status).toEqual(201);
         expect(response.body.id_token).toBeDefined();
 
-        const decoded = app.jwtService().decode(response.body.id_token, { json: true }) as any;
+        const decoded = app.jwtService().decode(response.body.id_token, {json: true}) as any;
 
         expect(decoded.sid).toBeDefined();
         expect(decoded.sid).toMatch(UUID_V4_REGEX);
@@ -92,7 +92,7 @@ describe('Login Session Creation', () => {
         expect(response.status).toEqual(201);
         expect(response.body.id_token).toBeDefined();
 
-        const decoded = app.jwtService().decode(response.body.id_token, { json: true }) as any;
+        const decoded = app.jwtService().decode(response.body.id_token, {json: true}) as any;
 
         expect(decoded.auth_time).toBeDefined();
         expect(Number.isInteger(decoded.auth_time)).toBe(true);
@@ -121,7 +121,7 @@ describe('Login Session Creation', () => {
         ) as any;
         expect(tokenResult.id_token).toBeDefined();
 
-        const decoded = app.jwtService().decode(tokenResult.id_token, { json: true }) as any;
+        const decoded = app.jwtService().decode(tokenResult.id_token, {json: true}) as any;
 
         // Both claims must be present — proves the session was persisted
         // before the login response was returned

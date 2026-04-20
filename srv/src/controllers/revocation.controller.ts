@@ -18,7 +18,8 @@ import {OAuthException} from '../exceptions/oauth-exception';
 export class RevocationController {
     constructor(
         private readonly revocationService: TokenRevocationService,
-    ) {}
+    ) {
+    }
 
     /**
      * POST /api/oauth/revoke

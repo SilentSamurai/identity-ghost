@@ -1,12 +1,12 @@
 /**
  * Integration tests for negative OAuth token flow scenarios.
- * 
+ *
  * Tests error responses for:
  * - Invalid credentials (wrong password)
  * - Missing grant type
  * - Invalid grant types
  * - Invalid refresh tokens
- * 
+ *
  * Verifies OAuth 2.0 RFC 6749 compliant error responses.
  */
 import {SharedTestFixture} from "../shared-test.fixture";

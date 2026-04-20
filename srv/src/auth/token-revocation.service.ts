@@ -30,7 +30,8 @@ export class TokenRevocationService {
         @InjectRepository(RefreshToken)
         private readonly refreshTokenRepo: Repository<RefreshToken>,
         private readonly loginSessionService: LoginSessionService,
-    ) {}
+    ) {
+    }
 
     /**
      * Revoke a refresh token and its entire family.

@@ -28,7 +28,7 @@ describe('Property 2: Unauthenticated requests are rejected', () => {
             fc.asyncProperty(fakeTokenArb, async (fakeToken) => {
                 const response = await fixture.getHttpServer()
                     .post('/api/oauth/revoke')
-                    .send({ token: 'some-token-value' })
+                    .send({token: 'some-token-value'})
                     .set('Authorization', `Bearer ${fakeToken}`)
                     .set('Accept', 'application/json');
 

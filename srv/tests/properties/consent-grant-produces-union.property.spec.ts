@@ -1,9 +1,9 @@
 import * as fc from 'fast-check';
-import { SharedTestFixture } from '../shared-test.fixture';
-import { TokenFixture } from '../token.fixture';
-import { ClientEntityClient } from '../api-client/client-entity-client';
-import { TenantClient } from '../api-client/tenant-client';
-import { ScopeNormalizer } from '../../src/casl/scope-normalizer';
+import {SharedTestFixture} from '../shared-test.fixture';
+import {TokenFixture} from '../token.fixture';
+import {ClientEntityClient} from '../api-client/client-entity-client';
+import {TenantClient} from '../api-client/tenant-client';
+import {ScopeNormalizer} from '../../src/casl/scope-normalizer';
 
 /**
  * Feature: user-consent-tracking, Property 4: Granting consent produces the union of scopes
@@ -25,7 +25,7 @@ describe('Feature: user-consent-tracking, Property 4: Granting consent produces 
     beforeAll(async () => {
         fixture = new SharedTestFixture();
         const tokenFixture = new TokenFixture(fixture);
-        const { accessToken } = await tokenFixture.fetchAccessToken(
+        const {accessToken} = await tokenFixture.fetchAccessToken(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com',
@@ -123,9 +123,9 @@ describe('Feature: user-consent-tracking, Property 4: Granting consent produces 
         await fc.assert(
             fc.asyncProperty(
                 // G: initial granted scopes
-                fc.subarray(['openid', 'profile', 'email'], { minLength: 1 }),
+                fc.subarray(['openid', 'profile', 'email'], {minLength: 1}),
                 // A: newly approved scopes
-                fc.subarray(['openid', 'profile', 'email'], { minLength: 1 }),
+                fc.subarray(['openid', 'profile', 'email'], {minLength: 1}),
                 async (grantedScopes, approvedScopes) => {
                     // Create a fresh client for this iteration
                     const uniqueSuffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -157,19 +157,20 @@ describe('Feature: user-consent-tracking, Property 4: Granting consent produces 
                         // Step 4: Verify stored scopes equal G ∪ A
                         await verifyStoredScopes(clientId, expectedUnion);
                     } finally {
-                        await clientApi.deleteClient(clientId).catch(() => {});
+                        await clientApi.deleteClient(clientId).catch(() => {
+                        });
                     }
                 },
             ),
-            { numRuns: 15 },
+            {numRuns: 15},
         );
     }, 300_000);
 
     it('union is commutative: G ∪ A = A ∪ G (order of grants does not matter for final state)', async () => {
         await fc.assert(
             fc.asyncProperty(
-                fc.subarray(['openid', 'profile', 'email'], { minLength: 1 }),
-                fc.subarray(['openid', 'profile', 'email'], { minLength: 1 }),
+                fc.subarray(['openid', 'profile', 'email'], {minLength: 1}),
+                fc.subarray(['openid', 'profile', 'email'], {minLength: 1}),
                 async (scopesFirst, scopesSecond) => {
                     const uniqueSuffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -210,19 +211,21 @@ describe('Feature: user-consent-tracking, Property 4: Granting consent produces 
                         await verifyStoredScopes(clientA.client.clientId, expectedUnion);
                         await verifyStoredScopes(clientB.client.clientId, expectedUnion);
                     } finally {
-                        await clientApi.deleteClient(clientA.client.clientId).catch(() => {});
-                        await clientApi.deleteClient(clientB.client.clientId).catch(() => {});
+                        await clientApi.deleteClient(clientA.client.clientId).catch(() => {
+                        });
+                        await clientApi.deleteClient(clientB.client.clientId).catch(() => {
+                        });
                     }
                 },
             ),
-            { numRuns: 10 },
+            {numRuns: 10},
         );
     }, 300_000);
 
     it('granting the same scopes twice produces the same result as granting once (idempotent union)', async () => {
         await fc.assert(
             fc.asyncProperty(
-                fc.subarray(['openid', 'profile', 'email'], { minLength: 1 }),
+                fc.subarray(['openid', 'profile', 'email'], {minLength: 1}),
                 async (scopes) => {
                     const uniqueSuffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
                     const client = await clientApi.createClient(
@@ -244,11 +247,12 @@ describe('Feature: user-consent-tracking, Property 4: Granting consent produces 
                         // G ∪ G = G — stored scopes must equal the original scopes
                         await verifyStoredScopes(clientId, scopes);
                     } finally {
-                        await clientApi.deleteClient(clientId).catch(() => {});
+                        await clientApi.deleteClient(clientId).catch(() => {
+                        });
                     }
                 },
             ),
-            { numRuns: 10 },
+            {numRuns: 10},
         );
     }, 300_000);
 });

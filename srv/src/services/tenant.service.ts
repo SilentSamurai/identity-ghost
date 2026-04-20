@@ -114,26 +114,6 @@ export class TenantService implements OnModuleInit {
         return tenant;
     }
 
-    private async createDefaultClient(tenantId: string, domain: string): Promise<Client> {
-        const client = this.clientRepository.create({
-            clientId: uuidv4(),
-            alias: domain,
-            isPublic: true,
-            allowPasswordGrant: false,
-            allowedScopes: 'openid profile email',
-            name: 'Default Client',
-            redirectUris: [],
-            grantTypes: 'authorization_code',
-            responseTypes: 'code',
-            tokenEndpointAuthMethod: 'none',
-            requirePkce: false,
-            allowRefreshToken: true,
-            clientSecrets: [],
-            tenantId,
-        });
-        return this.clientRepository.save(client);
-    }
-
     async updateKeys(permission: Permission, id: string): Promise<Tenant> {
         permission.isAuthorized(
             Action.Update,
@@ -587,5 +567,25 @@ export class TenantService implements OnModuleInit {
         }
 
         return user;
+    }
+
+    private async createDefaultClient(tenantId: string, domain: string): Promise<Client> {
+        const client = this.clientRepository.create({
+            clientId: uuidv4(),
+            alias: domain,
+            isPublic: true,
+            allowPasswordGrant: false,
+            allowedScopes: 'openid profile email',
+            name: 'Default Client',
+            redirectUris: [],
+            grantTypes: 'authorization_code',
+            responseTypes: 'code',
+            tokenEndpointAuthMethod: 'none',
+            requirePkce: false,
+            allowRefreshToken: true,
+            clientSecrets: [],
+            tenantId,
+        });
+        return this.clientRepository.save(client);
     }
 }

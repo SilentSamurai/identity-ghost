@@ -1,12 +1,12 @@
 /**
  * OAuthTokenController - Handles OAuth 2.0 token endpoint operations.
- * 
+ *
  * This controller implements the token endpoint per RFC 6749:
  * - Authorization Code grant (exchange code for tokens)
  * - Refresh Token grant (refresh access tokens)
  * - Password grant (direct credentials)
  * - Client Credentials grant (technical tokens)
- * 
+ *
  * All responses follow OAuth 2.0 token response format and use
  * OAuthExceptionFilter for proper OAuth error formatting.
  */
@@ -37,7 +37,7 @@ import {TokenIssuanceService} from "../auth/token-issuance.service";
 import {OAuthException} from "../exceptions/oauth-exception";
 import {AuthorizeRedirectException} from "../exceptions/authorize-redirect.exception";
 import {OAuthExceptionFilter} from "../exceptions/filter/oauth-exception.filter";
-import {AuthorizeService, AuthorizeQueryParams} from "../auth/authorize.service";
+import {AuthorizeQueryParams, AuthorizeService} from "../auth/authorize.service";
 import {CryptUtil} from "../util/crypt.util";
 import {parseBasicAuthHeader} from "../util/http.util";
 import {InjectRepository} from "@nestjs/typeorm";

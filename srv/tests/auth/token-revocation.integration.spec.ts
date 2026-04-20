@@ -88,11 +88,15 @@ describe('Token Revocation & Logout Endpoints (RFC 7009)', () => {
             'admin9000',
             'auth.server.com',
         );
-        return { accessToken: result.accessToken, refreshToken: result.refreshToken };
+        return {accessToken: result.accessToken, refreshToken: result.refreshToken};
     }
 
     /** Build a token family of the given size by rotating the refresh token */
-    async function buildTokenFamily(size: number): Promise<{ accessToken: string; tokens: string[]; latestToken: string }> {
+    async function buildTokenFamily(size: number): Promise<{
+        accessToken: string;
+        tokens: string[];
+        latestToken: string
+    }> {
         const result = await tokenFixture.fetchAccessToken(
             'admin@auth.server.com',
             'admin9000',
@@ -118,7 +122,7 @@ describe('Token Revocation & Logout Endpoints (RFC 7009)', () => {
             tokens.push(currentToken);
         }
 
-        return { accessToken: result.accessToken, tokens, latestToken: currentToken };
+        return {accessToken: result.accessToken, tokens, latestToken: currentToken};
     }
 
     /** POST /api/oauth/revoke with Bearer auth */
@@ -158,9 +162,9 @@ describe('Token Revocation & Logout Endpoints (RFC 7009)', () => {
 
     describe('revoke valid refresh token', () => {
         it('returns HTTP 200 with empty body and revokes the entire family', async () => {
-            const { accessToken, latestToken } = await buildTokenFamily(2);
+            const {accessToken, latestToken} = await buildTokenFamily(2);
 
-            const response = await revoke(accessToken, { token: latestToken });
+            const response = await revoke(accessToken, {token: latestToken});
 
             expect(response.status).toEqual(200);
             expect(response.body).toEqual({});
@@ -183,7 +187,7 @@ describe('Token Revocation & Logout Endpoints (RFC 7009)', () => {
         });
 
         it('returns 400 with invalid_request when token is empty string', async () => {
-            const response = await revoke(adminAccessToken, { token: '' });
+            const response = await revoke(adminAccessToken, {token: ''});
 
             expect(response.status).toEqual(400);
             expect(response.body.error).toEqual('invalid_request');
@@ -194,7 +198,7 @@ describe('Token Revocation & Logout Endpoints (RFC 7009)', () => {
 
     describe('whitespace-only token', () => {
         it('returns 400 with invalid_request', async () => {
-            const response = await revoke(adminAccessToken, { token: '   \t\n  ' });
+            const response = await revoke(adminAccessToken, {token: '   \t\n  '});
 
             expect(response.status).toEqual(400);
             expect(response.body.error).toEqual('invalid_request');
@@ -205,10 +209,10 @@ describe('Token Revocation & Logout Endpoints (RFC 7009)', () => {
 
     describe('no authentication', () => {
         it('returns 401 when no Authorization header is provided', async () => {
-            const { refreshToken } = await getFreshTokens();
+            const {refreshToken} = await getFreshTokens();
             const response = await app.getHttpServer()
                 .post('/api/oauth/revoke')
-                .send({ token: refreshToken })
+                .send({token: refreshToken})
                 .set('Accept', 'application/json');
 
             expect(response.status).toEqual(401);
@@ -219,7 +223,7 @@ describe('Token Revocation & Logout Endpoints (RFC 7009)', () => {
 
     describe('invalid Bearer token', () => {
         it('returns 401 for an invalid JWT', async () => {
-            const response = await revoke('invalid-jwt-token', { token: 'some-token' });
+            const response = await revoke('invalid-jwt-token', {token: 'some-token'});
 
             expect(response.status).toEqual(401);
         });
@@ -242,14 +246,14 @@ describe('Token Revocation & Logout Endpoints (RFC 7009)', () => {
 
     describe('already-revoked token', () => {
         it('returns HTTP 200 without error on second revocation', async () => {
-            const { accessToken, refreshToken } = await getFreshTokens();
+            const {accessToken, refreshToken} = await getFreshTokens();
 
             // First revocation
-            const first = await revoke(accessToken, { token: refreshToken });
+            const first = await revoke(accessToken, {token: refreshToken});
             expect(first.status).toEqual(200);
 
             // Second revocation — idempotent
-            const second = await revoke(accessToken, { token: refreshToken });
+            const second = await revoke(accessToken, {token: refreshToken});
             expect(second.status).toEqual(200);
             expect(second.body).toEqual({});
         });
@@ -259,10 +263,10 @@ describe('Token Revocation & Logout Endpoints (RFC 7009)', () => {
 
     describe('expired token', () => {
         it('returns HTTP 200 and revokes the family', async () => {
-            const { accessToken, tokens } = await buildTokenFamily(2);
+            const {accessToken, tokens} = await buildTokenFamily(2);
             const consumedToken = tokens[0]; // first token was consumed during rotation
 
-            const response = await revoke(accessToken, { token: consumedToken });
+            const response = await revoke(accessToken, {token: consumedToken});
 
             expect(response.status).toEqual(200);
             expect(response.body).toEqual({});
@@ -278,10 +282,10 @@ describe('Token Revocation & Logout Endpoints (RFC 7009)', () => {
     describe('cross-tenant token', () => {
         it('returns HTTP 200 but does NOT revoke the token', async () => {
             // Get a refresh token from the default tenant
-            const { refreshToken } = await getFreshTokens();
+            const {refreshToken} = await getFreshTokens();
 
             // Try to revoke it using a cross-tenant Bearer token
-            const response = await revoke(crossTenantAccessToken, { token: refreshToken });
+            const response = await revoke(crossTenantAccessToken, {token: refreshToken});
 
             // Should return 200 (no information leakage)
             expect(response.status).toEqual(200);
@@ -297,7 +301,7 @@ describe('Token Revocation & Logout Endpoints (RFC 7009)', () => {
 
     describe('token_type_hint handling', () => {
         it('succeeds with token_type_hint=refresh_token', async () => {
-            const { accessToken, refreshToken } = await getFreshTokens();
+            const {accessToken, refreshToken} = await getFreshTokens();
             const response = await revoke(accessToken, {
                 token: refreshToken,
                 token_type_hint: 'refresh_token',
@@ -308,7 +312,7 @@ describe('Token Revocation & Logout Endpoints (RFC 7009)', () => {
         });
 
         it('succeeds with token_type_hint=access_token', async () => {
-            const { accessToken, refreshToken } = await getFreshTokens();
+            const {accessToken, refreshToken} = await getFreshTokens();
             const response = await revoke(accessToken, {
                 token: refreshToken,
                 token_type_hint: 'access_token',
@@ -319,7 +323,7 @@ describe('Token Revocation & Logout Endpoints (RFC 7009)', () => {
         });
 
         it('succeeds with unrecognized token_type_hint', async () => {
-            const { accessToken, refreshToken } = await getFreshTokens();
+            const {accessToken, refreshToken} = await getFreshTokens();
             const response = await revoke(accessToken, {
                 token: refreshToken,
                 token_type_hint: 'some_random_hint',
@@ -330,8 +334,8 @@ describe('Token Revocation & Logout Endpoints (RFC 7009)', () => {
         });
 
         it('succeeds without token_type_hint', async () => {
-            const { accessToken, refreshToken } = await getFreshTokens();
-            const response = await revoke(accessToken, { token: refreshToken });
+            const {accessToken, refreshToken} = await getFreshTokens();
+            const response = await revoke(accessToken, {token: refreshToken});
 
             expect(response.status).toEqual(200);
             expect(response.body).toEqual({});
@@ -342,8 +346,8 @@ describe('Token Revocation & Logout Endpoints (RFC 7009)', () => {
 
     describe('response headers', () => {
         it('includes Cache-Control: no-store and Pragma: no-cache on revoke success', async () => {
-            const { accessToken, refreshToken } = await getFreshTokens();
-            const response = await revoke(accessToken, { token: refreshToken });
+            const {accessToken, refreshToken} = await getFreshTokens();
+            const response = await revoke(accessToken, {token: refreshToken});
 
             expect(response.status).toEqual(200);
             expect(response.headers['cache-control']).toEqual('no-store');
@@ -359,8 +363,8 @@ describe('Token Revocation & Logout Endpoints (RFC 7009)', () => {
         });
 
         it('includes Cache-Control: no-store and Pragma: no-cache on logout', async () => {
-            const { accessToken, refreshToken } = await getFreshTokens();
-            const response = await logout(accessToken, { refresh_token: refreshToken });
+            const {accessToken, refreshToken} = await getFreshTokens();
+            const response = await logout(accessToken, {refresh_token: refreshToken});
 
             expect(response.status).toEqual(200);
             expect(response.headers['cache-control']).toEqual('no-store');
@@ -372,11 +376,11 @@ describe('Token Revocation & Logout Endpoints (RFC 7009)', () => {
 
     describe('form-urlencoded content type', () => {
         it('accepts application/x-www-form-urlencoded', async () => {
-            const { accessToken, refreshToken } = await getFreshTokens();
+            const {accessToken, refreshToken} = await getFreshTokens();
             const response = await app.getHttpServer()
                 .post('/api/oauth/revoke')
                 .type('form')
-                .send({ token: refreshToken })
+                .send({token: refreshToken})
                 .set('Authorization', `Bearer ${accessToken}`)
                 .set('Accept', 'application/json');
 
@@ -389,9 +393,9 @@ describe('Token Revocation & Logout Endpoints (RFC 7009)', () => {
 
     describe('logout with valid token', () => {
         it('returns HTTP 200, revokes family, and includes Set-Cookie headers', async () => {
-            const { accessToken, refreshToken } = await getFreshTokens();
+            const {accessToken, refreshToken} = await getFreshTokens();
 
-            const response = await logout(accessToken, { refresh_token: refreshToken });
+            const response = await logout(accessToken, {refresh_token: refreshToken});
 
             expect(response.status).toEqual(200);
             expect(response.body).toEqual({});
@@ -434,10 +438,10 @@ describe('Token Revocation & Logout Endpoints (RFC 7009)', () => {
 
     describe('logout without authentication', () => {
         it('returns 401 when no Authorization header is provided', async () => {
-            const { refreshToken } = await getFreshTokens();
+            const {refreshToken} = await getFreshTokens();
             const response = await app.getHttpServer()
                 .post('/api/oauth/logout')
-                .send({ refresh_token: refreshToken })
+                .send({refresh_token: refreshToken})
                 .set('Accept', 'application/json');
 
             expect(response.status).toEqual(401);

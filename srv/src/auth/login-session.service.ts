@@ -12,7 +12,8 @@ export class LoginSessionService {
         @InjectRepository(LoginSession)
         private readonly repo: Repository<LoginSession>,
         private readonly configService: Environment,
-    ) {}
+    ) {
+    }
 
     /**
      * Create a new login session for a user authentication event.

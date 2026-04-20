@@ -1,10 +1,10 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { ClientService } from '../services/client.service';
-import { ScopeResolverService } from '../casl/scope-resolver.service';
-import { OAuthException } from '../exceptions/oauth-exception';
-import { AuthorizeRedirectException } from '../exceptions/authorize-redirect.exception';
-import { Client } from '../entity/client.entity';
-import { ValidationSchema } from '../validation/validation.schema';
+import {Injectable, Logger, NotFoundException} from '@nestjs/common';
+import {ClientService} from '../services/client.service';
+import {ScopeResolverService} from '../casl/scope-resolver.service';
+import {OAuthException} from '../exceptions/oauth-exception';
+import {AuthorizeRedirectException} from '../exceptions/authorize-redirect.exception';
+import {Client} from '../entity/client.entity';
+import {ValidationSchema} from '../validation/validation.schema';
 
 export interface AuthorizeQueryParams {
     response_type?: string;
@@ -40,7 +40,8 @@ export class AuthorizeService {
     constructor(
         private readonly clientService: ClientService,
         private readonly scopeResolver: ScopeResolverService,
-    ) {}
+    ) {
+    }
 
     async validateAuthorizeRequest(params: AuthorizeQueryParams): Promise<ValidatedAuthorizeRequest> {
         this.logRequest(params);
@@ -60,7 +61,7 @@ export class AuthorizeService {
             this.validateState(params.state, redirectUri);
 
             // 4. Validate PKCE
-            const { codeChallenge, codeChallengeMethod } = this.validatePkce(
+            const {codeChallenge, codeChallengeMethod} = this.validatePkce(
                 client,
                 params.code_challenge,
                 params.code_challenge_method,
@@ -96,42 +97,6 @@ export class AuthorizeService {
                     ? error.errorCode
                     : (error as AuthorizeRedirectException).errorCode;
                 this.logger.warn(`Authorization request failed: error_code=${errorCode}`);
-            }
-            throw error;
-        }
-    }
-
-    private async validateSchema(params: AuthorizeQueryParams): Promise<void> {
-        try {
-            await ValidationSchema.AuthorizeSchema.validate(params, { abortEarly: true });
-        } catch (error) {
-            // Log with client_id but never sensitive param values
-            this.logger.warn(
-                `Schema validation failed: client_id=${params.client_id || 'missing'}, ` +
-                `error=${error.message}`,
-            );
-
-            // RFC 6749 §4.1.2.1: both missing and unsupported response_type
-            // use the unsupported_response_type error code
-            if (error.path === 'response_type') {
-                throw OAuthException.unsupportedResponseType(
-                    'The response_type parameter must be "code"',
-                );
-            }
-
-            throw OAuthException.invalidRequest(error.message);
-        }
-    }
-
-    private async validateClientId(clientId?: string): Promise<Client> {
-        if (!clientId) {
-            throw OAuthException.invalidRequest('The client_id parameter is required');
-        }
-        try {
-            return await this.clientService.findByClientId(clientId);
-        } catch (error) {
-            if (error instanceof NotFoundException) {
-                throw OAuthException.invalidRequest('Unknown client_id');
             }
             throw error;
         }
@@ -175,6 +140,42 @@ export class AuthorizeService {
             return null;
         }
         return this.validateRedirectUri(client, redirectUri);
+    }
+
+    private async validateSchema(params: AuthorizeQueryParams): Promise<void> {
+        try {
+            await ValidationSchema.AuthorizeSchema.validate(params, {abortEarly: true});
+        } catch (error) {
+            // Log with client_id but never sensitive param values
+            this.logger.warn(
+                `Schema validation failed: client_id=${params.client_id || 'missing'}, ` +
+                `error=${error.message}`,
+            );
+
+            // RFC 6749 §4.1.2.1: both missing and unsupported response_type
+            // use the unsupported_response_type error code
+            if (error.path === 'response_type') {
+                throw OAuthException.unsupportedResponseType(
+                    'The response_type parameter must be "code"',
+                );
+            }
+
+            throw OAuthException.invalidRequest(error.message);
+        }
+    }
+
+    private async validateClientId(clientId?: string): Promise<Client> {
+        if (!clientId) {
+            throw OAuthException.invalidRequest('The client_id parameter is required');
+        }
+        try {
+            return await this.clientService.findByClientId(clientId);
+        } catch (error) {
+            if (error instanceof NotFoundException) {
+                throw OAuthException.invalidRequest('Unknown client_id');
+            }
+            throw error;
+        }
     }
 
     private validateState(state: string | undefined, redirectUri: string): void {

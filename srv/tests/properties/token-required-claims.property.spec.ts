@@ -1,5 +1,5 @@
 import * as fc from 'fast-check';
-import {GRANT_TYPES, TenantToken, TechnicalToken} from '../../src/casl/contexts';
+import {GRANT_TYPES, TechnicalToken, TenantToken} from '../../src/casl/contexts';
 import {RoleEnum} from '../../src/entity/roleEnum';
 
 /**
@@ -23,10 +23,10 @@ describe('Property 1: All required claims present', () => {
 
     const uuidArb = fc.uuid();
     const emailArb = fc.emailAddress();
-    const nameArb = fc.string({ minLength: 1, maxLength: 50 });
+    const nameArb = fc.string({minLength: 1, maxLength: 50});
     const domainArb = fc.domain();
-    const scopesArb = fc.subarray(VALID_OIDC_SCOPES, { minLength: 0 });
-    const rolesArb = fc.subarray(VALID_ROLES, { minLength: 0 });
+    const scopesArb = fc.subarray(VALID_OIDC_SCOPES, {minLength: 0});
+    const rolesArb = fc.subarray(VALID_ROLES, {minLength: 0});
     const tenantGrantTypeArb = fc.constantFrom(...TENANT_GRANT_TYPES);
 
     // Claims the payload builder is responsible for
@@ -43,7 +43,7 @@ describe('Property 1: All required claims present', () => {
                     (userId, tenantId, tenantName, tenantDomain, clientId, scopes, roles, grantType) => {
                         const token = TenantToken.create({
                             sub: userId,
-                            tenant: { id: tenantId, name: tenantName, domain: tenantDomain },
+                            tenant: {id: tenantId, name: tenantName, domain: tenantDomain},
                             roles,
                             grant_type: grantType,
                             aud: ['https://auth.example.com'],
@@ -60,7 +60,7 @@ describe('Property 1: All required claims present', () => {
                         }
                     },
                 ),
-                { numRuns: 100 },
+                {numRuns: 100},
             );
         });
     });
@@ -73,7 +73,7 @@ describe('Property 1: All required claims present', () => {
                     (tenantId, tenantName, tenantDomain, clientId, scopes) => {
                         const token = TechnicalToken.create({
                             sub: 'oauth',
-                            tenant: { id: tenantId, name: tenantName, domain: tenantDomain },
+                            tenant: {id: tenantId, name: tenantName, domain: tenantDomain},
                             scope: scopes.join(' '),
                             aud: ['https://auth.example.com'],
                             jti: crypto.randomUUID(),
@@ -88,7 +88,7 @@ describe('Property 1: All required claims present', () => {
                         }
                     },
                 ),
-                { numRuns: 100 },
+                {numRuns: 100},
             );
         });
     });

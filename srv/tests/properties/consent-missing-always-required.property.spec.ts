@@ -1,8 +1,8 @@
 import * as fc from 'fast-check';
-import { SharedTestFixture } from '../shared-test.fixture';
-import { TokenFixture } from '../token.fixture';
-import { ClientEntityClient } from '../api-client/client-entity-client';
-import { TenantClient } from '../api-client/tenant-client';
+import {SharedTestFixture} from '../shared-test.fixture';
+import {TokenFixture} from '../token.fixture';
+import {ClientEntityClient} from '../api-client/client-entity-client';
+import {TenantClient} from '../api-client/tenant-client';
 
 /**
  * Feature: user-consent-tracking, Property 3: Missing consent record always requires consent
@@ -23,7 +23,7 @@ describe('Feature: user-consent-tracking, Property 3: Missing consent record alw
     beforeAll(async () => {
         fixture = new SharedTestFixture();
         const tokenFixture = new TokenFixture(fixture);
-        const { accessToken } = await tokenFixture.fetchAccessToken(
+        const {accessToken} = await tokenFixture.fetchAccessToken(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com',
@@ -47,7 +47,7 @@ describe('Feature: user-consent-tracking, Property 3: Missing consent record alw
         await fc.assert(
             fc.asyncProperty(
                 // Generate a non-empty set of requested scopes
-                fc.subarray(['openid', 'profile', 'email'], { minLength: 1 }),
+                fc.subarray(['openid', 'profile', 'email'], {minLength: 1}),
                 async (requestedScopes) => {
                     // Create a fresh client for this iteration — no prior consent record exists
                     const uniqueSuffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -87,11 +87,12 @@ describe('Feature: user-consent-tracking, Property 3: Missing consent record alw
                         expect(response.body.requested_scopes).toBeDefined();
                         expect(Array.isArray(response.body.requested_scopes)).toBe(true);
                     } finally {
-                        await clientApi.deleteClient(clientId).catch(() => {});
+                        await clientApi.deleteClient(clientId).catch(() => {
+                        });
                     }
                 },
             ),
-            { numRuns: 20 },
+            {numRuns: 20},
         );
     }, 300_000);
 
@@ -138,7 +139,8 @@ describe('Feature: user-consent-tracking, Property 3: Missing consent record alw
                 expect(response.body.requires_consent).toBe(true);
                 expect(response.body.authentication_code).toBeUndefined();
             } finally {
-                await clientApi.deleteClient(clientId).catch(() => {});
+                await clientApi.deleteClient(clientId).catch(() => {
+                });
             }
         }
     }, 120_000);
@@ -146,7 +148,7 @@ describe('Feature: user-consent-tracking, Property 3: Missing consent record alw
     it('consent is required even after a different client has been consented (no cross-client leakage)', async () => {
         await fc.assert(
             fc.asyncProperty(
-                fc.subarray(['openid', 'profile', 'email'], { minLength: 1 }),
+                fc.subarray(['openid', 'profile', 'email'], {minLength: 1}),
                 async (requestedScopes) => {
                     // Create two fresh clients
                     const uniqueSuffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -207,12 +209,14 @@ describe('Feature: user-consent-tracking, Property 3: Missing consent record alw
                         expect(responseB.body.requires_consent).toBe(true);
                         expect(responseB.body.authentication_code).toBeUndefined();
                     } finally {
-                        await clientApi.deleteClient(clientIdA).catch(() => {});
-                        await clientApi.deleteClient(clientIdB).catch(() => {});
+                        await clientApi.deleteClient(clientIdA).catch(() => {
+                        });
+                        await clientApi.deleteClient(clientIdB).catch(() => {
+                        });
                     }
                 },
             ),
-            { numRuns: 10 },
+            {numRuns: 10},
         );
     }, 300_000);
 });

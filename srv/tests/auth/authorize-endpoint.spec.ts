@@ -71,9 +71,12 @@ describe('GET /api/oauth/authorize', () => {
 
     afterAll(async () => {
         // Cleanup test clients
-        await clientApi.deleteClient(singleUriClientId).catch(() => {});
-        await clientApi.deleteClient(multiUriClientId).catch(() => {});
-        await clientApi.deleteClient(pkceRequiredClientId).catch(() => {});
+        await clientApi.deleteClient(singleUriClientId).catch(() => {
+        });
+        await clientApi.deleteClient(multiUriClientId).catch(() => {
+        });
+        await clientApi.deleteClient(pkceRequiredClientId).catch(() => {
+        });
         await app.close();
     });
 
@@ -366,7 +369,8 @@ describe('GET /api/oauth/authorize', () => {
                 expect(location.searchParams.get('error_description')).toContain('downgrade');
                 expect(location.searchParams.get('state')).toEqual('downgrade-test');
             } finally {
-                await clientApi.deleteClient(clientId).catch(() => {});
+                await clientApi.deleteClient(clientId).catch(() => {
+                });
             }
         });
 
@@ -397,7 +401,8 @@ describe('GET /api/oauth/authorize', () => {
                 // Method should default to plain
                 expect(location.searchParams.get('code_challenge_method')).toEqual('plain');
             } finally {
-                await clientApi.deleteClient(clientId).catch(() => {});
+                await clientApi.deleteClient(clientId).catch(() => {
+                });
             }
         });
     });

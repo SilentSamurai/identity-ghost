@@ -59,7 +59,8 @@ export class TokenIntrospectionService {
         private readonly authService: AuthService,
         @Inject(RS256_TOKEN_GENERATOR)
         private readonly tokenGenerator: TokenService,
-    ) {}
+    ) {
+    }
 
     /**
      * Introspect an access token on behalf of an authenticated client.

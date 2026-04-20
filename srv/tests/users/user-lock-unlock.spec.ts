@@ -1,10 +1,10 @@
 /**
  * Integration tests for the user lock/unlock feature.
- * 
+ *
  * This suite verifies the full admin lock/unlock lifecycle by booting the real
  * NestJS app, authenticating as the super-admin, and hitting actual HTTP
  * endpoints against a real database. It covers:
- * 
+ *
  *  - Default state: new users are unlocked.
  *  - Lock/unlock round trips: state toggles correctly and persists.
  *  - Idempotency: locking an already-locked (or unlocking an already-unlocked)

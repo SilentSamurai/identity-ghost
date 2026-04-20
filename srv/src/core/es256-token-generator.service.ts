@@ -34,7 +34,7 @@ export class ES256TokenGenerator implements TokenService {
     }
 
     decodeComplete(token: string): { header: any; payload: any } {
-        const decoded = this.jwtService.decode(token, { complete: true }) as { header: any; payload: any } | null;
-        return decoded ?? { header: {}, payload: {} };
+        const decoded = this.jwtService.decode(token, {complete: true}) as { header: any; payload: any } | null;
+        return decoded ?? {header: {}, payload: {}};
     }
 }

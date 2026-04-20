@@ -19,7 +19,8 @@ export class JwksService {
     constructor(
         @InjectRepository(TenantKey)
         private readonly tenantKeyRepository: Repository<TenantKey>,
-    ) {}
+    ) {
+    }
 
     async getJwks(tenantId: string): Promise<{ body: string; etag: string }> {
         const activeKeys = await this.tenantKeyRepository.find({

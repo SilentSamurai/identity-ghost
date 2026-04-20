@@ -1,9 +1,9 @@
 import * as fc from 'fast-check';
-import { SharedTestFixture } from '../shared-test.fixture';
-import { TokenFixture } from '../token.fixture';
-import { ClientEntityClient } from '../api-client/client-entity-client';
-import { TenantClient } from '../api-client/tenant-client';
-import { expect2xx } from '../api-client/client';
+import {SharedTestFixture} from '../shared-test.fixture';
+import {TokenFixture} from '../token.fixture';
+import {ClientEntityClient} from '../api-client/client-entity-client';
+import {TenantClient} from '../api-client/tenant-client';
+import {expect2xx} from '../api-client/client';
 
 /**
  * Feature: redirect-uri-validation, Properties 4 & 5: Token exchange redirect_uri binding
@@ -32,7 +32,7 @@ describe('Feature: redirect-uri-validation, Property 4: Token exchange binding a
     beforeAll(async () => {
         app = new SharedTestFixture();
         const tokenFixture = new TokenFixture(app);
-        const { accessToken } = await tokenFixture.fetchAccessToken(email, password, 'auth.server.com');
+        const {accessToken} = await tokenFixture.fetchAccessToken(email, password, 'auth.server.com');
 
         clientApi = new ClientEntityClient(app, accessToken);
         const tenantClient = new TenantClient(app, accessToken);
@@ -63,7 +63,8 @@ describe('Feature: redirect-uri-validation, Property 4: Token exchange binding a
     });
 
     afterAll(async () => {
-        await clientApi.deleteClient(testClientId).catch(() => {});
+        await clientApi.deleteClient(testClientId).catch(() => {
+        });
         await app.close();
     });
 
@@ -103,7 +104,7 @@ describe('Feature: redirect-uri-validation, Property 4: Token exchange binding a
             .send(payload)
             .set('Accept', 'application/json');
 
-        return { status: res.status, body: res.body };
+        return {status: res.status, body: res.body};
     }
 
     /**
@@ -139,7 +140,7 @@ describe('Feature: redirect-uri-validation, Property 4: Token exchange binding a
                     expect(omittedResult.body.error).toBe('invalid_grant');
                 },
             ),
-            { numRuns: 20 },
+            {numRuns: 20},
         );
     }, 120_000);
 });
@@ -168,7 +169,7 @@ describe('Feature: redirect-uri-validation, Property 5: Null stored redirect_uri
     beforeAll(async () => {
         app = new SharedTestFixture();
         const tokenFixture = new TokenFixture(app);
-        const { accessToken } = await tokenFixture.fetchAccessToken(email, password, 'auth.server.com');
+        const {accessToken} = await tokenFixture.fetchAccessToken(email, password, 'auth.server.com');
 
         clientApi = new ClientEntityClient(app, accessToken);
         const tenantClient = new TenantClient(app, accessToken);
@@ -199,7 +200,8 @@ describe('Feature: redirect-uri-validation, Property 5: Null stored redirect_uri
     });
 
     afterAll(async () => {
-        await clientApi.deleteClient(testClientId).catch(() => {});
+        await clientApi.deleteClient(testClientId).catch(() => {
+        });
         await app.close();
     });
 
@@ -238,7 +240,7 @@ describe('Feature: redirect-uri-validation, Property 5: Null stored redirect_uri
             .send(payload)
             .set('Accept', 'application/json');
 
-        return { status: res.status, body: res.body };
+        return {status: res.status, body: res.body};
     }
 
     /**
@@ -252,7 +254,7 @@ describe('Feature: redirect-uri-validation, Property 5: Null stored redirect_uri
         await fc.assert(
             fc.asyncProperty(
                 // Generate either an arbitrary URL string or undefined
-                fc.option(fc.webUrl(), { nil: undefined }),
+                fc.option(fc.webUrl(), {nil: undefined}),
                 async (requestRedirectUri) => {
                     const code = await loginForCodeWithoutRedirectUri();
                     const result = await exchangeCode(code, requestRedirectUri ?? undefined);
@@ -262,7 +264,7 @@ describe('Feature: redirect-uri-validation, Property 5: Null stored redirect_uri
                     expect(result.body.access_token).toBeDefined();
                 },
             ),
-            { numRuns: 20 },
+            {numRuns: 20},
         );
     }, 120_000);
 });

@@ -406,7 +406,7 @@ export class StartUpService implements OnModuleInit {
                 for (const roleName of entry.roles) {
                     try {
                         const exists = await this.roleService.findByNameAndTenant(permission, roleName, tenant);
-                        if (exists) continue;
+                        if (exists) ;
                     } catch {
                         await this.roleService.create(permission, roleName, tenant);
                         this.logger.log(`Created role: ${roleName} in ${entry.domain}`);

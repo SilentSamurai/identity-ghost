@@ -42,7 +42,7 @@ describe('Property 6: Uniform response for any token string', () => {
             fc.asyncProperty(tokenArb, async (token) => {
                 const response = await fixture.getHttpServer()
                     .post('/api/oauth/revoke')
-                    .send({ token })
+                    .send({token})
                     .set('Authorization', `Bearer ${accessToken}`)
                     .set('Accept', 'application/json');
 

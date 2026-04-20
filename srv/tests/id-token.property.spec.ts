@@ -1,11 +1,11 @@
 import * as fc from 'fast-check';
 import * as jwt from 'jsonwebtoken';
-import { createHash } from 'crypto';
-import { IdTokenService, GenerateIdTokenParams } from '../src/auth/id-token.service';
-import { TokenService, SigningKeyProvider } from '../src/core/token-abstraction';
-import { Environment } from '../src/config/environment.service';
-import { CryptUtil } from '../src/util/crypt.util';
-import { ClaimsResolverService } from '../src/auth/claims-resolver.service';
+import {createHash} from 'crypto';
+import {GenerateIdTokenParams, IdTokenService} from '../src/auth/id-token.service';
+import {SigningKeyProvider, TokenService} from '../src/core/token-abstraction';
+import {Environment} from '../src/config/environment.service';
+import {CryptUtil} from '../src/util/crypt.util';
+import {ClaimsResolverService} from '../src/auth/claims-resolver.service';
 
 /**
  * Feature: id-token-generation — Property-Based Tests (P1–P9)
@@ -19,7 +19,7 @@ import { ClaimsResolverService } from '../src/auth/claims-resolver.service';
 
 const TEST_ISSUER = 'https://auth.test.example.com';
 const TEST_KID = 'test-kid-001';
-const { privateKey, publicKey } = CryptUtil.generateKeyPair();
+const {privateKey, publicKey} = CryptUtil.generateKeyPair();
 
 function createConfigService(): Environment {
     return {
@@ -34,11 +34,11 @@ function createConfigService(): Environment {
 
 function createSigningKeyProvider(): SigningKeyProvider {
     return {
-        getSigningKeyWithKid: jest.fn().mockResolvedValue({ privateKey, kid: TEST_KID }),
+        getSigningKeyWithKid: jest.fn().mockResolvedValue({privateKey, kid: TEST_KID}),
         getPrivateKey: jest.fn().mockResolvedValue(privateKey),
         getPublicKey: jest.fn().mockResolvedValue(publicKey),
         getPublicKeyByKid: jest.fn().mockResolvedValue(publicKey),
-        generateKeyPair: jest.fn().mockReturnValue({ privateKey, publicKey }),
+        generateKeyPair: jest.fn().mockReturnValue({privateKey, publicKey}),
     } as unknown as SigningKeyProvider;
 }
 
@@ -49,17 +49,17 @@ let signingKeyProvider: SigningKeyProvider;
 beforeAll(() => {
     const configService = createConfigService();
     // Use a JwtService without expiresIn defaults — IdTokenService sets exp directly in claims
-    const { JwtService } = require('@nestjs/jwt');
+    const {JwtService} = require('@nestjs/jwt');
     const jwtService = new JwtService({
-        signOptions: { algorithm: 'RS256' },
+        signOptions: {algorithm: 'RS256'},
     });
     tokenGenerator = {
         sign: (payload: any, options: any) => jwtService.signAsync(payload, options),
         verify: (token: string, options: any) => jwtService.verifyAsync(token, options),
-        decode: (token: string) => jwtService.decode(token, { json: true }),
+        decode: (token: string) => jwtService.decode(token, {json: true}),
         decodeComplete: (token: string) => {
-            const decoded = jwtService.decode(token, { complete: true }) as any;
-            return decoded ?? { header: {}, payload: {} };
+            const decoded = jwtService.decode(token, {complete: true}) as any;
+            return decoded ?? {header: {}, payload: {}};
         },
     } as TokenService;
     signingKeyProvider = createSigningKeyProvider();
@@ -78,16 +78,16 @@ const OIDC_SCOPES = ['openid', 'profile', 'email', 'offline_access'];
 
 const uuidArb = fc.uuid();
 const emailArb = fc.emailAddress();
-const nameArb = fc.string({ minLength: 1, maxLength: 80 });
-const scopeSetArb = fc.subarray(OIDC_SCOPES, { minLength: 0 });
-const scopeSetWithOpenidArb = fc.subarray(OIDC_SCOPES, { minLength: 0 }).map(
+const nameArb = fc.string({minLength: 1, maxLength: 80});
+const scopeSetArb = fc.subarray(OIDC_SCOPES, {minLength: 0});
+const scopeSetWithOpenidArb = fc.subarray(OIDC_SCOPES, {minLength: 0}).map(
     (scopes) => (scopes.includes('openid') ? scopes : ['openid', ...scopes]),
 );
-const accessTokenArb = fc.string({ minLength: 10, maxLength: 256 });
-const nonceArb = fc.option(fc.string({ minLength: 1, maxLength: 128 }), { nil: undefined });
-const acrArb = fc.option(fc.string({ minLength: 1, maxLength: 64 }), { nil: undefined });
-const amrArb = fc.array(fc.constantFrom('pwd', 'mfa', 'otp', 'sms', 'face', 'fpt'), { minLength: 1, maxLength: 3 });
-const authTimeArb = fc.integer({ min: 1600000000, max: 2000000000 });
+const accessTokenArb = fc.string({minLength: 10, maxLength: 256});
+const nonceArb = fc.option(fc.string({minLength: 1, maxLength: 128}), {nil: undefined});
+const acrArb = fc.option(fc.string({minLength: 1, maxLength: 64}), {nil: undefined});
+const amrArb = fc.array(fc.constantFrom('pwd', 'mfa', 'otp', 'sms', 'face', 'fpt'), {minLength: 1, maxLength: 3});
+const authTimeArb = fc.integer({min: 1600000000, max: 2000000000});
 const sessionIdArb = fc.uuid();
 
 function paramsArb(scopeArb: fc.Arbitrary<string[]>): fc.Arbitrary<GenerateIdTokenParams> {
@@ -138,7 +138,7 @@ describe('Feature: id-token-generation, Property 1: Conditional ID token generat
                     expect(result).toBeUndefined();
                 }
             }),
-            { numRuns: 100 },
+            {numRuns: 100},
         );
     });
 });
@@ -181,7 +181,7 @@ describe('Feature: id-token-generation, Property 2: Mandatory claims presence an
                 expect(typeof decoded.exp).toBe('number');
                 expect(decoded.exp).toBeGreaterThan(decoded.iat);
             }),
-            { numRuns: 100 },
+            {numRuns: 100},
         );
     });
 });
@@ -219,7 +219,7 @@ describe('Feature: id-token-generation, Property 3: Session and authentication c
                     expect(decoded.acr).toBeUndefined();
                 }
             }),
-            { numRuns: 100 },
+            {numRuns: 100},
         );
     });
 });
@@ -250,7 +250,7 @@ describe('Feature: id-token-generation, Property 4: Nonce echo-back', () => {
                     expect(decoded.nonce).toBeUndefined();
                 }
             }),
-            { numRuns: 100 },
+            {numRuns: 100},
         );
     });
 });
@@ -280,7 +280,7 @@ describe('Feature: id-token-generation, Property 5: Access token hash correctnes
 
                 expect(decoded.at_hash).toBe(expectedAtHash);
             }),
-            { numRuns: 100 },
+            {numRuns: 100},
         );
     });
 });
@@ -323,7 +323,7 @@ describe('Feature: id-token-generation, Property 6: Scope-dependent identity cla
                     expect(decoded.email_verified).toBeUndefined();
                 }
             }),
-            { numRuns: 100 },
+            {numRuns: 100},
         );
     });
 });
@@ -347,13 +347,13 @@ describe('Feature: id-token-generation, Property 7: JWT signing structure', () =
                 const token = await idTokenService.generateIdToken(params);
                 expect(token).toBeDefined();
 
-                const decoded = jwt.decode(token!, { complete: true }) as jwt.Jwt;
+                const decoded = jwt.decode(token!, {complete: true}) as jwt.Jwt;
                 expect(decoded).toBeTruthy();
 
                 expect(decoded.header.alg).toBe('RS256');
                 expect(decoded.header.kid).toBe(TEST_KID);
             }),
-            { numRuns: 100 },
+            {numRuns: 100},
         );
     });
 });
@@ -405,7 +405,7 @@ describe('Feature: id-token-generation, Property 8: Sign-decode round-trip integ
                     expect(decoded.email_verified).toBe(params.user.verified);
                 }
             }),
-            { numRuns: 100 },
+            {numRuns: 100},
         );
     });
 });
@@ -430,10 +430,10 @@ describe('Feature: id-token-generation, Property 9: Idempotent re-signing', () =
                 const decoded1 = jwt.decode(token1!) as Record<string, any>;
 
                 // Re-sign the decoded payload (strip JWT-added fields, keep iat/exp)
-                const { iat, exp, ...restClaims } = decoded1;
+                const {iat, exp, ...restClaims} = decoded1;
                 const token2 = await tokenGenerator.sign(
-                    { ...restClaims, iat, exp },
-                    { privateKey, keyid: TEST_KID },
+                    {...restClaims, iat, exp},
+                    {privateKey, keyid: TEST_KID},
                 );
                 const decoded2 = jwt.decode(token2) as Record<string, any>;
 
@@ -464,7 +464,7 @@ describe('Feature: id-token-generation, Property 9: Idempotent re-signing', () =
                     expect(decoded2.email_verified).toBe(decoded1.email_verified);
                 }
             }),
-            { numRuns: 100 },
+            {numRuns: 100},
         );
     });
 });

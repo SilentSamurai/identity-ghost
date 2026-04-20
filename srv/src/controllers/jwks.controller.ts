@@ -8,7 +8,8 @@ export class JwksController {
     constructor(
         private readonly jwksService: JwksService,
         private readonly tenantService: TenantService,
-    ) {}
+    ) {
+    }
 
     @Get("jwks.json")
     async getJwks(

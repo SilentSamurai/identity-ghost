@@ -1,7 +1,7 @@
-import { SharedTestFixture } from './shared-test.fixture';
-import { TokenFixture } from './token.fixture';
-import { ClientEntityClient } from './api-client/client-entity-client';
-import { TenantClient } from './api-client/tenant-client';
+import {SharedTestFixture} from './shared-test.fixture';
+import {TokenFixture} from './token.fixture';
+import {ClientEntityClient} from './api-client/client-entity-client';
+import {TenantClient} from './api-client/tenant-client';
 
 /**
  * Integration tests for AuthorizeSchema validation in GET /api/oauth/authorize.
@@ -28,7 +28,7 @@ describe('AuthorizeSchema validation — GET /api/oauth/authorize', () => {
         app = new SharedTestFixture();
 
         const tokenFixture = new TokenFixture(app);
-        const { accessToken } = await tokenFixture.fetchAccessToken(
+        const {accessToken} = await tokenFixture.fetchAccessToken(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com',
@@ -51,7 +51,8 @@ describe('AuthorizeSchema validation — GET /api/oauth/authorize', () => {
     });
 
     afterAll(async () => {
-        await clientApi.deleteClient(testClientId).catch(() => {});
+        await clientApi.deleteClient(testClientId).catch(() => {
+        });
         await app.close();
     });
 
@@ -81,7 +82,7 @@ describe('AuthorizeSchema validation — GET /api/oauth/authorize', () => {
 
     describe('required parameter rejection (Req 4.1–4.4, 7.1, 7.2)', () => {
         it('should return 400 unsupported_response_type when response_type is omitted (RFC 6749 §4.1.2.1)', async () => {
-            const { response_type: _, ...params } = validParams() as any;
+            const {response_type: _, ...params} = validParams() as any;
             const res = await authorize(params);
 
             expect(res.status).toEqual(400);
@@ -90,7 +91,7 @@ describe('AuthorizeSchema validation — GET /api/oauth/authorize', () => {
         });
 
         it('should return 400 invalid_request when client_id is omitted (Req 4.1)', async () => {
-            const { client_id: _, ...params } = validParams() as any;
+            const {client_id: _, ...params} = validParams() as any;
             const res = await authorize(params);
 
             expect(res.status).toEqual(400);
@@ -100,7 +101,7 @@ describe('AuthorizeSchema validation — GET /api/oauth/authorize', () => {
         });
 
         it('should default redirect_uri when omitted and client has one registered URI (RFC 6749 §3.1.2.3)', async () => {
-            const { redirect_uri: _, ...params } = validParams() as any;
+            const {redirect_uri: _, ...params} = validParams() as any;
             const res = await authorize(params);
 
             // Client has exactly one registered redirect URI → defaults to it → 302 redirect
@@ -110,7 +111,7 @@ describe('AuthorizeSchema validation — GET /api/oauth/authorize', () => {
         });
 
         it('should use default scopes when scope is omitted (RFC 6749 §3.3)', async () => {
-            const { scope: _, ...params } = validParams() as any;
+            const {scope: _, ...params} = validParams() as any;
             const res = await authorize(params);
 
             // Scope omitted → defaults to client's allowedScopes → 302 redirect
@@ -120,7 +121,7 @@ describe('AuthorizeSchema validation — GET /api/oauth/authorize', () => {
         });
 
         it('should redirect with error when state is omitted (RFC 6749 §4.1.2.1)', async () => {
-            const { state: _, ...params } = validParams() as any;
+            const {state: _, ...params} = validParams() as any;
             const res = await authorize(params);
 
             // Missing state is a post-redirect error — redirect with error params
@@ -135,7 +136,7 @@ describe('AuthorizeSchema validation — GET /api/oauth/authorize', () => {
 
     describe('response_type error code mapping (Req 3.1, 3.2, 7.3)', () => {
         it('should return 400 unsupported_response_type when response_type=token (Req 3.1)', async () => {
-            const res = await authorize(validParams({ response_type: 'token' }));
+            const res = await authorize(validParams({response_type: 'token'}));
 
             expect(res.status).toEqual(400);
             expect(res.body.error).toEqual('unsupported_response_type');
@@ -143,7 +144,7 @@ describe('AuthorizeSchema validation — GET /api/oauth/authorize', () => {
         });
 
         it('should return 400 unsupported_response_type when response_type=id_token (Req 3.1)', async () => {
-            const res = await authorize(validParams({ response_type: 'id_token' }));
+            const res = await authorize(validParams({response_type: 'id_token'}));
 
             expect(res.status).toEqual(400);
             expect(res.body.error).toEqual('unsupported_response_type');
@@ -151,7 +152,7 @@ describe('AuthorizeSchema validation — GET /api/oauth/authorize', () => {
         });
 
         it('should return 400 unsupported_response_type when response_type is omitted (RFC 6749 §4.1.2.1)', async () => {
-            const { response_type: _, ...params } = validParams() as any;
+            const {response_type: _, ...params} = validParams() as any;
             const res = await authorize(params);
 
             expect(res.status).toEqual(400);
@@ -185,7 +186,7 @@ describe('AuthorizeSchema validation — GET /api/oauth/authorize', () => {
         });
 
         it('should redirect with error for nonce of 513 characters (OIDC Core §3.1.2.6)', async () => {
-            const res = await authorize(validParams({ nonce: 'a'.repeat(513) }));
+            const res = await authorize(validParams({nonce: 'a'.repeat(513)}));
 
             // Nonce length is a post-redirect error — redirect with error params
             expect(res.status).toEqual(302);
@@ -195,14 +196,14 @@ describe('AuthorizeSchema validation — GET /api/oauth/authorize', () => {
         });
 
         it('should accept nonce of exactly 512 characters (Req 1.6)', async () => {
-            const res = await authorize(validParams({ nonce: 'a'.repeat(512) }));
+            const res = await authorize(validParams({nonce: 'a'.repeat(512)}));
 
             // Schema passes; business validation proceeds → 302 redirect to /authorize
             expect(res.status).toEqual(302);
         });
 
         it('should reject prompt=invalid (Req 1.7)', async () => {
-            const res = await authorize(validParams({ prompt: 'invalid' }));
+            const res = await authorize(validParams({prompt: 'invalid'}));
 
             expect(res.status).toEqual(400);
             expect(res.body.error).toEqual('invalid_request');
@@ -210,25 +211,25 @@ describe('AuthorizeSchema validation — GET /api/oauth/authorize', () => {
         });
 
         it('should accept prompt=login (Req 1.7)', async () => {
-            const res = await authorize(validParams({ prompt: 'login' }));
+            const res = await authorize(validParams({prompt: 'login'}));
 
             expect(res.status).toEqual(302);
         });
 
         it('should accept prompt=none (Req 1.7)', async () => {
-            const res = await authorize(validParams({ prompt: 'none' }));
+            const res = await authorize(validParams({prompt: 'none'}));
 
             expect(res.status).toEqual(302);
         });
 
         it('should accept prompt=consent (Req 1.7)', async () => {
-            const res = await authorize(validParams({ prompt: 'consent' }));
+            const res = await authorize(validParams({prompt: 'consent'}));
 
             expect(res.status).toEqual(302);
         });
 
         it('should reject max_age=-1 (Req 1.8)', async () => {
-            const res = await authorize(validParams({ max_age: -1 }));
+            const res = await authorize(validParams({max_age: -1}));
 
             expect(res.status).toEqual(400);
             expect(res.body.error).toEqual('invalid_request');
@@ -236,13 +237,13 @@ describe('AuthorizeSchema validation — GET /api/oauth/authorize', () => {
         });
 
         it('should accept max_age=0 (Req 1.8)', async () => {
-            const res = await authorize(validParams({ max_age: 0 }));
+            const res = await authorize(validParams({max_age: 0}));
 
             expect(res.status).toEqual(302);
         });
 
         it('should accept max_age=3600 (Req 1.8)', async () => {
-            const res = await authorize(validParams({ max_age: 3600 }));
+            const res = await authorize(validParams({max_age: 3600}));
 
             expect(res.status).toEqual(302);
         });
@@ -304,7 +305,7 @@ describe('AuthorizeSchema validation — GET /api/oauth/authorize', () => {
         });
 
         it('should forward prompt=consent in the redirect URL (Req 6.1)', async () => {
-            const res = await authorize(validParams({ prompt: 'consent' }));
+            const res = await authorize(validParams({prompt: 'consent'}));
 
             expect(res.status).toEqual(302);
             const location = new URL(res.headers.location, 'http://localhost');
@@ -312,7 +313,7 @@ describe('AuthorizeSchema validation — GET /api/oauth/authorize', () => {
         });
 
         it('should forward max_age=0 in the redirect URL (Req 6.2)', async () => {
-            const res = await authorize(validParams({ max_age: 0 }));
+            const res = await authorize(validParams({max_age: 0}));
 
             expect(res.status).toEqual(302);
             const location = new URL(res.headers.location, 'http://localhost');
@@ -320,7 +321,7 @@ describe('AuthorizeSchema validation — GET /api/oauth/authorize', () => {
         });
 
         it('should forward resource in the redirect URL (Req 6.3)', async () => {
-            const res = await authorize(validParams({ resource: 'https://api.example.com/v2' }));
+            const res = await authorize(validParams({resource: 'https://api.example.com/v2'}));
 
             expect(res.status).toEqual(302);
             const location = new URL(res.headers.location, 'http://localhost');
@@ -342,7 +343,7 @@ describe('AuthorizeSchema validation — GET /api/oauth/authorize', () => {
 
     describe('error response format and abortEarly behaviour (Req 7.1–7.4)', () => {
         it('should return error response with error and error_description fields (Req 7.1)', async () => {
-            const { client_id: _, ...params } = validParams() as any;
+            const {client_id: _, ...params} = validParams() as any;
             const res = await authorize(params);
 
             expect(res.status).toEqual(400);
@@ -353,7 +354,7 @@ describe('AuthorizeSchema validation — GET /api/oauth/authorize', () => {
         });
 
         it('should use HTTP 400 for unsupported_response_type errors (Req 7.3)', async () => {
-            const res = await authorize(validParams({ response_type: 'token' }));
+            const res = await authorize(validParams({response_type: 'token'}));
 
             expect(res.status).toEqual(400);
             expect(res.body.error).toEqual('unsupported_response_type');
@@ -403,7 +404,7 @@ describe('AuthorizeSchema validation — GET /api/oauth/authorize', () => {
         });
 
         it('should default scope to client allowedScopes when scope is omitted (RFC 6749 §3.3)', async () => {
-            const { scope: _, ...params } = validParams() as any;
+            const {scope: _, ...params} = validParams() as any;
             const res = await authorize(params);
 
             expect(res.status).toEqual(302);
