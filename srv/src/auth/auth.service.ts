@@ -10,7 +10,7 @@
  * It implements OAuth 2.0 token validation per RFC 6749 and JWT token handling.
  */
 import {randomUUID} from "crypto";
-import {Inject, Injectable, Logger, NotFoundException, UnauthorizedException} from "@nestjs/common";
+import {HttpException, Inject, Injectable, Logger, NotFoundException, UnauthorizedException} from "@nestjs/common";
 import {OAuthException} from "../exceptions/oauth-exception";
 import {Environment} from "../config/environment.service";
 import {UsersService} from "../services/users.service";
@@ -24,6 +24,7 @@ import {
     ChangeEmailToken,
     EmailVerificationToken,
     GRANT_TYPES,
+    InternalToken,
     ResetPasswordToken,
     TechnicalToken,
     TenantToken,
@@ -33,6 +34,7 @@ import {AuthUserService} from "../casl/authUser.service";
 import * as yup from "yup";
 import {TechnicalTokenService} from "../core/technical-token.service";
 import {HS256_TOKEN_GENERATOR, RS256_TOKEN_GENERATOR, SIGNING_KEY_PROVIDER, SigningKeyProvider, TokenService} from "../core/token-abstraction";
+import {SubscriptionService} from "../services/subscription.service";
 
 const SecurityContextSchema = yup.object().shape({
     sub: yup.string().required("token is invalid"),
@@ -65,6 +67,7 @@ export class AuthService {
         private readonly hs256TokenGenerator: TokenService,
         @Inject(SIGNING_KEY_PROVIDER)
         private readonly signingKeyProvider: SigningKeyProvider,
+        private readonly subscriptionService: SubscriptionService,
     ) {
         this.LOGGER = new Logger(AuthService.name);
     }
@@ -133,6 +136,33 @@ export class AuthService {
                 tenantToken.email = user.email;
                 tenantToken.name = user.name;
                 tenantToken.userId = user.id;
+
+                // Membership verification for TenantToken
+                const membershipCheckEnabled = this.configService.get('MEMBERSHIP_CHECK_ENABLED', true);
+                if (membershipCheckEnabled) {
+                    try {
+                        const isMember = await this.authUserService.isMember(tenantToken.tenant_id, tenantToken.sub);
+                        if (!isMember) {
+                            // Check subscription fallback for subscribed users
+                            const isSubscribed = await this.checkSubscriptionAccess(user, tenantToken.tenant_id);
+                            if (!isSubscribed) {
+                                this.LOGGER.warn(
+                                    `Membership verification failed: sub=${tenantToken.sub}, ` +
+                                    `tenant_id=${tenantToken.tenant_id}, jti=${tenantToken.jti}`
+                                );
+                                throw OAuthException.invalidToken('The access token is invalid or has expired');
+                            }
+                        }
+                    } catch (error) {
+                        // Re-throw OAuthException as-is (membership failure)
+                        if (error instanceof OAuthException) {
+                            throw error;
+                        }
+                        // Database failure - fail closed with HTTP 503
+                        this.LOGGER.error(`Database error during membership verification: ${error.message}`);
+                        throw new HttpException('Service temporarily unavailable', 503);
+                    }
+                }
             }
             return payload;
         } catch (e) {
@@ -452,6 +482,18 @@ export class AuthService {
         return true;
     }
 
+    /**
+     * Check if a user has subscription-based access to a tenant.
+     * This is used as a fallback when the user is not a direct member of the tenant.
+     * @param user The user entity (already fetched from DB)
+     * @param tenantId The tenant ID to check subscription access for
+     * @returns true if the user has subscription-based access, false otherwise
+     */
+    private async checkSubscriptionAccess(user: User, tenantId: string): Promise<boolean> {
+        const tenant = await this.authUserService.findTenantById(tenantId);
+        const permission = this.securityService.createPermissionForTokenIssuance(tenantId);
+        return this.subscriptionService.isUserSubscribedToTenant(permission, user, tenant);
+    }
 
     public decodeToken(token: string): any {
         return this.tokenGenerator.decode(token);

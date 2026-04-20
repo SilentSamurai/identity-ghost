@@ -23,6 +23,7 @@ import {TenantKey} from "../entity/tenant-key.entity";
 import {JwksService} from "./jwks.service";
 import {DiscoveryService} from "./discovery.service";
 import {CorsOriginService} from "./cors-origin.service";
+import {SubscriptionService} from "./subscription.service";
 
 @Module(
     {
@@ -32,8 +33,8 @@ import {CorsOriginService} from "./cors-origin.service";
             CoreModule,
         ],
         controllers: [],
-        providers: [GroupService, AppService, TenantBitsService, ClientService, JwksService, DiscoveryService, CorsOriginService],
-        exports: [GroupService, AppService, TenantBitsService, ClientService, CoreModule, JwksService, DiscoveryService, CorsOriginService],
+        providers: [GroupService, AppService, TenantBitsService, ClientService, JwksService, DiscoveryService, CorsOriginService, SubscriptionService],
+        exports: [GroupService, AppService, TenantBitsService, ClientService, CoreModule, JwksService, DiscoveryService, CorsOriginService, SubscriptionService],
     })
 export class ServiceModule {
 }

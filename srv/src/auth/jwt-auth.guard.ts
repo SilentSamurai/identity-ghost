@@ -10,7 +10,7 @@
  * The guard extracts tokens, validates them via AuthService, and builds
  * the CASL ability context for authorization decisions.
  */
-import {CanActivate, ExecutionContext, Injectable, Logger, UnauthorizedException,} from "@nestjs/common";
+import {CanActivate, ExecutionContext, HttpException, Injectable, Logger, UnauthorizedException,} from "@nestjs/common";
 import {ExtractJwt} from "passport-jwt";
 import {AuthService} from "./auth.service";
 import {CaslAbilityFactory} from "../casl/casl-ability.factory";
@@ -44,6 +44,11 @@ export class JwtAuthGuard implements CanActivate {
             );
             // Re-throw if already an UnauthorizedException with WWW-Authenticate already set
             if (e instanceof UnauthorizedException) {
+                throw e;
+            }
+            // Re-throw HttpException with non-401 status (e.g., 503 for DB failures during membership checks)
+            // This prevents database failures from being converted to generic 401 errors
+            if (e instanceof HttpException && e.getStatus() !== 401) {
                 throw e;
             }
             response.setHeader('WWW-Authenticate', 'Bearer realm="auth-server"');
