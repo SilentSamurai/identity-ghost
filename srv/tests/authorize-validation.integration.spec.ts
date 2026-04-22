@@ -202,12 +202,12 @@ describe('AuthorizeSchema validation — GET /api/oauth/authorize', () => {
             expect(res.status).toEqual(302);
         });
 
-        it('should reject prompt=invalid (Req 1.7)', async () => {
+        it('should ignore unrecognized prompt values per OIDC Core §3.1.2.1 (Req 5.3)', async () => {
             const res = await authorize(validParams({prompt: 'invalid'}));
 
-            expect(res.status).toEqual(400);
-            expect(res.body.error).toEqual('invalid_request');
-            expect(res.body.error_description).toContain('prompt');
+            // OIDC Core §3.1.2.1: unrecognized prompt values are ignored
+            // Schema passes; business validation proceeds → 302 redirect to /authorize
+            expect(res.status).toEqual(302);
         });
 
         it('should accept prompt=login (Req 1.7)', async () => {
@@ -226,6 +226,32 @@ describe('AuthorizeSchema validation — GET /api/oauth/authorize', () => {
             const res = await authorize(validParams({prompt: 'consent'}));
 
             expect(res.status).toEqual(302);
+        });
+
+        it('should accept prompt="login consent" (space-delimited, Req 5.1)', async () => {
+            const res = await authorize(validParams({prompt: 'login consent'}));
+
+            // Space-delimited prompt values are valid per OIDC Core §3.1.2.1
+            expect(res.status).toEqual(302);
+        });
+
+        it('should redirect with error for prompt="none login" (none exclusivity, Req 5.2)', async () => {
+            const res = await authorize(validParams({prompt: 'none login'}));
+
+            // none exclusivity is enforced as a post-redirect error (after redirect_uri is validated)
+            expect(res.status).toEqual(302);
+            const location = new URL(res.headers.location);
+            expect(location.searchParams.get('error')).toEqual('invalid_request');
+            expect(location.searchParams.get('error_description')).toContain('none');
+        });
+
+        it('should redirect with error for prompt="none consent" (none exclusivity, Req 5.2)', async () => {
+            const res = await authorize(validParams({prompt: 'none consent'}));
+
+            // none exclusivity is enforced as a post-redirect error
+            expect(res.status).toEqual(302);
+            const location = new URL(res.headers.location);
+            expect(location.searchParams.get('error')).toEqual('invalid_request');
         });
 
         it('should reject max_age=-1 (Req 1.8)', async () => {

@@ -190,6 +190,12 @@ const LoginSchema = yup.object().shape({
     redirect_uri: yup.string().optional(),
     scope: yup.string().optional(),
     nonce: yup.string().optional().max(512),
+    prompt: yup.string().optional(),
+    max_age: yup
+        .number()
+        .optional()
+        .integer("max_age must be an integer")
+        .min(0, "max_age must be a non-negative integer"),
 });
 
 const PasswordGrantSchema = yup.object().shape({
@@ -314,6 +320,26 @@ const ConsentSchema = yup.object().shape({
     scope: yup.string().optional(),
     nonce: yup.string().optional().max(512),
     subscriber_tenant_hint: yup.string().optional().nullable(),
+    prompt: yup.string().optional(),
+});
+
+const SilentAuthSchema = yup.object().shape({
+    client_id: yup.string().required("client_id is required"),
+    user_id: yup.string().required("user_id is required"),
+    tenant_id: yup.string().required("tenant_id is required"),
+    code_challenge: yup.string().required("code_challenge is required"),
+    code_challenge_method: yup
+        .string()
+        .required()
+        .matches(/^(plain|S256|OWH32)$/, "method is required"),
+    redirect_uri: yup.string().optional(),
+    scope: yup.string().optional(),
+    nonce: yup.string().optional().max(512),
+    max_age: yup
+        .number()
+        .optional()
+        .integer("max_age must be an integer")
+        .min(0, "max_age must be a non-negative integer"),
 });
 
 const AuthorizeSchema = yup.object().shape({
@@ -350,10 +376,13 @@ const AuthorizeSchema = yup.object().shape({
     nonce: yup
         .string()
         .optional(),
+    // OIDC Core §3.1.2.1: prompt is a space-delimited list of values.
+    // Basic format validation only — the 'none' exclusivity check is enforced
+    // in AuthorizeService.validateAuthorizeRequest() after redirect_uri is validated,
+    // so the error can be delivered as a redirect per RFC 6749 §4.1.2.1.
     prompt: yup
         .string()
-        .optional()
-        .oneOf(["none", "login", "consent"], "prompt must be one of: none, login, consent"),
+        .optional(),
     max_age: yup
         .number()
         .optional()
@@ -401,5 +430,6 @@ export const ValidationSchema = {
     UpdateGroupSchema,
     VerifyAuthCodeSchema,
     ConsentSchema,
+    SilentAuthSchema,
     AuthorizeSchema,
 };

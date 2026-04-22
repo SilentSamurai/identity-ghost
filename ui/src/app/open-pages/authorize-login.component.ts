@@ -209,6 +209,8 @@ export class AuthorizeLoginComponent implements OnInit {
     state: string = '';
     scope: string = '';
     responseType: string = '';
+    prompt: string = '';
+    maxAge: number | undefined = undefined;
 
     constructor(
         private authService: AuthService,
@@ -292,11 +294,18 @@ export class AuthorizeLoginComponent implements OnInit {
             this.state = params['state'];
             this.scope = params['scope'];
             this.responseType = params['response_type'];
+            this.prompt = params['prompt'] || '';
+            this.maxAge = params['max_age'] !== undefined ? Number(params['max_age']) : undefined;
 
             // Generate and store nonce for OIDC flows
             if (this.scope && this.scope.split(' ').includes('openid')) {
                 const nonce = this.nonceService.generate();
                 this.nonceService.store(nonce);
+            }
+
+            // Handle prompt=none: skip login form, attempt silent auth
+            if (this.prompt === 'none') {
+                this.handleSilentAuth();
             }
         });
     }
@@ -321,6 +330,8 @@ export class AuthorizeLoginComponent implements OnInit {
                 this.code_challenge_method,
                 subscriberTenantHint,
                 nonce || undefined,
+                this.prompt || undefined,
+                this.maxAge,
             );
 
             if (data.requires_tenant_selection) {
@@ -347,6 +358,7 @@ export class AuthorizeLoginComponent implements OnInit {
                         client_name: data.client_name,
                         scopes: data.requested_scopes,
                         client_id: data.client_id,
+                        prompt: this.prompt || undefined,
                         loginParams: {
                             username, password, client_id,
                             code_challenge: this.code_challenge,
@@ -379,6 +391,65 @@ export class AuthorizeLoginComponent implements OnInit {
     private redirectToClient(authCode: string) {
         const redirectUrl = new URL(this.redirectUri);
         redirectUrl.searchParams.append('code', authCode);
+        if (this.state) {
+            redirectUrl.searchParams.append('state', this.state);
+        }
+        window.location.href = redirectUrl.toString();
+    }
+
+    private async handleSilentAuth(): Promise<void> {
+        this.loading = true;
+        try {
+            // For silent auth, we need user_id and tenant_id from the existing session.
+            // These would typically come from a stored session token.
+            const token = this.tokenStorage.getToken();
+            if (!token) {
+                // No existing session — redirect with login_required error
+                this.redirectWithError('login_required', 'User authentication is required but prompt=none was requested');
+                return;
+            }
+
+            const decoded = this.tokenStorage.getDecodedToken();
+            if (!decoded || !decoded.sub || !decoded.tenant?.id) {
+                this.redirectWithError('login_required', 'User authentication is required but prompt=none was requested');
+                return;
+            }
+
+            const nonce = this.nonceService.retrieve();
+            const data = await this.authService.silentAuth({
+                client_id: this.loginForm.get('client_id')?.value,
+                user_id: decoded.sub,
+                tenant_id: decoded.tenant.id,
+                code_challenge: this.code_challenge,
+                code_challenge_method: this.code_challenge_method,
+                redirect_uri: this.redirectUri,
+                scope: this.scope,
+                nonce: nonce || undefined,
+                max_age: this.maxAge,
+            });
+
+            if (data.error) {
+                this.redirectWithError(data.error, data.error_description || '');
+            } else if (data.authentication_code) {
+                this.tokenStorage.saveAuthCode(data.authentication_code);
+                this.redirectToClient(data.authentication_code);
+            } else {
+                this.redirectWithError('interaction_required', 'Silent authentication failed');
+            }
+        } catch (err: any) {
+            console.error('Silent auth error:', err);
+            const error = err.error?.error || 'login_required';
+            const description = err.error?.error_description || 'User authentication is required but prompt=none was requested';
+            this.redirectWithError(error, description);
+        } finally {
+            this.loading = false;
+        }
+    }
+
+    private redirectWithError(error: string, errorDescription: string): void {
+        const redirectUrl = new URL(this.redirectUri);
+        redirectUrl.searchParams.append('error', error);
+        redirectUrl.searchParams.append('error_description', errorDescription);
         if (this.state) {
             redirectUrl.searchParams.append('state', this.state);
         }

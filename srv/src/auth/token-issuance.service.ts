@@ -87,6 +87,7 @@ export interface IssueTokenOptions {
     requestedScope?: string;
     grant_type?: GRANT_TYPES;
     sid?: string;
+    requireAuthTime?: boolean;
 }
 
 @Injectable()
@@ -153,6 +154,10 @@ export class TokenIssuanceService {
             authTime = session.authTime;
             sessionId = session.sid;
         } else {
+            // When requireAuthTime is true, we MUST have a session sid - throw error instead of fallback
+            if (options?.requireAuthTime) {
+                throw new BadRequestException("auth_time is required but no session was provided");
+            }
             authTime = Math.floor(Date.now() / 1000);
             sessionId = randomUUID();
         }
@@ -391,6 +396,10 @@ export class TokenIssuanceService {
             authTime = session.authTime;
             sessionId = session.sid;
         } else {
+            // When requireAuthTime is true, we MUST have a session sid - throw error instead of fallback
+            if (options?.requireAuthTime) {
+                throw new BadRequestException("auth_time is required but no session was provided");
+            }
             authTime = Math.floor(Date.now() / 1000);
             sessionId = randomUUID();
         }

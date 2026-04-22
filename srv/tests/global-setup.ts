@@ -9,10 +9,14 @@
  * - Applies the HttpExceptionFilter globally for consistent error handling
  *
  * The app is reused across all tests for performance (avoids startup overhead).
+ *
+ * If a previous test run was killed without teardown (e.g. double Ctrl+C),
+ * stale ports are cleaned up automatically before starting new servers.
  */
 import * as process from 'node:process';
 import * as path from 'path';
 import * as fs from 'fs';
+import {execSync} from 'child_process';
 import {INestApplication} from '@nestjs/common';
 import {Test} from '@nestjs/testing';
 import {Environment} from '../src/config/environment.service';
@@ -33,7 +37,70 @@ declare global {
     var __SHARED_WEBHOOK__: TenantAppServer | undefined;
 }
 
+/**
+ * Kill any process listening on the given port.
+ * Works on Windows (netstat + taskkill) and Unix (lsof + kill).
+ * Silently ignores errors — the port may already be free.
+ */
+function killPort(port: number): void {
+    try {
+        if (process.platform === 'win32') {
+            // Find PIDs listening on the port via netstat
+            const output = execSync(
+                `netstat -ano | findstr "LISTENING" | findstr ":${port} "`,
+                {encoding: 'utf-8', timeout: 5000},
+            );
+            const pids = new Set<string>();
+            for (const line of output.trim().split('\n')) {
+                const pid = line.trim().split(/\s+/).pop();
+                if (pid && pid !== '0') pids.add(pid);
+            }
+            for (const pid of pids) {
+                try {
+                    execSync(`taskkill /F /PID ${pid}`, {timeout: 5000});
+                    console.log(`[globalSetup] Killed stale process PID ${pid} on port ${port}`);
+                } catch { /* already dead */ }
+            }
+        } else {
+            execSync(`lsof -ti :${port} | xargs kill -9`, {timeout: 5000});
+            console.log(`[globalSetup] Killed stale process on port ${port}`);
+        }
+    } catch {
+        // Nothing listening on this port — that's fine
+    }
+}
+
+/**
+ * If a previous test run was killed without teardown, a stale .test-ports.json
+ * will still exist. Read it, kill anything on those ports, and delete the file.
+ */
+function cleanupStalePorts(): void {
+    const portFilePath = path.resolve(__dirname, '../.test-ports.json');
+    if (!fs.existsSync(portFilePath)) return;
+
+    console.log('[globalSetup] Found stale .test-ports.json — cleaning up leftover ports...');
+    try {
+        const raw = fs.readFileSync(portFilePath, 'utf-8');
+        const ports = JSON.parse(raw);
+        const portValues: number[] = Object.values(ports).filter(
+            (v): v is number => typeof v === 'number' && v > 0,
+        );
+        for (const port of portValues) {
+            killPort(port);
+        }
+    } catch (error) {
+        console.warn('[globalSetup] Could not parse stale port file:', error);
+    }
+    try {
+        fs.unlinkSync(portFilePath);
+        console.log('[globalSetup] Deleted stale .test-ports.json');
+    } catch { /* ignore */ }
+}
+
 export default async function globalSetup(): Promise<void> {
+    // Clean up ports from a previously killed test run
+    cleanupStalePorts();
+
     let smtpServer: FakeSmtpServer | undefined;
     let webhookServer: TenantAppServer | undefined;
     let app: INestApplication | undefined;

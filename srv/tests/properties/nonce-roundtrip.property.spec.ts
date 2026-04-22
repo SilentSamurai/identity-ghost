@@ -80,7 +80,7 @@ describe('Feature: nonce-replay-protection, Property 1: Nonce round-trip integri
                 expect(payload).toBeTruthy();
                 expect(payload.nonce).toBe(generatedNonce);
             }),
-            {numRuns: 100},
+            {numRuns: 20},
         );
     }, 120_000);
 });

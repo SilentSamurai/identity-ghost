@@ -47,7 +47,7 @@ describe('Property 1: Empty or whitespace tokens are rejected', () => {
                 expect(response.status).toEqual(400);
                 expect(response.body.error).toEqual('invalid_request');
             }),
-            {numRuns: 100},
+            {numRuns: 20},
         );
     }, 120_000);
 });

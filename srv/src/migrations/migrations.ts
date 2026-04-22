@@ -19,6 +19,7 @@ import {AddNonceToAuthCode1755000000000} from "./1755000000000-AddNonceToAuthCod
 import {CreateLoginSessionsTable1756000000000} from "./1756000000000-CreateLoginSessionsTable";
 import {CreateUserConsentsTable1757000000000} from "./1757000000000-CreateUserConsentsTable";
 import {AddAliasToClients1758000000000} from "./1758000000000-AddAliasToClients";
+import {AddRequireAuthTimeToAuthCode1759000000000} from "./1759000000000-AddRequireAuthTimeToAuthCode";
 
 export const migrations = [
     CreateInitialTables1681147242561,
@@ -41,5 +42,6 @@ export const migrations = [
     AddNonceToAuthCode1755000000000,
     CreateLoginSessionsTable1756000000000,
     CreateUserConsentsTable1757000000000,
-    AddAliasToClients1758000000000
+    AddAliasToClients1758000000000,
+    AddRequireAuthTimeToAuthCode1759000000000
 ];

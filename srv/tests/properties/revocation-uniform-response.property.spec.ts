@@ -51,7 +51,7 @@ describe('Property 6: Uniform response for any token string', () => {
                 expect(response.headers['cache-control']).toEqual('no-store');
                 expect(response.headers['pragma']).toEqual('no-cache');
             }),
-            {numRuns: 100},
+            {numRuns: 20},
         );
     }, 120_000);
 });

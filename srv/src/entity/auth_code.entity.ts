@@ -44,6 +44,9 @@ export class AuthCode {
     @Column({name: "sid", type: "varchar", length: 36, nullable: true})
     sid: string | null;
 
+    @Column({name: "require_auth_time", default: false})
+    requireAuthTime: boolean;
+
     @CreateDateColumn({name: "created_at"})
     createdAt: Date;
 }

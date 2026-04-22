@@ -47,6 +47,7 @@ import {LoginSessionService} from "../auth/login-session.service";
 import {ConsentService} from "../auth/consent.service";
 import {ScopeResolverService} from "../casl/scope-resolver.service";
 import {ClientService} from "../services/client.service";
+import {PromptService, PromptAction} from "../auth/prompt.service";
 
 const logger = new Logger("OAuthTokenController");
 
@@ -66,6 +67,7 @@ export class OAuthTokenController {
         @InjectRepository(Client)
         private readonly clientRepository: Repository<Client>,
         private readonly clientService: ClientService,
+        private readonly promptService: PromptService,
     ) {
     }
 
@@ -127,6 +129,8 @@ export class OAuthTokenController {
             redirect_uri?: string;
             scope?: string;
             nonce?: string;
+            prompt?: string;
+            max_age?: number;
         },
     ) {
         const user: User = await this.authService.validate(
@@ -169,32 +173,73 @@ export class OAuthTokenController {
             };
         }
 
+        // Parse prompt parameter and evaluate prompt/max_age requirements
+        const promptValues = this.promptService.parsePrompt(body.prompt);
+        this.promptService.validatePrompt(promptValues);
+
+        // Find existing session for prompt/max_age evaluation
+        const existingSession = await this.loginSessionService.findValidSession(user.id, tenant.id);
+
+        // Resolve scopes for consent check
+        const clientAllowedScopes = client.allowedScopes || 'openid profile email';
+        const resolvedScopes = this.scopeResolverService.resolveScopes(
+            body.scope,
+            clientAllowedScopes,
+        );
+
+        // Check consent state for prompt evaluation
+        let consentGranted = true;
+        if (!isFirstParty) {
+            const consentCheck = await this.consentService.checkConsent(
+                user.id,
+                client.clientId,
+                resolvedScopes,
+            );
+            consentGranted = !consentCheck.consentRequired;
+        }
+
+        // Evaluate prompt/max_age to determine action
+        const evaluation = this.promptService.evaluate({
+            promptValues,
+            maxAge: body.max_age,
+            session: existingSession,
+            consentGranted,
+        });
+
+        // Handle FORCE_LOGIN: invalidate all existing sessions before creating a new one
+        if (evaluation.action === PromptAction.FORCE_LOGIN) {
+            await this.loginSessionService.invalidateAllSessions(user.id, tenant.id);
+        }
+
+        // Handle FORCE_CONSENT: always return requires_consent regardless of existing consent
+        if (evaluation.action === PromptAction.FORCE_CONSENT) {
+            return {
+                requires_consent: true,
+                requested_scopes: resolvedScopes,
+                client_name: client.name || client.clientId,
+            };
+        }
+
         // Consent check: only for third-party clients (non-first-party)
         // First-party (alias-resolved) logins skip consent (Requirements 8.1, 8.2)
-        if (!isFirstParty) {
-            const clientAllowedScopes = client.allowedScopes || 'openid profile email';
-            const resolvedScopes = this.scopeResolverService.resolveScopes(
-                body.scope,
-                clientAllowedScopes,
-            );
-
-            // Use client.clientId (UUID) for consent records, not body.client_id (Requirements 10.1, 10.2)
+        if (!isFirstParty && consentGranted === false) {
             const consentCheck = await this.consentService.checkConsent(
                 user.id,
                 client.clientId,
                 resolvedScopes,
             );
 
-            if (consentCheck.consentRequired) {
-                return {
-                    requires_consent: true,
-                    requested_scopes: consentCheck.requestedScopes,
-                    client_name: client.name || client.clientId,
-                };
-            }
+            return {
+                requires_consent: true,
+                requested_scopes: consentCheck.requestedScopes,
+                client_name: client.name || client.clientId,
+            };
         }
 
-        const session = await this.loginSessionService.createSession(user.id, tenant.id);
+        // Create session (new session if FORCE_LOGIN, otherwise may reuse existing)
+        const session = evaluation.action === PromptAction.FORCE_LOGIN
+            ? await this.loginSessionService.createSession(user.id, tenant.id)
+            : existingSession || await this.loginSessionService.createSession(user.id, tenant.id);
 
         const auth_code = await this.authCodeService.createAuthToken(
             user,
@@ -207,6 +252,7 @@ export class OAuthTokenController {
             body.scope,
             body.nonce,
             session.sid,
+            evaluation.requireAuthTime,
         );
 
         // Update pkceMethodUsed if client used S256 for the first time
@@ -235,6 +281,7 @@ export class OAuthTokenController {
             scope?: string;
             nonce?: string;
             subscriber_tenant_hint?: string;
+            prompt?: string;
         },
     ): Promise<any> {
         // Re-authenticate the user
@@ -278,6 +325,10 @@ export class OAuthTokenController {
             // Resolve tenant from the client entity
             const tenant = client.tenant;
 
+            // Determine requireAuthTime: true when prompt contains 'login' (Requirement 7.2)
+            const promptValues = this.promptService.parsePrompt(body.prompt);
+            const requireAuthTime = promptValues.includes('login');
+
             // Create session
             const session = await this.loginSessionService.createSession(user.id, tenant.id);
 
@@ -293,6 +344,7 @@ export class OAuthTokenController {
                 body.scope,
                 body.nonce,
                 session.sid,
+                requireAuthTime,
             );
 
             return {
@@ -301,6 +353,98 @@ export class OAuthTokenController {
         }
 
         throw OAuthException.invalidRequest('Invalid consent_action');
+    }
+
+    @Post("/silent-auth")
+    async silentAuth(
+        @Body(new ValidationPipe(ValidationSchema.SilentAuthSchema))
+        body: {
+            client_id: string;
+            user_id: string;
+            tenant_id: string;
+            code_challenge: string;
+            code_challenge_method: string;
+            redirect_uri?: string;
+            scope?: string;
+            nonce?: string;
+            max_age?: number;
+        },
+    ): Promise<{ authentication_code: string } | { error: string; error_description: string }> {
+        // Resolve Client entity by clientId or alias
+        let client: Client;
+        try {
+            client = await this.clientService.findByClientIdOrAlias(body.client_id);
+        } catch {
+            return {
+                error: 'invalid_client',
+                error_description: 'Unknown client_id',
+            };
+        }
+        const tenant = client.tenant;
+
+        // Find valid session for the user+tenant
+        const session = await this.loginSessionService.findValidSession(body.user_id, tenant.id);
+
+        // Resolve scopes for consent check
+        const clientAllowedScopes = client.allowedScopes || 'openid profile email';
+        const resolvedScopes = this.scopeResolverService.resolveScopes(
+            body.scope,
+            clientAllowedScopes,
+        );
+
+        // Check consent state
+        const consentCheck = await this.consentService.checkConsent(
+            body.user_id,
+            client.clientId,
+            resolvedScopes,
+        );
+        const consentGranted = !consentCheck.consentRequired;
+
+        // Evaluate prompt=none with gathered context
+        const evaluation = this.promptService.evaluate({
+            promptValues: ['none'],
+            maxAge: body.max_age,
+            session,
+            consentGranted,
+        });
+
+        // If evaluation returns an error, return it as JSON
+        if (evaluation.error) {
+            return {
+                error: evaluation.error,
+                error_description: evaluation.errorDescription || '',
+            };
+        }
+
+        // If evaluation returns ISSUE_CODE, create auth code using existing session's sid
+        if (evaluation.action === PromptAction.ISSUE_CODE && session) {
+            // Get user entity for auth code creation
+            const user = await this.authUserService.findUserById(body.user_id);
+
+            const auth_code = await this.authCodeService.createAuthToken(
+                user,
+                tenant,
+                body.client_id,
+                body.code_challenge,
+                body.code_challenge_method,
+                undefined, // subscriberTenantHint
+                body.redirect_uri,
+                body.scope,
+                body.nonce,
+                session.sid,
+                evaluation.requireAuthTime,
+            );
+
+            return {
+                authentication_code: auth_code,
+            };
+        }
+
+        // This should not happen with prompt=none, but handle gracefully
+        return {
+            error: 'interaction_required',
+            error_description: 'An unexpected error occurred during silent authentication',
+        };
     }
 
     @Post("/token")
@@ -404,6 +548,7 @@ export class OAuthTokenController {
             nonce: authCode.nonce ?? undefined,
             sid: authCode.sid ?? undefined,
             grant_type: GRANT_TYPES.CODE,
+            requireAuthTime: authCode.requireAuthTime,
         });
     }
 

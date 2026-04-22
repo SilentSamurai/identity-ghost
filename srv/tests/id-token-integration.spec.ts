@@ -267,4 +267,88 @@ describe('ID Token Generation Integration', () => {
             expect(refreshedPayload.nonce).toBeUndefined();
         });
     });
+
+    // ── 8.7: auth_time with prompt=login and max_age ────────────────
+    // Uses isolated user (prompt-test.local) to avoid invalidating sessions for other concurrent tests.
+
+    describe('8.7 auth_time with prompt=login and max_age', () => {
+        it('should include auth_time in ID token when prompt=login is used', async () => {
+            // Login with prompt=login
+            const loginRes = await app.getHttpServer()
+                .post('/api/oauth/login')
+                .send({
+                    email: 'admin@prompt-test.local',
+                    password: 'admin9000',
+                    client_id: 'prompt-test.local',
+                    code_challenge: challenge,
+                    code_challenge_method: 'plain',
+                    scope: 'openid profile email',
+                    prompt: 'login',
+                })
+                .set('Accept', 'application/json');
+
+            expect2xx(loginRes);
+            expect(loginRes.body.authentication_code).toBeDefined();
+
+            const tokenRes = await app.getHttpServer()
+                .post('/api/oauth/token')
+                .send({
+                    grant_type: 'authorization_code',
+                    code: loginRes.body.authentication_code,
+                    code_verifier: verifier,
+                    client_id: 'prompt-test.local',
+                })
+                .set('Accept', 'application/json');
+
+            expect2xx(tokenRes);
+            expect(tokenRes.body.id_token).toBeDefined();
+
+            const payload = jwt.decode(tokenRes.body.id_token) as any;
+            expect(payload.auth_time).toBeDefined();
+            expect(typeof payload.auth_time).toBe('number');
+            expect(Number.isInteger(payload.auth_time)).toBe(true);
+
+            // auth_time should be recent (within last 10 seconds)
+            const now = Math.floor(Date.now() / 1000);
+            expect(payload.auth_time).toBeGreaterThan(now - 10);
+            expect(payload.auth_time).toBeLessThanOrEqual(now + 1);
+        });
+
+        it('should include auth_time in ID token when max_age is used', async () => {
+            // Login with max_age=3600
+            const loginRes = await app.getHttpServer()
+                .post('/api/oauth/login')
+                .send({
+                    email: 'admin@prompt-test.local',
+                    password: 'admin9000',
+                    client_id: 'prompt-test.local',
+                    code_challenge: challenge,
+                    code_challenge_method: 'plain',
+                    scope: 'openid profile email',
+                    max_age: 3600,
+                })
+                .set('Accept', 'application/json');
+
+            expect2xx(loginRes);
+            expect(loginRes.body.authentication_code).toBeDefined();
+
+            const tokenRes = await app.getHttpServer()
+                .post('/api/oauth/token')
+                .send({
+                    grant_type: 'authorization_code',
+                    code: loginRes.body.authentication_code,
+                    code_verifier: verifier,
+                    client_id: 'prompt-test.local',
+                })
+                .set('Accept', 'application/json');
+
+            expect2xx(tokenRes);
+            expect(tokenRes.body.id_token).toBeDefined();
+
+            const payload = jwt.decode(tokenRes.body.id_token) as any;
+            expect(payload.auth_time).toBeDefined();
+            expect(typeof payload.auth_time).toBe('number');
+            expect(Number.isInteger(payload.auth_time)).toBe(true);
+        });
+    });
 });

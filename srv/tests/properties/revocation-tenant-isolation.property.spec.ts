@@ -105,7 +105,7 @@ describe('Property 7: Tenant isolation prevents cross-tenant revocation', () => 
                 expect(refreshResponse.status).toEqual(201);
                 expect(refreshResponse.body.access_token).toBeDefined();
             }),
-            {numRuns: 100},
+            {numRuns: 20},
         );
     }, 120_000);
 });

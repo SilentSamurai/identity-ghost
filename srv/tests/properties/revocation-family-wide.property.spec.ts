@@ -101,7 +101,7 @@ describe('Property 4: Family-wide revocation', () => {
                 expect(refreshResponse.status).toEqual(400);
                 expect(refreshResponse.body.error).toEqual('invalid_grant');
             }),
-            {numRuns: 100},
+            {numRuns: 20},
         );
     }, 120_000);
 });

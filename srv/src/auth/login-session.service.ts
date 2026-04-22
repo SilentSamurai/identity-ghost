@@ -1,6 +1,6 @@
 import {Injectable} from "@nestjs/common";
 import {InjectRepository} from "@nestjs/typeorm";
-import {Repository} from "typeorm";
+import {IsNull, Repository} from "typeorm";
 import {randomUUID} from "crypto";
 import {LoginSession} from "../entity/login-session.entity";
 import {Environment} from "../config/environment.service";
@@ -60,5 +60,45 @@ export class LoginSessionService {
      */
     async invalidateSession(sid: string): Promise<void> {
         await this.repo.update({sid}, {invalidatedAt: new Date()});
+    }
+
+    /**
+     * Find the most recent valid (non-expired, non-invalidated) session
+     * for a user+tenant pair. Returns null if none exists.
+     * Used by prompt=none and max_age enforcement to check existing sessions.
+     */
+    async findValidSession(userId: string, tenantId: string): Promise<LoginSession | null> {
+        const session = await this.repo.findOne({
+            where: {
+                userId,
+                tenantId,
+                invalidatedAt: IsNull(),
+            },
+            order: {
+                authTime: "DESC",
+            },
+        });
+
+        if (!session) {
+            return null;
+        }
+
+        // Check expiration after fetching (simpler than complex query)
+        if (session.expiresAt < new Date()) {
+            return null;
+        }
+
+        return session;
+    }
+
+    /**
+     * Invalidate all active sessions for a user+tenant pair.
+     * Used when prompt=login forces re-authentication.
+     */
+    async invalidateAllSessions(userId: string, tenantId: string): Promise<void> {
+        await this.repo.update(
+            {userId, tenantId, invalidatedAt: IsNull()},
+            {invalidatedAt: new Date()},
+        );
     }
 }

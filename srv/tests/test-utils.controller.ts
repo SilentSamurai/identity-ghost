@@ -1,6 +1,6 @@
 import {Body, Controller, Get, HttpCode, Param, Post} from "@nestjs/common";
 import {InjectRepository} from "@nestjs/typeorm";
-import {Repository} from "typeorm";
+import {IsNull, Repository} from "typeorm";
 import {LoginSession} from "../src/entity/login-session.entity";
 import {AuthCode} from "../src/entity/auth_code.entity";
 import {User} from "../src/entity/user.entity";
@@ -76,5 +76,91 @@ export class TestUtilsController {
             verified: user.verified,
             locked: user.locked,
         };
+    }
+
+    /**
+     * Create a login session for test seeding.
+     * Returns the created session with all fields.
+     */
+    @Post("sessions")
+    async createSession(@Body() body: { userId: string; tenantId: string; authTime?: number }): Promise<LoginSession> {
+        const sid = crypto.randomUUID();
+        const authTime = body.authTime ?? Math.floor(Date.now() / 1000);
+        const expiresAt = new Date(Date.now() + 86400000); // 24 hours from now
+
+        const session = this.loginSessionRepo.create({
+            sid,
+            userId: body.userId,
+            tenantId: body.tenantId,
+            authTime,
+            expiresAt,
+            invalidatedAt: null,
+        });
+
+        return this.loginSessionRepo.save(session);
+    }
+
+    /**
+     * List all sessions for a user+tenant pair.
+     * Returns sessions with all fields for verification.
+     */
+    @Get("sessions/user/:userId/tenant/:tenantId")
+    async listSessions(
+        @Param("userId") userId: string,
+        @Param("tenantId") tenantId: string,
+    ): Promise<LoginSession[]> {
+        return this.loginSessionRepo.find({
+            where: {userId, tenantId},
+            order: {authTime: "DESC"},
+        });
+    }
+
+    /**
+     * Invalidate all sessions for a user+tenant pair.
+     * Delegates to LoginSessionService.invalidateAllSessions.
+     */
+    @Post("sessions/user/:userId/tenant/:tenantId/invalidate-all")
+    @HttpCode(204)
+    async invalidateAllSessions(
+        @Param("userId") userId: string,
+        @Param("tenantId") tenantId: string,
+    ): Promise<void> {
+        await this.loginSessionRepo.update(
+            {userId, tenantId, invalidatedAt: IsNull()},
+            {invalidatedAt: new Date()},
+        );
+    }
+
+    /**
+     * Create an auth code for test seeding.
+     * Returns the created auth code with all fields.
+     */
+    @Post("auth-codes")
+    async createAuthCode(@Body() body: {
+        userId: string;
+        tenantId: string;
+        clientId: string;
+        codeChallenge: string;
+        method: string;
+        sid?: string;
+        requireAuthTime?: boolean;
+    }): Promise<AuthCode> {
+        const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+        const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes from now
+
+        const authCode = this.authCodeRepo.create({
+            code,
+            codeChallenge: body.codeChallenge,
+            method: body.method,
+            userId: body.userId,
+            tenantId: body.tenantId,
+            clientId: body.clientId,
+            sid: body.sid || null,
+            requireAuthTime: body.requireAuthTime || false,
+            used: false,
+            expiresAt,
+        });
+
+        return this.authCodeRepo.save(authCode);
     }
 }

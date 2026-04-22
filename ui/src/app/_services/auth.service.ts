@@ -23,6 +23,8 @@ export class AuthService {
         method: string,
         subscriber_tenant_hint?: string,
         nonce?: string,
+        prompt?: string,
+        max_age?: number,
     ): Promise<any> {
         const body: any = {
             code_challenge: code_challenge,
@@ -36,6 +38,12 @@ export class AuthService {
         }
         if (nonce) {
             body.nonce = nonce;
+        }
+        if (prompt) {
+            body.prompt = prompt;
+        }
+        if (max_age !== undefined && max_age !== null) {
+            body.max_age = max_age;
         }
         return await lastValueFrom(
             this.http.post(
@@ -168,6 +176,7 @@ export class AuthService {
         scope?: string;
         nonce?: string;
         subscriber_tenant_hint?: string;
+        prompt?: string;
     }): Promise<any> {
         const body: any = {
             email: params.email,
@@ -190,9 +199,51 @@ export class AuthService {
         if (params.subscriber_tenant_hint) {
             body.subscriber_tenant_hint = params.subscriber_tenant_hint;
         }
+        if (params.prompt) {
+            body.prompt = params.prompt;
+        }
         return await lastValueFrom(
             this.http.post(
                 `${AUTH_API}/consent`,
+                body,
+                httpOptions,
+            ),
+        );
+    }
+
+    async silentAuth(params: {
+        client_id: string;
+        user_id: string;
+        tenant_id: string;
+        code_challenge: string;
+        code_challenge_method: string;
+        redirect_uri?: string;
+        scope?: string;
+        nonce?: string;
+        max_age?: number;
+    }): Promise<any> {
+        const body: any = {
+            client_id: params.client_id,
+            user_id: params.user_id,
+            tenant_id: params.tenant_id,
+            code_challenge: params.code_challenge,
+            code_challenge_method: params.code_challenge_method,
+        };
+        if (params.redirect_uri) {
+            body.redirect_uri = params.redirect_uri;
+        }
+        if (params.scope) {
+            body.scope = params.scope;
+        }
+        if (params.nonce) {
+            body.nonce = params.nonce;
+        }
+        if (params.max_age !== undefined && params.max_age !== null) {
+            body.max_age = params.max_age;
+        }
+        return await lastValueFrom(
+            this.http.post(
+                `${AUTH_API}/silent-auth`,
                 body,
                 httpOptions,
             ),

@@ -44,4 +44,16 @@ export class OAuthException extends HttpException {
     static serverError(): OAuthException {
         return new OAuthException('server_error', 'An unexpected error occurred', HttpStatus.BAD_REQUEST);
     }
+
+    static loginRequired(description: string): OAuthException {
+        return new OAuthException('login_required', description, HttpStatus.BAD_REQUEST);
+    }
+
+    static consentRequired(description: string): OAuthException {
+        return new OAuthException('consent_required', description, HttpStatus.BAD_REQUEST);
+    }
+
+    static interactionRequired(description: string): OAuthException {
+        return new OAuthException('interaction_required', description, HttpStatus.BAD_REQUEST);
+    }
 }

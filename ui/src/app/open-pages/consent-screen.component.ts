@@ -91,6 +91,7 @@ export class ConsentScreenComponent implements OnInit {
     private loginParams: any = {};
     private redirectUri: string = '';
     private state: string = '';
+    private prompt: string = '';
 
     constructor(
         private router: Router,
@@ -108,6 +109,7 @@ export class ConsentScreenComponent implements OnInit {
             this.requestedScopes = state.scopes || [];
             this.redirectUri = state.loginParams?.redirect_uri || '';
             this.state = state.loginParams?.state || '';
+            this.prompt = state.prompt || '';
         } else {
             this.router.navigate(['/authorize']);
         }
@@ -138,6 +140,7 @@ export class ConsentScreenComponent implements OnInit {
                 scope: this.loginParams.scope,
                 nonce: this.loginParams.nonce,
                 subscriber_tenant_hint: this.loginParams.subscriber_tenant_hint,
+                prompt: this.prompt || undefined,
             });
 
             if (data.authentication_code) {
@@ -168,6 +171,7 @@ export class ConsentScreenComponent implements OnInit {
                 scope: this.loginParams.scope,
                 nonce: this.loginParams.nonce,
                 subscriber_tenant_hint: this.loginParams.subscriber_tenant_hint,
+                prompt: this.prompt || undefined,
             });
 
             // On deny, redirect to client with error

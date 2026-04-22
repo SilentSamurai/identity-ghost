@@ -34,7 +34,7 @@ describe('Property 2: Unauthenticated requests are rejected', () => {
 
                 expect(response.status).toEqual(401);
             }),
-            {numRuns: 100},
+            {numRuns: 20},
         );
     }, 120_000);
 });

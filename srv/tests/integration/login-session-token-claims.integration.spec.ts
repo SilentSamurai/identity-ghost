@@ -175,4 +175,95 @@ describe('Login Session Token Claims', () => {
         expect(typeof decoded.sid).toBe('string');
         expect(decoded.sid).toMatch(UUID_V4_REGEX);
     });
+
+    // prompt=login and max_age tests use an isolated user to avoid invalidating
+    // sessions that belong to other concurrent test files.
+    it('prompt=login — new session created — ID token auth_time reflects fresh session', async () => {
+        const codeChallenge = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq';
+        const codeVerifier = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq';
+
+        // Login with prompt=login to force a fresh session
+        const loginResponse = await app.getHttpServer()
+            .post('/api/oauth/login')
+            .send({
+                email: 'admin@prompt-test.local',
+                password: 'admin9000',
+                client_id: 'prompt-test.local',
+                code_challenge: codeChallenge,
+                code_challenge_method: 'plain',
+                prompt: 'login',
+            })
+            .set('Accept', 'application/json');
+
+        expect(loginResponse.status).toEqual(201);
+        expect(loginResponse.body.authentication_code).toBeDefined();
+
+        // Exchange the auth code for tokens
+        const tokenResponse = await app.getHttpServer()
+            .post('/api/oauth/token')
+            .send({
+                grant_type: 'authorization_code',
+                code: loginResponse.body.authentication_code,
+                code_verifier: codeVerifier,
+                client_id: 'prompt-test.local',
+            })
+            .set('Accept', 'application/json');
+
+        expect(tokenResponse.status).toEqual(201);
+        expect(tokenResponse.body.id_token).toBeDefined();
+
+        const decoded = app.jwtService().decode(tokenResponse.body.id_token, {json: true}) as any;
+
+        // auth_time should be a recent integer (within last 10 seconds)
+        expect(decoded.auth_time).toBeDefined();
+        expect(Number.isInteger(decoded.auth_time)).toBe(true);
+        const now = Math.floor(Date.now() / 1000);
+        expect(decoded.auth_time).toBeGreaterThan(now - 10);
+        expect(decoded.auth_time).toBeLessThanOrEqual(now + 1);
+
+        // sid should be a UUID
+        expect(decoded.sid).toBeDefined();
+        expect(decoded.sid).toMatch(UUID_V4_REGEX);
+    });
+
+    it('max_age — ID token contains auth_time', async () => {
+        const codeChallenge = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq';
+        const codeVerifier = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq';
+
+        // Login with max_age=3600 (isolated user to avoid session poisoning)
+        const loginResponse = await app.getHttpServer()
+            .post('/api/oauth/login')
+            .send({
+                email: 'admin@prompt-test.local',
+                password: 'admin9000',
+                client_id: 'prompt-test.local',
+                code_challenge: codeChallenge,
+                code_challenge_method: 'plain',
+                max_age: 3600,
+            })
+            .set('Accept', 'application/json');
+
+        expect(loginResponse.status).toEqual(201);
+        expect(loginResponse.body.authentication_code).toBeDefined();
+
+        // Exchange the auth code for tokens
+        const tokenResponse = await app.getHttpServer()
+            .post('/api/oauth/token')
+            .send({
+                grant_type: 'authorization_code',
+                code: loginResponse.body.authentication_code,
+                code_verifier: codeVerifier,
+                client_id: 'prompt-test.local',
+            })
+            .set('Accept', 'application/json');
+
+        expect(tokenResponse.status).toEqual(201);
+        expect(tokenResponse.body.id_token).toBeDefined();
+
+        const decoded = app.jwtService().decode(tokenResponse.body.id_token, {json: true}) as any;
+
+        // auth_time must be present when max_age was used
+        expect(decoded.auth_time).toBeDefined();
+        expect(Number.isInteger(decoded.auth_time)).toBe(true);
+    });
 });

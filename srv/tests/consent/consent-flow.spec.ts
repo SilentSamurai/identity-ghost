@@ -679,4 +679,74 @@ describe('Consent Flow Integration Tests', () => {
             }
         });
     });
+
+    // ─── prompt=consent forces consent even when already granted ─────
+
+    describe('login endpoint — prompt=consent forces consent (OIDC prompt)', () => {
+        it('should return requires_consent when prompt=consent even when consent already granted', async () => {
+            const freshClient = await clientApi.createClient(testTenantId, 'Prompt Consent App', {
+                redirectUris: [REDIRECT_URI],
+                allowedScopes: 'openid profile email',
+                isPublic: true,
+            });
+            const clientId = freshClient.client.clientId;
+
+            try {
+                // Step 1: Grant consent for all scopes
+                const approveResponse = await consentRequest({
+                    client_id: clientId,
+                    approved_scopes: ['openid', 'profile', 'email'],
+                    consent_action: 'approve',
+                    scope: 'openid profile email',
+                });
+                expect(approveResponse.body.authentication_code).toBeDefined();
+
+                // Step 2: Login again with prompt=consent — should force consent even though already granted
+                const loginResponse = await app.getHttpServer()
+                    .post('/api/oauth/login')
+                    .send({
+                        email: 'admin@auth.server.com',
+                        password: 'admin9000',
+                        code_challenge: CODE_CHALLENGE,
+                        code_challenge_method: 'plain',
+                        redirect_uri: REDIRECT_URI,
+                        client_id: clientId,
+                        scope: 'openid profile email',
+                        prompt: 'consent',
+                    })
+                    .set('Accept', 'application/json');
+
+                expect(loginResponse.status).toEqual(201);
+                expect(loginResponse.body.requires_consent).toBe(true);
+                expect(loginResponse.body.requested_scopes).toBeDefined();
+                expect(loginResponse.body.authentication_code).toBeUndefined();
+            } finally {
+                await clientApi.deleteClient(clientId).catch(() => {
+                });
+            }
+        });
+    });
+
+    // ─── prompt=login invalidates existing sessions ──────────────────
+    // Uses an isolated user (prompt-test.local) to avoid poisoning sessions for other concurrent tests.
+
+    describe('login endpoint — prompt=login invalidates sessions (OIDC prompt)', () => {
+        it('should create a new session when prompt=login is specified', async () => {
+            // Use an isolated tenant to avoid invalidating sessions used by other test files
+            const response = await app.getHttpServer()
+                .post('/api/oauth/login')
+                .send({
+                    email: 'admin@prompt-test.local',
+                    password: 'admin9000',
+                    code_challenge: CODE_CHALLENGE,
+                    code_challenge_method: 'plain',
+                    client_id: 'prompt-test.local',
+                    prompt: 'login',
+                })
+                .set('Accept', 'application/json');
+
+            expect(response.status).toEqual(201);
+            expect(response.body.authentication_code).toBeDefined();
+        });
+    });
 });

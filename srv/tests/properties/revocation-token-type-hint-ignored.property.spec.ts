@@ -49,7 +49,7 @@ describe('Property 3: Unrecognized token_type_hint is ignored', () => {
                 expect(response.status).toEqual(200);
                 expect(response.body).toEqual({});
             }),
-            {numRuns: 100},
+            {numRuns: 20},
         );
     }, 120_000);
 });

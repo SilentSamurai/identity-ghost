@@ -1,187 +1,276 @@
 /**
  * Integration tests for AuthCodeService.
  *
- * Tests the authorization code lifecycle:
- * - Creating authorization codes
- * - Validating authorization codes with PKCE
- * - Error handling for invalid/expired codes
+ * Tests the authorization code lifecycle through the real HTTP endpoints:
+ * - Creating authorization codes (via login)
+ * - Validating authorization codes with PKCE (via token exchange)
+ * - Single-use enforcement
+ * - requireAuthTime flag propagation
  *
- * These are integration tests that test the full service with real database operations.
+ * Uses SharedTestFixture to hit the running NestJS app with real database operations.
  */
-import {Test, TestingModule} from '@nestjs/testing';
-import {AuthCodeService} from '../../src/auth/auth-code.service';
-import {getRepositoryToken} from '@nestjs/typeorm';
-import {AuthCode} from '../../src/entity/auth_code.entity';
-import {User} from '../../src/entity/user.entity';
-import {Environment} from '../../src/config/environment.service';
-import {JwtService} from '@nestjs/jwt';
-import {TenantService} from '../../src/services/tenant.service';
-import {AuthUserService} from '../../src/casl/authUser.service';
-import {DataSource, Repository} from 'typeorm';
-import {OAuthException} from '../../src/exceptions/oauth-exception';
-import {CryptUtil} from '../../src/util/crypt.util';
-
-jest.mock('../../src/util/crypt.util', () => ({
-    CryptUtil: {
-        generateCodeChallenge: jest.fn(),
-    },
-}));
+import {SharedTestFixture} from '../shared-test.fixture';
+import {TokenFixture} from '../token.fixture';
 
 describe('AuthCodeService', () => {
-    let service: AuthCodeService;
-    let authCodeRepository: Repository<AuthCode>;
-    let usersRepository: Repository<User>;
-    let authUserService: AuthUserService;
+    let app: SharedTestFixture;
+    let tokenFixture: TokenFixture;
 
-    const mockAuthCode = {
-        code: 'test-code',
-        codeChallenge: 'test-challenge',
-        method: 'S256',
-        tenantId: '1',
-        userId: '1',
-        subscriberTenantHint: null,
-        createdAt: new Date(),
-    };
+    const CLIENT_ID = 'auth.server.com';
+    const EMAIL = 'admin@auth.server.com';
+    const PASSWORD = 'admin9000';
+    const CODE_CHALLENGE = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq';
+    const CODE_VERIFIER = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq';
 
-    const mockUser = {
-        id: '1',
-        email: 'test@example.com',
-    };
-
-    const mockTenant = {
-        id: '1',
-        name: 'Test Tenant',
-    };
-
-    beforeEach(async () => {
-        const module: TestingModule = await Test.createTestingModule({
-            providers: [
-                AuthCodeService,
-                {
-                    provide: getRepositoryToken(AuthCode),
-                    useValue: {
-                        findOne: jest.fn(),
-                        exist: jest.fn(),
-                        exists: jest.fn(),
-                        create: jest.fn(),
-                        save: jest.fn(),
-                        find: jest.fn(),
-                        delete: jest.fn(),
-                        query: jest.fn(),
-                        createQueryBuilder: jest.fn(),
-                    },
-                },
-                {
-                    provide: getRepositoryToken(User),
-                    useValue: {
-                        findOne: jest.fn(),
-                    },
-                },
-                {
-                    provide: Environment,
-                    useValue: {
-                        get: jest.fn().mockReturnValue('1h'),
-                    },
-                },
-                {
-                    provide: JwtService,
-                    useValue: {
-                        sign: jest.fn(),
-                    },
-                },
-                {
-                    provide: TenantService,
-                    useValue: {
-                        findById: jest.fn(),
-                    },
-                },
-                {
-                    provide: AuthUserService,
-                    useValue: {
-                        getMemberRoles: jest.fn(),
-                        findTenantById: jest.fn(),
-                        findUserById: jest.fn(),
-                    },
-                },
-                {
-                    provide: DataSource,
-                    useValue: {
-                        options: {type: 'postgres'},
-                    },
-                },
-            ],
-        }).compile();
-
-        service = module.get<AuthCodeService>(AuthCodeService);
-        authCodeRepository = module.get<Repository<AuthCode>>(getRepositoryToken(AuthCode));
-        usersRepository = module.get<Repository<User>>(getRepositoryToken(User));
-        authUserService = module.get<AuthUserService>(AuthUserService);
+    beforeAll(() => {
+        app = new SharedTestFixture();
+        tokenFixture = new TokenFixture(app);
     });
 
-    describe('existByCode', () => {
-        it('should return true when code exists', async () => {
-            jest.spyOn(authCodeRepository, 'exist').mockResolvedValue(true);
-            const result = await service.existByCode('test-code');
-            expect(result).toBe(true);
-        });
+    afterAll(async () => {
+        await app.close();
+    });
 
-        it('should return false when code does not exist', async () => {
-            jest.spyOn(authCodeRepository, 'exist').mockResolvedValue(false);
-            const result = await service.existByCode('non-existent-code');
-            expect(result).toBe(false);
+    describe('auth code creation via login', () => {
+        it('should create an auth code on successful login', async () => {
+            const response = await app.getHttpServer()
+                .post('/api/oauth/login')
+                .send({
+                    email: EMAIL,
+                    password: PASSWORD,
+                    client_id: CLIENT_ID,
+                    code_challenge: CODE_CHALLENGE,
+                    code_challenge_method: 'plain',
+                })
+                .set('Accept', 'application/json');
+
+            expect(response.status).toEqual(201);
+            expect(response.body.authentication_code).toBeDefined();
+            expect(typeof response.body.authentication_code).toBe('string');
+            expect(response.body.authentication_code.length).toBeGreaterThan(0);
         });
     });
 
-    describe('hasAuthCodeWithHint', () => {
-        it('should return true when auth code with hint exists', async () => {
-            jest.spyOn(authCodeRepository, 'exists').mockResolvedValue(true);
-            const result = await service.hasAuthCodeWithHint('test-code');
-            expect(result).toBe(true);
+    describe('PKCE validation via token exchange', () => {
+        it('should reject token exchange with invalid code verifier', async () => {
+            const loginResponse = await app.getHttpServer()
+                .post('/api/oauth/login')
+                .send({
+                    email: EMAIL,
+                    password: PASSWORD,
+                    client_id: CLIENT_ID,
+                    code_challenge: CODE_CHALLENGE,
+                    code_challenge_method: 'plain',
+                })
+                .set('Accept', 'application/json');
+
+            expect(loginResponse.status).toEqual(201);
+
+            const tokenResponse = await app.getHttpServer()
+                .post('/api/oauth/token')
+                .send({
+                    grant_type: 'authorization_code',
+                    code: loginResponse.body.authentication_code,
+                    code_verifier: 'WRONG_VERIFIER_that_does_not_match_the_challenge_at_all',
+                    client_id: CLIENT_ID,
+                })
+                .set('Accept', 'application/json');
+
+            expect(tokenResponse.status).toEqual(400);
+            expect(tokenResponse.body.error).toEqual('invalid_grant');
         });
 
-        it('should return false when auth code with hint does not exist', async () => {
-            jest.spyOn(authCodeRepository, 'exists').mockResolvedValue(false);
-            const result = await service.hasAuthCodeWithHint('test-code');
-            expect(result).toBe(false);
+        it('should succeed with valid code verifier', async () => {
+            const loginResponse = await app.getHttpServer()
+                .post('/api/oauth/login')
+                .send({
+                    email: EMAIL,
+                    password: PASSWORD,
+                    client_id: CLIENT_ID,
+                    code_challenge: CODE_CHALLENGE,
+                    code_challenge_method: 'plain',
+                })
+                .set('Accept', 'application/json');
+
+            expect(loginResponse.status).toEqual(201);
+
+            const tokenResponse = await app.getHttpServer()
+                .post('/api/oauth/token')
+                .send({
+                    grant_type: 'authorization_code',
+                    code: loginResponse.body.authentication_code,
+                    code_verifier: CODE_VERIFIER,
+                    client_id: CLIENT_ID,
+                })
+                .set('Accept', 'application/json');
+
+            expect(tokenResponse.status).toEqual(201);
+            expect(tokenResponse.body.access_token).toBeDefined();
+            expect(tokenResponse.body.refresh_token).toBeDefined();
+            expect(tokenResponse.body.token_type).toEqual('Bearer');
         });
     });
 
-    describe('validateAuthCode', () => {
-        it('should throw UnauthorizedException when code challenge is invalid', async () => {
-            jest.spyOn(authCodeRepository, 'findOne').mockResolvedValue(mockAuthCode as AuthCode);
-            jest.spyOn(authUserService, 'findTenantById').mockResolvedValue(mockTenant as any);
-            jest.spyOn(authUserService, 'findUserById').mockResolvedValue(mockUser as any);
-            (CryptUtil.generateCodeChallenge as jest.Mock).mockReturnValue('different-challenge');
+    describe('auth code single-use enforcement', () => {
+        it('should reject a second token exchange with the same auth code', async () => {
+            const loginResponse = await app.getHttpServer()
+                .post('/api/oauth/login')
+                .send({
+                    email: EMAIL,
+                    password: PASSWORD,
+                    client_id: CLIENT_ID,
+                    code_challenge: CODE_CHALLENGE,
+                    code_challenge_method: 'plain',
+                })
+                .set('Accept', 'application/json');
 
-            await expect(service.validateAuthCode('test-code', 'invalid-verifier')).rejects.toThrow(OAuthException);
-        });
+            expect(loginResponse.status).toEqual(201);
+            const code = loginResponse.body.authentication_code;
 
-        it('should return tenant and user when validation is successful', async () => {
-            jest.spyOn(authCodeRepository, 'findOne').mockResolvedValue(mockAuthCode as AuthCode);
-            jest.spyOn(authUserService, 'findTenantById').mockResolvedValue(mockTenant as any);
-            jest.spyOn(authUserService, 'findUserById').mockResolvedValue(mockUser as any);
-            (CryptUtil.generateCodeChallenge as jest.Mock).mockReturnValue('test-challenge');
+            // First exchange — should succeed
+            const firstExchange = await app.getHttpServer()
+                .post('/api/oauth/token')
+                .send({
+                    grant_type: 'authorization_code',
+                    code,
+                    code_verifier: CODE_VERIFIER,
+                    client_id: CLIENT_ID,
+                })
+                .set('Accept', 'application/json');
 
-            const result = await service.validateAuthCode('test-code', 'valid-verifier');
-            expect(result).toEqual({
-                tenant: mockTenant,
-                user: mockUser,
-            });
+            expect(firstExchange.status).toEqual(201);
+
+            // Second exchange — should fail
+            const secondExchange = await app.getHttpServer()
+                .post('/api/oauth/token')
+                .send({
+                    grant_type: 'authorization_code',
+                    code,
+                    code_verifier: CODE_VERIFIER,
+                    client_id: CLIENT_ID,
+                })
+                .set('Accept', 'application/json');
+
+            expect(secondExchange.status).toEqual(400);
+            expect(secondExchange.body.error).toEqual('invalid_grant');
         });
     });
 
-    describe('deleteExpiredAuthCodes', () => {
-        it('should delete expired and used auth codes via query builder', async () => {
-            const mockExecute = jest.fn().mockResolvedValue({affected: 2});
-            const mockWhere = jest.fn().mockReturnValue({execute: mockExecute});
-            const mockDelete = jest.fn().mockReturnValue({where: mockWhere});
-            jest.spyOn(authCodeRepository, 'createQueryBuilder').mockReturnValue({
-                delete: mockDelete,
-            } as any);
+    describe('invalid auth code', () => {
+        it('should reject token exchange with a non-existent auth code', async () => {
+            const tokenResponse = await app.getHttpServer()
+                .post('/api/oauth/token')
+                .send({
+                    grant_type: 'authorization_code',
+                    code: 'NONEXISTENT999',
+                    code_verifier: CODE_VERIFIER,
+                    client_id: CLIENT_ID,
+                })
+                .set('Accept', 'application/json');
 
-            await service.deleteExpiredAuthCodes();
-
-            expect(mockWhere).toHaveBeenCalledWith("expires_at < NOW() OR used = true");
+            expect(tokenResponse.status).toEqual(400);
+            expect(tokenResponse.body.error).toEqual('invalid_grant');
         });
     });
-}); 
+
+    describe('subscriber tenant hint on auth code', () => {
+        it('should store subscriber_tenant_hint on the auth code when provided', async () => {
+            const loginResponse = await app.getHttpServer()
+                .post('/api/oauth/login')
+                .send({
+                    email: EMAIL,
+                    password: PASSWORD,
+                    client_id: CLIENT_ID,
+                    code_challenge: CODE_CHALLENGE,
+                    code_challenge_method: 'plain',
+                    subscriber_tenant_hint: 'some-tenant-hint',
+                })
+                .set('Accept', 'application/json');
+
+            expect(loginResponse.status).toEqual(201);
+            expect(loginResponse.body.authentication_code).toBeDefined();
+        });
+    });
+
+    describe('requireAuthTime flag propagation', () => {
+        // Use isolated tenant to avoid session interference with other tests
+        const PROMPT_CLIENT_ID = 'prompt-test.local';
+        const PROMPT_EMAIL = 'admin@prompt-test.local';
+
+        it('should set requireAuthTime=true when prompt=login is used', async () => {
+            const loginResponse = await app.getHttpServer()
+                .post('/api/oauth/login')
+                .send({
+                    email: PROMPT_EMAIL,
+                    password: PASSWORD,
+                    client_id: PROMPT_CLIENT_ID,
+                    code_challenge: CODE_CHALLENGE,
+                    code_challenge_method: 'plain',
+                    prompt: 'login',
+                })
+                .set('Accept', 'application/json');
+
+            expect(loginResponse.status).toEqual(201);
+            const code = loginResponse.body.authentication_code;
+
+            // Look up the auth code's sid via test-utils
+            const sidResponse = await app.getHttpServer()
+                .get(`/api/test-utils/auth-codes/${code}/sid`);
+
+            expect(sidResponse.status).toEqual(200);
+            expect(sidResponse.body.sid).toBeDefined();
+            expect(sidResponse.body.sid).not.toBeNull();
+
+            // Exchange the code — the resulting ID token should contain auth_time
+            const tokenResponse = await app.getHttpServer()
+                .post('/api/oauth/token')
+                .send({
+                    grant_type: 'authorization_code',
+                    code,
+                    code_verifier: CODE_VERIFIER,
+                    client_id: PROMPT_CLIENT_ID,
+                })
+                .set('Accept', 'application/json');
+
+            expect(tokenResponse.status).toEqual(201);
+            expect(tokenResponse.body.id_token).toBeDefined();
+
+            const idTokenPayload = JSON.parse(
+                Buffer.from(tokenResponse.body.id_token.split('.')[1], 'base64').toString(),
+            );
+
+            expect(idTokenPayload.auth_time).toBeDefined();
+            expect(Number.isInteger(idTokenPayload.auth_time)).toBe(true);
+        });
+
+        it('should default requireAuthTime to false when no prompt or max_age is provided', async () => {
+            const loginResponse = await app.getHttpServer()
+                .post('/api/oauth/login')
+                .send({
+                    email: EMAIL,
+                    password: PASSWORD,
+                    client_id: CLIENT_ID,
+                    code_challenge: CODE_CHALLENGE,
+                    code_challenge_method: 'plain',
+                })
+                .set('Accept', 'application/json');
+
+            expect(loginResponse.status).toEqual(201);
+            const code = loginResponse.body.authentication_code;
+
+            // Exchange the code — should still succeed
+            const tokenResponse = await app.getHttpServer()
+                .post('/api/oauth/token')
+                .send({
+                    grant_type: 'authorization_code',
+                    code,
+                    code_verifier: CODE_VERIFIER,
+                    client_id: CLIENT_ID,
+                })
+                .set('Accept', 'application/json');
+
+            expect(tokenResponse.status).toEqual(201);
+            expect(tokenResponse.body.access_token).toBeDefined();
+        });
+    });
+});

@@ -270,4 +270,80 @@ describe('Consent Screen Flow', () => {
 
     });
 
+    // ─── Prompt=consent Flow ──────────────────────────────────────────
+
+    describe('prompt=consent forces consent screen', () => {
+
+        // Validates: Requirement 3.1 — prompt=consent forces consent screen even when consent was previously granted
+        it('prompt=consent forces consent screen even when consent was previously granted', () => {
+            // Stub login to return requires_consent when prompt=consent is in the request
+            cy.intercept('POST', '**/api/oauth/login*', (req) => {
+                if (req.body.prompt && req.body.prompt.includes('consent')) {
+                    req.reply({
+                        statusCode: 200,
+                        body: {
+                            requires_consent: true,
+                            requested_scopes: ['openid', 'profile', 'email'],
+                            client_name: CLIENT_NAME,
+                            client_id: CLIENT_ID,
+                        },
+                    });
+                } else {
+                    req.reply({
+                        statusCode: 200,
+                        body: {
+                            authentication_code: AUTH_CODE,
+                        },
+                    });
+                }
+            }).as('loginWithPrompt');
+
+            cy.visit(
+                `/authorize?client_id=${CLIENT_ID}` +
+                `&code_challenge=${CODE_CHALLENGE}` +
+                `&code_challenge_method=${CODE_CHALLENGE_METHOD}` +
+                `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
+                `&state=${STATE}` +
+                `&scope=openid%20profile%20email` +
+                `&response_type=code` +
+                `&prompt=consent`,
+            );
+
+            cy.get('#username').type(TEST_USER.email);
+            cy.get('#password').type(TEST_USER.password);
+            cy.get('#login-btn').click();
+
+            cy.wait('@loginWithPrompt').should(({request}) => {
+                expect(request.body.prompt).to.eq('consent');
+            });
+
+            // Should navigate to consent screen
+            cy.url().should('include', '/consent');
+            cy.contains(CLIENT_NAME).should('be.visible');
+        });
+
+        // Validates: Requirement 3.2 — prompt is forwarded in consent submission
+        it('prompt is forwarded in consent submission', () => {
+            visitAuthorizeAndStubConsentRequired(['openid', 'profile', 'email']);
+
+            cy.url().should('include', '/consent');
+
+            cy.intercept('POST', '**/api/oauth/consent*', {
+                statusCode: 200,
+                body: {
+                    authentication_code: AUTH_CODE,
+                },
+            }).as('consentWithPrompt');
+
+            // Intercept the external redirect
+            cy.intercept('GET', `${REDIRECT_URI}*`, {statusCode: 200, body: 'ok'}).as('clientRedirect');
+
+            cy.contains('button', 'Approve').click();
+
+            cy.wait('@consentWithPrompt').should(({request}) => {
+                expect(request.body.consent_action).to.eq('approve');
+            });
+        });
+    });
+
 });

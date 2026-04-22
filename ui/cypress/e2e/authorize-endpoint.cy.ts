@@ -220,6 +220,90 @@ describe('GET /api/oauth/authorize', () => {
         });
     });
 
+    // ─── Prompt and max_age Parameter Forwarding ─────────────────────
+
+    describe('prompt and max_age parameter forwarding', () => {
+        it('forwards prompt=none in the redirect URL', () => {
+            cy.request({
+                method: 'GET',
+                url: API_BASE,
+                qs: {
+                    response_type: 'code',
+                    client_id: testClientId,
+                    redirect_uri: REDIRECT_URI,
+                    state: 'prompt-none-test',
+                    scope: 'openid',
+                    prompt: 'none',
+                },
+                followRedirect: false,
+            }).then((resp) => {
+                expect(resp.status).to.eq(302);
+                const url = new URL(resp.headers['location'] as string, Cypress.config('baseUrl'));
+                expect(url.searchParams.get('prompt')).to.eq('none');
+            });
+        });
+
+        it('forwards prompt=login in the redirect URL', () => {
+            cy.request({
+                method: 'GET',
+                url: API_BASE,
+                qs: {
+                    response_type: 'code',
+                    client_id: testClientId,
+                    redirect_uri: REDIRECT_URI,
+                    state: 'prompt-login-test',
+                    scope: 'openid',
+                    prompt: 'login',
+                },
+                followRedirect: false,
+            }).then((resp) => {
+                expect(resp.status).to.eq(302);
+                const url = new URL(resp.headers['location'] as string, Cypress.config('baseUrl'));
+                expect(url.searchParams.get('prompt')).to.eq('login');
+            });
+        });
+
+        it('forwards space-delimited prompt="login consent" in the redirect URL', () => {
+            cy.request({
+                method: 'GET',
+                url: API_BASE,
+                qs: {
+                    response_type: 'code',
+                    client_id: testClientId,
+                    redirect_uri: REDIRECT_URI,
+                    state: 'prompt-multi-test',
+                    scope: 'openid',
+                    prompt: 'login consent',
+                },
+                followRedirect: false,
+            }).then((resp) => {
+                expect(resp.status).to.eq(302);
+                const url = new URL(resp.headers['location'] as string, Cypress.config('baseUrl'));
+                expect(url.searchParams.get('prompt')).to.eq('login consent');
+            });
+        });
+
+        it('forwards max_age=300 in the redirect URL', () => {
+            cy.request({
+                method: 'GET',
+                url: API_BASE,
+                qs: {
+                    response_type: 'code',
+                    client_id: testClientId,
+                    redirect_uri: REDIRECT_URI,
+                    state: 'max-age-test',
+                    scope: 'openid',
+                    max_age: 300,
+                },
+                followRedirect: false,
+            }).then((resp) => {
+                expect(resp.status).to.eq(302);
+                const url = new URL(resp.headers['location'] as string, Cypress.config('baseUrl'));
+                expect(url.searchParams.get('max_age')).to.eq('300');
+            });
+        });
+    });
+
     // ─── Nonce Validation ────────────────────────────────────────────
 
     describe('nonce validation', () => {

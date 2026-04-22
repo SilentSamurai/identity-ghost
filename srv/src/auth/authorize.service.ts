@@ -57,10 +57,13 @@ export class AuthorizeService {
             // 2. Validate redirect_uri
             const redirectUri = this.validateRedirectUri(client, params.redirect_uri);
 
-            // 3. Validate state (post-redirect from here)
+            // 3. Validate prompt none exclusivity (post-redirect error — redirect_uri is now confirmed safe)
+            this.validatePromptNoneExclusivity(params.prompt, redirectUri, params.state);
+
+            // 4. Validate state (post-redirect from here)
             this.validateState(params.state, redirectUri);
 
-            // 4. Validate PKCE
+            // 5. Validate PKCE
             const {codeChallenge, codeChallengeMethod} = this.validatePkce(
                 client,
                 params.code_challenge,
@@ -69,10 +72,10 @@ export class AuthorizeService {
                 params.state,
             );
 
-            // 5. Validate nonce length
+            // 6. Validate nonce length
             this.validateNonce(params.nonce, redirectUri, params.state);
 
-            // 6. Resolve scope
+            // 7. Resolve scope
             const resolvedScopes = this.scopeResolver.resolveScopes(
                 params.scope || null,
                 client.allowedScopes,
@@ -237,6 +240,21 @@ export class AuthorizeService {
                 redirectUri,
                 'invalid_request',
                 'The nonce parameter must not exceed 512 characters',
+                state,
+            );
+        }
+    }
+
+    private validatePromptNoneExclusivity(prompt: string | undefined, redirectUri: string, state?: string): void {
+        if (!prompt) {
+            return;
+        }
+        const rawValues = prompt.split(' ').filter(v => v.length > 0);
+        if (rawValues.includes('none') && rawValues.length > 1) {
+            throw new AuthorizeRedirectException(
+                redirectUri,
+                'invalid_request',
+                'prompt=none must not be combined with other values',
                 state,
             );
         }
