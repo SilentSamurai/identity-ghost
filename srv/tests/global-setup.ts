@@ -14,8 +14,6 @@
  * Override via: TEST_APP_PORT, TEST_SMTP_PORT, TEST_SMTP_CONTROL_PORT, TEST_WEBHOOK_PORT
  */
 import * as process from 'node:process';
-import * as path from 'path';
-import * as fs from 'fs';
 import {execSync} from 'child_process';
 import {INestApplication} from '@nestjs/common';
 import {Test} from '@nestjs/testing';
@@ -30,31 +28,12 @@ import {LoginSession} from '../src/entity/login-session.entity';
 import {AuthCode} from '../src/entity/auth_code.entity';
 import {User} from '../src/entity/user.entity';
 import {CorsOriginService} from '../src/services/cors-origin.service';
+import {getTestPorts, TestPorts} from './test-ports';
 
 declare global {
     var __SHARED_TEST_APP__: INestApplication | undefined;
     var __SHARED_SMTP__: FakeSmtpServer | undefined;
     var __SHARED_WEBHOOK__: TenantAppServer | undefined;
-}
-
-/**
- * Default test ports. Override via environment variables if needed:
- *   TEST_APP_PORT, TEST_SMTP_PORT, TEST_SMTP_CONTROL_PORT, TEST_WEBHOOK_PORT
- */
-const DEFAULT_PORTS = {
-    app: 9001,
-    smtp: 3101,
-    smtpControl: 3102,
-    webhook: 3103,
-};
-
-function getConfiguredPorts() {
-    return {
-        app: parseInt(process.env.TEST_APP_PORT || '', 10) || DEFAULT_PORTS.app,
-        smtp: parseInt(process.env.TEST_SMTP_PORT || '', 10) || DEFAULT_PORTS.smtp,
-        smtpControl: parseInt(process.env.TEST_SMTP_CONTROL_PORT || '', 10) || DEFAULT_PORTS.smtpControl,
-        webhook: parseInt(process.env.TEST_WEBHOOK_PORT || '', 10) || DEFAULT_PORTS.webhook,
-    };
 }
 
 /**
@@ -93,7 +72,7 @@ function killPort(port: number): void {
 /**
  * Kill any processes on the configured test ports before starting.
  */
-function cleanupTestPorts(ports: ReturnType<typeof getConfiguredPorts>): void {
+function cleanupTestPorts(ports: TestPorts): void {
     const portValues = [ports.app, ports.smtp, ports.smtpControl, ports.webhook];
     for (const port of portValues) {
         killPort(port);
@@ -101,7 +80,7 @@ function cleanupTestPorts(ports: ReturnType<typeof getConfiguredPorts>): void {
 }
 
 export default async function globalSetup(): Promise<void> {
-    const ports = getConfiguredPorts();
+    const ports = getTestPorts();
     
     // Kill any stale processes on the test ports
     cleanupTestPorts(ports);
@@ -162,22 +141,17 @@ export default async function globalSetup(): Promise<void> {
 
         await app.listen(ports.app);
 
-        // 5. Write port file for worker processes
-        const portFilePath = path.resolve(__dirname, '../.test-ports.json');
-        const portData = {
-            appPort: ports.app,
-            smtpPort: ports.smtp,
-            smtpControlPort: ports.smtpControl,
-            webhookPort: ports.webhook,
-        };
-        fs.writeFileSync(portFilePath, JSON.stringify(portData, null, 2));
-
-        // 6. Store references on globalThis for teardown
+        // 5. Store references on globalThis for teardown
         globalThis.__SHARED_TEST_APP__ = app;
         globalThis.__SHARED_SMTP__ = smtpServer;
         globalThis.__SHARED_WEBHOOK__ = webhookServer;
 
-        console.log('[globalSetup] Shared test infrastructure started:', portData);
+        console.log('[globalSetup] Shared test infrastructure started:', {
+            appPort: ports.app,
+            smtpPort: ports.smtp,
+            smtpControlPort: ports.smtpControl,
+            webhookPort: ports.webhook,
+        });
     } catch (error) {
         console.error('[globalSetup] Failed to start shared test infrastructure:', error);
 

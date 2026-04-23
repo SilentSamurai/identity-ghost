@@ -1,5 +1,3 @@
-import * as path from 'path';
-import * as fs from 'fs';
 import {INestApplication} from '@nestjs/common';
 import {FakeSmtpServer} from '../src/mail/FakeSmtpServer';
 import {TenantAppServer} from './apps_&_subscription/tenant-app-server';
@@ -40,15 +38,5 @@ export default async function globalTeardown(): Promise<void> {
         } catch (error) {
             console.error('[globalTeardown] Error closing TenantAppServer:', error);
         }
-    }
-
-    const portFilePath = path.resolve(__dirname, '../.test-ports.json');
-    try {
-        if (fs.existsSync(portFilePath)) {
-            fs.unlinkSync(portFilePath);
-            console.log('[globalTeardown] Deleted .test-ports.json');
-        }
-    } catch (error) {
-        console.error('[globalTeardown] Error deleting .test-ports.json:', error);
     }
 }

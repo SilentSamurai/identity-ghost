@@ -29,8 +29,8 @@ import {expect2xx} from "../api-client/client";
  */
 describe('auth code expiration', () => {
     let app: SharedTestFixture;
-    const clientId = "auth.server.com";
-    const email = "admin@auth.server.com";
+    const clientId = "auth-code-expiry-test.local";
+    const email = "admin@auth-code-expiry-test.local";
     const password = "admin9000";
 
     beforeAll(async () => {

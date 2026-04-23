@@ -1,49 +1,9 @@
-import * as path from 'path';
-import * as fs from 'fs';
 import * as superTest from 'supertest';
 import TestAgent from 'supertest/lib/agent';
 import {JwtService} from '@nestjs/jwt';
 import {SmtpClientAdapter} from './smtp-client-adapter';
 import {WebhookClientAdapter} from './webhook-client-adapter';
-
-export interface PortFile {
-    appPort: number;
-    smtpPort: number;
-    smtpControlPort: number;
-    webhookPort: number;
-}
-
-const REQUIRED_PORT_FIELDS: (keyof PortFile)[] = ['appPort', 'smtpPort', 'smtpControlPort', 'webhookPort'];
-
-/**
- * Reads and validates the port file written by globalSetup.
- * Exported for use in property tests.
- */
-export function readPortFile(filePath?: string): PortFile {
-    const resolvedPath = filePath ?? path.resolve(__dirname, '../.test-ports.json');
-
-    let raw: string;
-    try {
-        raw = fs.readFileSync(resolvedPath, 'utf-8');
-    } catch {
-        throw new Error('Port file not found at srv/.test-ports.json. Did globalSetup run?');
-    }
-
-    let parsed: any;
-    try {
-        parsed = JSON.parse(raw);
-    } catch {
-        throw new Error('Port file contains invalid JSON');
-    }
-
-    for (const field of REQUIRED_PORT_FIELDS) {
-        if (parsed[field] === undefined || parsed[field] === null) {
-            throw new Error(`Port file missing required field: ${field}`);
-        }
-    }
-
-    return parsed as PortFile;
-}
+import {getTestPorts} from './test-ports';
 
 /**
  * Shared test fixture that connects to the global test infrastructure
@@ -58,12 +18,12 @@ export class SharedTestFixture {
     private readonly _jwtService: JwtService;
 
     constructor() {
-        const ports = readPortFile();
+        const ports = getTestPorts();
 
-        this._httpAgent = superTest(`http://127.0.0.1:${ports.appPort}`) as TestAgent<superTest.Test>;
+        this._httpAgent = superTest(`http://127.0.0.1:${ports.app}`) as TestAgent<superTest.Test>;
         this._jwtService = new JwtService({});
-        this.smtp = new SmtpClientAdapter(`http://127.0.0.1:${ports.smtpControlPort}`);
-        this.webhook = new WebhookClientAdapter(`http://localhost:${ports.webhookPort}`);
+        this.smtp = new SmtpClientAdapter(`http://127.0.0.1:${ports.smtpControl}`);
+        this.webhook = new WebhookClientAdapter(`http://localhost:${ports.webhook}`);
     }
 
     public getHttpServer(): TestAgent<superTest.Test> {
