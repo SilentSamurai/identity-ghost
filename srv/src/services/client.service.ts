@@ -31,6 +31,7 @@ export class ClientService {
         requirePkce?: boolean,
         allowPasswordGrant?: boolean,
         allowRefreshToken?: boolean,
+        allowedResources?: string[],
     ): Promise<{ client: Client; plainSecret: string | null }> {
         permission.isAuthorized(Action.Create, SubjectEnum.CLIENT, {tenantId});
 
@@ -65,6 +66,7 @@ export class ClientService {
             allowRefreshToken: allowRefreshToken !== undefined ? allowRefreshToken : true,
             name,
             tenant,
+            allowedResources: allowedResources || null,
         });
 
         const saved = await this.clientRepository.save(client);

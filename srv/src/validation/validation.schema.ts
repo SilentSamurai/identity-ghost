@@ -196,6 +196,7 @@ const LoginSchema = yup.object().shape({
         .optional()
         .integer("max_age must be an integer")
         .min(0, "max_age must be a non-negative integer"),
+    resource: yup.string().optional(),
 });
 
 const PasswordGrantSchema = yup.object().shape({
@@ -212,6 +213,7 @@ const PasswordGrantSchema = yup.object().shape({
     client_id: yup.string().required("client_id is required"),
     subscriber_tenant_hint: yup.string().nullable(),
     scope: yup.string().optional(),
+    resource: yup.string().optional(),
 });
 
 const ClientCredentialGrantSchema = yup.object().shape({
@@ -224,6 +226,7 @@ const ClientCredentialGrantSchema = yup.object().shape({
     client_id: yup.string().required("client_id is required"),
     client_secret: yup.string().required("client_secret is required"),
     scope: yup.string().optional(),
+    resource: yup.string().optional(),
 });
 
 const RefreshTokenGrantSchema = yup.object().shape({
@@ -235,6 +238,7 @@ const RefreshTokenGrantSchema = yup.object().shape({
     client_id: yup.string().required("client_id is required"),
     client_secret: yup.string().optional(),
     scope: yup.string().optional(),
+    resource: yup.string().optional(),
 });
 
 const CodeGrantSchema = yup.object().shape({
@@ -254,6 +258,7 @@ const CodeGrantSchema = yup.object().shape({
     subscriber_tenant_hint: yup.string().nullable(),
     scope: yup.string().optional(),
     redirect_uri: yup.string().optional(),
+    resource: yup.string().optional(),
 });
 
 const VerifyTokenSchema = yup.object().shape({
@@ -321,6 +326,7 @@ const ConsentSchema = yup.object().shape({
     nonce: yup.string().optional().max(512),
     subscriber_tenant_hint: yup.string().optional().nullable(),
     prompt: yup.string().optional(),
+    resource: yup.string().optional(),
 });
 
 const SilentAuthSchema = yup.object().shape({
@@ -340,6 +346,7 @@ const SilentAuthSchema = yup.object().shape({
         .optional()
         .integer("max_age must be an integer")
         .min(0, "max_age must be a non-negative integer"),
+    resource: yup.string().optional(),
 });
 
 const AuthorizeSchema = yup.object().shape({

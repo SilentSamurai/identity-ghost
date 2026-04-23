@@ -56,4 +56,8 @@ export class OAuthException extends HttpException {
     static interactionRequired(description: string): OAuthException {
         return new OAuthException('interaction_required', description, HttpStatus.BAD_REQUEST);
     }
+
+    static invalidTarget(description: string): OAuthException {
+        return new OAuthException('invalid_target', description, HttpStatus.BAD_REQUEST);
+    }
 }

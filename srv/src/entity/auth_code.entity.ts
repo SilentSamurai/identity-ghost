@@ -47,6 +47,9 @@ export class AuthCode {
     @Column({name: "require_auth_time", default: false})
     requireAuthTime: boolean;
 
+    @Column({name: "resource", nullable: true, length: "2048"})
+    resource: string | null;
+
     @CreateDateColumn({name: "created_at"})
     createdAt: Date;
 }

@@ -28,6 +28,22 @@ const CreateClientSchema = yup.object().shape({
     requirePkce: yup.boolean(),
     allowPasswordGrant: yup.boolean(),
     allowRefreshToken: yup.boolean(),
+    allowedResources: yup.array().of(yup.string().test(
+        'is-absolute-uri',
+        'each allowedResource must be an absolute URI (RFC 8707 §2)',
+        (value) => {
+            if (!value) return true;
+            // Must not contain a fragment
+            if (value.includes('#')) return false;
+            try {
+                const url = new URL(value);
+                // Must have a scheme (absolute URI per RFC 3986 §4.3)
+                return !!url.protocol && url.protocol !== ':';
+            } catch {
+                return false;
+            }
+        },
+    )),
 });
 
 const UpdateClientSchema = yup.object().shape({
@@ -62,6 +78,7 @@ export class ClientController {
             requirePkce?: boolean;
             allowPasswordGrant?: boolean;
             allowRefreshToken?: boolean;
+            allowedResources?: string[];
         },
     ) {
         const result = await this.clientService.createClient(
@@ -77,6 +94,7 @@ export class ClientController {
             body.requirePkce,
             body.allowPasswordGrant,
             body.allowRefreshToken,
+            body.allowedResources,
         );
         return {
             client: result.client,

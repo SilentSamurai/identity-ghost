@@ -5,6 +5,7 @@ import {OAuthException} from '../exceptions/oauth-exception';
 import {AuthorizeRedirectException} from '../exceptions/authorize-redirect.exception';
 import {Client} from '../entity/client.entity';
 import {ValidationSchema} from '../validation/validation.schema';
+import {ResourceIndicatorValidator} from './resource-indicator.validator';
 
 export interface AuthorizeQueryParams {
     response_type?: string;
@@ -75,7 +76,10 @@ export class AuthorizeService {
             // 6. Validate nonce length
             this.validateNonce(params.nonce, redirectUri, params.state);
 
-            // 7. Resolve scope
+            // 7. Validate resource indicator (post-redirect error)
+            this.validateResourceIndicator(params.resource, client, redirectUri, params.state);
+
+            // 8. Resolve scope
             const resolvedScopes = this.scopeResolver.resolveScopes(
                 params.scope || null,
                 client.allowedScopes,
@@ -257,6 +261,31 @@ export class AuthorizeService {
                 'prompt=none must not be combined with other values',
                 state,
             );
+        }
+    }
+
+    private validateResourceIndicator(
+        resource: string | undefined,
+        client: Client,
+        redirectUri: string,
+        state?: string,
+    ): void {
+        if (!resource) {
+            return;
+        }
+
+        try {
+            ResourceIndicatorValidator.validateResource(resource, client.allowedResources);
+        } catch (error) {
+            if (error instanceof OAuthException) {
+                throw new AuthorizeRedirectException(
+                    redirectUri,
+                    error.errorCode,
+                    error.errorDescription,
+                    state,
+                );
+            }
+            throw error;
         }
     }
 

@@ -16,6 +16,7 @@ export class ClientEntityClient extends HttpClient {
         requirePkce?: boolean;
         allowPasswordGrant?: boolean;
         allowRefreshToken?: boolean;
+        allowedResources?: string[];
     } = {}) {
         const response = await this.post('/api/clients/create')
             .send({tenantId, name, ...opts});

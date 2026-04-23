@@ -75,6 +75,7 @@ export class AuthCodeService {
         nonce?: string,
         sid?: string,
         requireAuthTime?: boolean,
+        resource?: string,
     ): Promise<string> {
         let code = CryptUtil.generateOTP(6);
 
@@ -99,6 +100,7 @@ export class AuthCodeService {
             used: false,
             expiresAt,
             requireAuthTime: requireAuthTime || false,
+            resource: resource || null,
         });
 
         await this.authCodeRepository.save(authCode);
@@ -225,6 +227,7 @@ export class AuthCodeService {
         authCode.createdAt = row.created_at;
         authCode.sid = row.sid;
         authCode.requireAuthTime = row.require_auth_time;
+        authCode.resource = row.resource;
         return authCode;
     }
 }

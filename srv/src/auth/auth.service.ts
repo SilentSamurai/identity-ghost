@@ -225,8 +225,9 @@ export class AuthService {
     async createTechnicalAccessToken(
         tenant: Tenant,
         roles: string[],
+        audience?: string[],
     ): Promise<string> {
-        return this.technicalTokenService.createTechnicalAccessToken(tenant, roles);
+        return this.technicalTokenService.createTechnicalAccessToken(tenant, roles, audience);
     }
 
     /**
@@ -238,6 +239,7 @@ export class AuthService {
         scopes: string[] = [],
         roles: string[] = [],
         grant_type: GRANT_TYPES = GRANT_TYPES.PASSWORD,
+        audience?: string[],
     ): Promise<{ accessToken: string; scopes: string[] }> {
         if (!user.verified) {
             throw new UnauthorizedException('Email not verified');
@@ -254,7 +256,7 @@ export class AuthService {
             },
             roles: [...new Set(roles)].sort(),
             grant_type,
-            aud: [this.configService.get("SUPER_TENANT_DOMAIN")],
+            aud: audience || [this.configService.get("SUPER_TENANT_DOMAIN")],
             jti: randomUUID(),
             nbf: Math.floor(Date.now() / 1000),
             scope: uniqueScopes.join(' '),
@@ -284,6 +286,7 @@ export class AuthService {
         scopes: string[] = [],
         roles: string[] = [],
         grant_type: GRANT_TYPES = GRANT_TYPES.PASSWORD,
+        audience?: string[],
     ): Promise<{ accessToken: string; scopes: string[] }> {
         if (!user.verified) {
             throw new UnauthorizedException('Email not verified');
@@ -300,7 +303,7 @@ export class AuthService {
             },
             roles: [...new Set(roles)].sort(),
             grant_type,
-            aud: [this.configService.get("SUPER_TENANT_DOMAIN")],
+            aud: audience || [this.configService.get("SUPER_TENANT_DOMAIN")],
             jti: randomUUID(),
             nbf: Math.floor(Date.now() / 1000),
             scope: uniqueScopes.join(' '),

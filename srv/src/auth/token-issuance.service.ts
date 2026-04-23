@@ -88,6 +88,7 @@ export interface IssueTokenOptions {
     grant_type?: GRANT_TYPES;
     sid?: string;
     requireAuthTime?: boolean;
+    resource?: string;
 }
 
 @Injectable()
@@ -139,8 +140,13 @@ export class TokenIssuanceService {
             clientAllowedScopes,
         );
 
+        // Construct audience with resource indicator if present
+        const audience = options?.resource
+            ? [options.resource, this.configService.get("SUPER_TENANT_DOMAIN")]
+            : [this.configService.get("SUPER_TENANT_DOMAIN")];
+
         const {accessToken, scopes} =
-            await this.authService.createUserAccessToken(user, tenant, grantedScopes, roleNames, options?.grant_type ?? GRANT_TYPES.PASSWORD);
+            await this.authService.createUserAccessToken(user, tenant, grantedScopes, roleNames, options?.grant_type ?? GRANT_TYPES.PASSWORD, audience);
 
         // Resolve session: validate existing sid or create new session for password grant
         let authTime: number;
@@ -251,6 +257,7 @@ export class TokenIssuanceService {
         plaintextToken: string,
         clientId: string,
         requestedScope?: string,
+        resource?: string,
     ): Promise<TokenResponse> {
         const {plaintext: newRefreshToken, record} = await this.refreshTokenService.consumeAndRotate({
             plaintextToken,
@@ -272,8 +279,13 @@ export class TokenIssuanceService {
 
         const grantedScopes = ScopeNormalizer.parse(record.scope);
 
+        // Construct audience with resource indicator if present
+        const audience = resource
+            ? [resource, this.configService.get("SUPER_TENANT_DOMAIN")]
+            : [this.configService.get("SUPER_TENANT_DOMAIN")];
+
         const {accessToken, scopes} =
-            await this.authService.createUserAccessToken(user, tenant, grantedScopes, roleNames, GRANT_TYPES.REFRESH_TOKEN);
+            await this.authService.createUserAccessToken(user, tenant, grantedScopes, roleNames, GRANT_TYPES.REFRESH_TOKEN, audience);
 
         // Resolve session from the refresh token's sid
         let authTime: number;
@@ -320,15 +332,23 @@ export class TokenIssuanceService {
     async issueClientCredentialsToken(
         tenant: Tenant,
         requestedScope: string | null,
+        resource?: string,
     ): Promise<TokenResponse> {
         const clientAllowedScopes = await this.getClientAllowedScopes(tenant);
         const grantedScopes = this.scopeResolverService.resolveScopes(
             requestedScope,
             clientAllowedScopes,
         );
+
+        // Construct audience with resource indicator if present
+        const audience = resource
+            ? [resource, this.configService.get("SUPER_TENANT_DOMAIN")]
+            : [this.configService.get("SUPER_TENANT_DOMAIN")];
+
         const accessToken = await this.authService.createTechnicalAccessToken(
             tenant,
             grantedScopes,
+            audience,
         );
         const response = this.formatResponse(accessToken, undefined, grantedScopes);
 
@@ -379,9 +399,14 @@ export class TokenIssuanceService {
             clientAllowedScopes,
         );
 
+        // Construct audience with resource indicator if present
+        const audience = options?.resource
+            ? [options.resource, this.configService.get("SUPER_TENANT_DOMAIN")]
+            : [this.configService.get("SUPER_TENANT_DOMAIN")];
+
         const {accessToken, scopes} =
             await this.authService.createSubscribedUserAccessToken(
-                user, tenant, subscribingTenant, grantedScopes, allRoleNames, options?.grant_type ?? GRANT_TYPES.PASSWORD,
+                user, tenant, subscribingTenant, grantedScopes, allRoleNames, options?.grant_type ?? GRANT_TYPES.PASSWORD, audience,
             );
 
         // Resolve session: validate existing sid or create new session for password grant

@@ -21,8 +21,10 @@ describe('AuthorizeSchema validation — GET /api/oauth/authorize', () => {
     let app: SharedTestFixture;
     let clientApi: ClientEntityClient;
     let testClientId: string;
+    let testClientWithResourcesId: string;
 
     const REDIRECT_URI = 'https://authorize-validation-test.example.com/callback';
+    const ALLOWED_RESOURCES = ['https://api.example.com', 'https://api.example.com/v2'];
 
     beforeAll(async () => {
         app = new SharedTestFixture();
@@ -42,16 +44,28 @@ describe('AuthorizeSchema validation — GET /api/oauth/authorize', () => {
             `authz-val-${Date.now()}.com`,
         );
 
+        // Client without allowedResources - for tests that don't use resource parameter
         const created = await clientApi.createClient(tenant.id, 'Authorize Validation Test Client', {
             redirectUris: [REDIRECT_URI],
             allowedScopes: 'openid profile email',
             isPublic: true,
         });
         testClientId = created.client.clientId;
+
+        // Client with allowedResources - for tests that use resource parameter
+        const createdWithResources = await clientApi.createClient(tenant.id, 'Authorize Validation Test Client With Resources', {
+            redirectUris: [REDIRECT_URI],
+            allowedScopes: 'openid profile email',
+            isPublic: true,
+            allowedResources: ALLOWED_RESOURCES,
+        });
+        testClientWithResourcesId = createdWithResources.client.clientId;
     });
 
     afterAll(async () => {
         await clientApi.deleteClient(testClientId).catch(() => {
+        });
+        await clientApi.deleteClient(testClientWithResourcesId).catch(() => {
         });
         await app.close();
     });
@@ -71,6 +85,18 @@ describe('AuthorizeSchema validation — GET /api/oauth/authorize', () => {
         return {
             response_type: 'code',
             client_id: testClientId,
+            redirect_uri: REDIRECT_URI,
+            scope: 'openid',
+            state: 'test-state-value',
+            ...overrides,
+        };
+    }
+
+    /** Valid params using the client with allowedResources - for resource parameter tests. */
+    function validParamsWithResources(overrides: Record<string, string | number> = {}): Record<string, string | number> {
+        return {
+            response_type: 'code',
+            client_id: testClientWithResourcesId,
             redirect_uri: REDIRECT_URI,
             scope: 'openid',
             state: 'test-state-value',
@@ -316,7 +342,7 @@ describe('AuthorizeSchema validation — GET /api/oauth/authorize', () => {
 
     describe('new parameter passthrough: prompt, max_age, resource (Req 6.1–6.4)', () => {
         it('should forward prompt, max_age, and resource in the redirect URL', async () => {
-            const res = await authorize(validParams({
+            const res = await authorize(validParamsWithResources({
                 prompt: 'login',
                 max_age: 3600,
                 resource: 'https://api.example.com',
@@ -347,7 +373,7 @@ describe('AuthorizeSchema validation — GET /api/oauth/authorize', () => {
         });
 
         it('should forward resource in the redirect URL (Req 6.3)', async () => {
-            const res = await authorize(validParams({resource: 'https://api.example.com/v2'}));
+            const res = await authorize(validParamsWithResources({resource: 'https://api.example.com/v2'}));
 
             expect(res.status).toEqual(302);
             const location = new URL(res.headers.location, 'http://localhost');
@@ -441,7 +467,7 @@ describe('AuthorizeSchema validation — GET /api/oauth/authorize', () => {
         });
 
         it('should redirect to /authorize with all optional params forwarded when provided', async () => {
-            const res = await authorize(validParams({
+            const res = await authorize(validParamsWithResources({
                 code_challenge: 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
                 code_challenge_method: 'S256',
                 nonce: 'nonce-value-123',
@@ -453,7 +479,7 @@ describe('AuthorizeSchema validation — GET /api/oauth/authorize', () => {
             expect(res.status).toEqual(302);
             const location = new URL(res.headers.location, 'http://localhost');
             expect(location.pathname).toEqual('/authorize');
-            expect(location.searchParams.get('client_id')).toEqual(testClientId);
+            expect(location.searchParams.get('client_id')).toEqual(testClientWithResourcesId);
             expect(location.searchParams.get('redirect_uri')).toEqual(REDIRECT_URI);
             expect(location.searchParams.get('scope')).toEqual('openid');
             expect(location.searchParams.get('state')).toEqual('test-state-value');

@@ -19,7 +19,7 @@ export class TechnicalTokenService {
     ) {
     }
 
-    createTechnicalToken(tenant: Tenant, additionalScopes: string[]): TechnicalToken {
+    createTechnicalToken(tenant: Tenant, additionalScopes: string[], audience?: string[]): TechnicalToken {
         additionalScopes = additionalScopes instanceof Array ? additionalScopes : [];
         const scopeString = ScopeNormalizer.format([...DEFAULT_TECHNICAL_SCOPES, ...additionalScopes]);
         return TechnicalToken.create({
@@ -30,7 +30,7 @@ export class TechnicalTokenService {
                 domain: tenant.domain,
             },
             scope: scopeString,
-            aud: [this.configService.get("SUPER_TENANT_DOMAIN")],
+            aud: audience || [this.configService.get("SUPER_TENANT_DOMAIN")],
             jti: randomUUID(),
             nbf: Math.floor(Date.now() / 1000),
             client_id: tenant.clientId,
@@ -41,9 +41,10 @@ export class TechnicalTokenService {
     async createTechnicalAccessToken(
         tenant: Tenant,
         additionalScopes: string[],
+        audience?: string[],
     ): Promise<string> {
         additionalScopes = additionalScopes instanceof Array ? additionalScopes : [];
-        const payload = this.createTechnicalToken(tenant, additionalScopes);
+        const payload = this.createTechnicalToken(tenant, additionalScopes, audience);
         const {privateKey, kid} = await this.signingKeyProvider.getSigningKeyWithKid(tenant.id);
         return this.tokenGenerator.sign(payload.asPlainObject(), {
             privateKey,

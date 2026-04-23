@@ -48,6 +48,9 @@ export class Client {
     @Column({nullable: true, unique: true, name: "alias"})
     alias: string | null;
 
+    @Column({type: "simple-json", nullable: true, name: "allowed_resources"})
+    allowedResources: string[] | null;
+
     @CreateDateColumn({name: "created_at"})
     createdAt: Date;
 

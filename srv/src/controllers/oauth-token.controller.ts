@@ -48,6 +48,7 @@ import {ConsentService} from "../auth/consent.service";
 import {ScopeResolverService} from "../casl/scope-resolver.service";
 import {ClientService} from "../services/client.service";
 import {PromptService, PromptAction} from "../auth/prompt.service";
+import {ResourceIndicatorValidator} from "../auth/resource-indicator.validator";
 
 const logger = new Logger("OAuthTokenController");
 
@@ -131,6 +132,7 @@ export class OAuthTokenController {
             nonce?: string;
             prompt?: string;
             max_age?: number;
+            resource?: string;
         },
     ) {
         const user: User = await this.authService.validate(
@@ -253,6 +255,7 @@ export class OAuthTokenController {
             body.nonce,
             session.sid,
             evaluation.requireAuthTime,
+            body.resource,
         );
 
         // Update pkceMethodUsed if client used S256 for the first time
@@ -282,6 +285,7 @@ export class OAuthTokenController {
             nonce?: string;
             subscriber_tenant_hint?: string;
             prompt?: string;
+            resource?: string;
         },
     ): Promise<any> {
         // Re-authenticate the user
@@ -345,6 +349,7 @@ export class OAuthTokenController {
                 body.nonce,
                 session.sid,
                 requireAuthTime,
+                body.resource,
             );
 
             return {
@@ -368,6 +373,7 @@ export class OAuthTokenController {
             scope?: string;
             nonce?: string;
             max_age?: number;
+            resource?: string;
         },
     ): Promise<{ authentication_code: string } | { error: string; error_description: string }> {
         // Resolve Client entity by clientId or alias
@@ -433,6 +439,7 @@ export class OAuthTokenController {
                 body.nonce,
                 session.sid,
                 evaluation.requireAuthTime,
+                body.resource,
             );
 
             return {
@@ -542,6 +549,7 @@ export class OAuthTokenController {
         const user = await this.authUserService.findUserById(authCode.userId);
         const tenant = await this.authUserService.findTenantById(authCode.tenantId);
 
+        // Use the resource from the auth code (auth code's stored value takes precedence per Requirement 3.5)
         return this.tokenIssuanceService.issueToken(user, tenant, {
             subscriberTenantHint: authCode.subscriberTenantHint,
             requestedScope: body.scope || authCode.scope,
@@ -549,6 +557,7 @@ export class OAuthTokenController {
             sid: authCode.sid ?? undefined,
             grant_type: GRANT_TYPES.CODE,
             requireAuthTime: authCode.requireAuthTime,
+            resource: authCode.resource ?? undefined,
         });
     }
 
@@ -583,10 +592,14 @@ export class OAuthTokenController {
         // Use the loaded client's tenant (Requirement 4.2)
         const tenant = client.tenant;
 
+        // Validate resource indicator if present
+        const resource = await this.validateResourceForTokenRequest(body.resource, body.client_id);
+
         return this.tokenIssuanceService.issueToken(user, tenant, {
             subscriberTenantHint: body.subscriber_tenant_hint,
             requestedScope: body.scope,
             grant_type: GRANT_TYPES.PASSWORD,
+            resource,
         });
     }
 
@@ -601,9 +614,45 @@ export class OAuthTokenController {
                 body.client_secret,
             );
 
+        // Validate resource indicator if present.
+        // For client_credentials, body.client_id is a Tenant.clientId (hex), not a Client.clientId (UUID).
+        // We validate the resource directly against the requesting Client entity if one can be resolved,
+        // otherwise skip Client-level allowedResources validation (tenant-level credentials have no
+        // Client entity with allowedResources).
+        let resource: string | undefined;
+        if (body.resource) {
+            // First validate the URI format per RFC 8707
+            if (!ResourceIndicatorValidator.isValidResourceUri(body.resource)) {
+                throw OAuthException.invalidTarget('The resource parameter must be an absolute URI without a fragment component');
+            }
+
+            // Try to find a Client entity to check allowedResources.
+            // client_credentials may be called with Tenant.clientId which has no Client entity,
+            // or with a Client.clientId that does have one.
+            try {
+                const client = await this.clientService.findByClientIdOrAlias(body.client_id);
+                const allowedResources = client.allowedResources
+                    ? (typeof client.allowedResources === 'string'
+                        ? JSON.parse(client.allowedResources)
+                        : client.allowedResources)
+                    : null;
+                ResourceIndicatorValidator.validateResource(body.resource, allowedResources);
+            } catch (e) {
+                // If the error is from ResourceIndicatorValidator (OAuthException), re-throw it
+                if (e instanceof OAuthException) {
+                    throw e;
+                }
+                // If Client entity not found (NotFoundException), the tenant-level credentials
+                // don't have a Client entity with allowedResources — reject the resource
+                throw OAuthException.invalidTarget('The client is not configured to accept resource indicators');
+            }
+            resource = body.resource;
+        }
+
         return this.tokenIssuanceService.issueClientCredentialsToken(
             tenant,
             body.scope ?? null,
+            resource,
         );
     }
 
@@ -640,10 +689,38 @@ export class OAuthTokenController {
             resolvedClientId = client.tenant.clientId;
         }
 
+        // Validate resource indicator if present
+        const resource = await this.validateResourceForTokenRequest(body.resource, body.client_id);
+
         return this.tokenIssuanceService.refreshToken(
             body.refresh_token,
             resolvedClientId,
             body.scope,
+            resource,
         );
+    }
+
+    /**
+     * Validate a resource parameter for token requests.
+     * Looks up the client, parses allowedResources, and validates the resource.
+     * Returns the validated resource or undefined if no resource was provided.
+     */
+    private async validateResourceForTokenRequest(
+        resource: string | undefined,
+        clientId: string,
+    ): Promise<string | undefined> {
+        if (!resource) {
+            return undefined;
+        }
+
+        const client = await this.clientService.findByClientIdOrAlias(clientId);
+        const allowedResources = client.allowedResources
+            ? (typeof client.allowedResources === 'string'
+                ? JSON.parse(client.allowedResources)
+                : client.allowedResources)
+            : null;
+
+        ResourceIndicatorValidator.validateResource(resource, allowedResources);
+        return resource;
     }
 }
