@@ -36,14 +36,19 @@ const validAbsoluteUriArb = fc.tuple(
 /**
  * Generates relative URIs (missing scheme or authority).
  * These should be rejected by isValidResourceUri().
+ *
+ * Note: We must avoid generating strings that happen to be valid absolute URIs.
+ * For example, "A:" is a valid URI with scheme "A" per RFC 3986, and Node's URL
+ * constructor accepts "http:" as a valid URL. We restrict to patterns that are
+ * genuinely relative or malformed.
  */
 const relativeUriArb = fc.oneof(
-    // Path-only URIs
-    fc.string({minLength: 1, maxLength: 50}).map(s => `/${s}`),
-    // Relative paths without leading slash
-    fc.string({minLength: 1, maxLength: 50}),
-    // Scheme-only (no authority)
-    fc.constantFrom('http', 'https').map(s => `${s}:`),
+    // Path-only URIs (start with /)
+    fc.string({minLength: 1, maxLength: 50}).map(s => `/${s.replace(/:/g, '')}`),
+    // Relative paths without leading slash — filter out anything URL-parseable
+    fc.string({minLength: 1, maxLength: 50}).filter(s => {
+        try { new URL(s); return false; } catch { return true; }
+    }),
     // Double-slash without scheme
     fc.tuple(fc.domain(), fc.string({minLength: 0, maxLength: 20})).map(([domain, path]) => `//${domain}${path}`),
 );

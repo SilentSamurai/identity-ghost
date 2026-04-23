@@ -6,6 +6,7 @@ import {AuthorizeRedirectException} from '../exceptions/authorize-redirect.excep
 import {Client} from '../entity/client.entity';
 import {ValidationSchema} from '../validation/validation.schema';
 import {ResourceIndicatorValidator} from './resource-indicator.validator';
+import {IdTokenHintValidator} from './id-token-hint.validator';
 
 export interface AuthorizeQueryParams {
     response_type?: string;
@@ -19,6 +20,7 @@ export interface AuthorizeQueryParams {
     prompt?: string;
     max_age?: number;
     resource?: string;
+    id_token_hint?: string;
 }
 
 export interface ValidatedAuthorizeRequest {
@@ -32,6 +34,7 @@ export interface ValidatedAuthorizeRequest {
     prompt?: string;
     maxAge?: number;
     resource?: string;
+    idTokenHintSub?: string;
 }
 
 @Injectable()
@@ -41,6 +44,7 @@ export class AuthorizeService {
     constructor(
         private readonly clientService: ClientService,
         private readonly scopeResolver: ScopeResolverService,
+        private readonly idTokenHintValidator: IdTokenHintValidator,
     ) {
     }
 
@@ -86,6 +90,17 @@ export class AuthorizeService {
             );
             const scope = resolvedScopes.join(' ');
 
+            // 9. Validate id_token_hint (post-redirect error)
+            let idTokenHintSub: string | undefined;
+            if (params.id_token_hint) {
+                idTokenHintSub = await this.validateIdTokenHint(
+                    params.id_token_hint,
+                    client.clientId,
+                    redirectUri,
+                    params.state,
+                );
+            }
+
             return {
                 clientId: client.clientId,
                 redirectUri,
@@ -97,6 +112,7 @@ export class AuthorizeService {
                 prompt: params.prompt,
                 maxAge: params.max_age,
                 resource: params.resource,
+                idTokenHintSub,
             };
         } catch (error) {
             if (error instanceof OAuthException || error instanceof AuthorizeRedirectException) {
@@ -276,6 +292,28 @@ export class AuthorizeService {
 
         try {
             ResourceIndicatorValidator.validateResource(resource, client.allowedResources);
+        } catch (error) {
+            if (error instanceof OAuthException) {
+                throw new AuthorizeRedirectException(
+                    redirectUri,
+                    error.errorCode,
+                    error.errorDescription,
+                    state,
+                );
+            }
+            throw error;
+        }
+    }
+
+    private async validateIdTokenHint(
+        idTokenHint: string,
+        expectedClientId: string,
+        redirectUri: string,
+        state?: string,
+    ): Promise<string | undefined> {
+        try {
+            const result = await this.idTokenHintValidator.validate(idTokenHint, expectedClientId);
+            return result.sub;
         } catch (error) {
             if (error instanceof OAuthException) {
                 throw new AuthorizeRedirectException(

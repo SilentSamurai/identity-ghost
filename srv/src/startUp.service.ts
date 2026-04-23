@@ -110,7 +110,15 @@ export class StartUpService implements OnModuleInit {
                 {name: "Erebor Tenant", domain: "erebor.local", signUp: false},
                 {name: "Isengard Tenant", domain: "isengard.local", signUp: false},
                 {name: "Perm Test Tenant", domain: "perm-test.local", signUp: false},
-                {name: "Prompt Test Tenant", domain: "prompt-test.local", signUp: false}
+                {name: "Prompt Test Tenant", domain: "prompt-test.local", signUp: false},
+                {name: "Nonce Test Tenant", domain: "nonce-test.local", signUp: false},
+                {name: "Compliance Test Tenant", domain: "compliance-test.local", signUp: false},
+                {name: "IDToken Test Tenant", domain: "idtoken-test.local", signUp: false},
+                {name: "Auth Cleanup Test Tenant", domain: "auth-cleanup-test.local", signUp: false},
+                {name: "ID Token Aud Test Tenant", domain: "idtoken-aud-test.local", signUp: false},
+                {name: "Perms Test Tenant", domain: "perms-test.local", signUp: false},
+                {name: "Session Claims Test Tenant", domain: "session-claims-test.local", signUp: false},
+                {name: "Prompt Prop Test Tenant", domain: "prompt-prop-test.local", signUp: false}
             ];
 
             // 4) Create each tenant and assign the existing user as owner

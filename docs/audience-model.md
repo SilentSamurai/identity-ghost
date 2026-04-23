@@ -79,6 +79,46 @@ function validateAudience(token, myAudience):
 
 When validating time-based claims (`exp`, `nbf`, `iat`) alongside the audience, allow for the configured clock skew tolerance (default ±30 seconds). See the `JWT_CLOCK_SKEW_SECONDS` environment variable.
 
+## ID Token Audience Validation (Relying Party Guidance)
+
+Relying parties (RPs) that consume ID tokens from this Auth Server must validate the `aud` and `azp` claims per OpenID Connect Core 1.0 §3.1.3.7. This prevents token confusion attacks where an ID token issued for one client is accepted by another.
+
+### Validation Rules
+
+1. **Verify `aud` is an array.** The `aud` claim is always a JSON array. Reject the ID token if `aud` is a bare string or missing entirely.
+
+2. **Verify your `client_id` is in `aud`.** The RP's own `client_id` must appear in the `aud` array. If it does not, reject the token — it was not issued for your client.
+
+3. **Verify `azp` when `aud` has multiple values.** When the `aud` array contains multiple values, the RP must also verify that the `azp` (authorized party) claim equals its `client_id`. This ensures the token was explicitly authorized for your client even though other audiences are present.
+
+4. **Reject tokens where your `client_id` is not in `aud`.** This is the core audience check — a token not intended for your client must never be accepted.
+
+### Example Validation Pseudocode
+
+```
+function validateIdTokenAudience(idToken, myClientId):
+    if not isArray(idToken.aud):
+        reject("aud must be an array")
+
+    if myClientId not in idToken.aud:
+        reject("ID token not issued for this client")
+
+    if length(idToken.aud) > 1:
+        if idToken.azp != myClientId:
+            reject("azp must equal client_id when aud has multiple values")
+
+    accept()
+```
+
+### Current Behavior
+
+This Auth Server always issues ID tokens with:
+
+- `aud: [clientId]` — a single-element array containing the requesting client's ID
+- `azp: clientId` — always set to the requesting client's ID
+
+Resource indicators (RFC 8707) affect access token audience only. ID token audience remains `[clientId]` regardless of the `resource` parameter.
+
 ## Future: RFC 8707 Resource Indicators
 
 The current audience model uses a single default value. When [RFC 8707](https://datatracker.ietf.org/doc/html/rfc8707) resource indicators are implemented, clients will be able to request tokens scoped to specific resource servers by including `resource` parameters in the token request. The `aud` array will then contain the requested resource server URIs instead of (or in addition to) the default value.

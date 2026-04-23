@@ -619,9 +619,9 @@ describe('Feature: oidc-prompt-max-age, Property 8: auth_time claim inclusion wh
     let app: typeof SharedTestFixture.prototype;
     let tokenFixture: typeof TokenFixture.prototype;
 
-    const ADMIN_EMAIL = 'admin@prompt-test.local';
+    const ADMIN_EMAIL = 'admin@prompt-prop-test.local';
     const ADMIN_PASSWORD = 'admin9000';
-    const CLIENT_ID = 'prompt-test.local';
+    const CLIENT_ID = 'prompt-prop-test.local';
     const CODE_CHALLENGE = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq';
     const CODE_VERIFIER = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq';
 

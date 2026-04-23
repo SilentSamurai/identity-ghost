@@ -2,6 +2,7 @@ import * as fc from 'fast-check';
 import {AuthorizeService} from '../../src/auth/authorize.service';
 import {Client} from '../../src/entity/client.entity';
 import {OAuthException} from '../../src/exceptions/oauth-exception';
+import {IdTokenHintValidator} from '../../src/auth/id-token-hint.validator';
 
 /**
  * Feature: redirect-uri-validation, Property 1: Redirect URI validation accepts iff URI is in registered set
@@ -14,7 +15,7 @@ import {OAuthException} from '../../src/exceptions/oauth-exception';
  */
 describe('Feature: redirect-uri-validation, Property 1: Redirect URI validation accepts iff URI is in registered set', () => {
     // Instantiate AuthorizeService with null deps — validateRedirectUri is pure and doesn't use them
-    const service = new AuthorizeService(null as any, null as any);
+    const service = new AuthorizeService(null as any, null as any, null as any);
 
     // Generator: arbitrary URI-like strings for redirect URIs
     const uriArb = fc.oneof(
@@ -113,7 +114,7 @@ describe('Feature: redirect-uri-validation, Property 1: Redirect URI validation 
  * Validates: Requirements 1.3, 1.4, 1.5
  */
 describe('Feature: redirect-uri-validation, Property 2: Omitted redirect_uri resolves correctly based on registered URI count', () => {
-    const service = new AuthorizeService(null as any, null as any);
+    const service = new AuthorizeService(null as any, null as any, null as any);
 
     // Generator: arbitrary URI-like strings
     const uriArb = fc.oneof(
@@ -211,7 +212,7 @@ describe('Feature: redirect-uri-validation, Property 2: Omitted redirect_uri res
  * Validates: Requirements 6.1, 6.2
  */
 describe('Feature: redirect-uri-validation, Property 7: No URI normalization — textually different URIs are always non-matching', () => {
-    const service = new AuthorizeService(null as any, null as any);
+    const service = new AuthorizeService(null as any, null as any, null as any);
 
     function makeClient(redirectUris: string[]): Client {
         const client = new Client();

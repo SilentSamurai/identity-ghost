@@ -27,10 +27,10 @@ import {expect2xx} from "../api-client/client";
  */
 describe('auth code cleanup — lifecycle state verification', () => {
     let app: SharedTestFixture;
-    const clientId = "auth.server.com";
+    const clientId = "auth-cleanup-test.local";
     const verifier = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq";
     const challenge = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq";
-    const email = "admin@auth.server.com";
+    const email = "admin@auth-cleanup-test.local";
     const password = "admin9000";
 
     beforeAll(async () => {

@@ -25,6 +25,7 @@ import {ConsentService} from "./consent.service";
 import {UserConsent} from "../entity/user-consent.entity";
 import {SecurityModule} from "../security/security.module";
 import {PromptService} from "./prompt.service";
+import {IdTokenHintValidator} from "./id-token-hint.validator";
 
 @Module({
     imports: [
@@ -36,8 +37,8 @@ import {PromptService} from "./prompt.service";
         TypeOrmModule.forFeature([AuthCode, User, RefreshToken, LoginSession, UserConsent]),
     ],
     controllers: [],
-    providers: [JwtAuthGuard, AuthService, AuthCodeService, TokenIssuanceService, TenantResolutionGuard, SuperAdminGuard, IdTokenService, TokenIntrospectionService, RefreshTokenService, TokenRevocationService, ClaimsResolverService, AuthorizeService, LoginSessionService, ConsentService, PromptService],
-    exports: [JwtAuthGuard, AuthService, AuthCodeService, TokenIssuanceService, TenantResolutionGuard, SuperAdminGuard, IdTokenService, TokenIntrospectionService, RefreshTokenService, TokenRevocationService, ClaimsResolverService, AuthorizeService, LoginSessionService, ConsentService, PromptService],
+    providers: [JwtAuthGuard, AuthService, AuthCodeService, TokenIssuanceService, TenantResolutionGuard, SuperAdminGuard, IdTokenService, TokenIntrospectionService, RefreshTokenService, TokenRevocationService, ClaimsResolverService, AuthorizeService, LoginSessionService, ConsentService, PromptService, IdTokenHintValidator],
+    exports: [JwtAuthGuard, AuthService, AuthCodeService, TokenIssuanceService, TenantResolutionGuard, SuperAdminGuard, IdTokenService, TokenIntrospectionService, RefreshTokenService, TokenRevocationService, ClaimsResolverService, AuthorizeService, LoginSessionService, ConsentService, PromptService, IdTokenHintValidator],
 })
 export class AuthModule {
 }

@@ -16,10 +16,10 @@ describe('ID Token Generation Integration', () => {
     let app: SharedTestFixture;
     let tokenFixture: TokenFixture;
 
-    const clientId = 'auth.server.com';
+    const clientId = 'idtoken-test.local';
     const verifier = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq';
     const challenge = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq';
-    const email = 'admin@auth.server.com';
+    const email = 'admin@idtoken-test.local';
     const password = 'admin9000';
 
     /** Helper: login → get auth code */

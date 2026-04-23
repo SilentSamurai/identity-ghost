@@ -558,6 +558,7 @@ export class OAuthTokenController {
             grant_type: GRANT_TYPES.CODE,
             requireAuthTime: authCode.requireAuthTime,
             resource: authCode.resource ?? undefined,
+            oauthClientId: authCode.clientId,
         });
     }
 
@@ -600,6 +601,7 @@ export class OAuthTokenController {
             requestedScope: body.scope,
             grant_type: GRANT_TYPES.PASSWORD,
             resource,
+            oauthClientId: body.client_id,
         });
     }
 

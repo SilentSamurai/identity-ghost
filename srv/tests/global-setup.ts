@@ -10,8 +10,8 @@
  *
  * The app is reused across all tests for performance (avoids startup overhead).
  *
- * If a previous test run was killed without teardown (e.g. double Ctrl+C),
- * stale ports are cleaned up automatically before starting new servers.
+ * Default ports: 3100 (app), 3101 (smtp), 3102 (smtp control), 3103 (webhook)
+ * Override via: TEST_APP_PORT, TEST_SMTP_PORT, TEST_SMTP_CONTROL_PORT, TEST_WEBHOOK_PORT
  */
 import * as process from 'node:process';
 import * as path from 'path';
@@ -35,6 +35,26 @@ declare global {
     var __SHARED_TEST_APP__: INestApplication | undefined;
     var __SHARED_SMTP__: FakeSmtpServer | undefined;
     var __SHARED_WEBHOOK__: TenantAppServer | undefined;
+}
+
+/**
+ * Default test ports. Override via environment variables if needed:
+ *   TEST_APP_PORT, TEST_SMTP_PORT, TEST_SMTP_CONTROL_PORT, TEST_WEBHOOK_PORT
+ */
+const DEFAULT_PORTS = {
+    app: 9001,
+    smtp: 3101,
+    smtpControl: 3102,
+    webhook: 3103,
+};
+
+function getConfiguredPorts() {
+    return {
+        app: parseInt(process.env.TEST_APP_PORT || '', 10) || DEFAULT_PORTS.app,
+        smtp: parseInt(process.env.TEST_SMTP_PORT || '', 10) || DEFAULT_PORTS.smtp,
+        smtpControl: parseInt(process.env.TEST_SMTP_CONTROL_PORT || '', 10) || DEFAULT_PORTS.smtpControl,
+        webhook: parseInt(process.env.TEST_WEBHOOK_PORT || '', 10) || DEFAULT_PORTS.webhook,
+    };
 }
 
 /**
@@ -71,35 +91,20 @@ function killPort(port: number): void {
 }
 
 /**
- * If a previous test run was killed without teardown, a stale .test-ports.json
- * will still exist. Read it, kill anything on those ports, and delete the file.
+ * Kill any processes on the configured test ports before starting.
  */
-function cleanupStalePorts(): void {
-    const portFilePath = path.resolve(__dirname, '../.test-ports.json');
-    if (!fs.existsSync(portFilePath)) return;
-
-    console.log('[globalSetup] Found stale .test-ports.json — cleaning up leftover ports...');
-    try {
-        const raw = fs.readFileSync(portFilePath, 'utf-8');
-        const ports = JSON.parse(raw);
-        const portValues: number[] = Object.values(ports).filter(
-            (v): v is number => typeof v === 'number' && v > 0,
-        );
-        for (const port of portValues) {
-            killPort(port);
-        }
-    } catch (error) {
-        console.warn('[globalSetup] Could not parse stale port file:', error);
+function cleanupTestPorts(ports: ReturnType<typeof getConfiguredPorts>): void {
+    const portValues = [ports.app, ports.smtp, ports.smtpControl, ports.webhook];
+    for (const port of portValues) {
+        killPort(port);
     }
-    try {
-        fs.unlinkSync(portFilePath);
-        console.log('[globalSetup] Deleted stale .test-ports.json');
-    } catch { /* ignore */ }
 }
 
 export default async function globalSetup(): Promise<void> {
-    // Clean up ports from a previously killed test run
-    cleanupStalePorts();
+    const ports = getConfiguredPorts();
+    
+    // Kill any stale processes on the test ports
+    cleanupTestPorts(ports);
 
     let smtpServer: FakeSmtpServer | undefined;
     let webhookServer: TenantAppServer | undefined;
@@ -111,18 +116,18 @@ export default async function globalSetup(): Promise<void> {
         process.env.ENABLE_FAKE_SMTP_SERVER = 'false';
         Environment.setup();
 
-        // 2. Start FakeSmtpServer on dynamic ports
-        smtpServer = createFakeSmtpServer({port: 0, controlPort: 0});
+        // 2. Start FakeSmtpServer on configured ports
+        smtpServer = createFakeSmtpServer({port: ports.smtp, controlPort: ports.smtpControl});
         await smtpServer.listen();
 
-        // Point the mail transport at the actual bound port
-        process.env.MAIL_PORT = String(smtpServer.boundPort);
+        // Point the mail transport at the SMTP port
+        process.env.MAIL_PORT = String(ports.smtp);
 
-        // 3. Start TenantAppServer on a dynamic port
-        webhookServer = createTenantAppServer({port: 0});
+        // 3. Start TenantAppServer on configured port
+        webhookServer = createTenantAppServer({port: ports.webhook});
         await webhookServer.listen();
 
-        // 4. Compile and start the NestJS app on a dynamic port
+        // 4. Compile and start the NestJS app on configured port
         //    Register TestUtilsController for test-only endpoints (session expiry, auth code lookup)
         const moduleRef = await Test.createTestingModule({
             imports: [AppModule, TypeOrmModule.forFeature([LoginSession, AuthCode, User])],
@@ -155,18 +160,15 @@ export default async function globalSetup(): Promise<void> {
             });
         }
 
-        await app.listen(0);
-
-        const addr = app.getHttpServer().address();
-        const appPort = typeof addr === 'object' ? addr.port : 0;
+        await app.listen(ports.app);
 
         // 5. Write port file for worker processes
         const portFilePath = path.resolve(__dirname, '../.test-ports.json');
         const portData = {
-            appPort,
-            smtpPort: smtpServer.boundPort,
-            smtpControlPort: smtpServer.boundControlPort,
-            webhookPort: webhookServer.boundPort,
+            appPort: ports.app,
+            smtpPort: ports.smtp,
+            smtpControlPort: ports.smtpControl,
+            webhookPort: ports.webhook,
         };
         fs.writeFileSync(portFilePath, JSON.stringify(portData, null, 2));
 

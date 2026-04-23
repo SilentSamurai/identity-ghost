@@ -227,13 +227,13 @@ describe('Token Response RFC 6749 Compliance', () => {
         beforeAll(async () => {
             const verifier = "compliance-test-verifier-ABCDEFGHIJKLMNOPQRS";
 
-            // Step 1: Login to get an auth code
+            // Step 1: Login to get an auth code (uses isolated tenant to avoid session interference)
             const loginResponse = await app.getHttpServer()
                 .post('/api/oauth/login')
                 .send({
-                    email: "admin@auth.server.com",
+                    email: "admin@compliance-test.local",
                     password: "admin9000",
-                    client_id: "auth.server.com",
+                    client_id: "compliance-test.local",
                     code_challenge: verifier,
                     code_challenge_method: "plain",
                 })
@@ -249,7 +249,7 @@ describe('Token Response RFC 6749 Compliance', () => {
                     grant_type: "authorization_code",
                     code: authCode,
                     code_verifier: verifier,
-                    client_id: "auth.server.com",
+                    client_id: "compliance-test.local",
                 })
                 .set('Accept', 'application/json');
 

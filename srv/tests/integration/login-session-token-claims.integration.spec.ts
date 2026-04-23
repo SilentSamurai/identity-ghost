@@ -186,9 +186,9 @@ describe('Login Session Token Claims', () => {
         const loginResponse = await app.getHttpServer()
             .post('/api/oauth/login')
             .send({
-                email: 'admin@prompt-test.local',
+                email: 'admin@session-claims-test.local',
                 password: 'admin9000',
-                client_id: 'prompt-test.local',
+                client_id: 'session-claims-test.local',
                 code_challenge: codeChallenge,
                 code_challenge_method: 'plain',
                 prompt: 'login',
@@ -205,7 +205,7 @@ describe('Login Session Token Claims', () => {
                 grant_type: 'authorization_code',
                 code: loginResponse.body.authentication_code,
                 code_verifier: codeVerifier,
-                client_id: 'prompt-test.local',
+                client_id: 'session-claims-test.local',
             })
             .set('Accept', 'application/json');
 
@@ -234,9 +234,9 @@ describe('Login Session Token Claims', () => {
         const loginResponse = await app.getHttpServer()
             .post('/api/oauth/login')
             .send({
-                email: 'admin@prompt-test.local',
+                email: 'admin@session-claims-test.local',
                 password: 'admin9000',
-                client_id: 'prompt-test.local',
+                client_id: 'session-claims-test.local',
                 code_challenge: codeChallenge,
                 code_challenge_method: 'plain',
                 max_age: 3600,
@@ -253,7 +253,7 @@ describe('Login Session Token Claims', () => {
                 grant_type: 'authorization_code',
                 code: loginResponse.body.authentication_code,
                 code_verifier: codeVerifier,
-                client_id: 'prompt-test.local',
+                client_id: 'session-claims-test.local',
             })
             .set('Accept', 'application/json');
 

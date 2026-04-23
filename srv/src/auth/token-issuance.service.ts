@@ -89,6 +89,8 @@ export interface IssueTokenOptions {
     sid?: string;
     requireAuthTime?: boolean;
     resource?: string;
+    /** The OAuth client_id from the authorization request. Used as the ID token audience (aud) claim per OIDC Core §2. */
+    oauthClientId?: string;
 }
 
 @Injectable()
@@ -179,10 +181,14 @@ export class TokenIssuanceService {
         // Read nonce from options (passed by controller from the already-redeemed auth code)
         const nonce = options?.nonce;
 
+        // Use the OAuth client_id from the authorization request for the ID token audience (aud) claim
+        // per OIDC Core §2. Falls back to tenant.clientId for backward compatibility.
+        const idTokenClientId = options?.oauthClientId || tenant.clientId;
+
         const idToken = await this.idTokenService.generateIdToken({
             user: {id: user.id, email: user.email, name: user.name, verified: user.verified},
             tenantId: tenant.id,
-            clientId: tenant.clientId,
+            clientId: idTokenClientId,
             grantedScopes: scopes,
             accessToken,
             nonce,
@@ -437,10 +443,13 @@ export class TokenIssuanceService {
             sid: sessionId,
         });
 
+        // Use the OAuth client_id from the authorization request for the ID token audience (aud) claim
+        const idTokenClientId = options?.oauthClientId || tenant.clientId;
+
         const idToken = await this.idTokenService.generateIdToken({
             user: {id: user.id, email: user.email, name: user.name, verified: user.verified},
             tenantId: tenant.id,
-            clientId: tenant.clientId,
+            clientId: idTokenClientId,
             grantedScopes: scopes,
             accessToken,
             nonce,

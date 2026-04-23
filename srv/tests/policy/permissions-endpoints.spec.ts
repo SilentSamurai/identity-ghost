@@ -121,7 +121,7 @@ describe('Permissions Endpoints (e2e)', () => {
         it('returns CASL rules with Manage grants for TENANT_ADMIN token', async () => {
             // arrange
             const adminToken = await tokenFixture.fetchAccessToken(
-                "admin@shire.local", "admin9000", "shire.local"
+                "admin@perms-test.local", "admin9000", "perms-test.local"
             );
             const policyClient = new PolicyClient(app, adminToken.accessToken);
 
@@ -160,7 +160,7 @@ describe('Permissions Endpoints (e2e)', () => {
         it('each rule has action and subject fields', async () => {
             // arrange
             const adminToken = await tokenFixture.fetchAccessToken(
-                "admin@shire.local", "admin9000", "shire.local"
+                "admin@perms-test.local", "admin9000", "perms-test.local"
             );
             const policyClient = new PolicyClient(app, adminToken.accessToken);
 

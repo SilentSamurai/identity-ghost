@@ -13,10 +13,10 @@ import * as jwt from "jsonwebtoken";
 describe('Nonce Replay Protection', () => {
     let app: SharedTestFixture;
 
-    const clientId = 'auth.server.com';
+    const clientId = 'nonce-test.local';
     const verifier = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq';
     const challenge = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq';
-    const email = 'admin@auth.server.com';
+    const email = 'admin@nonce-test.local';
     const password = 'admin9000';
 
     /** Helper: login → get auth code */
