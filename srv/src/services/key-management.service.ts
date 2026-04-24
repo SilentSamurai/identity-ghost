@@ -40,9 +40,9 @@ export class KeyManagementService {
         return {privateKey: tenantKey.privateKey, kid: tenantKey.kid};
     }
 
-    async getPublicKeyByKid(kid: string): Promise<string> {
+    async getPublicKeyByKid(kid: string, tenantId: string): Promise<string> {
         const tenantKey = await this.tenantKeyRepository.findOne({
-            where: {kid, deactivatedAt: IsNull()},
+            where: {kid, tenantId, deactivatedAt: IsNull()},
             select: ['id', 'publicKey'],
         });
         if (!tenantKey) {

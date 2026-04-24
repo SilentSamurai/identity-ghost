@@ -115,7 +115,7 @@ export class AuthService {
             );
 
             const {header} = this.tokenGenerator.decodeComplete(token);
-            const publicKey = await this.signingKeyProvider.getPublicKeyByKid(header.kid);
+            const publicKey = await this.signingKeyProvider.getPublicKeyByKid(header.kid, rawDecoded.tenant_id);
 
             // Apply clock skew tolerance for time-based claim validation
             const clockSkew = parseInt(this.configService.get("JWT_CLOCK_SKEW_SECONDS", "30"), 10);

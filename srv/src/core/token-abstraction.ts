@@ -25,7 +25,7 @@ export interface SigningKeyProvider {
 
     getSigningKeyWithKid(tenantId: string): Promise<{ privateKey: string; kid: string }>;
 
-    getPublicKeyByKid(kid: string): Promise<string>;
+    getPublicKeyByKid(kid: string, tenantId: string): Promise<string>;
 }
 
 export const SIGNING_KEY_PROVIDER = Symbol("SIGNING_KEY_PROVIDER");

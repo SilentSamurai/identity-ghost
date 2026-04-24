@@ -98,7 +98,7 @@ export class IdTokenHintValidator {
 
         let publicKey: string;
         try {
-            publicKey = await this.signingKeyProvider.getPublicKeyByKid(kid);
+            publicKey = await this.signingKeyProvider.getPublicKeyByKid(kid, payload.tenant_id);
         } catch (error) {
             this.logger.warn(`id_token_hint kid not found: ${kid}`);
             throw OAuthException.invalidRequest('The id_token_hint signature key is unknown');
