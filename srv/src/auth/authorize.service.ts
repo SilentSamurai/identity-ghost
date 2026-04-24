@@ -154,15 +154,13 @@ export class AuthorizeService {
     }
 
     async validateRedirectUriForClient(clientId: string, redirectUri?: string): Promise<string | null> {
-        let client: Client;
-        try {
-            client = await this.clientService.findByClientId(clientId);
-        } catch (error) {
-            if (error instanceof NotFoundException) {
-                // Legacy tenant-based client — no Client entity, skip redirect URI validation
-                return redirectUri || null;
-            }
-            throw error;
+        const client = await this.clientService.findByClientIdOrAlias(clientId);
+
+        const registeredUris: string[] = client.redirectUris || [];
+        if (registeredUris.length === 0) {
+            // Client has no registered redirect URIs — skip validation.
+            // The redirect_uri binding check at token exchange still applies.
+            return redirectUri || null;
         }
         if (!redirectUri) {
             return null;

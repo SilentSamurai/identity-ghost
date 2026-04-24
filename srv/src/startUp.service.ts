@@ -121,7 +121,8 @@ export class StartUpService implements OnModuleInit {
                 {name: "Prompt Prop Test Tenant", domain: "prompt-prop-test.local", signUp: false},
                 {name: "Auth Code Expiry Test Tenant", domain: "auth-code-expiry-test.local", signUp: false},
                 {name: "Offline Access Test Tenant", domain: "offline-access-test.local", signUp: false},
-                {name: "Redirect URI Binding Test Tenant", domain: "redirect-uri-test.local", signUp: false}
+                {name: "Redirect URI Binding Test Tenant", domain: "redirect-uri-test.local", signUp: false},
+                {name: "Redirect URI Bypass Test Tenant", domain: "redirect-uri-bypass-test.local", signUp: false}
             ];
 
             // 4) Create each tenant and assign the existing user as owner
