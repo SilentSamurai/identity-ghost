@@ -21,6 +21,16 @@ import {LoginSessionService} from "./login-session.service";
 import {SecurityEventLogger} from "../security/security-event-logger.service";
 
 /**
+ * Decision result for refresh token eligibility.
+ * Used to determine whether a refresh token should be issued and why.
+ * Requirements: 1.1, 1.2, 1.3, 2.1, 2.2
+ */
+interface RefreshTokenDecision {
+    eligible: boolean;
+    reason: 'offline_access_scope' | 'client_allow_refresh_token' | 'refresh_token_not_eligible';
+}
+
+/**
  * TokenIssuanceService — Central orchestrator for OAuth 2.0 / OIDC token issuance.
  *
  * This service coordinates the full token issuance pipeline for all grant types:
@@ -128,8 +138,10 @@ export class TokenIssuanceService {
             throw new BadRequestException("User is not a member of the tenant and does not have a valid app subscription");
         }
 
-        // Resolve client allowedScopes for scope intersection
-        const clientAllowedScopes = await this.getClientAllowedScopes(tenant);
+        // Resolve client allowedScopes for scope intersection.
+        // When oauthClientId is provided (e.g. from password grant), resolve the specific client
+        // rather than falling back to the tenant's default client.
+        const clientAllowedScopes = await this.getClientAllowedScopes(tenant, options?.oauthClientId);
 
         if (isSubscribed) {
             return this.issueSubscribedToken(permission, user, tenant, clientAllowedScopes, options);
@@ -170,13 +182,36 @@ export class TokenIssuanceService {
             sessionId = randomUUID();
         }
 
-        const {plaintext: refreshToken} = await this.refreshTokenService.create({
-            userId: user.id,
+        // Determine refresh token eligibility (Requirements: 1.1, 1.2, 1.3, 2.1, 2.2, 8.1, 8.2, 8.3)
+        const refreshTokenDecision = await this.shouldIssueRefreshToken(
+            scopes,
+            tenant,
+            options?.grant_type ?? GRANT_TYPES.PASSWORD,
+            options?.oauthClientId,
+        );
+
+        // Log the refresh token decision
+        this.securityEventLogger.refreshTokenDecision({
+            grantType: options?.grant_type ?? GRANT_TYPES.PASSWORD,
             clientId: tenant.clientId,
             tenantId: tenant.id,
-            scope: ScopeNormalizer.format(scopes),
-            sid: sessionId,
+            userId: user.id,
+            decision: refreshTokenDecision.eligible ? 'granted' : 'denied',
+            reason: refreshTokenDecision.reason,
         });
+
+        // Conditionally create refresh token based on eligibility
+        let refreshToken: string | undefined;
+        if (refreshTokenDecision.eligible) {
+            const {plaintext} = await this.refreshTokenService.create({
+                userId: user.id,
+                clientId: tenant.clientId,
+                tenantId: tenant.id,
+                scope: ScopeNormalizer.format(scopes),
+                sid: sessionId,
+            });
+            refreshToken = plaintext;
+        }
 
         // Read nonce from options (passed by controller from the already-redeemed auth code)
         const nonce = options?.nonce;
@@ -435,13 +470,36 @@ export class TokenIssuanceService {
             sessionId = randomUUID();
         }
 
-        const {plaintext: refreshToken} = await this.refreshTokenService.create({
-            userId: user.id,
+        // Determine refresh token eligibility (Requirements: 1.1, 1.2, 2.1, 2.2, 8.1, 8.2, 8.3)
+        const refreshTokenDecision = await this.shouldIssueRefreshToken(
+            scopes,
+            tenant,
+            options?.grant_type ?? GRANT_TYPES.PASSWORD,
+            options?.oauthClientId,
+        );
+
+        // Log the refresh token decision
+        this.securityEventLogger.refreshTokenDecision({
+            grantType: options?.grant_type ?? GRANT_TYPES.PASSWORD,
             clientId: tenant.clientId,
             tenantId: tenant.id,
-            scope: ScopeNormalizer.format(scopes),
-            sid: sessionId,
+            userId: user.id,
+            decision: refreshTokenDecision.eligible ? 'granted' : 'denied',
+            reason: refreshTokenDecision.reason,
         });
+
+        // Conditionally create refresh token based on eligibility
+        let refreshToken: string | undefined;
+        if (refreshTokenDecision.eligible) {
+            const {plaintext} = await this.refreshTokenService.create({
+                userId: user.id,
+                clientId: tenant.clientId,
+                tenantId: tenant.id,
+                scope: ScopeNormalizer.format(scopes),
+                sid: sessionId,
+            });
+            refreshToken = plaintext;
+        }
 
         // Use the OAuth client_id from the authorization request for the ID token audience (aud) claim
         const idTokenClientId = options?.oauthClientId || tenant.clientId;
@@ -506,13 +564,15 @@ export class TokenIssuanceService {
     }
 
     /**
-     * Resolve the allowed scopes for a specific tenant's client.
-     * Uses the tenant's clientId to find the exact client rather than
-     * arbitrarily picking the first client in the tenant.
+     * Resolve the allowed scopes for a specific client.
+     * When oauthClientId is provided, resolves that specific client (by UUID or alias).
+     * Falls back to the tenant's default client (by domain alias) when no oauthClientId is given.
      */
-    private async getClientAllowedScopes(tenant: Tenant): Promise<string> {
+    private async getClientAllowedScopes(tenant: Tenant, oauthClientId?: string): Promise<string> {
         try {
-            const client = await this.clientService.findByClientId(tenant.clientId);
+            const client = oauthClientId
+                ? await this.clientService.findByClientIdOrAlias(oauthClientId)
+                : await this.clientService.findByAlias(tenant.domain);
             if (client?.allowedScopes) {
                 return client.allowedScopes;
             }
@@ -520,5 +580,46 @@ export class TokenIssuanceService {
             // Fall through to default
         }
         return 'openid profile email';
+    }
+
+    /**
+     * Determines whether a refresh token should be issued based on:
+     * 1. Grant type eligibility (client_credentials is never eligible per RFC 6749 §4.4.3)
+     * 2. Presence of offline_access scope in granted scopes (OIDC Core §11)
+     * 3. Client's allowRefreshToken flag (per-client override for trusted first-party clients)
+     *
+     * Requirements: 1.1, 1.2, 1.3, 2.1, 2.2
+     */
+    private async shouldIssueRefreshToken(
+        grantedScopes: string[],
+        tenant: Tenant,
+        grantType: string,
+        oauthClientId?: string,
+    ): Promise<RefreshTokenDecision> {
+        // Per RFC 6749 §4.4.3, client_credentials grant MUST NOT include a refresh token
+        if (grantType === GRANT_TYPES.CLIENT_CREDENTIALS) {
+            return { eligible: false, reason: 'refresh_token_not_eligible' };
+        }
+
+        // Check if offline_access scope is present in granted scopes (OIDC Core §11)
+        if (grantedScopes.includes('offline_access')) {
+            return { eligible: true, reason: 'offline_access_scope' };
+        }
+
+        // Check client's allowRefreshToken flag (per-client override)
+        // When oauthClientId is provided, resolve that specific client.
+        // Otherwise fall back to the tenant's default client (by domain alias).
+        try {
+            const client = oauthClientId
+                ? await this.clientService.findByClientIdOrAlias(oauthClientId)
+                : await this.clientService.findByAlias(tenant.domain);
+            if (client?.allowRefreshToken === true) {
+                return { eligible: true, reason: 'client_allow_refresh_token' };
+            }
+        } catch {
+            // If client lookup fails, fall through to not eligible
+        }
+
+        return { eligible: false, reason: 'refresh_token_not_eligible' };
     }
 }

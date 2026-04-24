@@ -32,7 +32,7 @@ export class DiscoveryService {
      * Static OIDC metadata values that don't change per request.
      * These represent the Auth Server's supported capabilities.
      */
-    private static readonly SCOPES_SUPPORTED = ["openid", "profile", "email"];
+    private static readonly SCOPES_SUPPORTED = ["openid", "profile", "email", "offline_access"];
     private static readonly RESPONSE_TYPES_SUPPORTED = ["code"];
     private static readonly GRANT_TYPES_SUPPORTED = ["authorization_code", "client_credentials", "refresh_token"];
     private static readonly SUBJECT_TYPES_SUPPORTED = ["public"];

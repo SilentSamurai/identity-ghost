@@ -84,6 +84,11 @@ export class AuthorizeService {
             this.validateResourceIndicator(params.resource, client, redirectUri, params.state);
 
             // 8. Resolve scope
+            // OIDC Core §11: The offline_access scope is only honored when the response_type
+            // results in an authorization code being returned. Since this server only supports
+            // response_type=code, this condition is always satisfied — any offline_access scope
+            // that passes scope resolution will result in an authorization code that can be
+            // exchanged for a refresh token. No additional response_type check is needed here.
             const resolvedScopes = this.scopeResolver.resolveScopes(
                 params.scope || null,
                 client.allowedScopes,

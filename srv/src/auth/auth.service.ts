@@ -246,6 +246,8 @@ export class AuthService {
         }
 
         const uniqueScopes = [...new Set(scopes)].sort();
+        // Filter offline_access from JWT scope claim per Requirements 7.1, 7.2
+        const jwtScopes = uniqueScopes.filter(s => s !== 'offline_access');
 
         const accessTokenPayload = TenantToken.create({
             sub: user.id,
@@ -259,7 +261,7 @@ export class AuthService {
             aud: audience || [this.configService.get("SUPER_TENANT_DOMAIN")],
             jti: randomUUID(),
             nbf: Math.floor(Date.now() / 1000),
-            scope: uniqueScopes.join(' '),
+            scope: jwtScopes.join(' '),
             client_id: tenant.clientId,
             tenant_id: tenant.id,
         });
@@ -272,7 +274,8 @@ export class AuthService {
             },
         );
 
-        return {accessToken, scopes: accessTokenPayload.scopes};
+        // Return full scopes (including offline_access) for Token_Response scope field
+        return {accessToken, scopes: uniqueScopes};
     }
 
     /**
@@ -293,6 +296,8 @@ export class AuthService {
         }
 
         const uniqueScopes = [...new Set(scopes)].sort();
+        // Filter offline_access from JWT scope claim per Requirements 7.1, 7.2
+        const jwtScopes = uniqueScopes.filter(s => s !== 'offline_access');
 
         const accessTokenPayload = TenantToken.create({
             sub: user.id,
@@ -306,7 +311,7 @@ export class AuthService {
             aud: audience || [this.configService.get("SUPER_TENANT_DOMAIN")],
             jti: randomUUID(),
             nbf: Math.floor(Date.now() / 1000),
-            scope: uniqueScopes.join(' '),
+            scope: jwtScopes.join(' '),
             client_id: issuingTenant.clientId,
             tenant_id: issuingTenant.id,
         });
@@ -327,7 +332,8 @@ export class AuthService {
             },
         );
 
-        return {accessToken, scopes: accessTokenPayload.scopes};
+        // Return full scopes (including offline_access) for Token_Response scope field
+        return {accessToken, scopes: uniqueScopes};
     }
 
     /**

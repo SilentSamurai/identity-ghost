@@ -11,10 +11,10 @@ import {expect2xx} from "../api-client/client";
  */
 describe('redirect_uri binding in authorization code flow', () => {
     let app: SharedTestFixture;
-    const clientId = "auth.server.com";
+    const clientId = "redirect-uri-test.local";
     const verifier = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq";
     const challenge = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq";
-    const email = "admin@auth.server.com";
+    const email = "admin@redirect-uri-test.local";
     const password = "admin9000";
 
     beforeAll(async () => {

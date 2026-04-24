@@ -123,7 +123,7 @@ describe('OIDC Discovery endpoint', () => {
 
         const doc = res.body;
 
-        expect(doc.scopes_supported).toEqual(["openid", "profile", "email"]);
+        expect(doc.scopes_supported).toEqual(["openid", "profile", "email", "offline_access"]);
         expect(doc.response_types_supported).toEqual(["code"]);
         expect(doc.grant_types_supported).toEqual(["authorization_code", "client_credentials", "refresh_token"]);
         expect(doc.subject_types_supported).toEqual(["public"]);
@@ -309,6 +309,6 @@ describe('OIDC Discovery endpoint', () => {
         const doc = res.body;
         expect(doc.issuer).toBeDefined();
         expect(doc.jwks_uri).toContain('auth.server.com');
-        expect(doc.scopes_supported).toEqual(["openid", "profile", "email"]);
+        expect(doc.scopes_supported).toEqual(["openid", "profile", "email", "offline_access"]);
     });
 });

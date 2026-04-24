@@ -7,14 +7,14 @@ import {SearchClient} from "./api-client/search-client";
 /**
  * Integration tests for admin key management endpoints.
  *
- * GET /api/admin/tenant/:tenantId/keys  — per-tenant key listing
- * GET /api/admin/keys                   — cross-tenant key listing
+ * GET /api/admin/tenant/:tenantId/keys — per-tenant key listing
+ * GET /api/admin/keys — cross-tenant key listing
  *
  * Validates:
  *   - Key metadata returned with correct ordering and config (Req 1)
  *   - Private/public key exclusion from responses (Req 1.3, 9.3)
  *   - Auth guards: 401 without token, 403 for non-super-admin (Req 1.4, 9.4)
- *   - Error handling: 404 unknown tenant, 400 invalid UUID (Req 1.5, 1.6)
+ *   - Error handling: 404 unknown tenants, 400 invalid UUID (Req 1.5, 1.6)
  *   - Cross-tenant listing with tenant info (Req 9.1, 9.2)
  *   - Status and tenantId query filters (Req 9.5)
  */

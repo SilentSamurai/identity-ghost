@@ -87,4 +87,38 @@ export class SecurityEventLogger {
             tenant_id: params.tenantId,
         });
     }
+
+    /**
+     * Log a refresh token eligibility decision.
+     * Uses `log` (info) level for granted decisions, `warn` level for denied decisions.
+     * Requirements: 8.1, 8.2, 8.3
+     */
+    refreshTokenDecision(params: {
+        grantType: string;
+        clientId: string;
+        tenantId: string;
+        userId?: string;
+        decision: 'granted' | 'denied';
+        reason: 'offline_access_scope' | 'client_allow_refresh_token' | 'refresh_token_not_eligible';
+    }): void {
+        const logEntry: Record<string, unknown> = {
+            event: 'refresh_token_decision',
+            timestamp: new Date().toISOString(),
+            grant_type: params.grantType,
+            client_id: params.clientId,
+            tenant_id: params.tenantId,
+            decision: params.decision,
+            reason: params.reason,
+        };
+
+        if (params.userId !== undefined) {
+            logEntry.user_id = params.userId;
+        }
+
+        if (params.decision === 'granted') {
+            this.logger.log(logEntry);
+        } else {
+            this.logger.warn(logEntry);
+        }
+    }
 }
