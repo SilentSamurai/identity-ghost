@@ -79,7 +79,7 @@ export class OAuthTokenController {
             const validated = await this.authorizeService.validateAuthorizeRequest(query);
 
             const params = new URLSearchParams();
-            params.set('client_id', validated.clientId);
+            params.set('client_id', query.client_id!); // it needs to be query.client_id as client id can also be a domain or client id
             params.set('redirect_uri', validated.redirectUri);
             params.set('scope', validated.scope);
             params.set('state', validated.state);

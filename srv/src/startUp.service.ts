@@ -124,7 +124,8 @@ export class StartUpService implements OnModuleInit {
                 {name: "Redirect URI Binding Test Tenant", domain: "redirect-uri-test.local", signUp: false},
                 {name: "Redirect URI Bypass Test Tenant", domain: "redirect-uri-bypass-test.local", signUp: false},
                 {name: "OIDC Compat Test Tenant", domain: "oidc-compat-test.local", signUp: false},
-                {name: "Client Creds Migration Test Tenant", domain: "client-creds-migration-test.local", signUp: false}
+                {name: "Client Creds Migration Test Tenant", domain: "client-creds-migration-test.local", signUp: false},
+                {name: "Client Binding Test Tenant", domain: "client-binding-test.local", signUp: false}
             ];
 
             // 4) Create each tenant and assign the existing user as owner

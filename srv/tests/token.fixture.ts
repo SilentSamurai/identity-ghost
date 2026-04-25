@@ -133,17 +133,26 @@ export class TokenFixture {
      * Login using OAuth authorization code flow.
      * Returns the response which may contain an authentication_code or requires_tenant_selection.
      */
-    public async login(email: string, password: string, clientId: string, codeChallenge: string = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq', subscriberTenantHint?: string): Promise<any> {
+    public async login(
+        email: string, 
+        password: string, 
+        clientId: string, 
+        codeChallenge: string = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq', 
+        subscriberTenantHint?: string,
+        opts?: { scope?: string; nonce?: string; codeChallengeMethod?: string }
+    ): Promise<any> {
         const body: any = {
             email,
             password,
             client_id: clientId,
-            code_challenge_method: 'plain',
+            code_challenge_method: opts?.codeChallengeMethod || 'plain',
             code_challenge: codeChallenge
         };
         if (subscriberTenantHint) {
             body.subscriber_tenant_hint = subscriberTenantHint;
         }
+        if (opts?.scope) body.scope = opts.scope;
+        if (opts?.nonce) body.nonce = opts.nonce;
         const response = await this.app.getHttpServer()
             .post('/api/oauth/login')
             .send(body)

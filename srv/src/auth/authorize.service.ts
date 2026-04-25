@@ -195,7 +195,7 @@ export class AuthorizeService {
             throw OAuthException.invalidRequest('The client_id parameter is required');
         }
         try {
-            return await this.clientService.findByClientId(clientId);
+            return await this.clientService.findByClientIdOrAlias(clientId);
         } catch (error) {
             if (error instanceof NotFoundException) {
                 throw OAuthException.invalidRequest('Unknown client_id');

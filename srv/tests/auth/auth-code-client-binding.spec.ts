@@ -11,8 +11,8 @@ import {expect2xx} from "../api-client/client";
  */
 describe('client_id binding verification at token exchange', () => {
     let app: SharedTestFixture;
-    const clientId = "auth.server.com";
-    const email = "admin@auth.server.com";
+    const clientId = "client-binding-test.local";
+    const email = "admin@client-binding-test.local";
     const password = "admin9000";
     const verifier = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq";
     const challenge = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq";
