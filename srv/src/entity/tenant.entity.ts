@@ -1,6 +1,5 @@
 import {Column, CreateDateColumn, Entity, JoinTable, ManyToMany, OneToMany, PrimaryGeneratedColumn,} from "typeorm";
 import {Role} from "./role.entity";
-import {Exclude} from "class-transformer";
 import {User} from "./user.entity";
 import {Group} from "./group.entity";
 import {App} from "./app.entity";
@@ -18,16 +17,6 @@ export class Tenant {
     @Column({unique: true, nullable: false})
     domain: string;
 
-    @Column({unique: true, nullable: false, name: "client_id"})
-    clientId: string;
-
-    @Column({nullable: false, name: "client_secret"})
-    @Exclude()
-    clientSecret: string;
-
-    @Column({nullable: false, name: "secret_salt"})
-    @Exclude()
-    secretSalt: string;
 
     // privateKey and publicKey columns REMOVED — keys live in tenant_keys table
 

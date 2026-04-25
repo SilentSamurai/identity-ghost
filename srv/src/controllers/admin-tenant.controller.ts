@@ -156,10 +156,10 @@ export class AdminTenantController {
     ): Promise<any> {
         let tenant = await this.tenantService.findById(permission, tenantId);
         const publicKey = await this.signingKeyProvider.getPublicKey(tenant.id);
+        const defaultClient = await this.clientService.findByAlias(tenant.domain);
         return {
             id: tenant.id,
-            clientId: tenant.clientId,
-            clientSecret: tenant.clientSecret,
+            clientId: defaultClient.clientId,
             publicKey,
         };
     }

@@ -104,7 +104,7 @@ describe('AuthCodeService', () => {
                 })
                 .set('Accept', 'application/json');
 
-            expect(tokenResponse.status).toEqual(201);
+            expect(tokenResponse.status).toEqual(200);
             expect(tokenResponse.body.access_token).toBeDefined();
             expect(tokenResponse.body.refresh_token).toBeDefined();
             expect(tokenResponse.body.token_type).toEqual('Bearer');
@@ -138,7 +138,7 @@ describe('AuthCodeService', () => {
                 })
                 .set('Accept', 'application/json');
 
-            expect(firstExchange.status).toEqual(201);
+            expect(firstExchange.status).toEqual(200);
 
             // Second exchange — should fail
             const secondExchange = await app.getHttpServer()
@@ -232,7 +232,7 @@ describe('AuthCodeService', () => {
                 })
                 .set('Accept', 'application/json');
 
-            expect(tokenResponse.status).toEqual(201);
+            expect(tokenResponse.status).toEqual(200);
             expect(tokenResponse.body.id_token).toBeDefined();
 
             const idTokenPayload = JSON.parse(
@@ -269,7 +269,7 @@ describe('AuthCodeService', () => {
                 })
                 .set('Accept', 'application/json');
 
-            expect(tokenResponse.status).toEqual(201);
+            expect(tokenResponse.status).toEqual(200);
             expect(tokenResponse.body.access_token).toBeDefined();
         });
     });

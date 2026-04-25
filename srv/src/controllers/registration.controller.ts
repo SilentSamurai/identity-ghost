@@ -28,6 +28,7 @@ import {
 import {TenantService} from "../services/tenant.service";
 import {SecurityService} from "../casl/security.service";
 import * as argon2 from "argon2";
+import {ClientService} from "../services/client.service";
 import {InjectRepository} from "@nestjs/typeorm";
 import {Repository} from "typeorm";
 import * as yup from "yup";
@@ -74,6 +75,7 @@ export class RegisterController {
         private readonly mailService: MailService,
         private readonly securityService: SecurityService,
         private readonly configService: Environment,
+        private readonly clientService: ClientService,
         @InjectRepository(User) private usersRepository: Repository<User>,
     ) {
     }
@@ -148,10 +150,13 @@ export class RegisterController {
         },
     ): Promise<{ success: boolean }> {
         const permission = this.securityService.createPermissionForRegistration();
-        const tenant = await this.tenantService.findByClientIdOrDomain(
-            permission,
-            body.client_id,
-        );
+        let tenant;
+        try {
+            const client = await this.clientService.findByClientIdOrAlias(body.client_id);
+            tenant = client.tenant;
+        } catch {
+            tenant = await this.tenantService.findByDomain(permission, body.client_id);
+        }
         if (!tenant.allowSignUp) {
             throw new BadRequestException("Sign up not allowed by admin");
         }

@@ -1,4 +1,4 @@
-import {Module} from "@nestjs/common";
+import {forwardRef, Module} from "@nestjs/common";
 import {TypeOrmModule} from "@nestjs/typeorm";
 import {ConfigModule} from "../config/config.module";
 import {CaslModule} from "../casl/casl.module";
@@ -17,6 +17,7 @@ import {RoleService} from "../services/role.service";
 import {SubscriptionService} from "../services/subscription.service";
 import {AppSubscriptionService} from "../services/app-subscription.service";
 import {KeyManagementService} from "../services/key-management.service";
+import {ClientService} from "../services/client.service";
 import {TechnicalTokenService} from "./technical-token.service";
 import {RS256TokenGenerator} from "./rs256-token-generator.service";
 import {HS256TokenGenerator} from "./hs256-token-generator.service";
@@ -34,7 +35,7 @@ import {
 @Module({
     imports: [
         ConfigModule,
-        CaslModule,
+        forwardRef(() => CaslModule),
         TypeOrmModule.forFeature([User, Tenant, TenantKey, TenantMember, Role, UserRole, App, Subscription, Client]),
     ],
     providers: [
@@ -43,6 +44,7 @@ import {
         RoleService,
         SubscriptionService,
         AppSubscriptionService,
+        ClientService,
         RS256TokenGenerator,
         HS256TokenGenerator,
         ES256TokenGenerator,
@@ -77,6 +79,7 @@ import {
         RoleService,
         SubscriptionService,
         AppSubscriptionService,
+        ClientService,
         RS256_TOKEN_GENERATOR,
         HS256_TOKEN_GENERATOR,
         ES256_TOKEN_GENERATOR,

@@ -70,7 +70,7 @@ describe('auth code concurrency safety', () => {
         const failure = sorted[1];
 
         // Exactly one should succeed with a token
-        expect(success.status).toEqual(201);
+        expect(success.status).toEqual(200);
         expect(success.body.access_token).toBeDefined();
 
         // Exactly one should fail with invalid_grant

@@ -65,7 +65,7 @@ describe('Login Session Creation', () => {
             })
             .set('Accept', 'application/json');
 
-        expect(response.status).toEqual(201);
+        expect(response.status).toEqual(200);
         expect(response.body.id_token).toBeDefined();
 
         const decoded = app.jwtService().decode(response.body.id_token, {json: true}) as any;
@@ -89,7 +89,7 @@ describe('Login Session Creation', () => {
 
         const afterLogin = Math.floor(Date.now() / 1000);
 
-        expect(response.status).toEqual(201);
+        expect(response.status).toEqual(200);
         expect(response.body.id_token).toBeDefined();
 
         const decoded = app.jwtService().decode(response.body.id_token, {json: true}) as any;

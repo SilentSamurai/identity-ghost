@@ -20,6 +20,7 @@ import {SubjectEnum} from "../entity/subjectEnum";
 import {Action} from "../casl/actions.enum";
 import {CurrentPermission, CurrentTenantId, CurrentUser, Permission} from "../auth/auth.decorator";
 import {SIGNING_KEY_PROVIDER, SigningKeyProvider} from "../core/token-abstraction";
+import {ClientService} from "../services/client.service";
 import {User} from "../entity/user.entity";
 import * as yup from "yup";
 
@@ -36,6 +37,7 @@ export class TenantController {
         private readonly tenantService: TenantService,
         @Inject(SIGNING_KEY_PROVIDER)
         private readonly signingKeyProvider: SigningKeyProvider,
+        private readonly clientService: ClientService,
     ) {
     }
 
@@ -81,10 +83,10 @@ export class TenantController {
         const tenant = await this.tenantService.findById(permission, tenantId);
         permission.isAuthorized(Action.ReadCredentials, SubjectEnum.TENANT, tenant);
         const publicKey = await this.signingKeyProvider.getPublicKey(tenant.id);
+        const defaultClient = await this.clientService.findByAlias(tenant.domain);
         return {
             id: tenant.id,
-            clientId: tenant.clientId,
-            clientSecret: tenant.clientSecret,
+            clientId: defaultClient.clientId,
             publicKey,
         };
     }
@@ -94,8 +96,13 @@ export class TenantController {
     async getMyTenant(
         @CurrentPermission() permission: Permission,
         @CurrentTenantId() tenantId: string,
-    ): Promise<Tenant> {
-        return this._getTenant(permission, tenantId);
+    ) {
+        const tenant = await this._getTenant(permission, tenantId);
+        const defaultClient = await this.clientService.findByAlias(tenant.domain);
+        return {
+            ...tenant,
+            clientId: defaultClient.clientId,
+        };
     }
 
     // ─── Shared implementation methods ───

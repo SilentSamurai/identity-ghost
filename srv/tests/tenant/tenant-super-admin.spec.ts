@@ -44,7 +44,6 @@ describe("E2E Tenant Management", () => {
         expect(tenantDetails.id).toEqual(tenant.id);
         expect(tenantDetails.name).toEqual("tenant-1");
         expect(tenantDetails.domain).toEqual("test-website.com");
-        expect(tenantDetails.clientId).toBeDefined();
 
         // Verify members array
         expect(Array.isArray(tenantDetails.members)).toBe(true);

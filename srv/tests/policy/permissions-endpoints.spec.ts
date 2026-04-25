@@ -268,7 +268,7 @@ describe('Permissions Endpoints (e2e)', () => {
             );
 
             // Get client credentials for the tenant
-            const credential = await state.tenantClient.getTenantCredentials(state.tenant.id);
+            const credential = await tokenFixture.createConfidentialClient(state.adminToken.accessToken, state.tenant.id);
             const ccToken = await tokenFixture.fetchClientCredentialsToken(
                 credential.clientId,
                 credential.clientSecret

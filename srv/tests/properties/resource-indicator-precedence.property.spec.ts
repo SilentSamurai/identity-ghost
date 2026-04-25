@@ -153,7 +153,7 @@ describe('Feature: resource-indicator-support, Property 4: Auth code resource ta
                         })
                         .set('Accept', 'application/json');
 
-                    expect(tokenResponse.status).toEqual(201);
+                    expect(tokenResponse.status).toEqual(200);
 
                     const jwt = app.jwtService().decode(tokenResponse.body.access_token, {json: true}) as any;
 
@@ -215,7 +215,7 @@ describe('Feature: resource-indicator-support, Property 4: Auth code resource ta
                 })
                 .set('Accept', 'application/json');
 
-            expect(tokenResponse.status).toEqual(201);
+            expect(tokenResponse.status).toEqual(200);
 
             const jwt = app.jwtService().decode(tokenResponse.body.access_token, {json: true}) as any;
 
@@ -273,7 +273,7 @@ describe('Feature: resource-indicator-support, Property 4: Auth code resource ta
                 })
                 .set('Accept', 'application/json');
 
-            expect(tokenResponse.status).toEqual(201);
+            expect(tokenResponse.status).toEqual(200);
 
             const jwt = app.jwtService().decode(tokenResponse.body.access_token, {json: true}) as any;
 

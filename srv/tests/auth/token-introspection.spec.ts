@@ -54,14 +54,10 @@ describe('Token Introspection Endpoint (RFC 7662)', () => {
         clientId = created.client.clientId;
         clientSecret = created.clientSecret;
 
-        // 3. Get a technical access token using legacy tenant credentials
-        //    (the token endpoint uses Tenant.clientId, not Client entity)
-        const tenantCreds = await app.getHttpServer()
-            .get('/api/tenant/my/credentials')
-            .set('Authorization', `Bearer ${userAccessToken}`);
+        // 3. Get a technical access token using Client entity credentials
         const techResult = await tokenFixture.fetchClientCredentialsToken(
-            tenantCreds.body.clientId,
-            tenantCreds.body.clientSecret,
+            clientId,
+            clientSecret,
         );
         technicalAccessToken = techResult.accessToken;
     });

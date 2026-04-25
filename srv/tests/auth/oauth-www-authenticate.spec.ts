@@ -66,24 +66,19 @@ describe('WWW-Authenticate headers on protected endpoints (RFC 6750 §3)', () =>
         let clientCredentialsAccessToken: string;
 
         beforeAll(async () => {
-            // 1. Get an admin access token to fetch tenant credentials
+            // 1. Get an admin access token to create a confidential client
             const adminToken = await tokenFixture.fetchAccessToken(
                 'admin@auth.server.com',
                 'admin9000',
                 'auth.server.com',
             );
 
-            // 2. Fetch the tenant's client credentials
-            const credsResponse = await app.getHttpServer()
-                .get('/api/tenant/my/credentials')
-                .set('Authorization', `Bearer ${adminToken.accessToken}`)
-                .set('Accept', 'application/json');
-
-            expect(credsResponse.status).toEqual(200);
-            const {clientId, clientSecret} = credsResponse.body;
+            // 2. Create a confidential client for the tenant
+            const decoded = app.jwtService().decode(adminToken.accessToken, {json: true}) as any;
+            const creds = await tokenFixture.createConfidentialClient(adminToken.accessToken, decoded.tenant.id);
 
             // 3. Get a client_credentials token (TechnicalToken — no roles, not a super admin)
-            const ccToken = await tokenFixture.fetchClientCredentialsToken(clientId, clientSecret);
+            const ccToken = await tokenFixture.fetchClientCredentialsToken(creds.clientId, creds.clientSecret);
             clientCredentialsAccessToken = ccToken.accessToken;
         });
 

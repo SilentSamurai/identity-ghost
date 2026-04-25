@@ -97,7 +97,7 @@ export class SubscriptionService {
     }> {
         // Find all userTenants that are subscribed to any of the ownedApps
         if (subscriberTenantHint) {
-            const resolvedTenant = await this.tenantService.findByClientIdOrDomain(permission, subscriberTenantHint);
+            const resolvedTenant = await this.tenantService.findByDomain(permission, subscriberTenantHint);
             if (await this.canLoginToTenant(resolvedTenant, appOwnerTenant)) {
                 return {resolvedTenant}
             }

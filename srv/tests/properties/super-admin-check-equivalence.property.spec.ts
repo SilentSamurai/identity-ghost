@@ -7,7 +7,7 @@ import {Environment} from '../../src/config/environment.service';
  * Feature: scope-model-refactoring, Property 5: Super-admin check equivalence
  *
  * For any TenantToken, isSuperAdmin shall return true if and only if
- * the token's roles array contains 'SUPER_ADMIN' AND the token's
+ * the token's role array contains 'SUPER_ADMIN' AND the token's
  * tenant.domain equals the configured super tenant domain.
  * For all other combinations, it shall return false.
  *
@@ -21,7 +21,7 @@ describe('Property 5: Super-admin check equivalence', () => {
 
     // SecurityService requires caslAbilityFactory and authUserService in the constructor,
     // but isSuperAdmin uses neither — safe to pass null for this pure-logic test.
-    const service = new SecurityService(mockEnv, null as any, null as any);
+    const service = new SecurityService(mockEnv, null as any, null as any, null as any);
 
     const allRoles = ['SUPER_ADMIN', 'TENANT_ADMIN', 'TENANT_VIEWER'];
     const roleSubsetArb = fc.subarray(allRoles);

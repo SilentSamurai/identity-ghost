@@ -40,7 +40,7 @@ export class HelperFixture {
     /**
      * Enables the password grant on a client identified by its UUID clientId.
      * Use this for seeded tenants whose client was created before the alias system,
-     * where the client_id used in token requests is the hex Tenant.clientId.
+     * where the client_id used in token requests is the Client entity's clientId (UUID).
      */
     async enablePasswordGrantByClientId(tenantId: string, clientUuid: string): Promise<void> {
         const adminClient = new AdminTenantClient(this.app, this.accessToken);

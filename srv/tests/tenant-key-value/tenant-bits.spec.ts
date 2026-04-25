@@ -10,14 +10,12 @@
  */
 import {SharedTestFixture} from '../shared-test.fixture';
 import {TenantClient} from '../api-client/tenant-client';
-import {AdminTenantClient} from '../api-client/admin-tenant-client';
 import {TokenFixture} from '../token.fixture';
 import {TenantBitsClient} from "../api-client/tenant-bits-client";
 
 describe('TenantBits API', () => {
     let app: SharedTestFixture;
     let tenantClient: TenantClient;
-    let adminTenantClient: AdminTenantClient;
     let bitsClient: TenantBitsClient;
     let accessToken: string;
     let tenantId: string;
@@ -37,7 +35,6 @@ describe('TenantBits API', () => {
             'auth.server.com'
         );
         tenantClient = new TenantClient(app, adminResponse.accessToken);
-        adminTenantClient = new AdminTenantClient(app, adminResponse.accessToken);
         // Create tenants as admin
         const tenant = await tenantClient.createTenant('bits-test-tenant', 'bits-test-tenant-domain');
         tenantId = tenant.id;
@@ -45,7 +42,7 @@ describe('TenantBits API', () => {
         tenantId2 = tenant2.id;
 
         // Use client credentials for bitsClient (tenant 1)
-        const tenant1Creds = await adminTenantClient.getTenantCredentials(tenantId);
+        const tenant1Creds = await tokenFixture.createConfidentialClient(adminResponse.accessToken, tenantId);
         const response1 = await tokenFixture.fetchClientCredentialsToken(
             tenant1Creds.clientId,
             tenant1Creds.clientSecret
@@ -54,7 +51,7 @@ describe('TenantBits API', () => {
         bitsClient = new TenantBitsClient(app, accessToken);
 
         // Use client credentials for bitsClient2 (tenant 2)
-        const tenant2Creds = await adminTenantClient.getTenantCredentials(tenantId2);
+        const tenant2Creds = await tokenFixture.createConfidentialClient(adminResponse.accessToken, tenantId2);
         const response2 = await tokenFixture.fetchClientCredentialsToken(
             tenant2Creds.clientId,
             tenant2Creds.clientSecret

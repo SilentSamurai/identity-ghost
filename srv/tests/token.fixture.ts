@@ -1,4 +1,5 @@
 import {expect2xx, TestFixture} from "./api-client/client";
+import {ClientEntityClient} from "./api-client/client-entity-client";
 
 export class TokenFixture {
 
@@ -6,6 +7,30 @@ export class TokenFixture {
 
     constructor(app: TestFixture) {
         this.app = app;
+    }
+
+    /**
+     * Create a confidential (non-public) client for a tenant with client_credentials grant.
+     * Returns the clientId and plaintext clientSecret needed for fetchClientCredentialsToken.
+     *
+     * The default tenant client is public and has no secret, so tests that need
+     * client_credentials tokens must create a confidential client first.
+     */
+    public async createConfidentialClient(
+        accessToken: string,
+        tenantId: string,
+        name: string = 'test-confidential-client',
+    ): Promise<{ clientId: string; clientSecret: string }> {
+        const clientEntityClient = new ClientEntityClient(this.app, accessToken);
+        const result = await clientEntityClient.createClient(tenantId, name, {
+            grantTypes: 'client_credentials',
+            allowedScopes: 'openid profile email',
+            isPublic: false,
+        });
+        return {
+            clientId: result.client.clientId,
+            clientSecret: result.clientSecret,
+        };
     }
 
     public async fetchAccessToken(username: string, password: string, client_id: string): Promise<{
@@ -27,7 +52,7 @@ export class TokenFixture {
 
         expect2xx(response);
 
-        expect(response.status).toEqual(201);
+        expect(response.status).toEqual(200);
         expect(response.body.access_token).toBeDefined();
         expect(response.body.expires_in).toBeDefined();
         expect(response.body.token_type).toEqual('Bearer');

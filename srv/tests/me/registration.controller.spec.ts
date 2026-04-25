@@ -7,6 +7,7 @@ import {Test, TestingModule} from "@nestjs/testing";
 import {AppModule} from "../../src/app.module";
 import {MailService} from "../../src/mail/mail.service";
 import {TenantService} from "../../src/services/tenant.service";
+import {ClientService} from "../../src/services/client.service";
 import {Environment} from "../../src/config/environment.service";
 import * as superTest from "supertest";
 import * as process from "node:process";
@@ -17,6 +18,7 @@ describe('RegistrationController', () => {
     let moduleRef: TestingModule;
     let mailService: MailService;
     let tenantService: TenantService;
+    let clientService: ClientService;
 
     setupConsole();
 
@@ -34,6 +36,7 @@ describe('RegistrationController', () => {
 
         mailService = app.get<MailService>(MailService);
         tenantService = app.get<TenantService>(TenantService);
+        clientService = app.get<ClientService>(ClientService);
     });
 
     afterEach(async () => {
@@ -84,8 +87,8 @@ describe('RegistrationController', () => {
     });
 
     it('should prevent signup when not allowed by tenant', async () => {
-        jest.spyOn(tenantService, 'findByClientIdOrDomain').mockResolvedValue({
-            allowSignUp: false
+        jest.spyOn(clientService, 'findByClientIdOrAlias').mockResolvedValue({
+            tenant: { allowSignUp: false }
         } as any);
 
         const response = await getHttpServer()

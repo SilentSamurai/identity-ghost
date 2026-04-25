@@ -2,7 +2,6 @@ import * as fc from 'fast-check';
 import {SharedTestFixture} from '../shared-test.fixture';
 import {TokenFixture} from '../token.fixture';
 import {TenantClient} from '../api-client/tenant-client';
-import {AdminTenantClient} from '../api-client/admin-tenant-client';
 
 /**
  * Feature: token-revocation, Property 7: Tenant isolation prevents cross-tenant revocation
@@ -22,8 +21,8 @@ describe('Property 7: Tenant isolation prevents cross-tenant revocation', () => 
     let tokenFixture: TokenFixture;
 
     // Default tenant credentials (for obtaining and refreshing tokens)
+    // Must match the client used by fetchAccessToken ('auth.server.com' alias → default public client)
     let tenantClientId: string;
-    let tenantClientSecret: string;
 
     // Cross-tenant Bearer token
     let crossTenantAccessToken: string;
@@ -38,12 +37,12 @@ describe('Property 7: Tenant isolation prevents cross-tenant revocation', () => 
             'auth.server.com',
         );
 
-        // Get tenant credentials for refresh grants
+        // Get the default client's clientId — this is the same client that fetchAccessToken
+        // binds the refresh token to (via the 'auth.server.com' alias).
         const creds = await fixture.getHttpServer()
             .get('/api/tenant/my/credentials')
             .set('Authorization', `Bearer ${adminResult.accessToken}`);
         tenantClientId = creds.body.clientId;
-        tenantClientSecret = creds.body.clientSecret;
 
         // Create a second tenant
         const tenantClient = new TenantClient(fixture, adminResult.accessToken);
@@ -53,9 +52,8 @@ describe('Property 7: Tenant isolation prevents cross-tenant revocation', () => 
             `iso-${suffix}.com`,
         );
 
-        // Get the cross-tenant's tenant-level credentials and obtain a Bearer token
-        const adminTenantClient = new AdminTenantClient(fixture, adminResult.accessToken);
-        const crossCreds = await adminTenantClient.getTenantCredentials(crossTenant.id);
+        // Get the cross-tenant's confidential client credentials and obtain a Bearer token
+        const crossCreds = await tokenFixture.createConfidentialClient(adminResult.accessToken, crossTenant.id);
         const crossTokenResult = await tokenFixture.fetchClientCredentialsToken(
             crossCreds.clientId,
             crossCreds.clientSecret,
@@ -91,18 +89,18 @@ describe('Property 7: Tenant isolation prevents cross-tenant revocation', () => 
                 expect(revokeResponse.status).toEqual(200);
                 expect(revokeResponse.body).toEqual({});
 
-                // Token should still be valid — not revoked
+                // Token should still be valid — not revoked.
+                // The default client is public, so no client_secret is needed (RFC 6749 §6).
                 const refreshResponse = await fixture.getHttpServer()
                     .post('/api/oauth/token')
                     .send({
                         grant_type: 'refresh_token',
                         refresh_token: result.refreshToken,
                         client_id: tenantClientId,
-                        client_secret: tenantClientSecret,
                     })
                     .set('Accept', 'application/json');
 
-                expect(refreshResponse.status).toEqual(201);
+                expect(refreshResponse.status).toEqual(200);
                 expect(refreshResponse.body.access_token).toBeDefined();
             }),
             {numRuns: 20},

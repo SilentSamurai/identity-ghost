@@ -2,7 +2,6 @@ import {SharedTestFixture} from '../shared-test.fixture';
 import {TokenFixture} from '../token.fixture';
 import {ClientEntityClient} from '../api-client/client-entity-client';
 import {TenantClient} from '../api-client/tenant-client';
-import {AdminTenantClient} from '../api-client/admin-tenant-client';
 
 /**
  * Integration tests for Resource Indicator Audience Claim Construction (RFC 8707).
@@ -68,7 +67,7 @@ describe('Resource Indicator Audience Claim Construction', () => {
                     })
                     .set('Accept', 'application/json');
 
-                expect(response.status).toEqual(201);
+                expect(response.status).toEqual(200);
 
                 const jwt = app.jwtService().decode(response.body.access_token, {json: true}) as any;
                 
@@ -107,7 +106,7 @@ describe('Resource Indicator Audience Claim Construction', () => {
                     })
                     .set('Accept', 'application/json');
 
-                expect(response.status).toEqual(201);
+                expect(response.status).toEqual(200);
 
                 const jwt = app.jwtService().decode(response.body.access_token, {json: true}) as any;
                 
@@ -147,7 +146,7 @@ describe('Resource Indicator Audience Claim Construction', () => {
                     })
                     .set('Accept', 'application/json');
 
-                expect(response.status).toEqual(201);
+                expect(response.status).toEqual(200);
 
                 const jwt = app.jwtService().decode(response.body.access_token, {json: true}) as any;
                 
@@ -177,7 +176,7 @@ describe('Resource Indicator Audience Claim Construction', () => {
                     })
                     .set('Accept', 'application/json');
 
-                expect(response.status).toEqual(201);
+                expect(response.status).toEqual(200);
 
                 const jwt = app.jwtService().decode(response.body.access_token, {json: true}) as any;
                 
@@ -217,7 +216,7 @@ describe('Resource Indicator Audience Claim Construction', () => {
                     })
                     .set('Accept', 'application/json');
 
-                expect(initialResponse.status).toEqual(201);
+                expect(initialResponse.status).toEqual(200);
                 const refreshToken = initialResponse.body.refresh_token;
 
                 // Verify initial token has correct aud
@@ -235,7 +234,7 @@ describe('Resource Indicator Audience Claim Construction', () => {
                     })
                     .set('Accept', 'application/json');
 
-                expect(refreshResponse.status).toEqual(201);
+                expect(refreshResponse.status).toEqual(200);
 
                 const refreshJwt = app.jwtService().decode(refreshResponse.body.access_token, {json: true}) as any;
                 
@@ -253,25 +252,30 @@ describe('Resource Indicator Audience Claim Construction', () => {
     // ─── Client Credentials with Resource ─────────────────────────────────
 
     describe('client credentials with resource', () => {
-        it('should return invalid_target for client_credentials with tenant-level credentials (Req 4.1, 4.2)', async () => {
-            // client_credentials grant uses Tenant.clientId/clientSecret (not Client entity credentials).
-            // Tenant-level credentials don't have a Client entity with allowedResources,
-            // so resource indicators are rejected for tenant-level client_credentials.
-            const adminTenantClient = new AdminTenantClient(app, accessToken);
-            const tenantCreds = await adminTenantClient.getTenantCredentials(testTenantId);
+        it('should return invalid_target for client_credentials when client has no allowedResources (Req 4.1, 4.2)', async () => {
+            // Create a confidential client without allowedResources
+            const noResourceClient = await clientApi.createClient(testTenantId, 'No Resource CC Client', {
+                allowedScopes: 'openid profile email',
+                grantTypes: 'client_credentials',
+                isPublic: false,
+            });
 
-            const response = await app.getHttpServer()
-                .post('/api/oauth/token')
-                .send({
-                    grant_type: 'client_credentials',
-                    client_id: tenantCreds.clientId,
-                    client_secret: tenantCreds.clientSecret,
-                    resource: VALID_RESOURCE,
-                })
-                .set('Accept', 'application/json');
+            try {
+                const response = await app.getHttpServer()
+                    .post('/api/oauth/token')
+                    .send({
+                        grant_type: 'client_credentials',
+                        client_id: noResourceClient.client.clientId,
+                        client_secret: noResourceClient.clientSecret,
+                        resource: VALID_RESOURCE,
+                    })
+                    .set('Accept', 'application/json');
 
-            expect(response.status).toEqual(400);
-            expect(response.body.error).toEqual('invalid_target');
+                expect(response.status).toEqual(400);
+                expect(response.body.error).toEqual('invalid_target');
+            } finally {
+                await clientApi.deleteClient(noResourceClient.client.clientId).catch(() => {});
+            }
         });
     });
 });

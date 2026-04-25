@@ -26,7 +26,7 @@ describe('Token Claims Compliance', () => {
             .set('Accept', 'application/json');
 
         expect2xx(response);
-        expect(response.status).toEqual(201);
+        expect(response.status).toEqual(200);
 
         const accessToken = response.body.access_token;
         const refreshToken = response.body.refresh_token;

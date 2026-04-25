@@ -62,9 +62,7 @@ import {ModalService} from '../../component/dialogs/modal.service';
                             </code>
                         </app-attribute>
                         <app-attribute label="Client Secret">
-                            <code>
-                                <pre class="text-wrap text-break">{{ credentials.clientSecret }}</pre>
-                            </code>
+                            <span class="text-muted">Secret is only shown at client creation time. Use the Clients tab to rotate secrets.</span>
                         </app-attribute>
                         <app-attribute label="Public Key">
                             <code>
@@ -250,7 +248,7 @@ export class TN02AComponent implements OnInit {
     loading = false;
     tenant_id = '';
     tenant: any = {};
-    credentials: any = {clientId: 'NA', clientSecret: 'NA', publicKey: 'NA'};
+    credentials: any = {clientId: 'NA', publicKey: 'NA'};
     memberDataModel: StaticSource<any>;
     rolesDataModel: StaticSource<any>;
     createdAppsDataModel: StaticSource<any>;

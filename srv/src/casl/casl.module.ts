@@ -1,4 +1,4 @@
-import {Module} from "@nestjs/common";
+import {forwardRef, Module} from "@nestjs/common";
 import {TypeOrmModule} from "@nestjs/typeorm";
 import {Role} from "../entity/role.entity";
 import {UserRole} from "../entity/user.roles.entity";
@@ -18,10 +18,12 @@ import {PolicyService} from "./policy.service";
 import {CacheService} from "./cache.service";
 import {ScopeResolverService} from "./scope-resolver.service";
 import {ResolvePermissionPipe} from "../auth/auth.decorator";
+import {CoreModule} from "../core/core.module";
 
 @Module({
     imports: [
         ConfigModule,
+        forwardRef(() => CoreModule),
         TypeOrmModule.forFeature([
             Tenant,
             User,

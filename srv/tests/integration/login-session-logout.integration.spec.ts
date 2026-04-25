@@ -62,7 +62,7 @@ describe('Login Session Logout', () => {
             })
             .set('Accept', 'application/json');
 
-        expect(response.status).toEqual(201);
+        expect(response.status).toEqual(200);
         expect(response.body.id_token).toBeDefined();
         expect(response.body.access_token).toBeDefined();
         expect(response.body.refresh_token).toBeDefined();
@@ -143,7 +143,7 @@ describe('Login Session Logout', () => {
             })
             .set('Accept', 'application/json');
 
-        expect(rotateResponse.status).toEqual(201);
+        expect(rotateResponse.status).toEqual(200);
         const rotatedRefreshToken = rotateResponse.body.refresh_token;
         expect(rotatedRefreshToken).toBeDefined();
 

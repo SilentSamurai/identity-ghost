@@ -6,6 +6,7 @@ import {Tenant} from '../entity/tenant.entity';
 import {Role} from '../entity/role.entity';
 import {App} from '../entity/app.entity';
 import {TechnicalTokenService} from '../core/technical-token.service';
+import {ClientService} from './client.service';
 
 const logger = new Logger("AppSubscriptionService");
 
@@ -33,6 +34,7 @@ export class AppSubscriptionService {
         @InjectRepository(App)
         private readonly appRepo: Repository<App>,
         private readonly technicalTokenService: TechnicalTokenService,
+        private readonly clientService: ClientService,
     ) {
     }
 
@@ -254,7 +256,8 @@ export class AppSubscriptionService {
         logger.log(`Making request to endpoint: ${endpoint}`);
         logger.log(`Request payload:`, {tenantId: tenant.id});
         // Get technical token (use app owner's tenant)
-        const token = await this.technicalTokenService.createTechnicalAccessToken(app.owner, []);
+        const ownerClient = await this.clientService.findByAlias(app.owner.domain);
+        const token = await this.technicalTokenService.createTechnicalAccessToken(ownerClient, []);
         logger.log(`Request headers:`, {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
@@ -317,7 +320,8 @@ export class AppSubscriptionService {
         logger.log(`Making request to endpoint: ${endpoint}`);
         logger.log(`Request payload:`, {tenantId: tenant.id});
         // Get technical token (use app owner's tenant)
-        const token = await this.technicalTokenService.createTechnicalAccessToken(app.owner, []);
+        const ownerClient = await this.clientService.findByAlias(app.owner.domain);
+        const token = await this.technicalTokenService.createTechnicalAccessToken(ownerClient, []);
         logger.log(`Request headers:`, {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`

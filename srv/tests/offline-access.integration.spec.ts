@@ -172,7 +172,7 @@ describe('Offline Access & Refresh Token Gating Integration Tests', () => {
                 scope: 'openid offline_access',
             });
 
-            expect(response.status).toEqual(201);
+            expect(response.status).toEqual(200);
             expect(response.body.access_token).toBeDefined();
             expect(response.body.refresh_token).toBeDefined();
             expect(response.body.token_type).toEqual('Bearer');
@@ -211,7 +211,7 @@ describe('Offline Access & Refresh Token Gating Integration Tests', () => {
                 scope: 'openid profile',
             });
 
-            expect(response.status).toEqual(201);
+            expect(response.status).toEqual(200);
             expect(response.body.access_token).toBeDefined();
             expect(response.body.token_type).toEqual('Bearer');
             expect(response.body.refresh_token).toBeUndefined();
@@ -248,7 +248,7 @@ describe('Offline Access & Refresh Token Gating Integration Tests', () => {
                 scope: 'openid profile',
             });
 
-            expect(response.status).toEqual(201);
+            expect(response.status).toEqual(200);
             expect(response.body.access_token).toBeDefined();
             expect(response.body.refresh_token).toBeDefined();
             expect(response.body.token_type).toEqual('Bearer');
@@ -287,7 +287,7 @@ describe('Offline Access & Refresh Token Gating Integration Tests', () => {
                 scope: 'openid offline_access',
             });
 
-            expect(response.status).toEqual(201);
+            expect(response.status).toEqual(200);
             expect(response.body.access_token).toBeDefined();
 
             // Decode the access token JWT
@@ -335,7 +335,7 @@ describe('Offline Access & Refresh Token Gating Integration Tests', () => {
                 scope: 'openid offline_access',
             });
 
-            expect(initialResponse.status).toEqual(201);
+            expect(initialResponse.status).toEqual(200);
             expect(initialResponse.body.refresh_token).toBeDefined();
             expect(initialResponse.body.scope).toContain('offline_access');
 
@@ -347,7 +347,7 @@ describe('Offline Access & Refresh Token Gating Integration Tests', () => {
                 refresh_token: refreshToken,
             });
 
-            expect(refreshResponse.status).toEqual(201);
+            expect(refreshResponse.status).toEqual(200);
             expect(refreshResponse.body.access_token).toBeDefined();
             expect(refreshResponse.body.refresh_token).toBeDefined();
 
@@ -360,13 +360,14 @@ describe('Offline Access & Refresh Token Gating Integration Tests', () => {
 
     describe('Req 1.3: client_credentials grant never includes refresh token', () => {
         it('should NOT issue refresh_token for client_credentials grant regardless of scope or client config', async () => {
-            // Get tenant-level credentials (hex clientId + clientSecret) for client_credentials grant
-            const credentials = await adminTenantApi.getTenantCredentials(testTenantId);
+            // Create a confidential client for client_credentials grant
+            const tokenFixture = new TokenFixture(app);
+            const credentials = await tokenFixture.createConfidentialClient(accessToken, testTenantId);
 
-            // Request token with client_credentials grant using tenant-level credentials
+            // Request token with client_credentials grant using confidential client credentials
             const response = await clientCredentialsGrantRequest(credentials.clientId, credentials.clientSecret);
 
-            expect(response.status).toEqual(201);
+            expect(response.status).toEqual(200);
             expect(response.body.access_token).toBeDefined();
             expect(response.body.token_type).toEqual('Bearer');
             // refresh_token should NOT be present for client_credentials
@@ -405,7 +406,7 @@ describe('Offline Access & Refresh Token Gating Integration Tests', () => {
                 scope: 'openid offline_access',
             });
 
-            expect(response.status).toEqual(201);
+            expect(response.status).toEqual(200);
             expect(response.body.access_token).toBeDefined();
 
             // The response scope should NOT contain offline_access (two-way intersection)

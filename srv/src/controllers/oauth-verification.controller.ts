@@ -18,6 +18,7 @@ import {Token} from "../casl/contexts";
 import {AuthUserService} from "../casl/authUser.service";
 import {OAuthException} from "../exceptions/oauth-exception";
 import {OAuthExceptionFilter} from "../exceptions/filter/oauth-exception.filter";
+import {ClientService} from "../services/client.service";
 
 @Controller("api/oauth")
 @UseFilters(OAuthExceptionFilter)
@@ -27,6 +28,7 @@ export class OAuthVerificationController {
         private readonly authService: AuthService,
         private readonly authCodeService: AuthCodeService,
         private readonly authUserService: AuthUserService,
+        private readonly clientService: ClientService,
     ) {
     }
 
@@ -39,14 +41,17 @@ export class OAuthVerificationController {
             throw OAuthException.invalidRequest("client_id is required");
         }
         const authCodeObj = await this.authCodeService.findByCode(body.auth_code);
-        let tenant = null;
-        if (await this.authUserService.tenantExistsByDomain(body.client_id)) {
-            tenant = await this.authUserService.findTenantByDomain(body.client_id);
-        } else if (await this.authUserService.tenantExistsByClientId(body.client_id)) {
-            tenant = await this.authUserService.findTenantByClientId(body.client_id);
-        } else {
+        
+        // Resolve Client entity via ClientService instead of AuthUserService
+        // Requirements: 2.4, 5.5
+        let client;
+        try {
+            client = await this.clientService.findByClientIdOrAlias(body.client_id);
+        } catch {
             throw OAuthException.invalidClient("Unknown client_id");
         }
+        
+        const tenant = client.tenant;
         if (authCodeObj.tenantId !== tenant.id) {
             throw OAuthException.invalidGrant("auth_code does not belong to the provided client_id");
         }
@@ -67,10 +72,14 @@ export class OAuthVerificationController {
             client_secret: string;
         },
     ): Promise<object> {
-        const tenant = await this.authService.validateClientCredentials(
+        // Validate client credentials and get the Client entity
+        // Requirements: 2.1, 2.4
+        const client = await this.authService.validateClientCredentials(
             body.client_id,
             body.client_secret,
         );
+        const tenant = client.tenant;
+        
         let securityContext: Token = await this.authService.validateAccessToken(body.access_token);
         if (securityContext.isTenantToken() || securityContext.asTenantToken().tenant.id !== tenant.id) {
             return securityContext;

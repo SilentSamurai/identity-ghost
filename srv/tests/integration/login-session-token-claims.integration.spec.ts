@@ -65,7 +65,7 @@ describe('Login Session Token Claims', () => {
             })
             .set('Accept', 'application/json');
 
-        expect(response.status).toEqual(201);
+        expect(response.status).toEqual(200);
         expect(response.body.id_token).toBeDefined();
 
         const decoded = app.jwtService().decode(response.body.id_token, {json: true}) as any;
@@ -92,7 +92,7 @@ describe('Login Session Token Claims', () => {
             })
             .set('Accept', 'application/json');
 
-        expect(passwordResponse.status).toEqual(201);
+        expect(passwordResponse.status).toEqual(200);
         expect(passwordResponse.body.id_token).toBeDefined();
         expect(passwordResponse.body.refresh_token).toBeDefined();
         expect(passwordResponse.body.access_token).toBeDefined();
@@ -102,7 +102,8 @@ describe('Login Session Token Claims', () => {
         expect(originalDecoded.auth_time).toBeDefined();
         expect(originalDecoded.sid).toBeDefined();
 
-        // Step 2: Get tenant credentials for the refresh request
+        // Step 2: Get tenant credentials for the refresh request.
+        // The default client is public — no client_secret needed (RFC 6749 §6).
         const credentialsResponse = await app.getHttpServer()
             .get('/api/tenant/my/credentials')
             .set('Authorization', `Bearer ${passwordResponse.body.access_token}`)
@@ -110,8 +111,6 @@ describe('Login Session Token Claims', () => {
 
         expect(credentialsResponse.status).toEqual(200);
         const clientId = credentialsResponse.body.clientId;
-        const clientSecret = credentialsResponse.body.clientSecret;
-        expect(clientSecret).toBeDefined();
 
         // Step 3: Refresh the token
         const refreshResponse = await app.getHttpServer()
@@ -120,11 +119,10 @@ describe('Login Session Token Claims', () => {
                 grant_type: 'refresh_token',
                 refresh_token: passwordResponse.body.refresh_token,
                 client_id: clientId,
-                client_secret: clientSecret,
             })
             .set('Accept', 'application/json');
 
-        expect(refreshResponse.status).toEqual(201);
+        expect(refreshResponse.status).toEqual(200);
         expect(refreshResponse.body.id_token).toBeDefined();
 
         // Step 4: Decode the refreshed ID token
@@ -146,7 +144,7 @@ describe('Login Session Token Claims', () => {
             })
             .set('Accept', 'application/json');
 
-        expect(response.status).toEqual(201);
+        expect(response.status).toEqual(200);
         expect(response.body.id_token).toBeDefined();
 
         const decoded = app.jwtService().decode(response.body.id_token, {json: true}) as any;
@@ -166,7 +164,7 @@ describe('Login Session Token Claims', () => {
             })
             .set('Accept', 'application/json');
 
-        expect(response.status).toEqual(201);
+        expect(response.status).toEqual(200);
         expect(response.body.id_token).toBeDefined();
 
         const decoded = app.jwtService().decode(response.body.id_token, {json: true}) as any;
@@ -209,7 +207,7 @@ describe('Login Session Token Claims', () => {
             })
             .set('Accept', 'application/json');
 
-        expect(tokenResponse.status).toEqual(201);
+        expect(tokenResponse.status).toEqual(200);
         expect(tokenResponse.body.id_token).toBeDefined();
 
         const decoded = app.jwtService().decode(tokenResponse.body.id_token, {json: true}) as any;
@@ -257,7 +255,7 @@ describe('Login Session Token Claims', () => {
             })
             .set('Accept', 'application/json');
 
-        expect(tokenResponse.status).toEqual(201);
+        expect(tokenResponse.status).toEqual(200);
         expect(tokenResponse.body.id_token).toBeDefined();
 
         const decoded = app.jwtService().decode(tokenResponse.body.id_token, {json: true}) as any;

@@ -71,7 +71,7 @@ describe('Refresh Token Scope Down-Scoping', () => {
 
         const response = await refreshGrant(refreshToken, clientId, clientSecret);
 
-        expect(response.status).toEqual(201);
+        expect(response.status).toEqual(200);
         expect(response.body.scope).toBeDefined();
         // Default scopes should be present (openid profile email)
         const scopes = response.body.scope.split(' ');
@@ -84,7 +84,7 @@ describe('Refresh Token Scope Down-Scoping', () => {
         // Request only 'openid' — a subset of the default 'openid profile email'
         const response = await refreshGrant(refreshToken, clientId, clientSecret, 'openid');
 
-        expect(response.status).toEqual(201);
+        expect(response.status).toEqual(200);
         expect(response.body.scope).toBeDefined();
         expect(response.body.scope).toEqual('openid');
     });
@@ -94,7 +94,7 @@ describe('Refresh Token Scope Down-Scoping', () => {
 
         const response = await refreshGrant(refreshToken, clientId, clientSecret, 'openid email');
 
-        expect(response.status).toEqual(201);
+        expect(response.status).toEqual(200);
         expect(response.body.scope).toBeDefined();
         const grantedScopes = response.body.scope.split(' ').sort();
         expect(grantedScopes).toEqual(['email', 'openid']);
@@ -134,14 +134,14 @@ describe('Refresh Token Scope Down-Scoping', () => {
 
         // First refresh: narrow to 'openid'
         const firstRefresh = await refreshGrant(refreshToken, clientId, clientSecret, 'openid');
-        expect(firstRefresh.status).toEqual(201);
+        expect(firstRefresh.status).toEqual(200);
         expect(firstRefresh.body.scope).toEqual('openid');
 
         const narrowedToken = firstRefresh.body.refresh_token;
 
         // Second refresh: omit scope — should use the narrowed scope from the record
         const secondRefresh = await refreshGrant(narrowedToken, clientId, clientSecret);
-        expect(secondRefresh.status).toEqual(201);
+        expect(secondRefresh.status).toEqual(200);
         expect(secondRefresh.body.scope).toEqual('openid');
     });
 
@@ -150,7 +150,7 @@ describe('Refresh Token Scope Down-Scoping', () => {
 
         // First refresh: narrow to 'openid'
         const firstRefresh = await refreshGrant(refreshToken, clientId, clientSecret, 'openid');
-        expect(firstRefresh.status).toEqual(201);
+        expect(firstRefresh.status).toEqual(200);
         const narrowedToken = firstRefresh.body.refresh_token;
 
         // Second refresh: try to broaden back to 'openid profile'

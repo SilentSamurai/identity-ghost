@@ -70,7 +70,7 @@ describe('Refresh Token Rotation', () => {
     it('returns a new refresh token different from the old one', async () => {
         const response = await refreshGrant(initialRefreshToken);
 
-        expect(response.status).toEqual(201);
+        expect(response.status).toEqual(200);
         expect(response.body.refresh_token).toBeDefined();
         expect(response.body.refresh_token).not.toEqual(initialRefreshToken);
     });
@@ -93,7 +93,7 @@ describe('Refresh Token Rotation', () => {
             creds.body.clientSecret,
         );
 
-        expect(response.status).toEqual(201);
+        expect(response.status).toEqual(200);
         expect(response.body.access_token).toBeDefined();
         expect(response.body.token_type).toEqual('Bearer');
         expect(response.body.expires_in).toBeDefined();
@@ -119,7 +119,7 @@ describe('Refresh Token Rotation', () => {
             creds.body.clientId,
             creds.body.clientSecret,
         );
-        expect(firstRefresh.status).toEqual(201);
+        expect(firstRefresh.status).toEqual(200);
 
         // Second refresh with the same old token — should fail (token was consumed)
         const secondRefresh = await refreshGrant(
@@ -149,7 +149,7 @@ describe('Refresh Token Rotation', () => {
             creds.body.clientId,
             creds.body.clientSecret,
         );
-        expect(rotationB.status).toEqual(201);
+        expect(rotationB.status).toEqual(200);
         const tokenB = rotationB.body.refresh_token;
 
         // Rotate B → C
@@ -158,7 +158,7 @@ describe('Refresh Token Rotation', () => {
             creds.body.clientId,
             creds.body.clientSecret,
         );
-        expect(rotationC.status).toEqual(201);
+        expect(rotationC.status).toEqual(200);
         const tokenC = rotationC.body.refresh_token;
 
         // All three tokens should be distinct
@@ -184,7 +184,7 @@ describe('Refresh Token Rotation', () => {
             creds.body.clientSecret,
         );
 
-        expect(response.status).toEqual(201);
+        expect(response.status).toEqual(200);
         expect(response.body.scope).toBeDefined();
         expect(typeof response.body.scope).toBe('string');
         expect(response.body.scope.length).toBeGreaterThan(0);

@@ -2,7 +2,6 @@ import {SharedTestFixture} from '../shared-test.fixture';
 import {TokenFixture} from '../token.fixture';
 import {ClientEntityClient} from '../api-client/client-entity-client';
 import {TenantClient} from '../api-client/tenant-client';
-import {AdminTenantClient} from '../api-client/admin-tenant-client';
 
 /**
  * Integration tests for Resource Indicator Validation (RFC 8707).
@@ -242,7 +241,7 @@ describe('Resource Indicator Validation', () => {
                     })
                     .set('Accept', 'application/json');
 
-                expect(response.status).toEqual(201);
+                expect(response.status).toEqual(200);
                 expect(response.body.access_token).toBeDefined();
 
                 const jwt = app.jwtService().decode(response.body.access_token, {json: true}) as any;
@@ -292,34 +291,32 @@ describe('Resource Indicator Validation', () => {
                 allowedScopes: 'openid profile email',
                 isPublic: false,
                 allowedResources: [VALID_RESOURCE],
+                grantTypes: 'client_credentials',
             });
             const clientId = client.client.clientId;
             const clientSecret = client.clientSecret;
 
             try {
-                // client_credentials grant uses Tenant.clientId/clientSecret, not Client.clientId.
-                // Get the tenant credentials to authenticate.
-                const adminTenantClient = new AdminTenantClient(app, accessToken);
-                const tenantCreds = await adminTenantClient.getTenantCredentials(testTenantId);
-
                 const response = await app.getHttpServer()
                     .post('/api/oauth/token')
                     .send({
                         grant_type: 'client_credentials',
-                        client_id: tenantCreds.clientId,
-                        client_secret: tenantCreds.clientSecret,
+                        client_id: clientId,
+                        client_secret: clientSecret,
                         resource: VALID_RESOURCE,
                     })
                     .set('Accept', 'application/json');
 
-                // client_credentials with tenant-level credentials won't have a Client entity
-                // with allowedResources, so this should return invalid_target.
-                // The resource indicator for client_credentials requires a Client entity.
-                // Since the existing architecture uses Tenant credentials for client_credentials,
-                // resource indicators are not supported for tenant-level client_credentials.
-                // Test that the error is properly returned.
-                expect(response.status).toEqual(400);
-                expect(response.body.error).toEqual('invalid_target');
+                // client_credentials with a Client entity that has allowedResources
+                // should succeed and include the resource in the aud claim.
+                expect(response.status).toEqual(200);
+                expect(response.body.access_token).toBeDefined();
+
+                const jwt = app.jwtService().decode(response.body.access_token, {json: true}) as any;
+                expect(jwt.aud).toBeDefined();
+                expect(Array.isArray(jwt.aud)).toBe(true);
+                expect(jwt.aud).toContain(VALID_RESOURCE);
+                expect(jwt.aud).toContain('auth.server.com');
             } finally {
                 await clientApi.deleteClient(clientId).catch(() => {});
             }

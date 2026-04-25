@@ -2,8 +2,8 @@ import {createPublicKey} from "crypto";
 import * as jwt from "jsonwebtoken";
 import {SharedTestFixture} from "./shared-test.fixture";
 import {TokenFixture} from "./token.fixture";
-import {AdminTenantClient} from "./api-client/admin-tenant-client";
 import {expect2xx} from "./api-client/client";
+import {ClientEntityClient} from "./api-client/client-entity-client";
 
 /**
  * Integration tests for multi-tenant token isolation.
@@ -26,7 +26,6 @@ describe('Tenant isolation', () => {
     let app: SharedTestFixture;
     let adminAccessToken: string;
     let tokenFixture: TokenFixture;
-    let adminTenantClient: AdminTenantClient;
 
     // Tenant A
     let tenantA: { id: string; domain: string; clientId: string; clientSecret: string };
@@ -44,7 +43,6 @@ describe('Tenant isolation', () => {
             "auth.server.com",
         );
         adminAccessToken = response.accessToken;
-        adminTenantClient = new AdminTenantClient(app, adminAccessToken);
 
         // Create two isolated test tenants with unique timestamped domains
         const ts = Date.now().toString(36);
@@ -65,21 +63,31 @@ describe('Tenant isolation', () => {
             .set('Accept', 'application/json');
         expect2xx(resB);
 
-        // Fetch credentials for both tenants
-        const credsA = await adminTenantClient.getTenantCredentials(resA.body.id);
-        const credsB = await adminTenantClient.getTenantCredentials(resB.body.id);
+        // Create confidential clients with client_credentials grant for both tenants
+        const clientEntityClient = new ClientEntityClient(app, adminAccessToken);
+
+        const clientA = await clientEntityClient.createClient(resA.body.id, 'isolation-client-a', {
+            grantTypes: 'client_credentials',
+            allowedScopes: 'openid profile email',
+            isPublic: false,
+        });
+        const clientB = await clientEntityClient.createClient(resB.body.id, 'isolation-client-b', {
+            grantTypes: 'client_credentials',
+            allowedScopes: 'openid profile email',
+            isPublic: false,
+        });
 
         tenantA = {
             id: resA.body.id,
             domain: domainA,
-            clientId: credsA.clientId,
-            clientSecret: credsA.clientSecret,
+            clientId: clientA.client.clientId,
+            clientSecret: clientA.clientSecret,
         };
         tenantB = {
             id: resB.body.id,
             domain: domainB,
-            clientId: credsB.clientId,
-            clientSecret: credsB.clientSecret,
+            clientId: clientB.client.clientId,
+            clientSecret: clientB.clientSecret,
         };
     });
 

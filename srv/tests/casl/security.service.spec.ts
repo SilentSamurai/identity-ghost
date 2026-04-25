@@ -3,6 +3,7 @@ import {SecurityService} from '../../src/casl/security.service';
 import {Environment} from '../../src/config/environment.service';
 import {AuthUserService} from '../../src/casl/authUser.service';
 import {CaslAbilityFactory} from '../../src/casl/casl-ability.factory';
+import {ClientService} from '../../src/services/client.service';
 import {AuthContext, GRANT_TYPES, TechnicalToken, TenantToken} from '../../src/casl/contexts';
 import {ForbiddenException, UnauthorizedException} from '@nestjs/common';
 import {RoleEnum} from '../../src/entity/roleEnum';
@@ -104,6 +105,12 @@ describe('SecurityService', () => {
                     useValue: {
                         createForSecurityContext: jest.fn(),
                         createContextForUserAuth: jest.fn(),
+                    },
+                },
+                {
+                    provide: ClientService,
+                    useValue: {
+                        findByAlias: jest.fn(),
                     },
                 },
             ],
@@ -382,11 +389,13 @@ describe('SecurityService', () => {
             };
             const mockRoles = [{name: RoleEnum.TENANT_ADMIN}];
             const mockAbilities = createMockAbility();
+            const mockClient = {clientId: 'default-client-id'};
 
             jest.spyOn(authUserService, 'findUserByEmail').mockResolvedValue(mockUser as any);
             jest.spyOn(authUserService, 'findTenantByDomain').mockResolvedValue(mockTenant as any);
             jest.spyOn(authUserService, 'findMemberRoles').mockResolvedValue(mockRoles as any);
             jest.spyOn(caslAbilityFactory, 'createForSecurityContext').mockReturnValue(mockAbilities);
+            (service as any).clientService.findByAlias.mockResolvedValue(mockClient);
 
             const result = await service.getUserTenantAuthContext('test@example.com', 'test.com');
 

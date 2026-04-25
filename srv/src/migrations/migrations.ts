@@ -21,6 +21,7 @@ import {CreateUserConsentsTable1757000000000} from "./1757000000000-CreateUserCo
 import {AddAliasToClients1758000000000} from "./1758000000000-AddAliasToClients";
 import {AddRequireAuthTimeToAuthCode1759000000000} from "./1759000000000-AddRequireAuthTimeToAuthCode";
 import {AddResourceIndicatorSupport1760000000000} from "./1760000000000-AddResourceIndicatorSupport";
+import {RemoveTenantCredentialColumns1762000000000} from "./1762000000000-RemoveTenantCredentialColumns";
 
 export const migrations = [
     CreateInitialTables1681147242561,
@@ -45,5 +46,6 @@ export const migrations = [
     CreateUserConsentsTable1757000000000,
     AddAliasToClients1758000000000,
     AddRequireAuthTimeToAuthCode1759000000000,
-    AddResourceIndicatorSupport1760000000000
+    AddResourceIndicatorSupport1760000000000,
+    RemoveTenantCredentialColumns1762000000000
 ];

@@ -3,6 +3,8 @@ import * as jwt from "jsonwebtoken";
 import {SharedTestFixture} from "./shared-test.fixture";
 import {TokenFixture} from "./token.fixture";
 import {AdminTenantClient} from "./api-client/admin-tenant-client";
+import {TenantClient} from "./api-client/tenant-client";
+import {ClientEntityClient} from "./api-client/client-entity-client";
 import {expect2xx} from "./api-client/client";
 
 /**
@@ -19,6 +21,9 @@ describe('Token kid integration', () => {
     let tokenFixture: TokenFixture;
     let adminTenantClient: AdminTenantClient;
 
+    let tenantClient: TenantClient;
+    let clientEntityClient: ClientEntityClient;
+
     beforeAll(async () => {
         app = new SharedTestFixture();
         tokenFixture = new TokenFixture(app);
@@ -30,38 +35,28 @@ describe('Token kid integration', () => {
         );
         adminAccessToken = response.accessToken;
         adminTenantClient = new AdminTenantClient(app, adminAccessToken);
+        tenantClient = new TenantClient(app, adminAccessToken);
+        clientEntityClient = new ClientEntityClient(app, adminAccessToken);
     });
 
     afterAll(async () => {
         await app.close();
     });
 
-    /** Helper: create a tenant with a unique domain */
-    async function createTenant(suffix: string): Promise<{ id: string; domain: string; clientId: string }> {
+    /** Helper: create a tenant with a confidential client for client_credentials */
+    async function createTenantWithClient(suffix: string): Promise<{ id: string; domain: string; clientId: string; clientSecret: string }> {
         const ts = Date.now().toString(36);
         const domain = `tkid-${suffix}-${ts}.com`;
         const name = `tkid-${suffix}`.substring(0, 20);
 
-        // Retry on SQLite transient errors (concurrent writes)
-        for (let attempt = 0; attempt < 3; attempt++) {
-            const res = await app.getHttpServer()
-                .post('/api/tenant/create')
-                .send({name, domain})
-                .set('Authorization', `Bearer ${adminAccessToken}`)
-                .set('Accept', 'application/json');
-            if (res.status >= 200 && res.status < 300) {
-                return {id: res.body.id, domain, clientId: res.body.clientId};
-            }
-            if (attempt < 2) {
-                await new Promise(r => setTimeout(r, 500));
-            } else {
-                expect2xx(res);
-            }
-        }
-        throw new Error('unreachable');
-    }
-
-    /** Helper: fetch JWKS for a tenant domain */
+        const tenant = await tenantClient.createTenant(name, domain);
+        const result = await clientEntityClient.createClient(tenant.id, 'cc-test-client', {
+            grantTypes: 'client_credentials',
+            allowedScopes: 'openid profile email',
+            isPublic: false,
+        });
+        return {id: tenant.id, domain, clientId: result.client.clientId, clientSecret: result.clientSecret};
+    }    /** Helper: fetch JWKS for a tenant domain */
     async function fetchJwks(domain: string): Promise<{ keys: any[] }> {
         const res = await app.getHttpServer()
             .get(`/${domain}/.well-known/jwks.json`);
@@ -98,16 +93,15 @@ describe('Token kid integration', () => {
     // ─── Property 4: All signed JWTs include kid and alg: RS256 in JOSE header ───
 
     it('should include kid (non-empty string) and alg RS256 in access token header', async () => {
-        const tenant = await createTenant('p4');
-        const creds = await adminTenantClient.getTenantCredentials(tenant.id);
+        const tenant = await createTenantWithClient('p4');
 
         // Client credentials token (technical token) — simplest way to get a signed JWT
         const ccRes = await app.getHttpServer()
             .post('/api/oauth/token')
             .send({
                 grant_type: 'client_credentials',
-                client_id: creds.clientId,
-                client_secret: creds.clientSecret,
+                client_id: tenant.clientId,
+                client_secret: tenant.clientSecret,
             })
             .set('Accept', 'application/json');
         expect2xx(ccRes);
@@ -151,16 +145,15 @@ describe('Token kid integration', () => {
     // ─── Property 5: JWT kid matches exactly one kid in JWKS keys array ───
 
     it('should have JWT kid matching exactly one kid in the JWKS keys array', async () => {
-        const tenant = await createTenant('p5-match');
-        const creds = await adminTenantClient.getTenantCredentials(tenant.id);
+        const tenant = await createTenantWithClient('p5-match');
 
         // Get a client_credentials token
         const ccRes = await app.getHttpServer()
             .post('/api/oauth/token')
             .send({
                 grant_type: 'client_credentials',
-                client_id: creds.clientId,
-                client_secret: creds.clientSecret,
+                client_id: tenant.clientId,
+                client_secret: tenant.clientSecret,
             })
             .set('Accept', 'application/json');
         expect2xx(ccRes);
@@ -176,16 +169,15 @@ describe('Token kid integration', () => {
     // ─── Property 5: JWT can be verified using the matching JWK public key from JWKS ───
 
     it('should verify JWT using the matching JWK public key from JWKS', async () => {
-        const tenant = await createTenant('p5-verify');
-        const creds = await adminTenantClient.getTenantCredentials(tenant.id);
+        const tenant = await createTenantWithClient('p5-verify');
 
         // Get a client_credentials token
         const ccRes = await app.getHttpServer()
             .post('/api/oauth/token')
             .send({
                 grant_type: 'client_credentials',
-                client_id: creds.clientId,
-                client_secret: creds.clientSecret,
+                client_id: tenant.clientId,
+                client_secret: tenant.clientSecret,
             })
             .set('Accept', 'application/json');
         expect2xx(ccRes);
@@ -207,16 +199,15 @@ describe('Token kid integration', () => {
     // ─── Property 10: Token signed with previous (non-current but active) key can still be verified ───
 
     it('should still verify a token signed with a previous key after rotation', async () => {
-        const tenant = await createTenant('p10-prev');
-        const creds = await adminTenantClient.getTenantCredentials(tenant.id);
+        const tenant = await createTenantWithClient('p10-prev');
 
         // Get a token signed with key v1
         const ccRes = await app.getHttpServer()
             .post('/api/oauth/token')
             .send({
                 grant_type: 'client_credentials',
-                client_id: creds.clientId,
-                client_secret: creds.clientSecret,
+                client_id: tenant.clientId,
+                client_secret: tenant.clientSecret,
             })
             .set('Accept', 'application/json');
         expect2xx(ccRes);
@@ -240,16 +231,15 @@ describe('Token kid integration', () => {
     // ─── Property 10: Token verification fails when kid points to a deactivated key ───
 
     it('should fail verification when kid points to a deactivated key', async () => {
-        const tenant = await createTenant('p10-deact');
-        const creds = await adminTenantClient.getTenantCredentials(tenant.id);
+        const tenant = await createTenantWithClient('p10-deact');
 
         // Get a token signed with key v1
         const ccRes = await app.getHttpServer()
             .post('/api/oauth/token')
             .send({
                 grant_type: 'client_credentials',
-                client_id: creds.clientId,
-                client_secret: creds.clientSecret,
+                client_id: tenant.clientId,
+                client_secret: tenant.clientSecret,
             })
             .set('Accept', 'application/json');
         expect2xx(ccRes);
@@ -268,14 +258,12 @@ describe('Token kid integration', () => {
         expect(kidsInJwks).not.toContain(oldTokenHeader.kid);
 
         // Attempting to validate the old token via the API should fail
-        // We need the tenant's client credentials to call verify
-        const updatedCreds = await adminTenantClient.getTenantCredentials(tenant.id);
         const verifyRes = await app.getHttpServer()
             .post('/api/oauth/verify')
             .send({
                 access_token: oldToken,
-                client_id: updatedCreds.clientId,
-                client_secret: updatedCreds.clientSecret,
+                client_id: tenant.clientId,
+                client_secret: tenant.clientSecret,
             })
             .set('Accept', 'application/json');
 

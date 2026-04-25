@@ -17,12 +17,35 @@ describe('Token Response RFC 6749 Compliance', () => {
 
     // Shared state across sequential tests
     let refreshToken: string;
+    // Default public client UUID — for refresh grants (matches the client that issued the token)
+    let defaultClientId: string;
+    // Confidential client — for client_credentials and verify flows
     let clientId: string;
     let clientSecret: string;
 
     beforeAll(async () => {
         app = new SharedTestFixture();
         tokenFixture = new TokenFixture(app);
+
+        // Create a confidential client upfront for client_credentials tests
+        const tokenResult = await tokenFixture.fetchAccessToken(
+            "admin@auth.server.com",
+            "admin9000",
+            "auth.server.com",
+        );
+        refreshToken = tokenResult.refreshToken;
+
+        // Get the default public client's UUID for refresh grants
+        const creds = await app.getHttpServer()
+            .get('/api/tenant/my/credentials')
+            .set('Authorization', `Bearer ${tokenResult.accessToken}`)
+            .set('Accept', 'application/json');
+        defaultClientId = creds.body.clientId;
+
+        const decoded = app.jwtService().decode(tokenResult.accessToken, {json: true}) as any;
+        const confCreds = await tokenFixture.createConfidentialClient(tokenResult.accessToken, decoded.tenant.id);
+        clientId = confCreds.clientId;
+        clientSecret = confCreds.clientSecret;
     });
 
     afterAll(async () => {
@@ -94,27 +117,6 @@ describe('Token Response RFC 6749 Compliance', () => {
         });
     });
 
-    // ── Fetch client credentials for subsequent tests ───────────────
-
-    describe('setup: fetch client credentials', () => {
-        it('should retrieve tenant credentials', async () => {
-            // Get an access token first
-            const tokenResult = await tokenFixture.fetchAccessToken(
-                "admin@auth.server.com",
-                "admin9000",
-                "auth.server.com",
-            );
-
-            const creds = await app.getHttpServer()
-                .get("/api/tenant/my/credentials")
-                .set('Authorization', `Bearer ${tokenResult.accessToken}`);
-
-            expect(creds.status).toEqual(200);
-            clientId = creds.body.clientId;
-            clientSecret = creds.body.clientSecret;
-        });
-    });
-
     // ── Client Credentials Grant ────────────────────────────────────
 
     describe('client_credentials grant', () => {
@@ -175,8 +177,7 @@ describe('Token Response RFC 6749 Compliance', () => {
                 .send({
                     grant_type: "refresh_token",
                     refresh_token: refreshToken,
-                    client_id: clientId,
-                    client_secret: clientSecret,
+                    client_id: defaultClientId,
                 })
                 .set('Accept', 'application/json');
 

@@ -171,7 +171,7 @@ describe('Password Grant Deprecation Integration Tests', () => {
                     client_id: clientId,
                 });
 
-                expect(response.status).toEqual(201);
+                expect(response.status).toEqual(200);
                 expect(response.body.access_token).toBeDefined();
                 expect(response.body.token_type).toEqual('Bearer');
                 expect(response.body.refresh_token).toBeDefined();
@@ -198,7 +198,7 @@ describe('Password Grant Deprecation Integration Tests', () => {
                 client_id: testTenantDomain,
             });
 
-            expect(response.status).toEqual(201);
+            expect(response.status).toEqual(200);
             expect(response.body.access_token).toBeDefined();
             expect(response.body.token_type).toEqual('Bearer');
             expect(response.body.refresh_token).toBeDefined();
@@ -209,7 +209,7 @@ describe('Password Grant Deprecation Integration Tests', () => {
             const aliasResponse = await passwordGrantRequest({
                 client_id: testTenantDomain,
             });
-            expect(aliasResponse.status).toEqual(201);
+            expect(aliasResponse.status).toEqual(200);
 
             // Get the default client's UUID
             const tenantClients = await adminTenantApi.getTenantClients(testTenantId);
@@ -220,7 +220,7 @@ describe('Password Grant Deprecation Integration Tests', () => {
             const uuidResponse = await passwordGrantRequest({
                 client_id: defaultClient.clientId,
             });
-            expect(uuidResponse.status).toEqual(201);
+            expect(uuidResponse.status).toEqual(200);
 
             // Both should return valid tokens with same structure
             const aliasDecoded = app.jwtService().decode(aliasResponse.body.access_token, {json: true}) as any;
@@ -523,7 +523,7 @@ describe('Password Grant Deprecation Integration Tests', () => {
                 client_id: testTenantDomain,
             });
 
-            expect(passwordResponse.status).toEqual(201);
+            expect(passwordResponse.status).toEqual(200);
             expect(passwordResponse.body.refresh_token).toBeDefined();
             const refreshToken = passwordResponse.body.refresh_token;
 
@@ -533,7 +533,7 @@ describe('Password Grant Deprecation Integration Tests', () => {
                 refresh_token: refreshToken,
             });
 
-            expect(refreshResponse.status).toEqual(201);
+            expect(refreshResponse.status).toEqual(200);
             expect(refreshResponse.body.access_token).toBeDefined();
             expect(refreshResponse.body.refresh_token).toBeDefined();
             expect(refreshResponse.body.token_type).toEqual('Bearer');
@@ -545,7 +545,7 @@ describe('Password Grant Deprecation Integration Tests', () => {
                 client_id: testTenantDomain,
             });
 
-            expect(passwordResponse.status).toEqual(201);
+            expect(passwordResponse.status).toEqual(200);
             const refreshToken = passwordResponse.body.refresh_token;
 
             // Get the default client's UUID
@@ -559,7 +559,7 @@ describe('Password Grant Deprecation Integration Tests', () => {
                 refresh_token: refreshToken,
             });
 
-            expect(refreshResponse.status).toEqual(201);
+            expect(refreshResponse.status).toEqual(200);
             expect(refreshResponse.body.access_token).toBeDefined();
         });
 
@@ -574,7 +574,7 @@ describe('Password Grant Deprecation Integration Tests', () => {
                 client_id: defaultClient.clientId,
             });
 
-            expect(passwordResponse.status).toEqual(201);
+            expect(passwordResponse.status).toEqual(200);
             const refreshToken = passwordResponse.body.refresh_token;
 
             // Step 2: Use the refresh token with the alias
@@ -583,7 +583,7 @@ describe('Password Grant Deprecation Integration Tests', () => {
                 refresh_token: refreshToken,
             });
 
-            expect(refreshResponse.status).toEqual(201);
+            expect(refreshResponse.status).toEqual(200);
             expect(refreshResponse.body.access_token).toBeDefined();
         });
     });

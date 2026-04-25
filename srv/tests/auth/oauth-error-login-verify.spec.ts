@@ -111,12 +111,9 @@ describe('OAuth login, verify, and exchange endpoint error response format (RFC 
                 'admin9000',
                 'auth.server.com',
             );
-            const creds = await app.getHttpServer()
-                .get('/api/tenant/my/credentials')
-                .set('Authorization', `Bearer ${tokenResult.accessToken}`);
-
-            expect(creds.status).toEqual(200);
-            clientId = creds.body.clientId;
+            const decoded = app.jwtService().decode(tokenResult.accessToken, {json: true}) as any;
+            const creds = await tokenFixture.createConfidentialClient(tokenResult.accessToken, decoded.tenant.id);
+            clientId = creds.clientId;
         });
 
         it('returns 401 with error=invalid_client and RFC body shape', async () => {
@@ -147,13 +144,10 @@ describe('OAuth login, verify, and exchange endpoint error response format (RFC 
                 'admin9000',
                 'auth.server.com',
             );
-            const creds = await app.getHttpServer()
-                .get('/api/tenant/my/credentials')
-                .set('Authorization', `Bearer ${tokenResult.accessToken}`);
-
-            expect(creds.status).toEqual(200);
-            clientId = creds.body.clientId;
-            clientSecret = creds.body.clientSecret;
+            const decoded = app.jwtService().decode(tokenResult.accessToken, {json: true}) as any;
+            const creds = await tokenFixture.createConfidentialClient(tokenResult.accessToken, decoded.tenant.id);
+            clientId = creds.clientId;
+            clientSecret = creds.clientSecret;
         });
 
         it('returns 401 with error=invalid_token and RFC body shape', async () => {
@@ -182,19 +176,16 @@ describe('OAuth login, verify, and exchange endpoint error response format (RFC 
         let clientCredentialsAccessToken: string;
 
         beforeAll(async () => {
-            // First get a password-grant token to fetch tenant credentials
+            // First get a password-grant token to create a confidential client
             const tokenResult = await tokenFixture.fetchAccessToken(
                 'admin@auth.server.com',
                 'admin9000',
                 'auth.server.com',
             );
-            const creds = await app.getHttpServer()
-                .get('/api/tenant/my/credentials')
-                .set('Authorization', `Bearer ${tokenResult.accessToken}`);
-
-            expect(creds.status).toEqual(200);
-            clientId = creds.body.clientId;
-            clientSecret = creds.body.clientSecret;
+            const decoded = app.jwtService().decode(tokenResult.accessToken, {json: true}) as any;
+            const creds = await tokenFixture.createConfidentialClient(tokenResult.accessToken, decoded.tenant.id);
+            clientId = creds.clientId;
+            clientSecret = creds.clientSecret;
 
             // Now get a client_credentials token (grant_type=client_credentials, not password)
             const ccToken = await tokenFixture.fetchClientCredentialsToken(clientId, clientSecret);

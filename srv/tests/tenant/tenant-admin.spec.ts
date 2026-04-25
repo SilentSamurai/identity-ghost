@@ -55,13 +55,11 @@ describe('e2e tenant admin', () => {
         const details = await adminClient.getTenantDetails(tenant.id);
         expect(details.name).toEqual("tenant-1");
         expect(details.domain).toEqual("test-wesite.com");
-        expect(details.clientId).toBeDefined();
     });
 
     it('should read tenant credentials', async () => {
         const credentials = await adminClient.getTenantCredentials(tenant.id);
         expect(credentials.clientId).toBeDefined();
-        expect(credentials.clientSecret).toBeDefined();
         expect(credentials.publicKey).toBeDefined();
     });
 
@@ -81,7 +79,6 @@ describe('e2e tenant admin', () => {
 
     it('should update tenant', async () => {
         const updated = await adminClient.updateTenant(tenant.id, "updated-tenant-1");
-        expect(updated.clientId).toEqual(tenant.clientId);
         expect(updated.name).toEqual("updated-tenant-1");
         expect(updated.domain).toEqual("test-wesite.com");
     });

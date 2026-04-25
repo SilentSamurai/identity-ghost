@@ -17,7 +17,6 @@ import {UsersService} from "../services/users.service";
 import {User} from "../entity/user.entity";
 import * as argon2 from "argon2";
 import {Tenant} from "../entity/tenant.entity";
-import {CryptUtil} from "../util/crypt.util";
 import {ValidationPipe} from "../validation/validation.pipe";
 import {SecurityService} from "../casl/security.service";
 import {
@@ -40,6 +39,8 @@ import {
     TokenService
 } from "../core/token-abstraction";
 import {SubscriptionService} from "../services/subscription.service";
+import {ClientService} from "../services/client.service";
+import {Client} from "../entity/client.entity";
 
 const SecurityContextSchema = yup.object().shape({
     sub: yup.string().required("token is invalid"),
@@ -73,6 +74,7 @@ export class AuthService {
         @Inject(SIGNING_KEY_PROVIDER)
         private readonly signingKeyProvider: SigningKeyProvider,
         private readonly subscriptionService: SubscriptionService,
+        private readonly clientService: ClientService,
     ) {
         this.LOGGER = new Logger(AuthService.name);
     }
@@ -176,25 +178,37 @@ export class AuthService {
         }
     }
 
+    /**
+     * Validate client credentials for confidential clients.
+     * Resolves the Client entity by clientId or alias and validates the secret
+     * using timing-safe comparison via ClientService.validateClientSecret.
+     * 
+     * Requirements: 2.1, 2.2, 2.4, 2.5, 2.6
+     */
     async validateClientCredentials(
         clientId: string,
         clientSecret: string,
-    ): Promise<Tenant> {
-        const tenant: Tenant =
-            await this.authUserService.findTenantByClientId(clientId);
-        let valid: boolean = CryptUtil.verifyClientId(
-            tenant.clientSecret,
-            clientId,
-            tenant.secretSalt,
-        );
+    ): Promise<Client> {
+        // Resolve Client entity by clientId (UUID) or alias (domain)
+        let client: Client;
+        try {
+            client = await this.clientService.findByClientIdOrAlias(clientId);
+        } catch {
+            throw OAuthException.invalidClient('Client authentication failed');
+        }
+
+        // Public clients cannot authenticate with a secret
+        if (client.isPublic) {
+            throw OAuthException.invalidClient('Public clients cannot use client_secret');
+        }
+
+        // Validate the secret using timing-safe comparison
+        const valid = this.clientService.validateClientSecret(client, clientSecret);
         if (!valid) {
             throw OAuthException.invalidClient('Client authentication failed');
         }
-        valid = CryptUtil.verifyClientSecret(tenant.clientSecret, clientSecret);
-        if (!valid) {
-            throw OAuthException.invalidClient('Client authentication failed');
-        }
-        return tenant;
+
+        return client;
     }
 
     /**
@@ -203,31 +217,36 @@ export class AuthService {
      * Per RFC 6749 §6, public clients cannot authenticate with a secret
      * but must still provide a valid client_id so the server can verify
      * the refresh token was issued to that client.
+     * 
+     * Requirements: 2.3, 2.5
      */
-    async validatePublicClient(clientId: string): Promise<Tenant> {
-        const tenant: Tenant =
-            await this.authUserService.findTenantByClientId(clientId);
-        const valid: boolean = CryptUtil.verifyClientId(
-            tenant.clientSecret,
-            clientId,
-            tenant.secretSalt,
-        );
-        if (!valid) {
+    async validatePublicClient(clientId: string): Promise<Client> {
+        // Resolve Client entity by clientId (UUID) or alias (domain)
+        let client: Client;
+        try {
+            client = await this.clientService.findByClientIdOrAlias(clientId);
+        } catch {
             throw OAuthException.invalidClient('Client authentication failed');
         }
-        return tenant;
+
+        // Verify the client is marked as public
+        if (!client.isPublic) {
+            throw OAuthException.invalidClient('Confidential clients must provide client_secret');
+        }
+
+        return client;
     }
 
-    createTechnicalToken(tenant: Tenant, roles: string[]): TechnicalToken {
-        return this.technicalTokenService.createTechnicalToken(tenant, roles);
+    createTechnicalToken(client: Client, roles: string[]): TechnicalToken {
+        return this.technicalTokenService.createTechnicalToken(client, roles);
     }
 
     async createTechnicalAccessToken(
-        tenant: Tenant,
+        client: Client,
         roles: string[],
         audience?: string[],
     ): Promise<string> {
-        return this.technicalTokenService.createTechnicalAccessToken(tenant, roles, audience);
+        return this.technicalTokenService.createTechnicalAccessToken(client, roles, audience);
     }
 
     /**
@@ -240,6 +259,7 @@ export class AuthService {
         roles: string[] = [],
         grant_type: GRANT_TYPES = GRANT_TYPES.PASSWORD,
         audience?: string[],
+        clientId?: string,
     ): Promise<{ accessToken: string; scopes: string[] }> {
         if (!user.verified) {
             throw new UnauthorizedException('Email not verified');
@@ -262,7 +282,7 @@ export class AuthService {
             jti: randomUUID(),
             nbf: Math.floor(Date.now() / 1000),
             scope: jwtScopes.join(' '),
-            client_id: tenant.clientId,
+            client_id: clientId,
             tenant_id: tenant.id,
         });
 
@@ -290,6 +310,7 @@ export class AuthService {
         roles: string[] = [],
         grant_type: GRANT_TYPES = GRANT_TYPES.PASSWORD,
         audience?: string[],
+        clientId?: string,
     ): Promise<{ accessToken: string; scopes: string[] }> {
         if (!user.verified) {
             throw new UnauthorizedException('Email not verified');
@@ -312,7 +333,7 @@ export class AuthService {
             jti: randomUUID(),
             nbf: Math.floor(Date.now() / 1000),
             scope: jwtScopes.join(' '),
-            client_id: issuingTenant.clientId,
+            client_id: clientId,
             tenant_id: issuingTenant.id,
         });
         accessTokenPayload.userTenant = {

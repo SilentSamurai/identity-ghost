@@ -194,7 +194,8 @@ describe('e2e negative token flow', () => {
             })
             .set('Accept', 'application/json');
 
-        expect(response.status).toEqual(404);
+        expect(response.status).toEqual(401);
+        expect(response.body.error).toEqual('invalid_client');
     });
 
     it(`/POST password Gibberish `, async () => {

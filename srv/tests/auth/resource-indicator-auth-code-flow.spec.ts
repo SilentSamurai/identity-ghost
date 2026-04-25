@@ -112,7 +112,7 @@ describe('Resource Indicator Auth Code Flow', () => {
                     })
                     .set('Accept', 'application/json');
 
-                expect(tokenResponse.status).toEqual(201);
+                expect(tokenResponse.status).toEqual(200);
 
                 const jwt = app.jwtService().decode(tokenResponse.body.access_token, {json: true}) as any;
                 expect(jwt.aud).toContain(VALID_RESOURCE);
@@ -165,7 +165,7 @@ describe('Resource Indicator Auth Code Flow', () => {
                     })
                     .set('Accept', 'application/json');
 
-                expect(tokenResponse.status).toEqual(201);
+                expect(tokenResponse.status).toEqual(200);
 
                 const jwt = app.jwtService().decode(tokenResponse.body.access_token, {json: true}) as any;
                 
@@ -221,7 +221,7 @@ describe('Resource Indicator Auth Code Flow', () => {
                     })
                     .set('Accept', 'application/json');
 
-                expect(tokenResponse.status).toEqual(201);
+                expect(tokenResponse.status).toEqual(200);
 
                 const jwt = app.jwtService().decode(tokenResponse.body.access_token, {json: true}) as any;
                 
@@ -280,7 +280,7 @@ describe('Resource Indicator Auth Code Flow', () => {
                     })
                     .set('Accept', 'application/json');
 
-                expect(tokenResponse.status).toEqual(201);
+                expect(tokenResponse.status).toEqual(200);
 
                 const jwt = app.jwtService().decode(tokenResponse.body.access_token, {json: true}) as any;
                 expect(jwt.aud).toContain(VALID_RESOURCE);
@@ -333,7 +333,7 @@ describe('Resource Indicator Auth Code Flow', () => {
                     })
                     .set('Accept', 'application/json');
 
-                expect(firstTokenResponse.status).toEqual(201);
+                expect(firstTokenResponse.status).toEqual(200);
                 const firstJwt = app.jwtService().decode(firstTokenResponse.body.access_token, {json: true}) as any;
 
                 // Now use silent-auth with the correct parameters
@@ -365,7 +365,7 @@ describe('Resource Indicator Auth Code Flow', () => {
                     })
                     .set('Accept', 'application/json');
 
-                expect(tokenResponse.status).toEqual(201);
+                expect(tokenResponse.status).toEqual(200);
 
                 const jwt = app.jwtService().decode(tokenResponse.body.access_token, {json: true}) as any;
                 expect(jwt.aud).toContain(VALID_RESOURCE);

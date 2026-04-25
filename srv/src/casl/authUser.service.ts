@@ -91,29 +91,6 @@ export class AuthUserService {
         });
     }
 
-    async tenantExistsByClientId(clientId: string): Promise<boolean> {
-        return await this.tenantRepository.exists({
-            where: {clientId},
-            relations: {
-                members: true,
-                roles: true,
-            },
-        });
-    }
-
-    async findTenantByClientId(clientId: string): Promise<Tenant> {
-        let tenant = await this.tenantRepository.findOne({
-            where: {clientId},
-            relations: {
-                members: true,
-                roles: true,
-            },
-        });
-        if (tenant === null) {
-            throw new NotFoundException("tenant not found");
-        }
-        return tenant;
-    }
 
     async findTenantById(id: string) {
         let tenant = await this.tenantRepository.findOne({

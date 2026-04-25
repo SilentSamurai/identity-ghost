@@ -22,6 +22,7 @@ import {TenantClient} from '../api-client/tenant-client';
 import {AdminTenantClient} from '../api-client/admin-tenant-client';
 import {HelperFixture} from '../helper.fixture';
 import {AppClient} from '../api-client/app-client';
+import {ClientEntityClient} from '../api-client/client-entity-client';
 
 describe('Membership Verification Integration Tests', () => {
     let fixture: SharedTestFixture;
@@ -47,6 +48,10 @@ describe('Membership Verification Integration Tests', () => {
     // Test user for membership tests
     let testUserEmail: string;
     let testUserPassword: string;
+
+    // Confidential client credentials for client_credentials grant test
+    let ccClientId: string;
+    let ccClientSecret: string;
 
     beforeAll(async () => {
         fixture = new SharedTestFixture();
@@ -112,6 +117,16 @@ describe('Membership Verification Integration Tests', () => {
             subscriberEmail, subscriberPassword, subscriberDomain
         );
         subscriberAccessToken = subscriberTokenResponse.accessToken;
+
+        // Create a confidential client on the creator tenant for client_credentials grant tests
+        const clientEntityClient = new ClientEntityClient(fixture, superAdminAccessToken);
+        const ccClientResult = await clientEntityClient.createClient(creatorTenantId, 'cc-test-client', {
+            grantTypes: 'client_credentials',
+            allowedScopes: 'openid profile email',
+            isPublic: false,
+        });
+        ccClientId = ccClientResult.client.clientId;
+        ccClientSecret = ccClientResult.clientSecret;
     });
 
     afterAll(async () => {
@@ -228,14 +243,10 @@ describe('Membership Verification Integration Tests', () => {
     // ─────────────────────────────────────────────────────────────────────────────
     describe('6.5 Technical token bypasses membership check', () => {
         it('returns HTTP 200 for client_credentials token (no membership check)', async () => {
-            // Get tenant credentials for the creator tenant
-            const adminClient = new AdminTenantClient(fixture, superAdminAccessToken);
-            const creds = await adminClient.getTenantCredentials(creatorTenantId);
-
-            // Get a client_credentials token (TechnicalToken)
+            // Get a client_credentials token using the confidential client created in beforeAll
             const ccToken = await tokenFixture.fetchClientCredentialsToken(
-                creds.clientId,
-                creds.clientSecret
+                ccClientId,
+                ccClientSecret
             );
 
             // Make an API call with the technical token

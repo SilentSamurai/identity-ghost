@@ -85,7 +85,7 @@ describe('Refresh Token Grace Window', () => {
 
             // First use — succeeds
             const firstResponse = await refreshGrant(refreshToken, clientId, clientSecret);
-            expect(firstResponse.status).toEqual(201);
+            expect(firstResponse.status).toEqual(200);
             const childToken = firstResponse.body.refresh_token;
 
             // Immediate duplicate — should trigger replay (no grace window)
@@ -120,7 +120,7 @@ describe('Refresh Token Grace Window', () => {
 
             // First use — succeeds
             const firstResponse = await refreshGrant(refreshToken, clientId, clientSecret);
-            expect(firstResponse.status).toEqual(201);
+            expect(firstResponse.status).toEqual(200);
             expect(firstResponse.body.refresh_token).toBeDefined();
 
             // Immediate duplicate — with grace window disabled on server, this triggers replay

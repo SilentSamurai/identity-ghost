@@ -19,6 +19,7 @@ import {OAuthException} from "../exceptions/oauth-exception";
 import {randomUUID} from "crypto";
 import {LoginSessionService} from "./login-session.service";
 import {SecurityEventLogger} from "../security/security-event-logger.service";
+import {Client} from "../entity/client.entity";
 
 /**
  * Decision result for refresh token eligibility.
@@ -138,20 +139,19 @@ export class TokenIssuanceService {
             throw new BadRequestException("User is not a member of the tenant and does not have a valid app subscription");
         }
 
-        // Resolve client allowedScopes for scope intersection.
-        // When oauthClientId is provided (e.g. from password grant), resolve the specific client
-        // rather than falling back to the tenant's default client.
-        const clientAllowedScopes = await this.getClientAllowedScopes(tenant, options?.oauthClientId);
+        // Resolve the Client entity for scope resolution, refresh token binding, and ID token audience.
+        // Requirements: 3.1, 3.2, 3.3, 3.4
+        const client = await this.resolveClient(tenant, options?.oauthClientId);
 
         if (isSubscribed) {
-            return this.issueSubscribedToken(permission, user, tenant, clientAllowedScopes, options);
+            return this.issueSubscribedToken(permission, user, tenant, client, options);
         }
 
         const roles = await this.tenantService.getMemberRoles(permission, tenant.id, user);
         const roleNames = roles.map(r => r.name);
         const grantedScopes = this.scopeResolverService.resolveScopes(
             options?.requestedScope ?? null,
-            clientAllowedScopes,
+            client.allowedScopes || 'openid profile email',
         );
 
         // Construct audience with resource indicator if present
@@ -160,7 +160,7 @@ export class TokenIssuanceService {
             : [this.configService.get("SUPER_TENANT_DOMAIN")];
 
         const {accessToken, scopes} =
-            await this.authService.createUserAccessToken(user, tenant, grantedScopes, roleNames, options?.grant_type ?? GRANT_TYPES.PASSWORD, audience);
+            await this.authService.createUserAccessToken(user, tenant, grantedScopes, roleNames, options?.grant_type ?? GRANT_TYPES.PASSWORD, audience, client.clientId);
 
         // Resolve session: validate existing sid or create new session for password grant
         let authTime: number;
@@ -183,17 +183,16 @@ export class TokenIssuanceService {
         }
 
         // Determine refresh token eligibility (Requirements: 1.1, 1.2, 1.3, 2.1, 2.2, 8.1, 8.2, 8.3)
-        const refreshTokenDecision = await this.shouldIssueRefreshToken(
+        const refreshTokenDecision = this.shouldIssueRefreshToken(
             scopes,
-            tenant,
+            client,
             options?.grant_type ?? GRANT_TYPES.PASSWORD,
-            options?.oauthClientId,
         );
 
         // Log the refresh token decision
         this.securityEventLogger.refreshTokenDecision({
             grantType: options?.grant_type ?? GRANT_TYPES.PASSWORD,
-            clientId: tenant.clientId,
+            clientId: client.clientId,
             tenantId: tenant.id,
             userId: user.id,
             decision: refreshTokenDecision.eligible ? 'granted' : 'denied',
@@ -205,7 +204,7 @@ export class TokenIssuanceService {
         if (refreshTokenDecision.eligible) {
             const {plaintext} = await this.refreshTokenService.create({
                 userId: user.id,
-                clientId: tenant.clientId,
+                clientId: client.clientId,
                 tenantId: tenant.id,
                 scope: ScopeNormalizer.format(scopes),
                 sid: sessionId,
@@ -216,10 +215,11 @@ export class TokenIssuanceService {
         // Read nonce from options (passed by controller from the already-redeemed auth code)
         const nonce = options?.nonce;
 
-        // Use the OAuth client_id from the authorization request for the ID token audience (aud) claim
-        // per OIDC Core §2. Falls back to tenant.clientId for backward compatibility.
-        const idTokenClientId = options?.oauthClientId || tenant.clientId;
-
+        // Use the OAuth client_id from the request for the ID token audience (aud) claim
+        // per OIDC Core §2. When the RP identifies itself by alias (e.g. domain), the aud
+        // must reflect that value so the RP can validate it. Falls back to the Client entity's
+        // internal clientId (UUID) when no oauthClientId was provided. Requirements: 3.3
+        const idTokenClientId = options?.oauthClientId ?? client.clientId;
         const idToken = await this.idTokenService.generateIdToken({
             user: {id: user.id, email: user.email, name: user.name, verified: user.verified},
             tenantId: tenant.id,
@@ -234,10 +234,10 @@ export class TokenIssuanceService {
 
         const response = this.formatResponse(accessToken, refreshToken, scopes, idToken);
 
-        // Log token issuance event (Requirements 4.1, 4.2)
+        // Log token issuance event (Requirements 3.4)
         this.securityEventLogger.tokenIssued({
             grantType: options?.grant_type ?? GRANT_TYPES.PASSWORD,
-            clientId: tenant.clientId,
+            clientId: client.clientId,
             tenantId: tenant.id,
             scope: response.scope,
             userId: user.id,
@@ -299,6 +299,7 @@ export class TokenIssuanceService {
         clientId: string,
         requestedScope?: string,
         resource?: string,
+        oauthClientId?: string,
     ): Promise<TokenResponse> {
         const {plaintext: newRefreshToken, record} = await this.refreshTokenService.consumeAndRotate({
             plaintextToken,
@@ -315,6 +316,10 @@ export class TokenIssuanceService {
 
         const tenant = await this.tenantService.findById(permission, record.tenantId);
 
+        // Resolve the Client entity from the tenant's domain alias for ID token audience.
+        // Requirements: 3.2, 3.3, 3.6
+        const client = await this.resolveClient(tenant);
+
         const roles = await this.tenantService.getMemberRoles(permission, tenant.id, user);
         const roleNames = roles.map(r => r.name);
 
@@ -326,7 +331,7 @@ export class TokenIssuanceService {
             : [this.configService.get("SUPER_TENANT_DOMAIN")];
 
         const {accessToken, scopes} =
-            await this.authService.createUserAccessToken(user, tenant, grantedScopes, roleNames, GRANT_TYPES.REFRESH_TOKEN, audience);
+            await this.authService.createUserAccessToken(user, tenant, grantedScopes, roleNames, GRANT_TYPES.REFRESH_TOKEN, audience, client.clientId);
 
         // Resolve session from the refresh token's sid
         let authTime: number;
@@ -343,7 +348,7 @@ export class TokenIssuanceService {
         const idToken = await this.idTokenService.generateIdToken({
             user: {id: user.id, email: user.email, name: user.name, verified: user.verified},
             tenantId: tenant.id,
-            clientId: tenant.clientId,
+            clientId: oauthClientId ?? client.clientId,
             grantedScopes: scopes,
             accessToken,
             authTime,
@@ -353,10 +358,10 @@ export class TokenIssuanceService {
 
         const response = this.formatResponse(accessToken, newRefreshToken, scopes, idToken);
 
-        // Log token issuance event (Requirements 4.1, 4.2)
+        // Log token issuance event (Requirements 3.4)
         this.securityEventLogger.tokenIssued({
             grantType: 'refresh_token',
-            clientId: tenant.clientId,
+            clientId: client.clientId,
             tenantId: tenant.id,
             scope: response.scope,
             userId: user.id,
@@ -369,16 +374,16 @@ export class TokenIssuanceService {
      * Issues a token for client_credentials grant (machine-to-machine).
      * No refresh_token or id_token — there is no user identity.
      * Per RFC 6749 §4.4.3, the response MUST NOT include a refresh_token.
+     * Requirements: 3.5
      */
     async issueClientCredentialsToken(
-        tenant: Tenant,
+        client: Client,
         requestedScope: string | null,
         resource?: string,
     ): Promise<TokenResponse> {
-        const clientAllowedScopes = await this.getClientAllowedScopes(tenant);
         const grantedScopes = this.scopeResolverService.resolveScopes(
             requestedScope,
-            clientAllowedScopes,
+            client.allowedScopes || 'openid profile email',
         );
 
         // Construct audience with resource indicator if present
@@ -387,17 +392,17 @@ export class TokenIssuanceService {
             : [this.configService.get("SUPER_TENANT_DOMAIN")];
 
         const accessToken = await this.authService.createTechnicalAccessToken(
-            tenant,
+            client,
             grantedScopes,
             audience,
         );
         const response = this.formatResponse(accessToken, undefined, grantedScopes);
 
-        // Log token issuance event (Requirements 4.1, 4.3)
+        // Log token issuance event (Requirements 3.4, 3.5)
         this.securityEventLogger.tokenIssued({
             grantType: 'client_credentials',
-            clientId: tenant.clientId,
-            tenantId: tenant.id,
+            clientId: client.clientId,
+            tenantId: client.tenantId,
             scope: response.scope,
         });
 
@@ -408,7 +413,7 @@ export class TokenIssuanceService {
         permission: Permission,
         user: User,
         tenant: Tenant,
-        clientAllowedScopes: string,
+        client: Client,
         options?: IssueTokenOptions,
     ): Promise<TokenResponse> {
         let hint = options?.subscriberTenantHint;
@@ -437,7 +442,7 @@ export class TokenIssuanceService {
 
         const grantedScopes = this.scopeResolverService.resolveScopes(
             options?.requestedScope ?? null,
-            clientAllowedScopes,
+            client.allowedScopes || 'openid profile email',
         );
 
         // Construct audience with resource indicator if present
@@ -447,7 +452,7 @@ export class TokenIssuanceService {
 
         const {accessToken, scopes} =
             await this.authService.createSubscribedUserAccessToken(
-                user, tenant, subscribingTenant, grantedScopes, allRoleNames, options?.grant_type ?? GRANT_TYPES.PASSWORD, audience,
+                user, tenant, subscribingTenant, grantedScopes, allRoleNames, options?.grant_type ?? GRANT_TYPES.PASSWORD, audience, client.clientId,
             );
 
         // Resolve session: validate existing sid or create new session for password grant
@@ -471,17 +476,16 @@ export class TokenIssuanceService {
         }
 
         // Determine refresh token eligibility (Requirements: 1.1, 1.2, 2.1, 2.2, 8.1, 8.2, 8.3)
-        const refreshTokenDecision = await this.shouldIssueRefreshToken(
+        const refreshTokenDecision = this.shouldIssueRefreshToken(
             scopes,
-            tenant,
+            client,
             options?.grant_type ?? GRANT_TYPES.PASSWORD,
-            options?.oauthClientId,
         );
 
         // Log the refresh token decision
         this.securityEventLogger.refreshTokenDecision({
             grantType: options?.grant_type ?? GRANT_TYPES.PASSWORD,
-            clientId: tenant.clientId,
+            clientId: client.clientId,
             tenantId: tenant.id,
             userId: user.id,
             decision: refreshTokenDecision.eligible ? 'granted' : 'denied',
@@ -493,7 +497,7 @@ export class TokenIssuanceService {
         if (refreshTokenDecision.eligible) {
             const {plaintext} = await this.refreshTokenService.create({
                 userId: user.id,
-                clientId: tenant.clientId,
+                clientId: client.clientId,
                 tenantId: tenant.id,
                 scope: ScopeNormalizer.format(scopes),
                 sid: sessionId,
@@ -501,9 +505,9 @@ export class TokenIssuanceService {
             refreshToken = plaintext;
         }
 
-        // Use the OAuth client_id from the authorization request for the ID token audience (aud) claim
-        const idTokenClientId = options?.oauthClientId || tenant.clientId;
-
+        // Use the OAuth client_id from the request for the ID token audience (aud) claim
+        // per OIDC Core §2. Requirements: 3.3
+        const idTokenClientId = options?.oauthClientId ?? client.clientId;
         const idToken = await this.idTokenService.generateIdToken({
             user: {id: user.id, email: user.email, name: user.name, verified: user.verified},
             tenantId: tenant.id,
@@ -518,10 +522,10 @@ export class TokenIssuanceService {
 
         const response = this.formatResponse(accessToken, refreshToken, scopes, idToken);
 
-        // Log token issuance event (Requirements 4.1, 4.2)
+        // Log token issuance event (Requirements 3.4)
         this.securityEventLogger.tokenIssued({
             grantType: options?.grant_type ?? GRANT_TYPES.PASSWORD,
-            clientId: tenant.clientId,
+            clientId: client.clientId,
             tenantId: tenant.id,
             scope: response.scope,
             userId: user.id,
@@ -564,22 +568,23 @@ export class TokenIssuanceService {
     }
 
     /**
-     * Resolve the allowed scopes for a specific client.
+     * Resolve the Client entity for scope resolution, refresh token binding, and ID token audience.
      * When oauthClientId is provided, resolves that specific client (by UUID or alias).
      * Falls back to the tenant's default client (by domain alias) when no oauthClientId is given.
+     * Requirements: 3.1
      */
-    private async getClientAllowedScopes(tenant: Tenant, oauthClientId?: string): Promise<string> {
+    private async resolveClient(tenant: Tenant, oauthClientId?: string): Promise<Client> {
         try {
             const client = oauthClientId
                 ? await this.clientService.findByClientIdOrAlias(oauthClientId)
                 : await this.clientService.findByAlias(tenant.domain);
-            if (client?.allowedScopes) {
-                return client.allowedScopes;
+            if (client) {
+                return client;
             }
         } catch {
-            // Fall through to default
+            // Fall through to throw error
         }
-        return 'openid profile email';
+        throw OAuthException.invalidClient('Client not found');
     }
 
     /**
@@ -588,14 +593,13 @@ export class TokenIssuanceService {
      * 2. Presence of offline_access scope in granted scopes (OIDC Core §11)
      * 3. Client's allowRefreshToken flag (per-client override for trusted first-party clients)
      *
-     * Requirements: 1.1, 1.2, 1.3, 2.1, 2.2
+     * Requirements: 1.1, 1.2, 1.3, 2.1, 2.2, 3.1
      */
-    private async shouldIssueRefreshToken(
+    private shouldIssueRefreshToken(
         grantedScopes: string[],
-        tenant: Tenant,
+        client: Client,
         grantType: string,
-        oauthClientId?: string,
-    ): Promise<RefreshTokenDecision> {
+    ): RefreshTokenDecision {
         // Per RFC 6749 §4.4.3, client_credentials grant MUST NOT include a refresh token
         if (grantType === GRANT_TYPES.CLIENT_CREDENTIALS) {
             return { eligible: false, reason: 'refresh_token_not_eligible' };
@@ -607,17 +611,8 @@ export class TokenIssuanceService {
         }
 
         // Check client's allowRefreshToken flag (per-client override)
-        // When oauthClientId is provided, resolve that specific client.
-        // Otherwise fall back to the tenant's default client (by domain alias).
-        try {
-            const client = oauthClientId
-                ? await this.clientService.findByClientIdOrAlias(oauthClientId)
-                : await this.clientService.findByAlias(tenant.domain);
-            if (client?.allowRefreshToken === true) {
-                return { eligible: true, reason: 'client_allow_refresh_token' };
-            }
-        } catch {
-            // If client lookup fails, fall through to not eligible
+        if (client?.allowRefreshToken === true) {
+            return { eligible: true, reason: 'client_allow_refresh_token' };
         }
 
         return { eligible: false, reason: 'refresh_token_not_eligible' };

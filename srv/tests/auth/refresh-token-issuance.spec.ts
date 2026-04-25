@@ -85,7 +85,7 @@ describe('Refresh Token Issuance', () => {
                 })
                 .set('Accept', 'application/json');
 
-            expect(tokenResponse.status).toEqual(201);
+            expect(tokenResponse.status).toEqual(200);
             expect(tokenResponse.body.refresh_token).toBeDefined();
             expect(typeof tokenResponse.body.refresh_token).toBe('string');
 
@@ -107,7 +107,7 @@ describe('Refresh Token Issuance', () => {
                 })
                 .set('Accept', 'application/json');
 
-            expect(response.status).toEqual(201);
+            expect(response.status).toEqual(200);
             expect(response.body.access_token).toBeDefined();
             expect(response.body.token_type).toEqual('Bearer');
             expect(response.body.expires_in).toBeDefined();

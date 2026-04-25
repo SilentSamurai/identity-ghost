@@ -664,7 +664,7 @@ describe('Feature: oidc-prompt-max-age, Property 8: auth_time claim inclusion wh
             })
             .set('Accept', 'application/json');
 
-        expect(tokenResponse.status).toBe(201);
+        expect(tokenResponse.status).toBe(200);
         expect(tokenResponse.body.id_token).toBeDefined();
 
         return JSON.parse(Buffer.from(tokenResponse.body.id_token.split('.')[1], 'base64').toString());
@@ -756,7 +756,7 @@ describe('Feature: oidc-prompt-max-age, Property 8: auth_time claim inclusion wh
                 })
                 .set('Accept', 'application/json');
 
-            expect(tokenResponse.status).toBe(201);
+            expect(tokenResponse.status).toBe(200);
             const idTokenPayload = JSON.parse(
                 Buffer.from(tokenResponse.body.id_token.split('.')[1], 'base64').toString()
             );

@@ -56,7 +56,7 @@ describe('Refresh Token Client Binding', () => {
             })
             .set('Accept', 'application/json');
 
-        expect(response.status).toEqual(201);
+        expect(response.status).toEqual(200);
         expect(response.body.access_token).toBeDefined();
         expect(response.body.refresh_token).toBeDefined();
     });

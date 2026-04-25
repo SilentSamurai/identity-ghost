@@ -10,6 +10,7 @@ import {AuthContext, GRANT_TYPES, InternalToken, TechnicalToken, TenantToken,} f
 import {SubjectEnum} from "../entity/subjectEnum";
 import {RoleEnum} from "../entity/roleEnum";
 import {Permission} from "../auth/auth.decorator";
+import {ClientService} from "../services/client.service";
 
 @Injectable()
 export class SecurityService implements OnModuleInit {
@@ -18,6 +19,7 @@ export class SecurityService implements OnModuleInit {
         private readonly authUserService: AuthUserService,
         @Inject(forwardRef(() => CaslAbilityFactory))
         private readonly caslAbilityFactory: CaslAbilityFactory,
+        private readonly clientService: ClientService,
     ) {
     }
 
@@ -229,6 +231,7 @@ export class SecurityService implements OnModuleInit {
         const tenant = await this.authUserService.findTenantByDomain(domain);
         const roles = await this.authUserService.findMemberRoles(tenant, user);
         const roleNames = roles.map((item) => item.name);
+        const defaultClient = await this.clientService.findByAlias(tenant.domain);
         const token = TenantToken.create({
             sub: user.id,
             tenant: {
@@ -242,7 +245,7 @@ export class SecurityService implements OnModuleInit {
             jti: '',
             nbf: Math.floor(Date.now() / 1000),
             scope: '',
-            client_id: tenant.clientId,
+            client_id: defaultClient.clientId,
             tenant_id: tenant.id,
         });
         // Populate profile fields from DB (not from JWT)

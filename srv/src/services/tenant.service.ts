@@ -15,7 +15,6 @@ import {User} from "../entity/user.entity";
 import {Role} from "../entity/role.entity";
 import {RoleService} from "./role.service";
 import {RoleEnum} from "../entity/roleEnum";
-import {CryptUtil} from "../util/crypt.util";
 import {TenantMember} from "../entity/tenant.members.entity";
 import {Permission} from "../auth/auth.decorator";
 import {Action} from "../casl/actions.enum";
@@ -63,21 +62,19 @@ export class TenantService implements OnModuleInit {
             throw new BadRequestException("Domain already Taken");
         }
 
-        const {clientId, clientSecret, salt} =
-            CryptUtil.generateClientIdAndSecret();
-
+        // Create tenant without legacy credential columns
+        // Requirements: 5.4
         let tenant: Tenant = this.tenantRepository.create({
             name: name,
             domain: domain,
-            clientId: clientId,
-            clientSecret: clientSecret,
-            secretSalt: salt,
             members: [],
             roles: [],
         });
 
         tenant = await this.tenantRepository.save(tenant);
 
+        // Create the default client for the tenant
+        // Requirements: 1.1, 1.2, 1.3, 1.4, 1.5
         await this.createDefaultClient(tenant.id, domain);
 
         const {privateKey, publicKey} = this.signingKeyProvider.generateKeyPair();
@@ -192,29 +189,6 @@ export class TenantService implements OnModuleInit {
         return this.tenantRepository.findOne({
             where: {domain},
         });
-    }
-
-    async findByClientId(
-        permission: Permission,
-        clientId: string,
-    ): Promise<Tenant> {
-        permission.isAuthorized(
-            Action.Read,
-            SubjectEnum.TENANT,
-            {clientId: clientId},
-        );
-
-        let tenant = await this.tenantRepository.findOne({
-            where: {clientId},
-            relations: {
-                members: true,
-                roles: true,
-            },
-        });
-        if (tenant === null) {
-            throw new NotFoundException("tenant not found");
-        }
-        return tenant;
     }
 
     async addMember(
@@ -510,28 +484,6 @@ export class TenantService implements OnModuleInit {
         return this.roleService.getTenantRoles(permission, tenant);
     }
 
-    async findByClientIdOrDomain(
-        permission: Permission,
-        clientIdOrDomain: string,
-    ): Promise<Tenant> {
-        permission.isAuthorized(
-            Action.Read,
-            SubjectEnum.TENANT,
-            {clientId: clientIdOrDomain},
-        );
-
-        let tenant = await this.tenantRepository.findOne({
-            where: [{clientId: clientIdOrDomain}, {domain: clientIdOrDomain}],
-            relations: {
-                members: true,
-                roles: true,
-            },
-        });
-        if (tenant === null) {
-            throw new NotFoundException("tenant not found");
-        }
-        return tenant;
-    }
 
     async findMember(
         permission: Permission,

@@ -34,8 +34,12 @@ export interface IntrospectionResponse {
  * Owns the business logic for RFC 7662 Token Introspection.
  *
  * Responsibilities:
- *   1. Authenticate the requesting client via {@link ClientService} (constant-time
- *      secret comparison using scryptSync + timingSafeEqual).
+ *   1. Authenticate the requesting client — first via {@link ClientService}
+ *      (Client entity credentials), then falling back to tenant-level
+ *      credentials via {@link AuthService.validateClientCredentials}.
+ *      This mirrors the token endpoint's dual-path authentication and
+ *      ensures standard OIDC clients can introspect using the same
+ *      client_id/client_secret they use for token requests.
  *   2. Validate the submitted access token via {@link AuthService.validateAccessToken}
  *      (JWT decode, signature verification, locked-user check).
  *   3. Enforce tenant isolation — the token's tenant must match the client's tenant.
@@ -63,9 +67,47 @@ export class TokenIntrospectionService {
     }
 
     /**
+     * Authenticate the requesting client.
+     *
+     * Tries two paths in order:
+     *   1. Client entity lookup (clientService.findByClientIdOrAlias) — for
+     *      registered OAuth clients with UUID clientIds or domain aliases.
+     *   2. Tenant-level credentials (authService.validateClientCredentials) —
+     *      for callers using the tenant's hex clientId/clientSecret pair.
+     *
+     * Returns the authenticated tenant ID for use in isolation checks.
+     */
+    private async authenticateClient(clientId: string, clientSecret: string): Promise<string> {
+        // Path 1: Client entity credentials
+        try {
+            const client = await this.clientService.findByClientIdOrAlias(clientId);
+            if (!this.clientService.validateClientSecret(client, clientSecret)) {
+                throw OAuthException.invalidClient('Client authentication failed');
+            }
+            return client.tenantId;
+        } catch (e) {
+            if (e instanceof OAuthException) {
+                throw e;
+            }
+            // NotFoundException — fall through to tenant-level auth
+        }
+
+        // Path 2: Tenant-level credentials (hex clientId + clientSecret)
+        try {
+            const tenant = await this.authService.validateClientCredentials(clientId, clientSecret);
+            return tenant.id;
+        } catch (e) {
+            if (e instanceof OAuthException) {
+                throw e;
+            }
+            throw OAuthException.invalidClient('Client authentication failed');
+        }
+    }
+
+    /**
      * Introspect an access token on behalf of an authenticated client.
      *
-     * @param clientId     - The requesting client's identifier (from Client entity, not legacy Tenant.clientId).
+     * @param clientId     - The requesting client's identifier (Client.clientId or alias).
      * @param clientSecret - The requesting client's plain-text secret.
      * @param token        - The access token string to introspect.
      * @param tokenTypeHint - Optional hint ("access_token"); accepted but does not change behaviour.
@@ -80,19 +122,7 @@ export class TokenIntrospectionService {
     ): Promise<IntrospectionResponse> {
         try {
             // ── Step 1: Authenticate the requesting client ──────────────
-            let client;
-            try {
-                client = await this.clientService.findByClientId(clientId);
-            } catch (e) {
-                if (e instanceof NotFoundException) {
-                    throw OAuthException.invalidClient('Client authentication failed');
-                }
-                throw e;
-            }
-
-            if (!this.clientService.validateClientSecret(client, clientSecret)) {
-                throw OAuthException.invalidClient('Client authentication failed');
-            }
+            const authenticatedTenantId = await this.authenticateClient(clientId, clientSecret);
 
             // ── Step 2: Validate the access token ───────────────────────
             // Any failure (expired, malformed, bad signature, locked user)
@@ -111,8 +141,8 @@ export class TokenIntrospectionService {
                 ? validatedToken.asTenantToken().tenant.id
                 : validatedToken.asTechnicalToken().tenant.id;
 
-            if (tokenTenantId !== client.tenantId) {
-                this.logger.warn(`Tenant mismatch: token tenant ${tokenTenantId} != client tenant ${client.tenantId}`);
+            if (tokenTenantId !== authenticatedTenantId) {
+                this.logger.warn(`Tenant mismatch: token tenant ${tokenTenantId} != authenticated tenant ${authenticatedTenantId}`);
                 return {active: false};
             }
 

@@ -104,7 +104,7 @@ describe('Feature: resource-indicator-support, Property 5: Audience construction
                         })
                         .set('Accept', 'application/json');
 
-                    expect(tokenResponse.status).toEqual(201);
+                    expect(tokenResponse.status).toEqual(200);
                     expect(tokenResponse.body.access_token).toBeDefined();
 
                     // Decode the token
@@ -147,7 +147,7 @@ describe('Feature: resource-indicator-support, Property 5: Audience construction
                 })
                 .set('Accept', 'application/json');
 
-            expect(tokenResponse.status).toEqual(201);
+            expect(tokenResponse.status).toEqual(200);
 
             const jwt = app.jwtService().decode(tokenResponse.body.access_token, {json: true}) as any;
 
@@ -185,7 +185,7 @@ describe('Feature: resource-indicator-support, Property 5: Audience construction
                         })
                         .set('Accept', 'application/json');
 
-                    expect(tokenResponse.status).toEqual(201);
+                    expect(tokenResponse.status).toEqual(200);
 
                     const jwt = app.jwtService().decode(tokenResponse.body.access_token, {json: true}) as any;
 
@@ -226,7 +226,7 @@ describe('Feature: resource-indicator-support, Property 5: Audience construction
                 })
                 .set('Accept', 'application/json');
 
-            expect(initialResponse.status).toEqual(201);
+            expect(initialResponse.status).toEqual(200);
             const refreshToken = initialResponse.body.refresh_token;
 
             // Use refresh token with same resource
@@ -240,7 +240,7 @@ describe('Feature: resource-indicator-support, Property 5: Audience construction
                 })
                 .set('Accept', 'application/json');
 
-            expect(refreshResponse.status).toEqual(201);
+            expect(refreshResponse.status).toEqual(200);
 
             const jwt = app.jwtService().decode(refreshResponse.body.access_token, {json: true}) as any;
 

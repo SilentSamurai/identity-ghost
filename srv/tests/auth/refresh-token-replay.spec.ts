@@ -63,7 +63,7 @@ describe('Refresh Token Replay Detection', () => {
 
         // First use — consume the token (should succeed)
         const firstResponse = await refreshGrant(refreshToken, clientId, clientSecret);
-        expect(firstResponse.status).toEqual(201);
+        expect(firstResponse.status).toEqual(200);
         expect(firstResponse.body.refresh_token).toBeDefined();
 
         // Second use — replay the consumed token (should fail)
@@ -77,7 +77,7 @@ describe('Refresh Token Replay Detection', () => {
 
         // Consume token A → get token B
         const rotationResponse = await refreshGrant(refreshToken, clientId, clientSecret);
-        expect(rotationResponse.status).toEqual(201);
+        expect(rotationResponse.status).toEqual(200);
         const tokenB = rotationResponse.body.refresh_token;
 
         // Replay token A — triggers family revocation
@@ -96,12 +96,12 @@ describe('Refresh Token Replay Detection', () => {
 
         // A → B
         const rotationB = await refreshGrant(tokenA, clientId, clientSecret);
-        expect(rotationB.status).toEqual(201);
+        expect(rotationB.status).toEqual(200);
         const tokenB = rotationB.body.refresh_token;
 
         // B → C
         const rotationC = await refreshGrant(tokenB, clientId, clientSecret);
-        expect(rotationC.status).toEqual(201);
+        expect(rotationC.status).toEqual(200);
         const tokenC = rotationC.body.refresh_token;
 
         // Replay token A — triggers family revocation

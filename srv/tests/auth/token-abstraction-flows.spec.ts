@@ -19,12 +19,36 @@ describe('Token Abstraction Flows', () => {
     let app: SharedTestFixture;
     let jwtService: JwtService;
     let passwordGrantResponse: any;
+    // Default public client UUID — for refresh grants (matches the client that issued the token)
+    let defaultClientId: string;
+    // Confidential client — for client_credentials and verify flows
     let clientId: string;
     let clientSecret: string;
 
     beforeAll(async () => {
         app = new SharedTestFixture();
         jwtService = new JwtService({});
+
+        // Obtain password grant tokens and create a confidential client upfront
+        const tokenFixture = new TokenFixture(app);
+        const response = await tokenFixture.fetchAccessToken(
+            "admin@auth.server.com",
+            "admin9000",
+            "auth.server.com"
+        );
+        passwordGrantResponse = response;
+
+        // Get the default public client's UUID for refresh grants
+        const creds = await app.getHttpServer()
+            .get('/api/tenant/my/credentials')
+            .set('Authorization', `Bearer ${response.accessToken}`)
+            .set('Accept', 'application/json');
+        defaultClientId = creds.body.clientId;
+
+        const decoded = jwtService.decode(response.accessToken) as any;
+        const confCreds = await tokenFixture.createConfidentialClient(response.accessToken, decoded.tenant.id);
+        clientId = confCreds.clientId;
+        clientSecret = confCreds.clientSecret;
     });
 
     afterAll(async () => {
@@ -32,19 +56,6 @@ describe('Token Abstraction Flows', () => {
     });
 
     describe('Password Grant Flow', () => {
-        it('should obtain tokens via password grant', async () => {
-            const tokenFixture = new TokenFixture(app);
-            const response = await tokenFixture.fetchAccessToken(
-                "admin@auth.server.com",
-                "admin9000",
-                "auth.server.com"
-            );
-            passwordGrantResponse = response;
-
-            expect(passwordGrantResponse.accessToken).toBeDefined();
-            expect(passwordGrantResponse.refreshToken).toBeDefined();
-        });
-
         it('should have standard claims in access token', () => {
             const decoded: any = jwtService.decode(passwordGrantResponse.accessToken);
             // sub is now user UUID, not email
@@ -105,16 +116,6 @@ describe('Token Abstraction Flows', () => {
     });
 
     describe('Client Credentials Grant Flow', () => {
-        it('should get tenant credentials first', async () => {
-            const response = await app.getHttpServer()
-                .get("/api/tenant/my/credentials")
-                .set('Authorization', `Bearer ${passwordGrantResponse.accessToken}`);
-
-            expect(response.status).toEqual(200);
-            clientId = response.body.clientId;
-            clientSecret = response.body.clientSecret;
-        });
-
         it('should obtain technical token with OIDC scopes and no roles', async () => {
             const response = await app.getHttpServer()
                 .post('/api/oauth/token')
@@ -125,7 +126,7 @@ describe('Token Abstraction Flows', () => {
                 })
                 .set('Accept', 'application/json');
 
-            expect(response.status).toEqual(201);
+            expect(response.status).toEqual(200);
             expect(response.body.access_token).toBeDefined();
 
             const decoded: any = jwtService.decode(response.body.access_token);
@@ -149,17 +150,18 @@ describe('Token Abstraction Flows', () => {
 
     describe('Refresh Token Grant Flow', () => {
         it('should obtain new tokens via refresh token grant', async () => {
+            // Use the default public client (same client that issued the refresh token).
+            // Public clients don't need a secret per RFC 6749 §6.
             const response = await app.getHttpServer()
                 .post('/api/oauth/token')
                 .send({
                     "grant_type": "refresh_token",
                     "refresh_token": passwordGrantResponse.refreshToken,
-                    "client_id": clientId,
-                    "client_secret": clientSecret,
+                    "client_id": defaultClientId,
                 })
                 .set('Accept', 'application/json');
 
-            expect(response.status).toEqual(201);
+            expect(response.status).toEqual(200);
             expect(response.body.access_token).toBeDefined();
             expect(response.body.refresh_token).toBeDefined();
 

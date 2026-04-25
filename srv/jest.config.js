@@ -5,6 +5,7 @@ module.exports = {
     globalTeardown: './tests/global-teardown.ts',
     setupFiles: ['dotenv/config'],
     testTimeout: 30000,
+    testPathIgnorePatterns: ['/node_modules/', '/dist/'],
     collectCoverage: true, // ensures coverage is actually collected
     collectCoverageFrom: [
         "src/**/*.ts",

@@ -106,7 +106,7 @@ describe('Login Session Expiry', () => {
             })
             .set('Accept', 'application/json');
 
-        expect(response.status).toEqual(201);
+        expect(response.status).toEqual(200);
         const decoded = app.jwtService().decode(response.body.id_token, {json: true}) as any;
         const sid = decoded.sid;
         expect(sid).toBeDefined();

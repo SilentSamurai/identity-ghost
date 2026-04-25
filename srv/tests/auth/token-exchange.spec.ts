@@ -13,28 +13,20 @@ describe('e2e token exchange flow', () => {
 
     beforeAll(async () => {
         app = new SharedTestFixture();
-    });
 
-    afterAll(async () => {
-        await app.close();
-    });
-
-    it(`/POST Access Token`, async () => {
-        let tokenFixture = new TokenFixture(app);
-        let response = await tokenFixture.fetchAccessToken(
+        // Obtain super admin token
+        const tokenFixture = new TokenFixture(app);
+        const response = await tokenFixture.fetchAccessToken(
             "admin@auth.server.com",
             "admin9000",
             "auth.server.com"
         );
-        const jwt = response.jwt;
         superAdminToken = response.accessToken;
-        expect(jwt.tenant.domain).toEqual("auth.server.com");
+        expect(response.jwt.tenant.domain).toEqual("auth.server.com");
 
-    });
-
-    it(`/POST Create Tenant`, async () => {
+        // Create tenant
         const uniqueDomain = `tok-exch-${Date.now()}.com`;
-        const response = await app.getHttpServer()
+        const tenantResponse = await app.getHttpServer()
             .post('/api/tenant/create')
             .send({
                 "name": "tenant-1",
@@ -43,33 +35,23 @@ describe('e2e token exchange flow', () => {
             .set('Authorization', `Bearer ${superAdminToken}`)
             .set('Accept', 'application/json');
 
-        expect(response.status).toEqual(201);
-        console.log(response.body);
-
-        expect(response.body.id).toBeDefined();
-        expect(response.body.name).toEqual("tenant-1");
-        expect(response.body.domain).toEqual(uniqueDomain);
-        expect(response.body.clientId).toBeDefined();
-        tenant = response.body;
+        expect(tenantResponse.status).toEqual(201);
+        expect(tenantResponse.body.id).toBeDefined();
+        expect(tenantResponse.body.name).toEqual("tenant-1");
+        expect(tenantResponse.body.domain).toEqual(uniqueDomain);
+        tenant = tenantResponse.body;
         tenantDomain = uniqueDomain;
+
+        // Create confidential client for the new tenant
+        const creds = await tokenFixture.createConfidentialClient(superAdminToken, tenant.id);
+        clientId = creds.clientId;
+        clientSecret = creds.clientSecret;
+        expect(clientId).toBeDefined();
+        expect(clientSecret).toBeDefined();
     });
 
-    it(`/GET Tenant Credentials`, async () => {
-        const response = await app.getHttpServer()
-            .get(`/api/admin/tenant/${tenant.id}/credentials`)
-            .set('Authorization', `Bearer ${superAdminToken}`)
-            .set('Accept', 'application/json');
-
-        expect(response.status).toEqual(200);
-        console.log(response.body);
-
-        expect(response.body.id).toBeDefined();
-        expect(response.body.clientId).toBeDefined();
-        expect(response.body.clientSecret).toBeDefined();
-        expect(response.body.publicKey).toBeDefined();
-        clientId = response.body.clientId;
-        clientSecret = response.body.clientSecret;
-
+    afterAll(async () => {
+        await app.close();
     });
 
     it(`/POST Token Exchange`, async () => {
@@ -123,7 +105,7 @@ describe('e2e token exchange flow', () => {
             })
             .set('Accept', 'application/json');
 
-        expect(response.status).toEqual(404);
+        expect(response.status).toEqual(401);
     });
 
     it(`/POST Token Wrong client_secret`, async () => {

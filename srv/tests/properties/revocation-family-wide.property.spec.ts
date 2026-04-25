@@ -18,7 +18,6 @@ describe('Property 4: Family-wide revocation', () => {
     let fixture: SharedTestFixture;
     let tokenFixture: TokenFixture;
     let tenantClientId: string;
-    let tenantClientSecret: string;
 
     beforeAll(async () => {
         fixture = new SharedTestFixture();
@@ -30,12 +29,12 @@ describe('Property 4: Family-wide revocation', () => {
             'auth.server.com',
         );
 
-        // Tenant credentials for refresh grants
+        // Get the default public client's clientId — matches the client that
+        // fetchAccessToken binds refresh tokens to (via the 'auth.server.com' alias).
         const creds = await fixture.getHttpServer()
             .get('/api/tenant/my/credentials')
             .set('Authorization', `Bearer ${adminResult.accessToken}`);
         tenantClientId = creds.body.clientId;
-        tenantClientSecret = creds.body.clientSecret;
     });
 
     afterAll(async () => {
@@ -65,11 +64,10 @@ describe('Property 4: Family-wide revocation', () => {
                             grant_type: 'refresh_token',
                             refresh_token: currentToken,
                             client_id: tenantClientId,
-                            client_secret: tenantClientSecret,
                         })
                         .set('Accept', 'application/json');
 
-                    expect(rotation.status).toEqual(201);
+                    expect(rotation.status).toEqual(200);
                     currentToken = rotation.body.refresh_token;
                     tokens.push(currentToken);
                 }
@@ -94,7 +92,6 @@ describe('Property 4: Family-wide revocation', () => {
                         grant_type: 'refresh_token',
                         refresh_token: latestToken,
                         client_id: tenantClientId,
-                        client_secret: tenantClientSecret,
                     })
                     .set('Accept', 'application/json');
 

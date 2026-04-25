@@ -54,7 +54,7 @@ describe('Policy Flow (e2e)', () => {
             {public: false}
         );
 
-        const credential = await tenantClient.getTenantCredentials(tenant.id);
+        const credential = await tokenFixture.createConfidentialClient(accessToken, tenant.id);
 
         const ccTr = await tokenFixture.fetchClientCredentialsToken(
             credential.clientId,

@@ -69,7 +69,7 @@ describe('Refresh Token Expiry', () => {
 
         // Token was just issued — well within the 7d sliding window
         const response = await refreshGrant(refreshToken, clientId, clientSecret);
-        expect(response.status).toEqual(201);
+        expect(response.status).toEqual(200);
         expect(response.body.access_token).toBeDefined();
         expect(response.body.refresh_token).toBeDefined();
     });
@@ -112,12 +112,12 @@ describe('Refresh Token Expiry', () => {
 
         // Rotate A → B
         const rotationB = await refreshGrant(refreshToken, clientId, clientSecret);
-        expect(rotationB.status).toEqual(201);
+        expect(rotationB.status).toEqual(200);
         const tokenB = rotationB.body.refresh_token;
 
         // Use B immediately — should succeed (new sliding expiry was just set)
         const rotationC = await refreshGrant(tokenB, clientId, clientSecret);
-        expect(rotationC.status).toEqual(201);
+        expect(rotationC.status).toEqual(200);
         expect(rotationC.body.access_token).toBeDefined();
         expect(rotationC.body.refresh_token).toBeDefined();
     });

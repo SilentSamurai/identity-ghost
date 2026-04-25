@@ -149,7 +149,7 @@ describe('Feature: resource-indicator-support, Property 3: Auth code resource ro
                         .set('Accept', 'application/json');
 
                     // Token exchange should succeed
-                    expect(tokenResponse.status).toEqual(201);
+                    expect(tokenResponse.status).toEqual(200);
                     expect(tokenResponse.body.access_token).toBeDefined();
 
                     // Decode the token and verify the audience contains the resource
@@ -213,7 +213,7 @@ describe('Feature: resource-indicator-support, Property 3: Auth code resource ro
                     })
                     .set('Accept', 'application/json');
 
-                expect(tokenResponse.status).toEqual(201);
+                expect(tokenResponse.status).toEqual(200);
 
                 const jwt = app.jwtService().decode(tokenResponse.body.access_token, {json: true}) as any;
                 // The resource should be preserved exactly as provided

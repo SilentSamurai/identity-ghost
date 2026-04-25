@@ -240,20 +240,15 @@ describe('UserInfo Endpoint Integration', () => {
 
     describe('client credentials token (TechnicalToken)', () => {
         it('should return 401 because UserInfo requires a user access token', async () => {
-            // Get an admin access token to fetch tenant credentials
+            // Get an admin access token to create a confidential client
             const adminToken = await tokenFixture.fetchAccessToken(email, password, clientId);
 
-            // Fetch the tenant's client credentials
-            const credsRes = await app.getHttpServer()
-                .get('/api/tenant/my/credentials')
-                .set('Authorization', `Bearer ${adminToken.accessToken}`)
-                .set('Accept', 'application/json');
-
-            expect2xx(credsRes);
-            const {clientId: tenantClientId, clientSecret} = credsRes.body;
+            // Create a confidential client for the tenant
+            const decoded = app.jwtService().decode(adminToken.accessToken, {json: true}) as any;
+            const creds = await tokenFixture.createConfidentialClient(adminToken.accessToken, decoded.tenant.id);
 
             // Get a client_credentials token (TechnicalToken — no user)
-            const ccToken = await tokenFixture.fetchClientCredentialsToken(tenantClientId, clientSecret);
+            const ccToken = await tokenFixture.fetchClientCredentialsToken(creds.clientId, creds.clientSecret);
 
             // UserInfo should reject it
             const res = await app.getHttpServer()

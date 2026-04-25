@@ -63,7 +63,7 @@ describe('Refresh Token Revocation', () => {
 
         // Rotate A → B
         const rotationB = await refreshGrant(tokenA, clientId, clientSecret);
-        expect(rotationB.status).toEqual(201);
+        expect(rotationB.status).toEqual(200);
 
         // Replay token A — triggers family revocation (all tokens in family revoked)
         const replayResponse = await refreshGrant(tokenA, clientId, clientSecret);
@@ -81,11 +81,11 @@ describe('Refresh Token Revocation', () => {
 
         // Build a chain: A → B → C
         const rotationB = await refreshGrant(tokenA, clientId, clientSecret);
-        expect(rotationB.status).toEqual(201);
+        expect(rotationB.status).toEqual(200);
         const tokenB = rotationB.body.refresh_token;
 
         const rotationC = await refreshGrant(tokenB, clientId, clientSecret);
-        expect(rotationC.status).toEqual(201);
+        expect(rotationC.status).toEqual(200);
         const tokenC = rotationC.body.refresh_token;
 
         // Replay token A — triggers family revocation
@@ -108,7 +108,7 @@ describe('Refresh Token Revocation', () => {
 
         // Rotate and trigger revocation
         const rotationB = await refreshGrant(tokenA, clientId, clientSecret);
-        expect(rotationB.status).toEqual(201);
+        expect(rotationB.status).toEqual(200);
 
         await refreshGrant(tokenA, clientId, clientSecret); // replay → revoke family
 
@@ -132,7 +132,7 @@ describe('Refresh Token Revocation', () => {
 
         // Revoke session 1's family via replay
         const rotation1 = await refreshGrant(session1.refreshToken, session1.clientId, session1.clientSecret);
-        expect(rotation1.status).toEqual(201);
+        expect(rotation1.status).toEqual(200);
         await refreshGrant(session1.refreshToken, session1.clientId, session1.clientSecret); // replay
 
         // Session 2's token should still work (different family)
@@ -141,7 +141,7 @@ describe('Refresh Token Revocation', () => {
             session2.clientId,
             session2.clientSecret,
         );
-        expect(session2Response.status).toEqual(201);
+        expect(session2Response.status).toEqual(200);
         expect(session2Response.body.access_token).toBeDefined();
     });
 });

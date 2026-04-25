@@ -60,7 +60,7 @@ describe('Login Session Threading', () => {
             })
             .set('Accept', 'application/json');
 
-        expect(passwordResponse.status).toEqual(201);
+        expect(passwordResponse.status).toEqual(200);
         expect(passwordResponse.body.id_token).toBeDefined();
         expect(passwordResponse.body.refresh_token).toBeDefined();
         expect(passwordResponse.body.access_token).toBeDefined();
@@ -70,15 +70,15 @@ describe('Login Session Threading', () => {
         expect(originalDecoded.sid).toBeDefined();
         expect(originalDecoded.sid).toMatch(UUID_V4_REGEX);
 
-        // Step 2: Get tenant credentials for the refresh request
+        // Step 2: Get tenant credentials for the refresh request.
+        // The default client is public, so no client_secret is needed (RFC 6749 §6).
         const credentialsResponse = await app.getHttpServer()
             .get('/api/tenant/my/credentials')
             .set('Authorization', `Bearer ${passwordResponse.body.access_token}`)
             .set('Accept', 'application/json');
 
         expect(credentialsResponse.status).toEqual(200);
-        const {clientId, clientSecret} = credentialsResponse.body;
-        expect(clientSecret).toBeDefined();
+        const {clientId} = credentialsResponse.body;
 
         // Step 3: Refresh the token
         const refreshResponse = await app.getHttpServer()
@@ -87,11 +87,10 @@ describe('Login Session Threading', () => {
                 grant_type: 'refresh_token',
                 refresh_token: passwordResponse.body.refresh_token,
                 client_id: clientId,
-                client_secret: clientSecret,
             })
             .set('Accept', 'application/json');
 
-        expect(refreshResponse.status).toEqual(201);
+        expect(refreshResponse.status).toEqual(200);
         expect(refreshResponse.body.id_token).toBeDefined();
 
         // Step 4: Decode the refreshed ID token and verify sid matches the original
@@ -112,20 +111,20 @@ describe('Login Session Threading', () => {
             })
             .set('Accept', 'application/json');
 
-        expect(passwordResponse.status).toEqual(201);
+        expect(passwordResponse.status).toEqual(200);
         const originalDecoded = app.jwtService().decode(passwordResponse.body.id_token, {json: true}) as any;
         const originalSid = originalDecoded.sid;
         expect(originalSid).toBeDefined();
         expect(originalSid).toMatch(UUID_V4_REGEX);
 
-        // Step 2: Get tenant credentials
+        // Step 2: Get tenant credentials (public client — no secret needed)
         const credentialsResponse = await app.getHttpServer()
             .get('/api/tenant/my/credentials')
             .set('Authorization', `Bearer ${passwordResponse.body.access_token}`)
             .set('Accept', 'application/json');
 
         expect(credentialsResponse.status).toEqual(200);
-        const {clientId, clientSecret} = credentialsResponse.body;
+        const {clientId} = credentialsResponse.body;
 
         // Step 3: First refresh (rotation #1)
         const refresh1Response = await app.getHttpServer()
@@ -134,11 +133,10 @@ describe('Login Session Threading', () => {
                 grant_type: 'refresh_token',
                 refresh_token: passwordResponse.body.refresh_token,
                 client_id: clientId,
-                client_secret: clientSecret,
             })
             .set('Accept', 'application/json');
 
-        expect(refresh1Response.status).toEqual(201);
+        expect(refresh1Response.status).toEqual(200);
         expect(refresh1Response.body.refresh_token).toBeDefined();
         expect(refresh1Response.body.id_token).toBeDefined();
 
@@ -152,11 +150,10 @@ describe('Login Session Threading', () => {
                 grant_type: 'refresh_token',
                 refresh_token: refresh1Response.body.refresh_token,
                 client_id: clientId,
-                client_secret: clientSecret,
             })
             .set('Accept', 'application/json');
 
-        expect(refresh2Response.status).toEqual(201);
+        expect(refresh2Response.status).toEqual(200);
         expect(refresh2Response.body.id_token).toBeDefined();
 
         const refresh2Decoded = app.jwtService().decode(refresh2Response.body.id_token, {json: true}) as any;

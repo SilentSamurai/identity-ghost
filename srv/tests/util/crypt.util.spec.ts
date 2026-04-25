@@ -12,42 +12,6 @@ describe('CryptUtil', () => {
         });
     });
 
-    describe('generateClientIdAndSecret', () => {
-        it('should generate a clientId, clientSecret, and salt', () => {
-            const result = CryptUtil.generateClientIdAndSecret();
-            expect(result).toHaveProperty('clientId');
-            expect(result).toHaveProperty('clientSecret');
-            expect(result).toHaveProperty('salt');
-            expect(typeof result.clientId).toBe('string');
-            expect(typeof result.clientSecret).toBe('string');
-            expect(typeof result.salt).toBe('string');
-        });
-    });
-
-    describe('verifyClientId', () => {
-        it('should verify a correct clientId', () => {
-            const {clientId, clientSecret, salt} = CryptUtil.generateClientIdAndSecret();
-            expect(CryptUtil.verifyClientId(clientSecret, clientId, salt)).toBe(true);
-        });
-        it('should not verify an incorrect clientId', () => {
-            const {clientSecret, salt} = CryptUtil.generateClientIdAndSecret();
-            expect(CryptUtil.verifyClientId(clientSecret, 'wrong', salt)).toBe(false);
-        });
-    });
-
-    describe('verifyClientSecret', () => {
-        it('should verify matching secrets', () => {
-            const hex = 'a'.repeat(64);
-            expect(CryptUtil.verifyClientSecret(hex, hex)).toBe(true);
-        });
-        it('should not verify secrets of different length', () => {
-            expect(CryptUtil.verifyClientSecret('a', 'aa')).toBe(false);
-        });
-        it('should not verify different secrets', () => {
-            expect(CryptUtil.verifyClientSecret('a'.repeat(64), 'b'.repeat(64))).toBe(false);
-        });
-    });
-
     describe('generateCodeVerifier', () => {
         it('should generate a code verifier of given length', () => {
             const verifier = CryptUtil.generateCodeVerifier(32);
@@ -98,4 +62,4 @@ describe('CryptUtil', () => {
             expect(otp).toBe('123456');
         });
     });
-}); 
+});

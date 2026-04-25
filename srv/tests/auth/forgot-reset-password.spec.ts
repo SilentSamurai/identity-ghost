@@ -89,7 +89,7 @@ describe("e2e forgot/reset password flow", () => {
                 client_id: clientId,
             });
 
-        expect(resLogin.status).toBe(201);
+        expect(resLogin.status).toBe(200);
         expect(resLogin.body.access_token).toBeDefined();
         expect(resLogin.body.refresh_token).toBeDefined();
     });

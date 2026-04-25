@@ -3,7 +3,6 @@ import {TokenFixture} from "./token.fixture";
 import {expect2xx} from "./api-client/client";
 import {ClientEntityClient} from "./api-client/client-entity-client";
 import {TenantClient} from "./api-client/tenant-client";
-import {AdminTenantClient} from "./api-client/admin-tenant-client";
 
 /**
  * Integration tests for CORS origin restriction.
@@ -50,10 +49,9 @@ describe('CORS origin restriction', () => {
             allowedScopes: "openid profile email",
         });
 
-        // Get the tenant's built-in credentials for client_credentials grant
-        const adminTenantClient = new AdminTenantClient(app, adminAccessToken);
-        const creds = await adminTenantClient.getTenantCredentials(tenant.id);
-        tenantCredentials = {clientId: creds.clientId, clientSecret: creds.clientSecret};
+        // Get the tenant's confidential client credentials for client_credentials grant
+        const tokenFixtureForCreds = new TokenFixture(app);
+        tenantCredentials = await tokenFixtureForCreds.createConfidentialClient(adminAccessToken, tenant.id);
     });
 
     afterAll(async () => {

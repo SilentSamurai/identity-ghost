@@ -144,7 +144,7 @@ describe('Ambiguous Subscription Tenant Flow', () => {
             })
             .set('Accept', 'application/json');
 
-        expect(response.status).toBe(201);
+        expect(response.status).toBe(200);
         expect(response.body.access_token).toBeDefined();
         expect(response.body.token_type).toBe('Bearer');
         expect(response.body.refresh_token).toBeDefined();

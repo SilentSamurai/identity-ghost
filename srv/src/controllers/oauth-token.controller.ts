@@ -15,6 +15,7 @@ import {
     ClassSerializerInterceptor,
     Controller,
     Get,
+    HttpCode,
     Logger,
     Post,
     Query,
@@ -454,6 +455,7 @@ export class OAuthTokenController {
         };
     }
 
+    @HttpCode(200)
     @Post("/token")
     async oauthToken(
         @Req() req: ExpressRequest,
@@ -496,16 +498,20 @@ export class OAuthTokenController {
         if (tenantToken.grant_type !== GRANT_TYPES.PASSWORD) {
             throw OAuthException.invalidGrant("The grant type of the source token is not permitted for exchange");
         }
-        await this.authService.validateClientCredentials(
+        
+        // Validate client credentials and get the Client entity
+        // Requirements: 2.1, 2.4
+        const client = await this.authService.validateClientCredentials(
             body.client_id,
             body.client_secret,
         );
+        
         const user = await this.authUserService.findUserByEmail(
             tenantToken.asTenantToken().email,
         );
-        const tenant = await this.authUserService.findTenantByClientId(
-            body.client_id,
-        );
+        
+        // Use the tenant from the Client entity
+        const tenant = client.tenant;
 
         return this.tokenIssuanceService.issueToken(user, tenant);
     }
@@ -610,17 +616,16 @@ export class OAuthTokenController {
             ValidationSchema.ClientCredentialGrantSchema,
         );
         await validationPipe.transform(body, null);
-        const tenant: Tenant =
+        
+        // Validate client credentials and get the Client entity
+        // Requirements: 2.1, 3.5
+        const client: Client =
             await this.authService.validateClientCredentials(
                 body.client_id,
                 body.client_secret,
             );
 
         // Validate resource indicator if present.
-        // For client_credentials, body.client_id is a Tenant.clientId (hex), not a Client.clientId (UUID).
-        // We validate the resource directly against the requesting Client entity if one can be resolved,
-        // otherwise skip Client-level allowedResources validation (tenant-level credentials have no
-        // Client entity with allowedResources).
         let resource: string | undefined;
         if (body.resource) {
             // First validate the URI format per RFC 8707
@@ -628,31 +633,18 @@ export class OAuthTokenController {
                 throw OAuthException.invalidTarget('The resource parameter must be an absolute URI without a fragment component');
             }
 
-            // Try to find a Client entity to check allowedResources.
-            // client_credentials may be called with Tenant.clientId which has no Client entity,
-            // or with a Client.clientId that does have one.
-            try {
-                const client = await this.clientService.findByClientIdOrAlias(body.client_id);
-                const allowedResources = client.allowedResources
-                    ? (typeof client.allowedResources === 'string'
-                        ? JSON.parse(client.allowedResources)
-                        : client.allowedResources)
-                    : null;
-                ResourceIndicatorValidator.validateResource(body.resource, allowedResources);
-            } catch (e) {
-                // If the error is from ResourceIndicatorValidator (OAuthException), re-throw it
-                if (e instanceof OAuthException) {
-                    throw e;
-                }
-                // If Client entity not found (NotFoundException), the tenant-level credentials
-                // don't have a Client entity with allowedResources — reject the resource
-                throw OAuthException.invalidTarget('The client is not configured to accept resource indicators');
-            }
+            // Validate against the Client's allowedResources
+            const allowedResources = client.allowedResources
+                ? (typeof client.allowedResources === 'string'
+                    ? JSON.parse(client.allowedResources)
+                    : client.allowedResources)
+                : null;
+            ResourceIndicatorValidator.validateResource(body.resource, allowedResources);
             resource = body.resource;
         }
 
         return this.tokenIssuanceService.issueClientCredentialsToken(
-            tenant,
+            client,
             body.scope ?? null,
             resource,
         );
@@ -664,41 +656,40 @@ export class OAuthTokenController {
         );
         await validationPipe.transform(body, null);
 
-        // Authenticate the client: confidential clients must provide a secret,
-        // public clients only need a valid client_id (RFC 6749 §6).
-        // Try the standard tenant-level auth path first (body.client_id is Tenant.clientId hex).
-        // If that fails, fall back to alias resolution: body.client_id may be a Client.alias
-        // (e.g. a tenant domain like "shire.local"), in which case we resolve the Client entity
-        // and use client.tenant.clientId (the hex string) for refresh token binding verification.
-        let resolvedClientId = body.client_id;
+        // Authenticate the client: resolve Client entity directly.
+        // Confidential clients must provide a secret, public clients only need a valid client_id (RFC 6749 §6).
+        // Requirements: 2.1, 2.3, 4.2, 4.3
+        let client: Client;
         try {
-            if (body.client_secret) {
-                await this.authService.validateClientCredentials(
-                    body.client_id,
-                    body.client_secret,
-                );
-            } else {
-                await this.authService.validatePublicClient(body.client_id);
-            }
+            client = await this.clientService.findByClientIdOrAlias(body.client_id);
         } catch {
-            // Fallback: resolve via Client alias → use tenant.clientId for binding
-            const client = await this.clientService.findByClientIdOrAlias(body.client_id);
-            if (!client.isPublic && body.client_secret) {
-                if (!this.clientService.validateClientSecret(client, body.client_secret)) {
-                    throw OAuthException.invalidClient('Client authentication failed');
-                }
+            throw OAuthException.invalidClient('Client authentication failed');
+        }
+
+        // Validate client authentication
+        if (client.isPublic) {
+            // Public clients don't need a secret, but we still validate the client exists
+            // (already done above via findByClientIdOrAlias)
+        } else {
+            // Confidential clients must provide a valid secret
+            if (!body.client_secret) {
+                throw OAuthException.invalidClient('Confidential clients must provide client_secret');
             }
-            resolvedClientId = client.tenant.clientId;
+            if (!this.clientService.validateClientSecret(client, body.client_secret)) {
+                throw OAuthException.invalidClient('Client authentication failed');
+            }
         }
 
         // Validate resource indicator if present
         const resource = await this.validateResourceForTokenRequest(body.resource, body.client_id);
 
+        // Use the Client entity's clientId (UUID) for refresh token binding
         return this.tokenIssuanceService.refreshToken(
             body.refresh_token,
-            resolvedClientId,
+            client.clientId,
             body.scope,
             resource,
+            body.client_id,
         );
     }
 

@@ -121,7 +121,7 @@ describe('S256 end-to-end verification', () => {
         const code = await loginWithChallenge(s256Challenge, 'S256');
         const response = await exchangeToken(code, verifier);
 
-        expect(response.status).toEqual(201);
+        expect(response.status).toEqual(200);
         expect(response.body.access_token).toBeDefined();
         expect(response.body.token_type).toEqual('Bearer');
     });
@@ -185,7 +185,7 @@ describe('S256 end-to-end verification', () => {
                 })
                 .set('Accept', 'application/json');
 
-            expect(tokenResponse.status).toEqual(201);
+            expect(tokenResponse.status).toEqual(200);
             expect(tokenResponse.body.access_token).toBeDefined();
             expect(tokenResponse.body.token_type).toEqual('Bearer');
         } finally {

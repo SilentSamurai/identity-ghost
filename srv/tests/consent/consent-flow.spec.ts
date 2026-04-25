@@ -262,7 +262,7 @@ describe('Consent Flow Integration Tests', () => {
         it('should skip consent entirely for tenant-domain alias client_id', async () => {
             // testTenantDomain is the alias of the default Client for the test tenant.
             // Using the domain as client_id resolves to the first-party default client,
-            // so consent is skipped (Req 8.1). Tenant.clientId (hex) is no longer a
+            // so consent is skipped (Req 8.1). Client.clientId (UUID) is the
             // valid client_id for the login endpoint — only Client.clientId (UUID) or
             // Client.alias (domain) are accepted.
             const response = await loginRequest({
@@ -428,7 +428,7 @@ describe('Consent Flow Integration Tests', () => {
                     })
                     .set('Accept', 'application/json');
 
-                expect(tokenResponse.status).toEqual(201);
+                expect(tokenResponse.status).toEqual(200);
                 expect(tokenResponse.body.access_token).toBeDefined();
                 expect(tokenResponse.body.token_type).toEqual('Bearer');
             } finally {
@@ -593,7 +593,7 @@ describe('Consent Flow Integration Tests', () => {
                     })
                     .set('Accept', 'application/json');
 
-                expect(tokenResponse.status).toEqual(201);
+                expect(tokenResponse.status).toEqual(200);
                 const decoded = app.jwtService().decode(tokenResponse.body.access_token, {json: true}) as any;
                 // email scope must not be present — it was outside client.allowedScopes
                 if (decoded?.scopes) {
