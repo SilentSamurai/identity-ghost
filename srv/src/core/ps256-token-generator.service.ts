@@ -16,7 +16,7 @@ export class PS256TokenGenerator implements TokenService {
                 expiresIn: this.configService.get(
                     "TOKEN_EXPIRATION_TIME",
                 ),
-                issuer: this.configService.get("SUPER_TENANT_DOMAIN")
+                issuer: this.configService.get("ISSUER")
             },
         });
     }

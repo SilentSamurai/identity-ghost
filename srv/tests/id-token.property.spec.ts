@@ -25,6 +25,7 @@ function createConfigService(): Environment {
     return {
         get: jest.fn((key: string, defaultValue?: any) => {
             if (key === 'SUPER_TENANT_DOMAIN') return TEST_ISSUER;
+            if (key === 'ISSUER') return TEST_ISSUER;
             if (key === 'ID_TOKEN_EXPIRATION_TIME_IN_SECONDS') return '3600';
             if (key === 'TOKEN_EXPIRATION_TIME') return '1h';
             return defaultValue ?? null;

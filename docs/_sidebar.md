@@ -2,6 +2,7 @@
 * [OAuth API](oauth.md)
 * [Refresh Token Rotation](refresh-token-rotation.md)
 * [Token API](token-api.md)
+* [Client API](client-api.md)
 * [Token Revocation](token-revocation.md)
 * [Resource Server Verification](resource-server-verification.md)
 * [Audience Model](audience-model.md)

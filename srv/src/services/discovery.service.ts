@@ -1,4 +1,5 @@
 import {Injectable} from "@nestjs/common";
+import {Environment} from "../config/environment.service";
 import {createHash} from "crypto";
 
 /**
@@ -47,14 +48,15 @@ export class DiscoveryService {
      * @returns An object containing the JSON body and SHA-256 ETag
      */
     buildDocument(baseUrl: string, tenantDomain: string): { body: string; etag: string } {
+        const effectiveBase = Environment.get("ISSUER") || baseUrl;
         const document: DiscoveryDocument = {
-            issuer: baseUrl,
-            authorization_endpoint: `${baseUrl}/api/oauth/authorize`,
-            token_endpoint: `${baseUrl}/api/oauth/token`,
-            userinfo_endpoint: `${baseUrl}/api/oauth/userinfo`,
-            jwks_uri: `${baseUrl}/${tenantDomain}/.well-known/jwks.json`,
-            introspection_endpoint: `${baseUrl}/api/oauth/introspect`,
-            revocation_endpoint: `${baseUrl}/api/oauth/revoke`,
+            issuer: effectiveBase,
+            authorization_endpoint: `${effectiveBase}/api/oauth/authorize`,
+            token_endpoint: `${effectiveBase}/api/oauth/token`,
+            userinfo_endpoint: `${effectiveBase}/api/oauth/userinfo`,
+            jwks_uri: `${effectiveBase}/${tenantDomain}/.well-known/jwks.json`,
+            introspection_endpoint: `${effectiveBase}/api/oauth/introspect`,
+            revocation_endpoint: `${effectiveBase}/api/oauth/revoke`,
             scopes_supported: DiscoveryService.SCOPES_SUPPORTED,
             response_types_supported: DiscoveryService.RESPONSE_TYPES_SUPPORTED,
             grant_types_supported: DiscoveryService.GRANT_TYPES_SUPPORTED,

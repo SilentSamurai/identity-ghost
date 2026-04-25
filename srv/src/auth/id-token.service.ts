@@ -83,7 +83,7 @@ export class IdTokenService {
         const idToken = await this.tokenGenerator.sign(claims, {
             privateKey,
             keyid: kid,
-            issuer: this.configService.get("SUPER_TENANT_DOMAIN"),
+            issuer: this.configService.get("ISSUER"),
             expiresIn: expirationSeconds,
         });
 

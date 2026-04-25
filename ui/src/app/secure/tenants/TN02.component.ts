@@ -72,11 +72,7 @@ import {SubscriptionService} from "../../_services/subscription.service";
                             </code>
                         </app-attribute>
                         <app-attribute label="Client Secret">
-                            <code>
-                                <pre class="text-wrap text-break">{{
-                                        credentials.clientSecret
-                                    }}</pre>
-                            </code>
+                            <span class="text-muted">Secret is only shown at client creation time. Use the Clients tab to rotate secrets.</span>
                         </app-attribute>
                         <app-attribute label="Public Key">
                             <code>
@@ -382,7 +378,6 @@ export class TN02Component implements OnInit {
     tenant: any = {};
     credentials: any = {
         clientId: 'NA',
-        clientSecret: 'NA',
         publicKey: 'NA',
     };
     members: any = [];

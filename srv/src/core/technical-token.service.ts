@@ -65,7 +65,7 @@ export class TechnicalTokenService {
         return this.tokenGenerator.sign(payload.asPlainObject(), {
             privateKey,
             keyid: kid,
-            issuer: this.configService.get("SUPER_TENANT_DOMAIN"),
+            issuer: this.configService.get("ISSUER"),
         });
     }
 

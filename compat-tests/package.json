@@ -1,0 +1,19 @@
+{
+  "name": "compat-tests",
+  "version": "1.0.0",
+  "description": "OAuth 2.0 / OIDC compatibility tests using openid-client v6",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test oidc-compat.test.mjs",
+    "start:backend": "cd ../srv && cross-env ENV_FILE=./envs/.env.testing npm run start",
+    "e2e:test": "start-server-and-test start:backend http://localhost:9001 test"
+  },
+  "dependencies": {
+    "openid-client": "^6.1.0"
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.3",
+    "start-server-and-test": "^2.0.11"
+  }
+}

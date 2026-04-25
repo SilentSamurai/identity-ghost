@@ -12,6 +12,7 @@ describe('RS256TokenGenerator sign-verify-decode round trip', () => {
             get: jest.fn((key) => {
                 if (key === 'TOKEN_EXPIRATION_TIME') return '1h';
                 if (key === 'SUPER_TENANT_DOMAIN') return 'auth.server.com';
+                if (key === 'ISSUER') return 'https://auth.server.com';
                 return null;
             }),
         } as unknown as Environment;

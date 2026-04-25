@@ -290,7 +290,7 @@ export class AuthService {
         const accessToken = await this.tokenGenerator.sign(accessTokenPayload.asPlainObject(), {
                 privateKey,
                 keyid: kid,
-                issuer: this.configService.get("SUPER_TENANT_DOMAIN"),
+                issuer: this.configService.get("ISSUER"),
             },
         );
 
@@ -349,7 +349,7 @@ export class AuthService {
         const accessToken = await this.tokenGenerator.sign(accessTokenPayload.asPlainObject(), {
                 privateKey: issuingPrivateKey,
                 keyid: issuingKid,
-                issuer: this.configService.get("SUPER_TENANT_DOMAIN"),
+                issuer: this.configService.get("ISSUER"),
             },
         );
 
