@@ -88,6 +88,17 @@ export class HomeComponent implements OnInit {
                         });
                     },
                 },
+                {
+                    title: 'Groups',
+                    subtitle: 'Manage Groups',
+                    icon: 'fa-layer-group',
+                    command: async () => {
+                        const tenant_id = this.user.tenant.id;
+                        await this.router.navigate(['/TN02', tenant_id], {
+                            fragment: 'GROUPS',
+                        });
+                    },
+                },
             ],
         },
     ];

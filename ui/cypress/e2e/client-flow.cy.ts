@@ -32,7 +32,7 @@ describe('Client Flow', () => {
     it('Create confidential client and verify secret is displayed', function () {
         cy.userOpenClientList();
 
-        cy.contains('button', 'Create Client').click();
+        cy.get('#CREATE_CLIENT_BTN').click();
 
         cy.get('#name').type(CLIENT_NAME);
         cy.get('#redirectUris').type('https://example.com/callback');
@@ -149,7 +149,7 @@ describe('Client Flow', () => {
             expect(response!.statusCode).to.be.oneOf([200]);
         });
 
-        cy.url().should('include', '/CL01/');
+        cy.url().should('include', '/TN02/');
 
         cy.contains('td', CLIENT_NAME_EDITED).should('not.exist');
     });
@@ -159,7 +159,7 @@ describe('Client Flow', () => {
     it('Create and delete client from CL01 list via row action button', function () {
         cy.userOpenClientList();
 
-        cy.contains('button', 'Create Client').click();
+        cy.get('#CREATE_CLIENT_BTN').click();
 
         cy.get('#name').type(CLIENT_NAME_DELETE);
         cy.get('#redirectUris').type('https://example.com/callback');
@@ -182,7 +182,8 @@ describe('Client Flow', () => {
 
         cy.contains('td', CLIENT_NAME_DELETE)
             .parent('tr')
-            .find('button.btn-danger')
+            .find('button .fa-trash')
+            .closest('button')
             .click();
 
         cy.get('#CONFIRMATION_YES_BTN').click();

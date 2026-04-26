@@ -64,6 +64,9 @@ export class CaslAbilityFactory {
                 can(Action.Read, SubjectEnum.POLICY, {
                     tenantId: tenantToken.tenant.id,
                 });
+                can(Action.Read, SubjectEnum.GROUP, {
+                    tenantId: tenantToken.tenant.id,
+                });
 
                 cannot(Action.ReadCredentials, SubjectEnum.TENANT);
             }
@@ -91,6 +94,12 @@ export class CaslAbilityFactory {
                     tenantId: tenantToken.tenant.id,
                 });
                 can(Action.Manage, SubjectEnum.CLIENT, {
+                    tenantId: tenantToken.tenant.id,
+                });
+                can(Action.Manage, SubjectEnum.GROUP, {
+                    tenantId: tenantToken.tenant.id,
+                });
+                can(Action.Manage, SubjectEnum.GROUP_ROLE, {
                     tenantId: tenantToken.tenant.id,
                 });
             }

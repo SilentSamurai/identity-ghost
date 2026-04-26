@@ -12,6 +12,7 @@ import {UserAuthGuard} from './shared/user-auth-guard.service';
 import {HttpErrorComponent} from './error-pages/HttpError.component';
 import {TenantAccessAuthGuard} from './shared/tenant-auth-guard.service';
 import {CL02Component} from './secure/clients/CL02.component';
+import {GP02Component} from './secure/group/GP02.component';
 import {AuthorizeLoginComponent} from "./open-pages/authorize-login.component";
 import {TenantSelectionComponent} from './open-pages/tenant-selection.component';
 import {ConsentScreenComponent} from './open-pages/consent-screen.component';
@@ -62,6 +63,11 @@ const routes: Routes = [
             {
                 path: 'CL02/:tenantId/:clientId',
                 component: CL02Component,
+                canActivate: [TenantAccessAuthGuard],
+            },
+            {
+                path: 'GP02/:tenantId/:groupId',
+                component: GP02Component,
                 canActivate: [TenantAccessAuthGuard],
             },
         ],

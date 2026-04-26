@@ -48,11 +48,6 @@ export class GroupService {
     }
 
     async findById(permission: Permission, id: string): Promise<Group> {
-        permission.isAuthorized(
-            Action.Read,
-            SubjectEnum.GROUP,
-            {id},
-        );
         let group: Group = await this.groupRepository.findOne({
             where: {id: id},
             relations: ["tenant"],
@@ -60,6 +55,11 @@ export class GroupService {
         if (group === null) {
             throw new BadRequestException("group not found");
         }
+        permission.isAuthorized(
+            Action.Read,
+            SubjectEnum.GROUP,
+            {tenantId: group.tenantId},
+        );
         return group;
     }
 
@@ -95,7 +95,7 @@ export class GroupService {
         permission.isAuthorized(
             Action.Read,
             SubjectEnum.GROUP,
-            {id: group.id},
+            {tenantId: group.tenantId},
         );
         return group;
     }
@@ -108,6 +108,7 @@ export class GroupService {
         permission.isAuthorized(
             Action.Read,
             SubjectEnum.GROUP,
+            {tenantId: tenantId},
         );
         return await this.groupRepository.exists({
             where: {
@@ -136,7 +137,7 @@ export class GroupService {
         permission.isAuthorized(
             Action.Delete,
             SubjectEnum.GROUP,
-            {id: id},
+            {tenantId: group.tenantId},
         );
         await this.groupRepository.remove(group);
 
@@ -152,8 +153,7 @@ export class GroupService {
             Action.Read,
             SubjectEnum.GROUP_ROLE,
             {
-                groupId: group.id,
-                roleId: role.id,
+                tenantId: group.tenantId,
             },
         );
 
@@ -175,7 +175,7 @@ export class GroupService {
             Action.Read,
             SubjectEnum.GROUP,
             {
-                id: group.id,
+                tenantId: group.tenantId,
             },
         );
 
@@ -197,7 +197,7 @@ export class GroupService {
             Action.Read,
             SubjectEnum.GROUP,
             {
-                id: group.id,
+                tenantId: group.tenantId,
             },
         );
 
@@ -219,7 +219,7 @@ export class GroupService {
             Action.Read,
             SubjectEnum.GROUP,
             {
-                id: group.id,
+                tenantId: group.tenantId,
             },
         );
 
@@ -240,7 +240,7 @@ export class GroupService {
             Action.Read,
             SubjectEnum.GROUP,
             {
-                id: group.id,
+                tenantId: group.tenantId,
             },
         );
 
@@ -264,7 +264,7 @@ export class GroupService {
             Action.Read,
             SubjectEnum.GROUP,
             {
-                id: group.id,
+                tenantId: group.tenantId,
             },
         );
 
@@ -285,7 +285,7 @@ export class GroupService {
             Action.Update,
             SubjectEnum.GROUP,
             {
-                id: group.id,
+                tenantId: group.tenantId,
             },
         );
 
@@ -327,7 +327,7 @@ export class GroupService {
             Action.Update,
             SubjectEnum.GROUP,
             {
-                id: group.id,
+                tenantId: group.tenantId,
             },
         );
 
@@ -361,7 +361,7 @@ export class GroupService {
             Action.Update,
             SubjectEnum.GROUP,
             {
-                id: group.id,
+                tenantId: group.tenantId,
             },
         );
 
@@ -395,7 +395,7 @@ export class GroupService {
             Action.Update,
             SubjectEnum.GROUP,
             {
-                id: group.id,
+                tenantId: group.tenantId,
             },
         );
 
@@ -429,7 +429,7 @@ export class GroupService {
             Action.Update,
             SubjectEnum.GROUP,
             {
-                id: group.id,
+                tenantId: group.tenantId,
             },
         );
 

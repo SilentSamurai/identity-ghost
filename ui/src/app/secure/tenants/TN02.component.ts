@@ -19,6 +19,8 @@ import {SubscriptionService} from "../../_services/subscription.service";
 import {ClientService} from "../../_services/client.service";
 import {CreateClientComponent} from "../clients/dialogs/create-client.component";
 import {SecretDisplayComponent} from "../clients/dialogs/secret-display.component";
+import {GroupService} from "../../_services/group.service";
+import {CreateGroupComponent} from "../group/dialogs/create-group.component";
 
 @Component({
     selector: 'view-tenant',
@@ -422,6 +424,50 @@ import {SecretDisplayComponent} from "../clients/dialogs/secret-display.componen
                     </app-section-content>
                 </app-op-section>
             </app-op-tab>
+
+            <app-op-tab name="Groups">
+                <app-op-section name="Groups">
+                    <app-section-content>
+                        <app-table
+                            title="Group List"
+                            [dataSource]="groupsDataModel"
+                        >
+                            <app-table-col label="Name" name="name"></app-table-col>
+                            <app-table-col label="Actions" name="actions"></app-table-col>
+
+                            <app-table-actions>
+                                <button
+                                    (click)="onCreateGroup()"
+                                    [disabled]="!isTenantAdmin"
+                                    id="CREATE_GROUP_BTN"
+                                    class="btn btn-primary btn-sm"
+                                >
+                                    Create
+                                </button>
+                            </app-table-actions>
+
+                            <ng-template let-group #table_body>
+                                <td>
+                                    <a
+                                        [routerLink]="['/GP02', tenant_id, group.id]"
+                                        href="javascript:void(0)"
+                                    >{{ group.name }}</a>
+                                </td>
+                                <td>
+                                    <button
+                                        (click)="onDeleteGroup(group)"
+                                        [disabled]="!isTenantAdmin"
+                                        class="btn btn-sm"
+                                        type="button"
+                                    >
+                                        <i class="fa fa-solid fa-trash"></i>
+                                    </button>
+                                </td>
+                            </ng-template>
+                        </app-table>
+                    </app-section-content>
+                </app-op-section>
+            </app-op-tab>
         </app-object-page>
     `,
     styles: [''],
@@ -443,6 +489,7 @@ export class TN02Component implements OnInit {
     createdAppsDataModel: StaticSource<any>;
     subscribedAppsDataModel: StaticSource<any>;
     clientsDataModel: StaticSource<any>;
+    groupsDataModel: StaticSource<any>;
 
     constructor(
         private tenantService: TenantService,
@@ -457,12 +504,14 @@ export class TN02Component implements OnInit {
         private appService: AppService,
         private subscriptionService: SubscriptionService,
         private clientService: ClientService,
+        private groupService: GroupService,
     ) {
         this.memberDataModel = new StaticSource(['id']);
         this.rolesDataModel = new StaticSource(['id']);
         this.createdAppsDataModel = new StaticSource(['id']);
         this.subscribedAppsDataModel = new StaticSource(['id']);
         this.clientsDataModel = new StaticSource(['id']);
+        this.groupsDataModel = new StaticSource(['id']);
     }
 
     async ngOnInit() {
@@ -480,12 +529,14 @@ export class TN02Component implements OnInit {
             const createdApps = await this.appService.getAppCreatedByTenantId();
             const subscribedApps = await this.subscriptionService.getTenantSubscription();
             const clients = await this.clientService.getClientsByTenant();
+            const groups = await this.groupService.getGroupsByTenant();
 
             this.memberDataModel.setData(Array.isArray(this.members) ? this.members : []);
             this.rolesDataModel.setData(Array.isArray(this.roles) ? this.roles : []);
             this.createdAppsDataModel.setData(Array.isArray(createdApps) ? createdApps : []);
             this.subscribedAppsDataModel.setData(Array.isArray(subscribedApps) ? subscribedApps : []);
             this.clientsDataModel.setData(Array.isArray(clients) ? clients : []);
+            this.groupsDataModel.setData(Array.isArray(groups) ? groups : []);
 
             this.authDefaultService.setTitle('TN02: ' + this.tenant.name);
         } finally {
@@ -771,6 +822,36 @@ export class TN02Component implements OnInit {
                     return true;
                 } catch (e) {
                     this.messageService.add({severity: 'error', summary: 'Error', detail: 'Client Deletion Failed'});
+                }
+                return null;
+            },
+        });
+        if (deleted) {
+            await this.ngOnInit();
+        }
+    }
+
+    async onCreateGroup() {
+        const result = await this.modalService.open(CreateGroupComponent, {
+            initData: {tenantId: this.tenant_id}
+        });
+        if (result.is_ok()) {
+            await this.ngOnInit();
+        }
+    }
+
+    async onDeleteGroup(group: any) {
+        const deleted = await this.confirmationService.confirm({
+            message: `Are you sure you want to delete group <b>${group.name}</b>?`,
+            header: 'Confirmation',
+            icon: 'pi pi-info-circle',
+            accept: async () => {
+                try {
+                    await this.groupService.deleteGroup(group.id);
+                    this.messageService.add({severity: 'success', summary: 'Success', detail: 'Group Deleted'});
+                    return true;
+                } catch (e) {
+                    this.messageService.add({severity: 'error', summary: 'Error', detail: 'Group Deletion Failed'});
                 }
                 return null;
             },

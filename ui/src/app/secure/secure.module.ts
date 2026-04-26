@@ -32,6 +32,9 @@ import {CreateAppComponent} from './apps/dialogs/create-app.component';
 import {UpdateAppComponent} from './apps/dialogs/update-app.component';
 import {CreatePolicyModalComponent} from './roles/create-policy-modal.component';
 import {UpdateRoleModalComponent} from './roles/update-role-modal.component';
+import {GP02Component} from './group/GP02.component';
+import {CreateGroupComponent} from './group/dialogs/create-group.component';
+import {UpdateGroupComponent} from './group/dialogs/update-group.component';
 
 @NgModule({
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
@@ -53,6 +56,9 @@ import {UpdateRoleModalComponent} from './roles/update-role-modal.component';
         UpdateAppComponent,
         CreatePolicyModalComponent,
         UpdateRoleModalComponent,
+        GP02Component,
+        CreateGroupComponent,
+        UpdateGroupComponent,
     ],
     imports: [
         TableModule,

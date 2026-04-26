@@ -187,10 +187,8 @@ Cypress.Commands.add('userPublishApp', (appName: string) => {
 
 // User-context: open client list from /home
 Cypress.Commands.add('userOpenClientList', () => {
-    cy.goToSecurePage('home');
-    cy.get('#Home_HOME_NAV').click();
-    cy.contains('app-tile', 'Clients').click();
-    cy.url().should('include', '/CL01/');
+    cy.userOpenTenantOverview();
+    cy.contains('button', 'Clients').click();
 });
 
 // Context-neutral commands
