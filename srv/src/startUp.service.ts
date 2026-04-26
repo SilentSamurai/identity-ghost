@@ -132,7 +132,10 @@ export class StartUpService implements OnModuleInit {
                 {name: "Client Binding Test Tenant", domain: "client-binding-test.local", signUp: false},
                 {name: "Auth Code Single Use Test Tenant", domain: "auth-code-single-use-test.local", signUp: false},
                 {name: "UserInfo Test Tenant", domain: "userinfo-test.local", signUp: false},
-                {name: "Session Threading Test Tenant", domain: "session-threading-test.local", signUp: false}
+                {name: "Session Threading Test Tenant", domain: "session-threading-test.local", signUp: false},
+                {name: "Sub Flow A Tenant", domain: "sub-flow-a.local", signUp: true},
+                {name: "Sub Flow B Tenant", domain: "sub-flow-b.local", signUp: false},
+                {name: "Forgot PW Test Tenant", domain: "forgot-pw-test.local", signUp: true}
             ];
 
             // 4) Create each tenant and assign the existing user as owner

@@ -34,7 +34,7 @@ describe('Ambiguous Tenant Flow', () => {
         }
     };
     const TEST_APP = {
-        name: "Test App",
+        name: "Ambiguous Tenant Test App",
         url: "http://localhost:3000",
         description: "Test application for ambiguous tenant flow"
     };

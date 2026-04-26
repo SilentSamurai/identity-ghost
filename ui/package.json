@@ -13,10 +13,11 @@
         "release": "npm run build && npm run test",
         "start:external-service": "cd ../external-user-app && node server.js",
         "start:backend": "cd ../srv && cross-env ENV_FILE=./envs/.env.testing npm run start",
-        "e2e:test": "start-server-and-test start:all \"http://localhost:4200|http://localhost:9001\" cypress:run",
+        "e2e:test": "start-server-and-test start:all \"http://localhost:4200|http://localhost:9001\" cypress:run:parallel",
         "e2e": "ng e2e",
         "cypress:open": "cypress open",
         "cypress:run": "cypress run",
+        "cypress:run:parallel": "node cypress-parallel.js",
         "cypress:run:spec": "cypress run --spec",
         "e2e:spec": "start-server-and-test start:all \"http://localhost:4200|http://localhost:9001\" \"cypress run --spec %npm_config_spec%\"",
         "start:all": "concurrently \"npm run start:backend\" \"npm run ui:serve\" \"npm run start:external-service\""

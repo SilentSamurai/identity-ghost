@@ -48,7 +48,7 @@ describe("Forgot/Reset Password (UI)", () => {
         // 1) Create user via public API
         cy.request({
             method: "POST",
-            url: "http://localhost:9001/api/signup",
+            url: "/api/signup", // angular listen in ipv6
             body: {
                 name: "UI Forgot Reset User",
                 email,
@@ -88,7 +88,7 @@ describe("Forgot/Reset Password (UI)", () => {
         // 4) Fetch reset password email, extract link, visit UI reset page
         cy.request({
             method: "GET",
-            url: `http://127.0.0.1:8899/__test__/emails/latest`,
+            url: `http://127.0.0.1:8899/__test__/emails/latest`, // smtp server listn on ipv4
             qs: {to: email, subject: "Reset your password"},
             failOnStatusCode: false,
         }).then((res) => {
