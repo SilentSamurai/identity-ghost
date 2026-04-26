@@ -15,7 +15,7 @@ const API_URL = '/api/oauth';
         >
             <div *ngIf="loading" class="align-middle text-center" style="padding-top:25%">
                 <div class="spinner-border m-5" role="status">
-                    <span class="sr-only">Loading...</span>
+                    <span class="visually-hidden">Loading...</span>
                 </div>
             </div>
 
@@ -39,11 +39,13 @@ const API_URL = '/api/oauth';
                                 id="password"
                                 minlength="6"
                                 placeholder="Enter new password"
+                                aria-describedby="password-error"
                             />
                             <button
                                 (click)="isPasswordVisible = !isPasswordVisible"
                                 class="input-group-text"
                                 type="button"
+                                aria-label="Toggle password visibility"
                             >
                                 <i class="fa fas {{ !isPasswordVisible ? 'fa-eye' : 'fa-eye-slash' }}"></i>
                             </button>
@@ -51,7 +53,8 @@ const API_URL = '/api/oauth';
                         <div
                             *ngIf="resetPasswordForm.get('password')?.errors && (resetPasswordForm.get('password')?.touched || resetPasswordForm.get('password')?.dirty)"
                             class="alert alert-danger mt-2"
-                            role="alert">
+                            role="alert"
+                            id="password-error">
                             <div *ngIf="resetPasswordForm.get('password')?.errors?.['required']">
                                 Password is required
                             </div>
@@ -70,11 +73,13 @@ const API_URL = '/api/oauth';
                                 formControlName="confirmPassword"
                                 id="confirmPassword"
                                 placeholder="Confirm new password"
+                                aria-describedby="confirmPassword-error"
                             />
                             <button
                                 (click)="isConfirmPasswordVisible = !isConfirmPasswordVisible"
                                 class="input-group-text"
                                 type="button"
+                                aria-label="Toggle confirm password visibility"
                             >
                                 <i class="fa fas {{ !isConfirmPasswordVisible ? 'fa-eye' : 'fa-eye-slash' }}"></i>
                             </button>
@@ -82,7 +87,8 @@ const API_URL = '/api/oauth';
                         <div
                             *ngIf="resetPasswordForm.get('confirmPassword')?.errors && (resetPasswordForm.get('confirmPassword')?.touched || resetPasswordForm.get('confirmPassword')?.dirty)"
                             class="alert alert-danger mt-2"
-                            role="alert">
+                            role="alert"
+                            id="confirmPassword-error">
                             <div *ngIf="resetPasswordForm.get('confirmPassword')?.errors?.['required']">
                                 Please confirm your password
                             </div>

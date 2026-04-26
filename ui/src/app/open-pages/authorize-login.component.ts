@@ -15,7 +15,7 @@ import {MessageService} from 'primeng/api';
         >
             <div *ngIf="loading" class="align-middle text-center" style="padding-top:25%">
                 <div class="spinner-border m-5" role="status">
-                    <span class="sr-only">Loading...</span>
+                    <span class="visually-hidden">Loading...</span>
                 </div>
             </div>
 
@@ -56,12 +56,14 @@ import {MessageService} from 'primeng/api';
                                 id="username"
                                 placeholder="Enter Username / Email"
                                 type="text"
+                                aria-describedby="username-error"
                             />
                         </div>
                         <div
                             *ngIf="loginForm.get('username')?.errors && (loginForm.get('username')?.touched || loginForm.get('username')?.dirty)"
                             class="alert alert-danger mt-2"
-                            role="alert">
+                            role="alert"
+                            id="username-error">
                             Username is required
                         </div>
                     </div>
@@ -76,11 +78,13 @@ import {MessageService} from 'primeng/api';
                                 id="password"
                                 minlength="6"
                                 placeholder="Password"
+                                aria-describedby="password-error"
                             />
                             <button
                                 (click)="isPasswordVisible = !isPasswordVisible"
                                 class="input-group-text"
                                 type="button"
+                                aria-label="Toggle password visibility"
                             >
                                 <i class="fa fas {{ !isPasswordVisible ? 'fa-eye' : 'fa-eye-slash' }}"></i>
                             </button>
@@ -88,7 +92,8 @@ import {MessageService} from 'primeng/api';
                         <div
                             *ngIf="loginForm.get('password')?.errors && (loginForm.get('password')?.touched || loginForm.get('password')?.dirty)"
                             class="alert alert-danger mt-2"
-                            role="alert">
+                            role="alert"
+                            id="password-error">
                             <div *ngIf="loginForm.get('password')?.errors?.['required']">
                                 Password is required
                             </div>

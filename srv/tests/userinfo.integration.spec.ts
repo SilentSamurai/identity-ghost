@@ -17,8 +17,8 @@ describe('UserInfo Endpoint Integration', () => {
     let app: SharedTestFixture;
     let tokenFixture: TokenFixture;
 
-    const clientId = 'auth.server.com';
-    const email = 'admin@auth.server.com';
+    const clientId = 'userinfo-test.local';
+    const email = 'admin@userinfo-test.local';
     const password = 'admin9000';
     const verifier = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq';
     const challenge = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq';

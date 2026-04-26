@@ -62,6 +62,7 @@ import {ModalService} from "../../component/dialogs/modal.service";
                                 (click)="openUpdateModal(app)"
                                 class="btn btn-sm btn-primary me-2"
                                 type="button"
+                                aria-label="Edit app"
                             >
                                 <i class="fa fa-edit"></i>
                             </button>
@@ -69,6 +70,7 @@ import {ModalService} from "../../component/dialogs/modal.service";
                                 (click)="openDeleteModal(app)"
                                 class="btn btn-sm btn-danger"
                                 type="button"
+                                aria-label="Delete app"
                             >
                                 <i class="fa fa-solid fa-trash"></i>
                             </button>

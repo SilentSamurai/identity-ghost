@@ -51,7 +51,7 @@ import {ModalService} from '../../component/dialogs/modal.service';
                         <app-attribute label="Tenant">
                             <a
                                 [routerLink]="['/admin/TN02/', tenantId]"
-                                href="javascript:void(0)"
+                                
                             >{{ tenantDomain }}</a>
                         </app-attribute>
                         <app-attribute label="Created At">
@@ -80,7 +80,7 @@ import {ModalService} from '../../component/dialogs/modal.service';
                                 <td>
                                     <a
                                         [routerLink]="['/admin/UR02/', user.id]"
-                                        href="javascript:void(0)"
+                                        
                                     >{{ user.email }}</a>
                                 </td>
                                 <td>{{ user.name }}</td>

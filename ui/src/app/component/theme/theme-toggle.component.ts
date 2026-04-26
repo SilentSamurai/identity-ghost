@@ -4,7 +4,7 @@ import {ThemeService} from './theme.service';
 @Component({
     selector: 'app-theme-toggle',
     template: `
-        <button class="btn btn-link" (click)="toggleTheme()">
+        <button class="btn btn-link" (click)="toggleTheme()" aria-label="Toggle theme">
             <i
                 class="pi"
                 [class.pi-moon]="!(themeService.darkMode$ | async)"

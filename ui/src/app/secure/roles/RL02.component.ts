@@ -138,6 +138,7 @@ import {AppService} from '../../_services/app.service';
                                         (click)="onUserRemove(user)"
                                         class="btn btn-sm"
                                         type="button"
+                                        aria-label="Remove user"
                                     >
                                         <i class="fa fa-solid fa-trash"></i>
                                     </button>
@@ -201,6 +202,7 @@ import {AppService} from '../../_services/app.service';
                                     <button
                                         class="btn btn-sm btn-success me-2"
                                         (click)="openViewPolicyModal(policy.id)"
+                                        aria-label="View policy"
                                     >
                                         <i class="fa fa-eye"></i>
                                     </button>
@@ -209,12 +211,14 @@ import {AppService} from '../../_services/app.service';
                                         (click)="
                                             openUpdatePolicyModal(policy.id)
                                         "
+                                        aria-label="Edit policy"
                                     >
                                         <i class="fa fa-pencil"></i>
                                     </button>
                                     <button
                                         class="btn btn-sm btn-danger"
                                         (click)="onPolicyRemove(policy)"
+                                        aria-label="Delete policy"
                                     >
                                         <i class="fa fa-trash"></i>
                                     </button>
@@ -228,7 +232,7 @@ import {AppService} from '../../_services/app.service';
 
         <div class="text-center mt-5" *ngIf="loading">
             <div class="spinner-border" role="status">
-                <span class="sr-only">Loading...</span>
+                <span class="visually-hidden">Loading...</span>
             </div>
         </div>
         <p-confirmDialog></p-confirmDialog>

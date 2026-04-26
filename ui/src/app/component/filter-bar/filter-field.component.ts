@@ -44,6 +44,7 @@ export class InternalFilter {
                         (click)="openValueHelp()"
                         class="input-group-text btn btn-outline-secondary"
                         type="button"
+                        aria-label="Open value help"
                     >
                         <i class="fa fas fa-clone"></i>
                     </button>

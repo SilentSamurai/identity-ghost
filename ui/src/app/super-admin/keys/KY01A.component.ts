@@ -42,7 +42,7 @@ import {FilterSelectOption} from '../../component/filter-bar/filter-select-field
                     <ng-template #table_body let-key>
                         <td>
                             <a [routerLink]="['/admin/TN02', key.tenant?.id]"
-                               href="javascript:void(0)">{{ key.tenant?.domain }}</a>
+                               >{{ key.tenant?.domain }}</a>
                         </td>
                         <td>{{ key.keyVersion }}</td>
                         <td>{{ key.kid ? key.kid.substring(0, 8) + '\u2026' : '' }}</td>

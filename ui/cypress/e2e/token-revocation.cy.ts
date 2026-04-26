@@ -19,7 +19,7 @@ describe('Token Revocation — Sign Out', () => {
         cy.intercept('POST', '**/api/oauth/logout').as('logoutCall');
 
         cy.get('#dropdownUser1').click();
-        cy.contains('a.dropdown-item', 'Sign Out').click();
+        cy.contains('button.dropdown-item', 'Sign Out').click();
 
         cy.wait('@logoutCall').then((interception) => {
             expect(interception.request.body).to.have.property('refresh_token');
@@ -38,7 +38,7 @@ describe('Token Revocation — Sign Out', () => {
         cy.intercept('POST', '**/api/oauth/logout').as('logoutCall');
 
         cy.get('#dropdownUser1').click();
-        cy.contains('a.dropdown-item', 'Sign Out').click();
+        cy.contains('button.dropdown-item', 'Sign Out').click();
 
         cy.url().should('include', '/login');
 
@@ -53,7 +53,7 @@ describe('Token Revocation — Sign Out', () => {
         cy.intercept('POST', '**/api/oauth/logout', {statusCode: 500}).as('logoutError');
 
         cy.get('#dropdownUser1').click();
-        cy.contains('a.dropdown-item', 'Sign Out').click();
+        cy.contains('button.dropdown-item', 'Sign Out').click();
 
         cy.wait('@logoutError').its('response.statusCode').should('eq', 500);
 

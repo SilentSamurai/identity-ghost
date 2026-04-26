@@ -12,7 +12,7 @@ import {MessageService} from 'primeng/api';
         <app-centered-card imageUrl="/assets/logo-img.jpg">
             <div *ngIf="loading" class="align-middle text-center" style="padding-top:25%">
                 <div class="spinner-border m-5" role="status">
-                    <span class="sr-only">Loading...</span>
+                    <span class="visually-hidden">Loading...</span>
                 </div>
             </div>
 
@@ -25,11 +25,11 @@ import {MessageService} from 'primeng/api';
                         <div class="input-group">
                             <input class="form-control" formControlName="orgName" id="orgName"
                                    [readonly]="currentStep != 1"
-                                   type="text" placeholder="Organization"/>
+                                   type="text" placeholder="Organization" aria-describedby="orgName-error"/>
                         </div>
                         <div
                             *ngIf="registerForm.get('orgName')?.errors && (registerForm.get('orgName')?.touched || registerForm.get('orgName')?.dirty)"
-                            class="alert alert-danger mt-2" role="alert">
+                            class="alert alert-danger mt-2" role="alert" id="orgName-error">
                             Organization is required
                         </div>
                     </div>
@@ -38,11 +38,11 @@ import {MessageService} from 'primeng/api';
                         <div class="input-group">
                             <input class="form-control" formControlName="domain" id="domain"
                                    [readonly]="currentStep != 1"
-                                   type="text" placeholder="Domain"/>
+                                   type="text" placeholder="Domain" aria-describedby="domain-error"/>
                         </div>
                         <div
                             *ngIf="registerForm.get('domain')?.errors && (registerForm.get('domain')?.touched || registerForm.get('domain')?.dirty)"
-                            class="alert alert-danger mt-2" role="alert">
+                            class="alert alert-danger mt-2" role="alert" id="domain-error">
                             Domain is required
                         </div>
                     </div>
@@ -58,11 +58,11 @@ import {MessageService} from 'primeng/api';
                         <label for="username">Username</label>
                         <div class="input-group">
                             <input class="form-control" formControlName="username" id="username" type="text"
-                                   placeholder="Username"/>
+                                   placeholder="Username" aria-describedby="username-error"/>
                         </div>
                         <div
                             *ngIf="registerForm.get('username')?.errors && (registerForm.get('username')?.touched || registerForm.get('username')?.dirty)"
-                            class="alert alert-danger mt-2" role="alert">
+                            class="alert alert-danger mt-2" role="alert" id="username-error">
                             <div *ngIf="registerForm.get('username')?.errors?.['required']">Username is required</div>
                             <div *ngIf="registerForm.get('username')?.errors?.['minlength']">Username must be at least 3
                                 characters
@@ -76,11 +76,11 @@ import {MessageService} from 'primeng/api';
                         <label for="email">Email</label>
                         <div class="input-group">
                             <input class="form-control" formControlName="email" id="email" type="email"
-                                   placeholder="Email"/>
+                                   placeholder="Email" aria-describedby="email-error"/>
                         </div>
                         <div
                             *ngIf="registerForm.get('email')?.errors && (registerForm.get('email')?.touched || registerForm.get('email')?.dirty)"
-                            class="alert alert-danger mt-2" role="alert">
+                            class="alert alert-danger mt-2" role="alert" id="email-error">
                             <div *ngIf="registerForm.get('email')?.errors?.['required']">Email is required</div>
                             <div *ngIf="registerForm.get('email')?.errors?.['email']">Must be a valid email
                                 address
@@ -91,11 +91,11 @@ import {MessageService} from 'primeng/api';
                         <label for="password">Password</label>
                         <div class="input-group">
                             <input [type]="'password'" class="form-control" formControlName="password" id="password"
-                                   minlength="6" placeholder="Password"/>
+                                   minlength="6" placeholder="Password" aria-describedby="password-error"/>
                         </div>
                         <div
                             *ngIf="registerForm.get('password')?.errors && (registerForm.get('password')?.touched || registerForm.get('password')?.dirty)"
-                            class="alert alert-danger mt-2" role="alert">
+                            class="alert alert-danger mt-2" role="alert" id="password-error">
                             <div *ngIf="registerForm.get('password')?.errors?.['required']">Password is required
                             </div>
                             <div *ngIf="registerForm.get('password')?.errors?.['minlength']">Password must be at

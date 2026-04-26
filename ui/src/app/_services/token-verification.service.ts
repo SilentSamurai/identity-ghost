@@ -1,5 +1,5 @@
 import {Injectable} from '@angular/core';
-import jwt_decode from 'jwt-decode';
+import {jwtDecode} from 'jwt-decode';
 import {DecodedToken} from '../model/user.model';
 
 @Injectable({
@@ -8,7 +8,7 @@ import {DecodedToken} from '../model/user.model';
 export class TokenVerificationService {
     verifyToken(token: string): boolean {
         try {
-            const decodedToken = jwt_decode(token) as DecodedToken;
+            const decodedToken = jwtDecode(token) as DecodedToken;
 
             if (!this.verifyRequiredFields(decodedToken)) {
                 console.error('Invalid token structure');

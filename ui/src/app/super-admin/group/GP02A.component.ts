@@ -98,7 +98,7 @@ import {CloseType, ValueHelpResult,} from '../../component/value-help/value-help
                                                 group.tenant.id,
                                                 role.id,
                                             ]"
-                                            href="javascript:void(0)"
+                                            
                                         >
                                             {{ role.name }}
                                         </a>
@@ -109,6 +109,7 @@ import {CloseType, ValueHelpResult,} from '../../component/value-help/value-help
                                             (click)="onRemoveRole(role)"
                                             class="btn btn-sm"
                                             type="button"
+                                            aria-label="Remove role"
                                         >
                                             <i class="fa fa-solid fa-trash"></i>
                                         </button>
@@ -163,7 +164,7 @@ import {CloseType, ValueHelpResult,} from '../../component/value-help/value-help
                                     <td>
                                         <a
                                             [routerLink]="['/admin/UR02', user.email]"
-                                            href="javascript:void(0)"
+                                            
                                         >{{ user.email }}</a
                                         >
                                     </td>
@@ -174,7 +175,7 @@ import {CloseType, ValueHelpResult,} from '../../component/value-help/value-help
                                                 group.tenant.id,
                                                 user.email,
                                             ]"
-                                            href="javascript:void(0)"
+                                            
                                         >View Assignments</a
                                         >
                                     </td>
@@ -183,6 +184,7 @@ import {CloseType, ValueHelpResult,} from '../../component/value-help/value-help
                                             (click)="onUserRemove(user)"
                                             class="btn btn-sm"
                                             type="button"
+                                            aria-label="Remove user"
                                         >
                                             <i class="fa fa-solid fa-trash"></i>
                                         </button>
@@ -196,7 +198,7 @@ import {CloseType, ValueHelpResult,} from '../../component/value-help/value-help
         </app-object-page>
         <div class="text-center" *ngIf="loading">
             <div class="spinner-border" role="status">
-                <span class="sr-only">Loading...</span>
+                <span class="visually-hidden">Loading...</span>
             </div>
         </div>
         <p-confirmDialog></p-confirmDialog>

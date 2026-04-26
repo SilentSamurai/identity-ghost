@@ -1,5 +1,5 @@
 import {Injectable} from '@angular/core';
-import jwt_decode from 'jwt-decode';
+import {jwtDecode} from 'jwt-decode';
 import {Router} from '@angular/router';
 import {PureAbility} from '@casl/ability';
 import {DecodedToken} from '../model/user.model';
@@ -87,7 +87,7 @@ export class SessionService {
             return null;
         }
         try {
-            const decodedToken = new DecodedToken(jwt_decode(token));
+            const decodedToken = new DecodedToken(jwtDecode(token));
             if (tokenExpired(decodedToken)) {
                 this.clearSession();
                 return null;
@@ -111,7 +111,7 @@ export class SessionService {
      * Returns the decoded payload object.
      */
     public decodeIdToken(idToken: string): any {
-        return jwt_decode(idToken);
+        return jwtDecode(idToken);
     }
 
     public getUser(): DecodedToken | null {
@@ -124,7 +124,7 @@ export class SessionService {
             return true;
         }
         try {
-            return tokenExpired(new DecodedToken(jwt_decode(token)));
+            return tokenExpired(new DecodedToken(jwtDecode(token)));
         } catch (error) {
             console.error('Error checking token expiration:', error);
             this.clearSession();

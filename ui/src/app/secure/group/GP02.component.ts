@@ -79,6 +79,7 @@ import {CloseType, ValueHelpResult} from '../../component/value-help/value-help.
                                         [disabled]="!isTenantAdmin"
                                         class="btn btn-sm"
                                         type="button"
+                                        aria-label="Remove user"
                                     >
                                         <i class="fa fa-solid fa-trash"></i>
                                     </button>
@@ -118,7 +119,7 @@ import {CloseType, ValueHelpResult} from '../../component/value-help/value-help.
                                 <td>
                                     <a
                                         [routerLink]="['/RL02', tenantId, role.id]"
-                                        href="javascript:void(0)"
+                                        
                                     >{{ role.name }}</a>
                                 </td>
                                 <td>{{ role.description }}</td>
@@ -128,6 +129,7 @@ import {CloseType, ValueHelpResult} from '../../component/value-help/value-help.
                                         [disabled]="!isTenantAdmin"
                                         class="btn btn-sm"
                                         type="button"
+                                        aria-label="Remove role"
                                     >
                                         <i class="fa fa-solid fa-trash"></i>
                                     </button>

@@ -98,7 +98,7 @@ import {ChangePasswordModalComponent} from './dialogs/change-password.modal.comp
                                 <td>
                                     <a
                                         [routerLink]="['/admin/TN02/', tenant.id]"
-                                        href="javascript:void(0)"
+                                        
                                     >{{ tenant.domain }}</a
                                     >
                                 </td>
@@ -109,7 +109,7 @@ import {ChangePasswordModalComponent} from './dialogs/change-password.modal.comp
                                             tenant.id,
                                             user.id,
                                         ]"
-                                        href="javascript:void(0)"
+                                        
                                     >View Role Assignments
                                     </a>
                                 </td>

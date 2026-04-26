@@ -92,7 +92,7 @@ describe('Admin Pages Separation — admin layout renders correctly', () => {
             .find('.dropdown-menu')
             .should('be.visible')
             .within(() => {
-                cy.contains('a.dropdown-item', 'Sign Out').should('exist');
+                cy.contains('button.dropdown-item', 'Sign Out').should('exist');
             });
     });
 });

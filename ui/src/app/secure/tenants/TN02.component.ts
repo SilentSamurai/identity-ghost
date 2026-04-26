@@ -133,7 +133,7 @@ import {CreateGroupComponent} from "../group/dialogs/create-group.component";
                                             tenant_id,
                                             user.id,
                                         ]"
-                                        href="javascript:void(0)"
+                                        
                                     >View Role Assignments
                                     </a>
                                 </td>
@@ -144,6 +144,7 @@ import {CreateGroupComponent} from "../group/dialogs/create-group.component";
                                         class="btn"
                                         [attr.data-cy-id]="user.email"
                                         type="button"
+                                        aria-label="Remove member"
                                     >
                                         <i class="fa fa-solid fa-trash"></i>
                                     </button>
@@ -193,7 +194,7 @@ import {CreateGroupComponent} from "../group/dialogs/create-group.component";
                                             tenant.id,
                                             role.id,
                                         ]"
-                                        href="javascript:void(0)"
+                                        
                                     >{{ role.name }}
                                     </a>
                                 </td>
@@ -206,6 +207,7 @@ import {CreateGroupComponent} from "../group/dialogs/create-group.component";
                                         class="btn btn-sm"
                                         [attr.data-cy-id]="role.name"
                                         type="button"
+                                        aria-label="Remove role"
                                     >
                                         <i class="fa fa-solid fa-trash"></i>
                                     </button>
@@ -273,6 +275,7 @@ import {CreateGroupComponent} from "../group/dialogs/create-group.component";
                                         class="btn btn-sm"
                                         data-test-id="edit"
                                         type="button"
+                                        aria-label="Edit app"
                                     >
                                         <i class="fa fa-solid fa-pencil"></i>
                                     </button>
@@ -282,6 +285,7 @@ import {CreateGroupComponent} from "../group/dialogs/create-group.component";
                                         class="btn btn-sm"
                                         data-test-id="delete"
                                         type="button"
+                                        aria-label="Delete app"
                                     >
                                         <i class="fa fa-solid fa-trash"></i>
                                     </button>
@@ -361,6 +365,7 @@ import {CreateGroupComponent} from "../group/dialogs/create-group.component";
                                         [disabled]="!isTenantAdmin"
                                         class="btn btn-sm btn-danger me-2"
                                         type="button"
+                                        aria-label="Unsubscribe"
                                     >
                                         <i class="fa fa-solid fa-trash"></i>
                                     </button>
@@ -400,7 +405,7 @@ import {CreateGroupComponent} from "../group/dialogs/create-group.component";
                                 <td>
                                     <a
                                         [routerLink]="['/CL02', tenant_id, client.clientId]"
-                                        href="javascript:void(0)"
+                                        
                                     >{{ client.name }}</a>
                                 </td>
                                 <td>{{ client.clientId }}</td>
@@ -450,7 +455,7 @@ import {CreateGroupComponent} from "../group/dialogs/create-group.component";
                                 <td>
                                     <a
                                         [routerLink]="['/GP02', tenant_id, group.id]"
-                                        href="javascript:void(0)"
+                                        
                                     >{{ group.name }}</a>
                                 </td>
                                 <td>
@@ -459,6 +464,7 @@ import {CreateGroupComponent} from "../group/dialogs/create-group.component";
                                         [disabled]="!isTenantAdmin"
                                         class="btn btn-sm"
                                         type="button"
+                                        aria-label="Delete group"
                                     >
                                         <i class="fa fa-solid fa-trash"></i>
                                     </button>

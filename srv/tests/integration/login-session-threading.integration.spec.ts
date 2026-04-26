@@ -28,16 +28,16 @@ describe('Login Session Threading', () => {
     it('auth code flow — sid is threaded from login to ID token', async () => {
         // Step 1: Login via auth code flow
         const loginResult = await tokenFixture.login(
-            'admin@auth.server.com',
+            'admin@session-threading-test.local',
             'admin9000',
-            'auth.server.com',
+            'session-threading-test.local',
         );
         expect(loginResult.authentication_code).toBeDefined();
 
         // Step 2: Exchange the auth code for tokens
         const tokenResult = await tokenFixture.exchangeCodeForToken(
             loginResult.authentication_code,
-            'auth.server.com',
+            'session-threading-test.local',
         ) as any;
         expect(tokenResult.id_token).toBeDefined();
 
@@ -54,9 +54,9 @@ describe('Login Session Threading', () => {
             .post('/api/oauth/token')
             .send({
                 grant_type: 'password',
-                username: 'admin@auth.server.com',
+                username: 'admin@session-threading-test.local',
                 password: 'admin9000',
-                client_id: 'auth.server.com',
+                client_id: 'session-threading-test.local',
             })
             .set('Accept', 'application/json');
 
@@ -105,9 +105,9 @@ describe('Login Session Threading', () => {
             .post('/api/oauth/token')
             .send({
                 grant_type: 'password',
-                username: 'admin@auth.server.com',
+                username: 'admin@session-threading-test.local',
                 password: 'admin9000',
-                client_id: 'auth.server.com',
+                client_id: 'session-threading-test.local',
             })
             .set('Accept', 'application/json');
 

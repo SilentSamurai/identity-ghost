@@ -60,20 +60,20 @@ import {Filter} from '../../component/model/Filters';
                                     role.tenant.id,
                                     role.id,
                                 ]"
-                                href="javascript:void(0)"
+                                
                             >{{ role.name }}</a
                             >
                         </td>
                         <td>
                             <a
                                 [routerLink]="['/admin/TN02/', role.tenant.id]"
-                                href="javascript:void(0)"
+                                
                             >{{ role.tenant.domain }}</a
                             >
                         </td>
                         <td>{{ role.tenant.name }}</td>
                         <td class="d-flex ">
-                            <button class="btn ">
+                            <button class="btn " aria-label="View role">
                                 <i class="fa fa-solid fa-eye"></i>
                             </button>
                             <button
@@ -81,6 +81,7 @@ import {Filter} from '../../component/model/Filters';
                                 class="btn "
                                 type="button"
                                 *ngIf="role.removable"
+                                aria-label="Delete role"
                             >
                                 <i class="fa fa-solid fa-trash"></i>
                             </button>

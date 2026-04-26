@@ -97,6 +97,7 @@ import {ModalService} from '../../component/dialogs/modal.service';
                                         class="btn"
                                         [attr.data-cy-id]="user.email"
                                         type="button"
+                                        aria-label="Remove member"
                                     >
                                         <i class="fa fa-solid fa-trash"></i>
                                     </button>
@@ -132,6 +133,7 @@ import {ModalService} from '../../component/dialogs/modal.service';
                                         class="btn btn-sm"
                                         [attr.data-cy-id]="role.name"
                                         type="button"
+                                        aria-label="Remove role"
                                     >
                                         <i class="fa fa-solid fa-trash"></i>
                                     </button>
@@ -171,6 +173,7 @@ import {ModalService} from '../../component/dialogs/modal.service';
                                         class="btn btn-sm"
                                         data-test-id="delete"
                                         type="button"
+                                        aria-label="Delete app"
                                     >
                                         <i class="fa fa-solid fa-trash"></i>
                                     </button>
@@ -200,6 +203,7 @@ import {ModalService} from '../../component/dialogs/modal.service';
                                     id="COPY_JWKS_URL_BTN"
                                     type="button"
                                     title="Copy JWKS URL"
+                                    aria-label="Copy JWKS URL"
                                 >
                                     <i class="fa fa-copy"></i>
                                 </button>

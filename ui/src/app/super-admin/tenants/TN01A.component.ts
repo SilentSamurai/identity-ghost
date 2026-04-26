@@ -57,7 +57,7 @@ import {DataSource} from "../../component/model/DataSource";
                         <td>
                             <a
                                 [routerLink]="['/admin/TN02/', tenant.id]"
-                                href="javascript:void(0)"
+                                
                             >{{ tenant.domain }}</a
                             >
                         </td>
@@ -69,6 +69,7 @@ import {DataSource} from "../../component/model/DataSource";
                                 [disabled]="!this.isTenantAdmin"
                                 class="btn btn-sm btn-primary me-2"
                                 type="button"
+                                aria-label="Edit tenant"
                             >
                                 <i class="fa fa-edit"></i>
                             </button>
@@ -77,6 +78,7 @@ import {DataSource} from "../../component/model/DataSource";
                                 [disabled]="!this.deleteAllowed"
                                 class="btn btn-sm btn-danger"
                                 type="button"
+                                aria-label="Delete tenant"
                             >
                                 <i class="fa fa-solid fa-trash"></i>
                             </button>

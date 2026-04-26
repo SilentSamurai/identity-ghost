@@ -81,11 +81,10 @@ import {ProfileComponent} from '../open-pages/profile.component';
                                 ngbDropdownMenu
                             >
                                 <a class="dropdown-item" href="#">Settings</a>
-                                <a
+                                <button
                                     class="dropdown-item"
-                                    href="javascript:void(0)"
                                     (click)="openProfileModal()"
-                                >Profile</a>
+                                >Profile</button>
                                 <div class="dropdown-divider"></div>
                                 <a
                                     class="dropdown-item"
@@ -96,11 +95,10 @@ import {ProfileComponent} from '../open-pages/profile.component';
                                     href="https://silentsamurai.github.io/auth-server"
                                 >API Docs</a>
                                 <div class="dropdown-divider"></div>
-                                <a
+                                <button
                                     class="dropdown-item"
-                                    href="javascript:void(0)"
                                     (click)="logout()"
-                                >Sign Out</a>
+                                >Sign Out</button>
                             </div>
                         </li>
                     </ul>

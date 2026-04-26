@@ -56,7 +56,7 @@ import {query} from '../../component/model/Query';
                     <ng-template #table_body let-client>
                         <td>
                             <a [routerLink]="['/admin/CL02', client.clientId]"
-                               href="javascript:void(0)">{{ client.name }}</a>
+                               >{{ client.name }}</a>
                         </td>
                         <td>{{ client.clientId }}</td>
                         <td>
@@ -72,6 +72,7 @@ import {query} from '../../component/model/Query';
                                 (click)="onRotateSecret(client)"
                                 class="btn btn-sm btn-primary me-2"
                                 type="button"
+                                aria-label="Rotate secret"
                             >
                                 <i class="fa fa-refresh"></i>
                             </button>
@@ -79,6 +80,7 @@ import {query} from '../../component/model/Query';
                                 (click)="openDeleteModal(client)"
                                 class="btn btn-sm btn-danger"
                                 type="button"
+                                aria-label="Delete client"
                             >
                                 <i class="fa fa-solid fa-trash"></i>
                             </button>

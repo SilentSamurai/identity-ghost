@@ -93,7 +93,7 @@ import {StaticSource} from "../../component/model/StaticSource";
                                             tenant.id,
                                             role.id,
                                         ]"
-                                        href="javascript:void(0)"
+                                        
                                     >{{ role.name }}</a
                                     >
                                 </td>
@@ -105,6 +105,7 @@ import {StaticSource} from "../../component/model/StaticSource";
                                         (click)="onRemoveAssignment(role)"
                                         class="btn btn-sm"
                                         type="button"
+                                        aria-label="Remove role assignment"
                                     >
                                         <i class="fa fa-solid fa-trash"></i>
                                     </button>

@@ -68,7 +68,7 @@ import {EditClientAdminComponent} from './dialogs/edit-client-admin.component';
                     <div class="col-lg-6">
                         <app-attribute label="Owner Tenant">
                             <a [routerLink]="['/admin/TN02', client.tenant.id]"
-                               href="javascript:void(0)">{{ client.tenant.name }}</a>
+                               >{{ client.tenant.name }}</a>
                         </app-attribute>
                         <app-attribute label="Response Types">
                             {{ client.responseTypes }}

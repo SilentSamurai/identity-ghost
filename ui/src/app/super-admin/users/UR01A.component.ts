@@ -51,7 +51,7 @@ import {Filter} from "../../component/model/Filters";
                         <td>
                             <a
                                 [routerLink]="['/admin/UR02/', user.id]"
-                                href="javascript:void(0)"
+                                
                             >{{ user.email }}</a
                             >
                         </td>
@@ -70,6 +70,7 @@ import {Filter} from "../../component/model/Filters";
                                 class="btn btn-sm btn-danger"
                                 type="button"
                                 data-test-id="delete"
+                                aria-label="Delete user"
                             >
                                 <i class="fa fa-solid fa-trash"></i>
                             </button>

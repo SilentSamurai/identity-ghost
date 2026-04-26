@@ -55,14 +55,14 @@ import {Filter} from '../../component/model/Filters';
                         <td>
                             <a
                                 [routerLink]="['/admin/GP02/', group.id]"
-                                href="javascript:void(0)"
+                                
                             >{{ group.name }}</a
                             >
                         </td>
                         <td>
                             <a
                                 [routerLink]="['/admin/TN02/', group.tenantId]"
-                                href="javascript:void(0)"
+                                
                             >{{ group.tenantId }}</a
                             >
                         </td>
@@ -75,6 +75,7 @@ import {Filter} from '../../component/model/Filters';
                                 (click)="openUpdateModal(group)"
                                 class="btn "
                                 type="button"
+                                aria-label="Edit group"
                             >
                                 <i class="fa fa-edit"></i>
                             </button>
@@ -82,6 +83,7 @@ import {Filter} from '../../component/model/Filters';
                                 (click)="openDeleteModal(group)"
                                 class="btn "
                                 type="button"
+                                aria-label="Delete group"
                             >
                                 <i class="fa fa-solid fa-trash"></i>
                             </button>

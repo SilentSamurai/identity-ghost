@@ -32,10 +32,10 @@ import {exportToCsv} from './csv-export';
                 </div>
                 <div class="d-flex gap-2">
                     <ng-content select="app-table-actions"></ng-content>
-                    <button type="button" class="btn btn-sm" (click)="refresh()" pRipple>
+                    <button type="button" class="btn btn-sm" (click)="refresh()" pRipple aria-label="Refresh">
                         <i class="pi pi-refresh"></i>
                     </button>
-                    <button type="button" class="btn btn-sm" (click)="onExportCsv()" pRipple>
+                    <button type="button" class="btn btn-sm" (click)="onExportCsv()" pRipple aria-label="Export CSV">
                         <i class="pi pi-download"></i>
                     </button>
                 </div>

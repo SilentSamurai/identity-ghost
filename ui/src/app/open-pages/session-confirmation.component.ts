@@ -14,7 +14,7 @@ import {AuthDefaultService} from '../_services/auth.default.service';
         >
             <div *ngIf="loading" class="align-middle text-center" style="padding-top:25%">
                 <div class="spinner-border m-5" role="status">
-                    <span class="sr-only">Loading...</span>
+                    <span class="visually-hidden">Loading...</span>
                 </div>
             </div>
 

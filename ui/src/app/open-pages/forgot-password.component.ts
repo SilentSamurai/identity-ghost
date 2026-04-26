@@ -14,7 +14,7 @@ const API_URL = '/api/oauth';
         >
             <div *ngIf="loading" class="align-middle text-center" style="padding-top:25%">
                 <div class="spinner-border m-5" role="status">
-                    <span class="sr-only">Loading...</span>
+                    <span class="visually-hidden">Loading...</span>
                 </div>
             </div>
 
@@ -39,12 +39,14 @@ const API_URL = '/api/oauth';
                                 id="email"
                                 placeholder="Enter your email"
                                 type="email"
+                                aria-describedby="email-error"
                             />
                         </div>
                         <div
                             *ngIf="forgotPasswordForm.get('email')?.errors && (forgotPasswordForm.get('email')?.touched || forgotPasswordForm.get('email')?.dirty)"
                             class="alert alert-danger mt-2"
-                            role="alert">
+                            role="alert"
+                            id="email-error">
                             <div *ngIf="forgotPasswordForm.get('email')?.errors?.['required']">
                                 Email is required
                             </div>

@@ -11,7 +11,7 @@ import {BehaviorSubject, catchError, filter, Observable, switchMap, take, throwE
 import {SessionService} from '../_services/session.service';
 import {AuthDefaultService} from '../_services/auth.default.service';
 import {AuthService} from '../_services/auth.service';
-import jwt_decode from 'jwt-decode';
+import {jwtDecode} from 'jwt-decode';
 import {JwtToken} from '../model/user.model';
 
 const TOKEN_HEADER_KEY = 'Authorization';
@@ -124,7 +124,7 @@ export class AuthInterceptor implements HttpInterceptor {
             return null;
         }
         try {
-            const decoded = jwt_decode<JwtToken>(token);
+            const decoded = jwtDecode<JwtToken>(token);
             return decoded.client_id ?? decoded.tenant?.client_id ?? null;
         } catch {
             return null;

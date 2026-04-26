@@ -12,7 +12,7 @@ import {AuthService} from '../_services/auth.service';
         <app-centered-card [title]="signupForm.get('client_id')?.value" imageUrl="/assets/logo-img.jpg">
             <div *ngIf="loading" class="align-middle text-center" style="padding-top:25%">
                 <div class="spinner-border m-5" role="status">
-                    <span class="sr-only">Loading...</span>
+                    <span class="visually-hidden">Loading...</span>
                 </div>
             </div>
 
@@ -26,11 +26,11 @@ import {AuthService} from '../_services/auth.service';
                 <div class="form-group mt-3">
                     <label for="name">Name</label>
                     <div class="input-group">
-                        <input class="form-control" formControlName="name" id="name" placeholder="Name" type="text"/>
+                        <input class="form-control" formControlName="name" id="name" placeholder="Name" type="text" aria-describedby="name-error"/>
                     </div>
                     <div
                         *ngIf="signupForm.get('name')?.errors && (signupForm.get('name')?.touched || signupForm.get('name')?.dirty)"
-                        class="alert alert-danger mt-2" role="alert">
+                        class="alert alert-danger mt-2" role="alert" id="name-error">
                         <div *ngIf="signupForm.get('name')?.errors?.['required']">Name is required</div>
                         <div *ngIf="signupForm.get('name')?.errors?.['minlength']">Name must be at least 3
                             characters
@@ -44,11 +44,11 @@ import {AuthService} from '../_services/auth.service';
                     <label for="email">Email</label>
                     <div class="input-group">
                         <input class="form-control" formControlName="email" id="email" placeholder="Email"
-                               type="email"/>
+                               type="email" aria-describedby="email-error"/>
                     </div>
                     <div
                         *ngIf="signupForm.get('email')?.errors && (signupForm.get('email')?.touched || signupForm.get('email')?.dirty)"
-                        class="alert alert-danger mt-2" role="alert">
+                        class="alert alert-danger mt-2" role="alert" id="email-error">
                         <div *ngIf="signupForm.get('email')?.errors?.['required']">Email is required</div>
                         <div *ngIf="signupForm.get('email')?.errors?.['email']">Must be a valid email address</div>
                     </div>
@@ -58,11 +58,11 @@ import {AuthService} from '../_services/auth.service';
                     <div class="input-group">
                         <input [type]="'password'" class="form-control" formControlName="password" id="password"
                                minlength="6"
-                               placeholder="Password"/>
+                               placeholder="Password" aria-describedby="password-error"/>
                     </div>
                     <div
                         *ngIf="signupForm.get('password')?.errors && (signupForm.get('password')?.touched || signupForm.get('password')?.dirty)"
-                        class="alert alert-danger mt-2" role="alert">
+                        class="alert alert-danger mt-2" role="alert" id="password-error">
                         <div *ngIf="signupForm.get('password')?.errors?.['required']">Password is required</div>
                         <div *ngIf="signupForm.get('password')?.errors?.['minlength']">Password must be at least 6
                             characters

@@ -22,7 +22,6 @@ import {InternalFilter} from './filter-field.component';
                         <button
                             aria-expanded="false"
                             class="btn btn-outline-secondary dropdown-toggle text-start"
-                            data-bs-toggle="dropdown"
                             ngbDropdown
                             ngbDropdownToggle
                             type="button"
@@ -56,6 +55,7 @@ import {InternalFilter} from './filter-field.component';
                         <button
                             class="btn btn-sm py-0"
                             (click)="removeFilter(i)"
+                            aria-label="Remove filter"
                         >
                             <i class="fa fa-close"></i>
                         </button>

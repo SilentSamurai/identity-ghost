@@ -251,6 +251,6 @@ Cypress.Commands.add('goToSecurePage', (page: string) => {
 
 Cypress.Commands.add('logout', () => {
     cy.get('#dropdownUser1').click();
-    cy.contains('a.dropdown-item', 'Sign Out').click();
+    cy.contains('button.dropdown-item', 'Sign Out').click();
     cy.url().should('include', '/login');
 });
