@@ -67,7 +67,7 @@ export class AdminHomeComponent implements OnInit {
                 {
                     title: 'RL01',
                     subtitle: 'Manage Roles',
-                    icon: 'fa-casl',
+                    icon: 'fa-shield',
                     link: ['/admin/RL01'],
                     canActivate: (ps: PermissionService) =>
                         ps.isAuthorized(Actions.Manage, Subjects.ROLE, 'all'),
@@ -75,7 +75,7 @@ export class AdminHomeComponent implements OnInit {
                 {
                     title: 'RL02',
                     subtitle: 'Display Role',
-                    icon: 'fa-role',
+                    icon: 'fa-id-badge',
                     link: ['/admin/RL02'],
                     canActivate: (ps: PermissionService) =>
                         ps.isAuthorized(Actions.Manage, Subjects.ROLE, 'all'),
@@ -88,7 +88,7 @@ export class AdminHomeComponent implements OnInit {
                 {
                     title: 'AP01',
                     subtitle: 'Manage Apps',
-                    icon: 'fa-app',
+                    icon: 'fa-th-large',
                     link: ['/admin/AP01'],
                     canActivate: (ps: PermissionService) =>
                         ps.isAuthorized(Actions.Manage, Subjects.APPS, 'all'),

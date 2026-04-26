@@ -26,6 +26,10 @@ import {Component, Input} from '@angular/core';
         </div>
     `,
     styles: [`
+        .vh-80 {
+            min-height: 80vh;
+        }
+
         label {
             display: block;
             margin-top: 10px;

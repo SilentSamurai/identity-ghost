@@ -86,7 +86,7 @@ import {MessageService} from 'primeng/api';
                                 type="button"
                                 aria-label="Toggle password visibility"
                             >
-                                <i class="fa fas {{ !isPasswordVisible ? 'fa-eye' : 'fa-eye-slash' }}"></i>
+                                <i class="fa {{ !isPasswordVisible ? 'fa-eye' : 'fa-eye-slash' }}"></i>
                             </button>
                         </div>
                         <div

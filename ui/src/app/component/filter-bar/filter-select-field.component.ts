@@ -71,6 +71,7 @@ export class FilterSelectFieldComponent implements OnInit {
     }
 
     getFilters(): Filter[] {
+        if (!this.selectedValue) return [];
         return [
             new Filter(
                 this.name,

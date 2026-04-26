@@ -58,7 +58,7 @@ export class HomeComponent implements OnInit {
                 {
                     title: 'Apps',
                     subtitle: 'Manage Apps',
-                    icon: 'fa-app',
+                    icon: 'fa-th-large',
                     command: async () => {
                         const tenant_id = this.user.tenant.id;
                         await this.router.navigate(['/TN02', tenant_id], {
@@ -91,7 +91,7 @@ export class HomeComponent implements OnInit {
                 {
                     title: 'Groups',
                     subtitle: 'Manage Groups',
-                    icon: 'fa-layer-group',
+                    icon: 'fa-group',
                     command: async () => {
                         const tenant_id = this.user.tenant.id;
                         await this.router.navigate(['/TN02', tenant_id], {

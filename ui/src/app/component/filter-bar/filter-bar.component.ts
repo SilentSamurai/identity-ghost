@@ -1,6 +1,6 @@
 import {Component, ContentChildren, EventEmitter, Input, OnInit, Output, QueryList, ViewChildren,} from '@angular/core';
 import {Operators} from '../model/Operator';
-import {FilterFieldComponent} from './filter-field.component';
+import {Condition, FilterFieldComponent} from './filter-field.component';
 import {FilterSelectFieldComponent, FilterSelectOption} from './filter-select-field.component';
 import {Filter} from '../model/Filters';
 
@@ -26,7 +26,7 @@ export class FilterBarColumnComponent implements OnInit {
     selector: 'app-fb',
     template: `
         <div class="row">
-            <div class="col-md-11 col-sm-12 my-2">
+            <div class="col-md col-sm-12 my-2">
                 <div class="row row-cols-auto">
                     <!-- Render a filter field for each projected column -->
                     <div *ngFor="let column of columns" class="col-auto">
@@ -46,8 +46,8 @@ export class FilterBarColumnComponent implements OnInit {
                     </div>
                 </div>
             </div>
-            <div class="col-md-1 col-sm-12 my-2">
-                <div class="col d-flex justify-content-end align-items-center">
+            <div class="col-md-auto col-sm-12 my-2">
+                <div class="d-flex justify-content-end align-items-center">
                     <!-- Go Button: Triggers filtering -->
                     <button
                         *ngIf="visibility"
@@ -56,6 +56,14 @@ export class FilterBarColumnComponent implements OnInit {
                         class="btn btn-primary btn-block btn-sm me-2"
                     >
                         Go
+                    </button>
+                    <!-- Clear Button: Resets all filters -->
+                    <button
+                        *ngIf="visibility"
+                        (click)="onClear()"
+                        class="btn btn-outline-secondary btn-block btn-sm me-2"
+                    >
+                        Clear
                     </button>
                     <!-- Visibility Toggle Button -->
                     <button
@@ -178,5 +186,15 @@ export class FilterBarComponent implements OnInit {
     onGo(): void {
         const activeFilters = this.getFilters();
         this.onFilter.emit(activeFilters);
+    }
+
+    onClear(): void {
+        this.filterFields?.forEach(f => {
+            f.internalFilter.conditions = [new Condition(Operators.MATCHES, '')];
+        });
+        this.filterSelectFields?.forEach(f => {
+            f.selectedValue = f.options.length > 0 ? f.options[0].value : '';
+        });
+        this.onFilter.emit([]);
     }
 }

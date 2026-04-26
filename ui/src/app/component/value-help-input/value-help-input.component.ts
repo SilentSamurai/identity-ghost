@@ -51,7 +51,7 @@ function parseBoolean(value: string): boolean {
                 id="{{ name }}-vh-btn"
                 type="button"
             >
-                <i class="fa fas fa-clone"></i>
+                <i class="fa fa-clone"></i>
             </button>
         </div>
     `,

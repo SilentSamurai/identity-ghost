@@ -2,6 +2,7 @@ import {Component, OnInit, QueryList, TemplateRef,} from '@angular/core';
 
 import {NgbActiveModal, NgbModal} from '@ng-bootstrap/ng-bootstrap';
 import {ActivatedRoute} from '@angular/router';
+import {AfterModalInit} from '../dialogs/modal.service';
 import {ValueHelpColumnComponent} from '../value-help-input/value-help-column.component';
 import {FilterBarColumnComponent} from '../filter-bar/filter-bar.component';
 import {DataSource} from '../model/DataSource';
@@ -96,7 +97,7 @@ export class ValueHelpResult {
     `,
     styles: [``],
 })
-export class ValueHelpComponent implements OnInit {
+export class ValueHelpComponent implements OnInit, AfterModalInit {
     name: string = '';
     multi: boolean = true;
     dataSource!: DataSource<any>;
@@ -117,19 +118,11 @@ export class ValueHelpComponent implements OnInit {
     }
 
     async ngOnInit(): Promise<void> {
-        // this.data = await lastValueFrom(this.userService.getAllUsers())
         console.log('multi', this.multi);
     }
 
-    async startUp(params: {
-        selectedItem: any[];
-        name: string;
-        multi: boolean;
-    }): Promise<any> {
-        this.name = params.name;
-        this.multi = params.multi;
-        this.previousSelectedRows = Array.from(params.selectedItem);
-        this.selectedItem = Array.from(params.selectedItem);
+    onModalInit(): void {
+        this.previousSelectedRows = Array.from(this.selectedItem);
     }
 
     cancel() {

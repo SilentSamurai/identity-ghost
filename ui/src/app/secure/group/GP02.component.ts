@@ -81,7 +81,7 @@ import {CloseType, ValueHelpResult} from '../../component/value-help/value-help.
                                         type="button"
                                         aria-label="Remove user"
                                     >
-                                        <i class="fa fa-solid fa-trash"></i>
+                                        <i class="fa fa-trash"></i>
                                     </button>
                                 </td>
                             </ng-template>
@@ -131,7 +131,7 @@ import {CloseType, ValueHelpResult} from '../../component/value-help/value-help.
                                         type="button"
                                         aria-label="Remove role"
                                     >
-                                        <i class="fa fa-solid fa-trash"></i>
+                                        <i class="fa fa-trash"></i>
                                     </button>
                                 </td>
                             </ng-template>

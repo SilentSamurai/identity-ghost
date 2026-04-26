@@ -119,7 +119,7 @@ import {exportToCsv} from './csv-export';
 
                 <!-- Empty state -->
                 <tr *ngIf="state.kind === 'empty'">
-                    <td [attr.colspan]="(columns?.length || 0) + 1" class="text-center text-muted p-4">
+                    <td [attr.colspan]="(columns.length || 0) + 1" class="text-center text-muted p-4">
                         No data available.
                     </td>
                 </tr>

@@ -35,18 +35,33 @@ export class InternalFilter {
             <div class="">
                 <div class="input-group-sm input-group">
                     <input
+                        *ngIf="internalFilter.conditions.length <= 1"
                         class="form-control form-control-sm"
                         id="FILTER_FIELD_{{ internalFilter.name }}"
                         [(ngModel)]="internalFilter.conditions[0].value"
                         type="text"
                     />
+                    <div
+                        *ngIf="internalFilter.conditions.length > 1"
+                        class="form-control form-control-sm d-flex align-items-center gap-1"
+                        style="cursor: pointer; height: calc(1.5em + 0.5rem + 2px); padding: 0.15rem 0.35rem; overflow-x: auto; overflow-y: hidden; flex-wrap: nowrap;"
+                        (click)="openValueHelp()"
+                    >
+                        <p-chip
+                            *ngFor="let c of internalFilter.conditions; index as i"
+                            [removable]="true"
+                            (onRemove)="removeCondition(i)"
+                            label="{{ c.operator.symbol }} {{ c.value }}"
+                            styleClass="filter-chip"
+                        ></p-chip>
+                    </div>
                     <button
                         (click)="openValueHelp()"
                         class="input-group-text btn btn-outline-secondary"
                         type="button"
                         aria-label="Open value help"
                     >
-                        <i class="fa fas fa-clone"></i>
+                        <i class="fa fa-clone"></i>
                     </button>
                 </div>
             </div>
@@ -54,6 +69,23 @@ export class InternalFilter {
     `,
     styles: [
         `
+            :host ::ng-deep .filter-chip {
+                font-size: 0.75rem;
+                background-color: var(--bs-primary);
+                color: #fff;
+                padding: 0.1rem 0.4rem;
+                border-radius: 4px;
+            }
+
+            :host ::ng-deep .filter-chip .p-chip-text {
+                line-height: 1.2;
+            }
+
+            :host ::ng-deep .filter-chip .p-chip-remove-icon {
+                color: #fff;
+                font-size: 0.65rem;
+            }
+
             .form-control {
                 background-color: var(--bs-body-bg);
                 color: var(--bs-body-color);
@@ -130,15 +162,23 @@ export class FilterFieldComponent implements OnInit {
         console.log(result);
     }
 
+    removeCondition(index: number) {
+        if (this.internalFilter.conditions.length > 1) {
+            this.internalFilter.conditions.splice(index, 1);
+        }
+    }
+
     getFilters(): Filter[] {
-        return this.internalFilter.conditions.map(
-            (condition) =>
-                new Filter(
-                    this.internalFilter.name,
-                    this.internalFilter.label,
-                    condition.value,
-                    condition.operator,
-                ),
-        );
+        return this.internalFilter.conditions
+            .filter(condition => condition.value.trim() !== '')
+            .map(
+                (condition) =>
+                    new Filter(
+                        this.internalFilter.name,
+                        this.internalFilter.label,
+                        condition.value,
+                        condition.operator,
+                    ),
+            );
     }
 }
