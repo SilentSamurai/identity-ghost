@@ -22,7 +22,7 @@ import {ProfileComponent} from '../open-pages/profile.component';
                         alt="Logo"
                         class="rounded-circle me-2"
                         height="30"
-                        src="/assets/logo-img.jpg"
+                        src="/assets/logo.svg"
                         width="30"
                     />
                     <span class="text-white">{{ getTitle() }}</span>

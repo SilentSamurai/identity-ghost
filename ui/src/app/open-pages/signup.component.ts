@@ -9,7 +9,7 @@ import {AuthService} from '../_services/auth.service';
     selector: 'app-signup',
     template: `
         <app-open-navbar></app-open-navbar>
-        <app-centered-card [title]="signupForm.get('client_id')?.value" imageUrl="/assets/logo-img.jpg">
+        <app-centered-card [title]="signupForm.get('client_id')?.value" imageUrl="/assets/logo.svg">
             <div *ngIf="loading" class="align-middle text-center" style="padding-top:25%">
                 <div class="spinner-border m-5" role="status">
                     <span class="visually-hidden">Loading...</span>

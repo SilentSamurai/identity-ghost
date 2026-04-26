@@ -9,7 +9,7 @@ import {MessageService} from 'primeng/api';
     selector: 'app-register',
     template: `
         <app-open-navbar></app-open-navbar>
-        <app-centered-card imageUrl="/assets/logo-img.jpg">
+        <app-centered-card imageUrl="/assets/logo.svg">
             <div *ngIf="loading" class="align-middle text-center" style="padding-top:25%">
                 <div class="spinner-border m-5" role="status">
                     <span class="visually-hidden">Loading...</span>

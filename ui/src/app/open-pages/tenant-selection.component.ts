@@ -8,7 +8,7 @@ import {MessageService} from 'primeng/api';
     selector: 'app-tenant-selection',
     template: `
         <app-centered-card
-            imageUrl="/assets/logo-img.jpg"
+            imageUrl="/assets/logo.svg"
         >
             <div class="card-header">
                 <h4 class="mb-0">Select Tenant</h4>

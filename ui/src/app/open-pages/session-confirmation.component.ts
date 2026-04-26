@@ -10,7 +10,7 @@ import {AuthDefaultService} from '../_services/auth.default.service';
     template: `
         <app-open-navbar></app-open-navbar>
         <app-centered-card
-            imageUrl="/assets/logo-img.jpg"
+            imageUrl="/assets/logo.svg"
         >
             <div *ngIf="loading" class="align-middle text-center" style="padding-top:25%">
                 <div class="spinner-border m-5" role="status">

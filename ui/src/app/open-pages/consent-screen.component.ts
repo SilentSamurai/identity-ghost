@@ -9,7 +9,7 @@ import {MessageService} from 'primeng/api';
     template: `
         <app-open-navbar></app-open-navbar>
         <app-centered-card
-            imageUrl="/assets/logo-img.jpg"
+            imageUrl="/assets/logo.svg"
         >
             <div class="card-header">
                 <h4 class="mb-0">{{ clientName }} is requesting access</h4>
