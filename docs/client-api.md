@@ -122,7 +122,9 @@
 ```json
 {
     "name": "string",
-    "redirectUris": ["string"],
+    "redirectUris": [
+        "string"
+    ],
     "requirePkce": boolean,
     "allowPasswordGrant": boolean,
     "allowRefreshToken": boolean

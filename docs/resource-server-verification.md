@@ -57,16 +57,16 @@ Accept: application/json
 
 ```json
 {
-  "keys": [
-    {
-      "kty": "RSA",
-      "alg": "RS256",
-      "use": "sig",
-      "kid": "a1b2c3d4e5f6g7h8",
-      "n": "...",
-      "e": "AQAB"
-    }
-  ]
+    "keys": [
+        {
+            "kty": "RSA",
+            "alg": "RS256",
+            "use": "sig",
+            "kid": "a1b2c3d4e5f6g7h8",
+            "n": "...",
+            "e": "AQAB"
+        }
+    ]
 }
 ```
 
@@ -77,7 +77,7 @@ Locate the key in the JWKS that matches the `kid` from the JWT header.
 ```javascript
 const jwk = jwks.keys.find(k => k.kid === kid);
 if (!jwk) {
-  throw new Error('Key not found for kid');
+    throw new Error('Key not found for kid');
 }
 ```
 
@@ -86,16 +86,16 @@ if (!jwk) {
 Use the JWK to verify the token signature.
 
 ```javascript
-const { createPublicKey } = require('crypto');
+const {createPublicKey} = require('crypto');
 const jwt = require('jsonwebtoken');
 
 const keyObject = createPublicKey({
-  key: { kty: 'RSA', n: jwk.n, e: jwk.e },
-  format: 'jwk',
+    key: {kty: 'RSA', n: jwk.n, e: jwk.e},
+    format: 'jwk',
 });
-const pem = keyObject.export({ type: 'spki', format: 'pem' });
+const pem = keyObject.export({type: 'spki', format: 'pem'});
 
-const payload = jwt.verify(token, pem, { algorithms: ['RS256'] });
+const payload = jwt.verify(token, pem, {algorithms: ['RS256']});
 ```
 
 #### 5. Validate Standard Claims
@@ -115,7 +115,7 @@ Verify the standard JWT claims:
 
 ```javascript
 if (payload.tenant_id !== expectedTenantId) {
-  throw new Error('Token tenant_id does not match expected tenant');
+    throw new Error('Token tenant_id does not match expected tenant');
 }
 ```
 
@@ -127,54 +127,54 @@ issued for Tenant A from being used to access Tenant B's resources.
 ### Complete Verification Example
 
 ```javascript
-const { createPublicKey } = require('crypto');
+const {createPublicKey} = require('crypto');
 const jwt = require('jsonwebtoken');
 
 async function verifyToken(token, expectedTenantDomain, expectedTenantId) {
-  // Step 1: Extract kid from header
-  const header = JSON.parse(
-    Buffer.from(token.split('.')[0], 'base64url').toString()
-  );
-  
-  if (header.alg !== 'RS256') {
-    throw new Error('Unsupported algorithm');
-  }
-  
-  // Step 2: Fetch JWKS for the expected tenant
-  const jwksRes = await fetch(
-    `https://auth.server.com/${expectedTenantDomain}/.well-known/jwks.json`
-  );
-  if (!jwksRes.ok) {
-    throw new Error('Failed to fetch JWKS');
-  }
-  const jwks = await jwksRes.json();
-  
-  // Step 3: Find matching JWK
-  const jwk = jwks.keys.find(k => k.kid === header.kid);
-  if (!jwk) {
-    throw new Error('Key not found for kid');
-  }
-  
-  // Step 4: Verify signature
-  const keyObject = createPublicKey({
-    key: { kty: 'RSA', n: jwk.n, e: jwk.e },
-    format: 'jwk',
-  });
-  const pem = keyObject.export({ type: 'spki', format: 'pem' });
-  
-  const payload = jwt.verify(token, pem, {
-    algorithms: ['RS256'],
-    issuer: 'auth.server.com',
-  });
-  
-  // Step 5: Standard claims validated by jwt.verify above
-  
-  // Step 6: Confirm tenant_id
-  if (payload.tenant_id !== expectedTenantId) {
-    throw new Error('Token tenant_id does not match expected tenant');
-  }
-  
-  return payload;
+    // Step 1: Extract kid from header
+    const header = JSON.parse(
+        Buffer.from(token.split('.')[0], 'base64url').toString()
+    );
+
+    if (header.alg !== 'RS256') {
+        throw new Error('Unsupported algorithm');
+    }
+
+    // Step 2: Fetch JWKS for the expected tenant
+    const jwksRes = await fetch(
+        `https://auth.server.com/${expectedTenantDomain}/.well-known/jwks.json`
+    );
+    if (!jwksRes.ok) {
+        throw new Error('Failed to fetch JWKS');
+    }
+    const jwks = await jwksRes.json();
+
+    // Step 3: Find matching JWK
+    const jwk = jwks.keys.find(k => k.kid === header.kid);
+    if (!jwk) {
+        throw new Error('Key not found for kid');
+    }
+
+    // Step 4: Verify signature
+    const keyObject = createPublicKey({
+        key: {kty: 'RSA', n: jwk.n, e: jwk.e},
+        format: 'jwk',
+    });
+    const pem = keyObject.export({type: 'spki', format: 'pem'});
+
+    const payload = jwt.verify(token, pem, {
+        algorithms: ['RS256'],
+        issuer: 'auth.server.com',
+    });
+
+    // Step 5: Standard claims validated by jwt.verify above
+
+    // Step 6: Confirm tenant_id
+    if (payload.tenant_id !== expectedTenantId) {
+        throw new Error('Token tenant_id does not match expected tenant');
+    }
+
+    return payload;
 }
 ```
 

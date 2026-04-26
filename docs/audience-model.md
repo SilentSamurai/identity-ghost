@@ -27,7 +27,9 @@ resource servers — there is no need to handle both string and array formats.
 
 ```json
 {
-  "aud": ["https://auth.example.com"]
+    "aud": [
+        "https://auth.example.com"
+    ]
 }
 ```
 
@@ -42,7 +44,9 @@ The standard case for all tokens issued today:
 
 ```json
 {
-  "aud": ["https://auth.example.com"]
+    "aud": [
+        "https://auth.example.com"
+    ]
 }
 ```
 
@@ -53,7 +57,10 @@ array will then contain those resource server URIs:
 
 ```json
 {
-  "aud": ["https://auth.example.com", "https://api.example.com"]
+    "aud": [
+        "https://auth.example.com",
+        "https://api.example.com"
+    ]
 }
 ```
 

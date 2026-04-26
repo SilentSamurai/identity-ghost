@@ -334,17 +334,20 @@ location ^~ /.well-known {
 **Auth code exchange:**
 
 ```sql
-UPDATE auth_code SET used = true, used_at = NOW()
-WHERE code = ? AND used = false
-RETURNING *
+UPDATE auth_code
+SET used = true,
+    used_at = NOW()
+WHERE code = ?
+  AND used = false RETURNING *
 ```
 
 **Refresh token rotation:**
 
 ```sql
-UPDATE refresh_token SET used_at = NOW()
-WHERE id = ? AND used_at IS NULL
-RETURNING *
+UPDATE refresh_token
+SET used_at = NOW()
+WHERE id = ?
+  AND used_at IS NULL RETURNING *
 ```
 
 `UNIQUE(parent_id)` prevents parallel refresh race conditions.
@@ -383,6 +386,7 @@ APIs must validate user still belongs to `tenant_id`. Accept risk for short-live
 ## Clock Skew: ±30s on `iat`, `nbf`, `exp`
 
 ## Error Codes: Standard OAuth 2.0 (RFC 6749 §5.2). Protected endpoints:
+
 `WWW-Authenticate: Bearer error="invalid_token"`
 
 ## CORS: Registered origins only on `/token`, `/userinfo`. Public on `/.well-known/*`
@@ -403,17 +407,19 @@ APIs must validate user still belongs to `tenant_id`. Accept risk for short-live
 
 ```json
 {
-  "iss": "https://auth.server.com",
-  "sub": "user-uuid",
-  "aud": ["api"],
-  "exp": 1234567890,
-  "iat": 1234567890,
-  "nbf": 1234567890,
-  "jti": "globally-unique-id",
-  "scope": "tenant.read tenant.write",
-  "client_id": "tenant-client-id",
-  "tenant_id": "tenant-uuid",
-  "grant_type": "authorization_code"
+    "iss": "https://auth.server.com",
+    "sub": "user-uuid",
+    "aud": [
+        "api"
+    ],
+    "exp": 1234567890,
+    "iat": 1234567890,
+    "nbf": 1234567890,
+    "jti": "globally-unique-id",
+    "scope": "tenant.read tenant.write",
+    "client_id": "tenant-client-id",
+    "tenant_id": "tenant-uuid",
+    "grant_type": "authorization_code"
 }
 ```
 
@@ -421,21 +427,25 @@ APIs must validate user still belongs to `tenant_id`. Accept risk for short-live
 
 ```json
 {
-  "iss": "https://auth.server.com",
-  "sub": "user-uuid",
-  "aud": ["client-id"],
-  "azp": "client-id",
-  "exp": 1234567890,
-  "iat": 1234567890,
-  "auth_time": 1234567890,
-  "nonce": "client-provided-nonce",
-  "at_hash": "left-half-of-sha256-of-access-token",
-  "sid": "session-id",
-  "acr": "urn:mace:incommon:iap:silver",
-  "amr": ["pwd"],
-  "email": "user@example.com",
-  "email_verified": true,
-  "name": "John Doe"
+    "iss": "https://auth.server.com",
+    "sub": "user-uuid",
+    "aud": [
+        "client-id"
+    ],
+    "azp": "client-id",
+    "exp": 1234567890,
+    "iat": 1234567890,
+    "auth_time": 1234567890,
+    "nonce": "client-provided-nonce",
+    "at_hash": "left-half-of-sha256-of-access-token",
+    "sid": "session-id",
+    "acr": "urn:mace:incommon:iap:silver",
+    "amr": [
+        "pwd"
+    ],
+    "email": "user@example.com",
+    "email_verified": true,
+    "name": "John Doe"
 }
 ```
 
