@@ -1,4 +1,4 @@
-import {Inject, Injectable, Logger, NotFoundException} from '@nestjs/common';
+import {Inject, Injectable, Logger} from '@nestjs/common';
 import {AuthService} from './auth.service';
 import {ClientService} from '../services/client.service';
 import {OAuthException} from '../exceptions/oauth-exception';
@@ -67,44 +67,6 @@ export class TokenIntrospectionService {
     }
 
     /**
-     * Authenticate the requesting client.
-     *
-     * Tries two paths in order:
-     *   1. Client entity lookup (clientService.findByClientIdOrAlias) — for
-     *      registered OAuth clients with UUID clientIds or domain aliases.
-     *   2. Tenant-level credentials (authService.validateClientCredentials) —
-     *      for callers using the tenant's hex clientId/clientSecret pair.
-     *
-     * Returns the authenticated tenant ID for use in isolation checks.
-     */
-    private async authenticateClient(clientId: string, clientSecret: string): Promise<string> {
-        // Path 1: Client entity credentials
-        try {
-            const client = await this.clientService.findByClientIdOrAlias(clientId);
-            if (!this.clientService.validateClientSecret(client, clientSecret)) {
-                throw OAuthException.invalidClient('Client authentication failed');
-            }
-            return client.tenantId;
-        } catch (e) {
-            if (e instanceof OAuthException) {
-                throw e;
-            }
-            // NotFoundException — fall through to tenant-level auth
-        }
-
-        // Path 2: Tenant-level credentials (hex clientId + clientSecret)
-        try {
-            const tenant = await this.authService.validateClientCredentials(clientId, clientSecret);
-            return tenant.id;
-        } catch (e) {
-            if (e instanceof OAuthException) {
-                throw e;
-            }
-            throw OAuthException.invalidClient('Client authentication failed');
-        }
-    }
-
-    /**
      * Introspect an access token on behalf of an authenticated client.
      *
      * @param clientId     - The requesting client's identifier (Client.clientId or alias).
@@ -157,6 +119,44 @@ export class TokenIntrospectionService {
             // Any other error is swallowed — log internally, return inactive.
             this.logger.error('Unexpected error during introspection', e.stack);
             return {active: false};
+        }
+    }
+
+    /**
+     * Authenticate the requesting client.
+     *
+     * Tries two paths in order:
+     *   1. Client entity lookup (clientService.findByClientIdOrAlias) — for
+     *      registered OAuth clients with UUID clientIds or domain aliases.
+     *   2. Tenant-level credentials (authService.validateClientCredentials) —
+     *      for callers using the tenant's hex clientId/clientSecret pair.
+     *
+     * Returns the authenticated tenant ID for use in isolation checks.
+     */
+    private async authenticateClient(clientId: string, clientSecret: string): Promise<string> {
+        // Path 1: Client entity credentials
+        try {
+            const client = await this.clientService.findByClientIdOrAlias(clientId);
+            if (!this.clientService.validateClientSecret(client, clientSecret)) {
+                throw OAuthException.invalidClient('Client authentication failed');
+            }
+            return client.tenantId;
+        } catch (e) {
+            if (e instanceof OAuthException) {
+                throw e;
+            }
+            // NotFoundException — fall through to tenant-level auth
+        }
+
+        // Path 2: Tenant-level credentials (hex clientId + clientSecret)
+        try {
+            const tenant = await this.authService.validateClientCredentials(clientId, clientSecret);
+            return tenant.id;
+        } catch (e) {
+            if (e instanceof OAuthException) {
+                throw e;
+            }
+            throw OAuthException.invalidClient('Client authentication failed');
         }
     }
 

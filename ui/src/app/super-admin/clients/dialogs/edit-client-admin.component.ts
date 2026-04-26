@@ -17,19 +17,23 @@ import {Client, ClientService, UpdateClientRequest} from '../../../_services/cli
                     </div>
                     <div class="mb-3">
                         <label for="redirectUris" class="form-label">Redirect URIs</label>
-                        <textarea class="form-control" id="redirectUris" [(ngModel)]="form.redirectUris" name="redirectUris"
+                        <textarea class="form-control" id="redirectUris" [(ngModel)]="form.redirectUris"
+                                  name="redirectUris"
                                   rows="3" placeholder="Comma-separated URIs"></textarea>
                     </div>
                     <div class="mb-3 form-check">
-                        <input type="checkbox" class="form-check-input" id="requirePkce" [(ngModel)]="form.requirePkce" name="requirePkce">
+                        <input type="checkbox" class="form-check-input" id="requirePkce" [(ngModel)]="form.requirePkce"
+                               name="requirePkce">
                         <label class="form-check-label" for="requirePkce">Require PKCE</label>
                     </div>
                     <div class="mb-3 form-check">
-                        <input type="checkbox" class="form-check-input" id="allowPasswordGrant" [(ngModel)]="form.allowPasswordGrant" name="allowPasswordGrant">
+                        <input type="checkbox" class="form-check-input" id="allowPasswordGrant"
+                               [(ngModel)]="form.allowPasswordGrant" name="allowPasswordGrant">
                         <label class="form-check-label" for="allowPasswordGrant">Allow Password Grant</label>
                     </div>
                     <div class="mb-3 form-check">
-                        <input type="checkbox" class="form-check-input" id="allowRefreshToken" [(ngModel)]="form.allowRefreshToken" name="allowRefreshToken">
+                        <input type="checkbox" class="form-check-input" id="allowRefreshToken"
+                               [(ngModel)]="form.allowRefreshToken" name="allowRefreshToken">
                         <label class="form-check-label" for="allowRefreshToken">Allow Refresh Token</label>
                     </div>
                 </form>

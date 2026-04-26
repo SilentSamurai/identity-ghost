@@ -23,7 +23,7 @@ import {MessageService} from 'primeng/api';
                 </div>
                 <div class="mb-3">
                     <label for="roleDescription" class="form-label"
-                        >Description</label
+                    >Description</label
                     >
                     <textarea
                         id="roleDescription"

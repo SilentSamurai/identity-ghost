@@ -1,8 +1,8 @@
 {
-  "permissions": {
-    "allow": [
-      "WebFetch(domain:github.com)",
-      "WebSearch"
-    ]
-  }
+    "permissions": {
+        "allow": [
+            "WebFetch(domain:github.com)",
+            "WebSearch"
+        ]
+    }
 }

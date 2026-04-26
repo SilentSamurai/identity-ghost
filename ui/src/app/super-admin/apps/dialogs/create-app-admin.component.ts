@@ -12,7 +12,8 @@ import {lastValueFrom} from 'rxjs';
                 <form (ngSubmit)="onSubmit()">
                     <div class="mb-3">
                         <label for="tenantSelect" class="form-label">Owner Tenant</label>
-                        <select class="form-select" id="tenantSelect" [(ngModel)]="tenantId" name="tenantSelect" required>
+                        <select class="form-select" id="tenantSelect" [(ngModel)]="tenantId" name="tenantSelect"
+                                required>
                             <option [ngValue]="undefined" disabled>Select a tenant</option>
                             <option *ngFor="let t of tenants" [ngValue]="t.id">{{ t.name }} ({{ t.domain }})</option>
                         </select>
@@ -23,7 +24,8 @@ import {lastValueFrom} from 'rxjs';
                     </div>
                     <div class="mb-3">
                         <label for="appUrl" class="form-label">App URL</label>
-                        <input type="text" class="form-control" id="appUrl" [(ngModel)]="app.appUrl" name="appUrl" required>
+                        <input type="text" class="form-control" id="appUrl" [(ngModel)]="app.appUrl" name="appUrl"
+                               required>
                     </div>
                     <div class="mb-3">
                         <label for="description" class="form-label">Description</label>
@@ -34,7 +36,8 @@ import {lastValueFrom} from 'rxjs';
             </app-dialog-tab>
 
             <app-dialog-footer>
-                <button type="button" class="btn btn-primary" (click)="onSubmit()" [disabled]="!tenantId">Create</button>
+                <button type="button" class="btn btn-primary" (click)="onSubmit()" [disabled]="!tenantId">Create
+                </button>
                 <button type="button" class="btn btn-secondary" (click)="activeModal.close()">Cancel</button>
             </app-dialog-footer>
         </app-standard-dialog>

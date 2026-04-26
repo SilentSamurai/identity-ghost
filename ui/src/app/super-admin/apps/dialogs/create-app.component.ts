@@ -14,7 +14,8 @@ import {AppService} from '../../../_services/app.service';
                     </div>
                     <div class="mb-3">
                         <label for="appUrl" class="form-label">App URL</label>
-                        <input type="text" class="form-control" id="appUrl" [(ngModel)]="app.appUrl" name="appUrl" required>
+                        <input type="text" class="form-control" id="appUrl" [(ngModel)]="app.appUrl" name="appUrl"
+                               required>
                     </div>
                     <div class="mb-3">
                         <label for="description" class="form-label">Description</label>

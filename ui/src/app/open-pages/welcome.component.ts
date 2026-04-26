@@ -5,36 +5,36 @@ import {SessionService} from '../_services/session.service';
 @Component({
     selector: 'app-welcome',
     template: `
-<app-open-navbar></app-open-navbar>
+        <app-open-navbar></app-open-navbar>
 
-<section class="hero container py-5">
-    <div class="row align-items-center">
-        <div class="col-lg-7">
-            <h1 class="display-5 fw-semibold mb-3">Production‑ready OAuth Authorization Server</h1>
-            <p class="lead text-muted mb-4">
-                A production‑ready, OAuth Authorization service built with Nest&nbsp;JS and TypeScript.
-            </p>
-            <div class="d-flex gap-2">
-                <a class="btn btn-primary btn-lg" routerLink="/login">Get Started</a>
-                <a class="btn btn-outline-secondary btn-lg" href="https://silentsamurai.github.io/auth-server"
-                    target="_blank" rel="noopener">Docs</a>
-            </div>
-        </div>
-        <div class="col-lg-5 mt-4 mt-lg-0">
-            <div class="card shadow-sm">
-                <div class="card-body">
-                    <h5 class="card-title mb-3">What you'll get</h5>
-                    <ul class="mb-0">
-                        <li>User registration, login, password reset</li>
-                        <li>JWT tokens, refresh & revocation</li>
-                        <li>Role & permission system (CASL)</li>
-                        <li>Deployable via Docker & Helm</li>
-                    </ul>
+        <section class="hero container py-5">
+            <div class="row align-items-center">
+                <div class="col-lg-7">
+                    <h1 class="display-5 fw-semibold mb-3">Production‑ready OAuth Authorization Server</h1>
+                    <p class="lead text-muted mb-4">
+                        A production‑ready, OAuth Authorization service built with Nest&nbsp;JS and TypeScript.
+                    </p>
+                    <div class="d-flex gap-2">
+                        <a class="btn btn-primary btn-lg" routerLink="/login">Get Started</a>
+                        <a class="btn btn-outline-secondary btn-lg" href="https://silentsamurai.github.io/auth-server"
+                           target="_blank" rel="noopener">Docs</a>
+                    </div>
+                </div>
+                <div class="col-lg-5 mt-4 mt-lg-0">
+                    <div class="card shadow-sm">
+                        <div class="card-body">
+                            <h5 class="card-title mb-3">What you'll get</h5>
+                            <ul class="mb-0">
+                                <li>User registration, login, password reset</li>
+                                <li>JWT tokens, refresh & revocation</li>
+                                <li>Role & permission system (CASL)</li>
+                                <li>Deployable via Docker & Helm</li>
+                            </ul>
+                        </div>
+                    </div>
                 </div>
             </div>
-        </div>
-    </div>
-    </section>
+        </section>
     `,
     styles: [`
         .hero {

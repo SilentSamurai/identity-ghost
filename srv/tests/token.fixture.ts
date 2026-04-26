@@ -134,10 +134,10 @@ export class TokenFixture {
      * Returns the response which may contain an authentication_code or requires_tenant_selection.
      */
     public async login(
-        email: string, 
-        password: string, 
-        clientId: string, 
-        codeChallenge: string = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq', 
+        email: string,
+        password: string,
+        clientId: string,
+        codeChallenge: string = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq',
         subscriberTenantHint?: string,
         opts?: { scope?: string; nonce?: string; codeChallengeMethod?: string }
     ): Promise<any> {

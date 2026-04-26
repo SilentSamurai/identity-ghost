@@ -41,7 +41,7 @@ export class OAuthVerificationController {
             throw OAuthException.invalidRequest("client_id is required");
         }
         const authCodeObj = await this.authCodeService.findByCode(body.auth_code);
-        
+
         // Resolve Client entity via ClientService instead of AuthUserService
         // Requirements: 2.4, 5.5
         let client;
@@ -50,7 +50,7 @@ export class OAuthVerificationController {
         } catch {
             throw OAuthException.invalidClient("Unknown client_id");
         }
-        
+
         const tenant = client.tenant;
         if (authCodeObj.tenantId !== tenant.id) {
             throw OAuthException.invalidGrant("auth_code does not belong to the provided client_id");
@@ -79,7 +79,7 @@ export class OAuthVerificationController {
             body.client_secret,
         );
         const tenant = client.tenant;
-        
+
         let securityContext: Token = await this.authService.validateAccessToken(body.access_token);
         if (securityContext.isTenantToken() || securityContext.asTenantToken().tenant.id !== tenant.id) {
             return securityContext;

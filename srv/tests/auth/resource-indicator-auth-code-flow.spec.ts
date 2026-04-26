@@ -117,7 +117,8 @@ describe('Resource Indicator Auth Code Flow', () => {
                 const jwt = app.jwtService().decode(tokenResponse.body.access_token, {json: true}) as any;
                 expect(jwt.aud).toContain(VALID_RESOURCE);
             } finally {
-                await clientApi.deleteClient(clientId).catch(() => {});
+                await clientApi.deleteClient(clientId).catch(() => {
+                });
             }
         });
     });
@@ -168,7 +169,7 @@ describe('Resource Indicator Auth Code Flow', () => {
                 expect(tokenResponse.status).toEqual(200);
 
                 const jwt = app.jwtService().decode(tokenResponse.body.access_token, {json: true}) as any;
-                
+
                 // Verify audience contains both resource and default
                 expect(jwt.aud).toBeDefined();
                 expect(Array.isArray(jwt.aud)).toBe(true);
@@ -176,7 +177,8 @@ describe('Resource Indicator Auth Code Flow', () => {
                 expect(jwt.aud).toContain(VALID_RESOURCE);
                 expect(jwt.aud).toContain('auth.server.com');
             } finally {
-                await clientApi.deleteClient(clientId).catch(() => {});
+                await clientApi.deleteClient(clientId).catch(() => {
+                });
             }
         });
 
@@ -224,12 +226,13 @@ describe('Resource Indicator Auth Code Flow', () => {
                 expect(tokenResponse.status).toEqual(200);
 
                 const jwt = app.jwtService().decode(tokenResponse.body.access_token, {json: true}) as any;
-                
+
                 // Token should have the auth code's resource, not the token request's
                 expect(jwt.aud).toContain(VALID_RESOURCE);
                 expect(jwt.aud).not.toContain(VALID_RESOURCE_2);
             } finally {
-                await clientApi.deleteClient(clientId).catch(() => {});
+                await clientApi.deleteClient(clientId).catch(() => {
+                });
             }
         });
     });
@@ -285,7 +288,8 @@ describe('Resource Indicator Auth Code Flow', () => {
                 const jwt = app.jwtService().decode(tokenResponse.body.access_token, {json: true}) as any;
                 expect(jwt.aud).toContain(VALID_RESOURCE);
             } finally {
-                await clientApi.deleteClient(clientId).catch(() => {});
+                await clientApi.deleteClient(clientId).catch(() => {
+                });
             }
         });
     });
@@ -370,7 +374,8 @@ describe('Resource Indicator Auth Code Flow', () => {
                 const jwt = app.jwtService().decode(tokenResponse.body.access_token, {json: true}) as any;
                 expect(jwt.aud).toContain(VALID_RESOURCE);
             } finally {
-                await clientApi.deleteClient(clientId).catch(() => {});
+                await clientApi.deleteClient(clientId).catch(() => {
+                });
             }
         });
     });

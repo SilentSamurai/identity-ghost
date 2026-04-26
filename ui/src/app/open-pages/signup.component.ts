@@ -20,14 +20,16 @@ import {AuthService} from '../_services/auth.service';
                 {{ error }}
             </div>
 
-            <form *ngIf="!isSuccessful && !loading && !error" (ngSubmit)="onSubmit()" [formGroup]="signupForm" class="mt-3" novalidate>
+            <form *ngIf="!isSuccessful && !loading && !error" (ngSubmit)="onSubmit()" [formGroup]="signupForm"
+                  class="mt-3" novalidate>
                 <!-- Details -->
                 <div class="form-group mt-3">
                     <label for="name">Name</label>
                     <div class="input-group">
-                        <input class="form-control" formControlName="name" id="name" placeholder="Name" type="text" />
+                        <input class="form-control" formControlName="name" id="name" placeholder="Name" type="text"/>
                     </div>
-                    <div *ngIf="signupForm.get('name')?.errors && (signupForm.get('name')?.touched || signupForm.get('name')?.dirty)"
+                    <div
+                        *ngIf="signupForm.get('name')?.errors && (signupForm.get('name')?.touched || signupForm.get('name')?.dirty)"
                         class="alert alert-danger mt-2" role="alert">
                         <div *ngIf="signupForm.get('name')?.errors?.['required']">Name is required</div>
                         <div *ngIf="signupForm.get('name')?.errors?.['minlength']">Name must be at least 3
@@ -41,9 +43,11 @@ import {AuthService} from '../_services/auth.service';
                 <div class="form-group mt-3">
                     <label for="email">Email</label>
                     <div class="input-group">
-                        <input class="form-control" formControlName="email" id="email" placeholder="Email" type="email" />
+                        <input class="form-control" formControlName="email" id="email" placeholder="Email"
+                               type="email"/>
                     </div>
-                    <div *ngIf="signupForm.get('email')?.errors && (signupForm.get('email')?.touched || signupForm.get('email')?.dirty)"
+                    <div
+                        *ngIf="signupForm.get('email')?.errors && (signupForm.get('email')?.touched || signupForm.get('email')?.dirty)"
                         class="alert alert-danger mt-2" role="alert">
                         <div *ngIf="signupForm.get('email')?.errors?.['required']">Email is required</div>
                         <div *ngIf="signupForm.get('email')?.errors?.['email']">Must be a valid email address</div>
@@ -52,10 +56,12 @@ import {AuthService} from '../_services/auth.service';
                 <div class="form-group mt-3">
                     <label for="password">Password</label>
                     <div class="input-group">
-                        <input [type]="'password'" class="form-control" formControlName="password" id="password" minlength="6"
-                            placeholder="Password" />
+                        <input [type]="'password'" class="form-control" formControlName="password" id="password"
+                               minlength="6"
+                               placeholder="Password"/>
                     </div>
-                    <div *ngIf="signupForm.get('password')?.errors && (signupForm.get('password')?.touched || signupForm.get('password')?.dirty)"
+                    <div
+                        *ngIf="signupForm.get('password')?.errors && (signupForm.get('password')?.touched || signupForm.get('password')?.dirty)"
                         class="alert alert-danger mt-2" role="alert">
                         <div *ngIf="signupForm.get('password')?.errors?.['required']">Password is required</div>
                         <div *ngIf="signupForm.get('password')?.errors?.['minlength']">Password must be at least 6
@@ -71,7 +77,7 @@ import {AuthService} from '../_services/auth.service';
                 </div>
 
                 <div *ngIf="isSignUpFailed" class="alert alert-warning">
-                    Signup failed!<br />
+                    Signup failed!<br/>
                     {{ errorMessage }}
                 </div>
             </form>
@@ -85,8 +91,16 @@ import {AuthService} from '../_services/auth.service';
         </app-centered-card>
     `,
     styles: [`
-        label { display: block; margin-top: 10px; }
-        .card-container.card { max-width: 400px !important; padding: 40px 40px; }
+        label {
+            display: block;
+            margin-top: 10px;
+        }
+
+        .card-container.card {
+            max-width: 400px !important;
+            padding: 40px 40px;
+        }
+
         .card {
             background-color: var(--bs-card-bg, #f7f7f7);
             padding: 20px 25px 30px;
@@ -96,53 +110,71 @@ import {AuthService} from '../_services/auth.service';
             box-shadow: 0px 2px 2px rgba(0, 0, 0, 0.3);
             transition: background-color 0.3s ease, box-shadow 0.3s ease;
         }
+
         [data-bs-theme="dark"] .card {
             background-color: var(--bs-dark, #212529);
             border-color: var(--bs-border-color, #495057);
             box-shadow: 0px 2px 2px rgba(0, 0, 0, 0.5);
         }
+
         [data-bs-theme="dark"] .form-control {
             background-color: var(--bs-dark, #212529);
             border-color: var(--bs-border-color, #495057);
             color: var(--bs-body-color, #f8f9fa);
             transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
         }
+
         [data-bs-theme="dark"] .form-control:focus {
             background-color: var(--bs-dark, #212529);
             border-color: var(--bs-primary, #0d6efd);
             color: var(--bs-body-color, #f8f9fa);
             box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
         }
-        [data-bs-theme="dark"] .form-control:hover { border-color: var(--bs-primary, #0d6efd); }
+
+        [data-bs-theme="dark"] .form-control:hover {
+            border-color: var(--bs-primary, #0d6efd);
+        }
+
         [data-bs-theme="dark"] .input-group-text {
             background-color: var(--bs-dark, #212529);
             border-color: var(--bs-border-color, #495057);
             color: var(--bs-body-color, #f8f9fa);
             transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
         }
-        [data-bs-theme="dark"] label { color: var(--bs-body-color, #f8f9fa); transition: color 0.3s ease; }
+
+        [data-bs-theme="dark"] label {
+            color: var(--bs-body-color, #f8f9fa);
+            transition: color 0.3s ease;
+        }
+
         [data-bs-theme="dark"] .alert-danger {
             background-color: var(--bs-danger-bg-subtle, rgba(220, 53, 69, 0.15));
             border-color: var(--bs-danger-border-subtle, rgba(220, 53, 69, 0.3));
             color: var(--bs-danger-text-emphasis, #ea868f);
             transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
         }
+
         [data-bs-theme="dark"] .alert-success {
             background-color: var(--bs-success-bg-subtle, rgba(25, 135, 84, 0.15));
             border-color: var(--bs-success-border-subtle, rgba(25, 135, 84, 0.3));
             color: var(--bs-success-text-emphasis, #75b798);
             transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
         }
+
         [data-bs-theme="dark"] .btn-primary {
             background-color: var(--bs-primary, #0d6efd);
             border-color: var(--bs-primary, #0d6efd);
             transition: background-color 0.3s ease, border-color 0.3s ease;
         }
+
         [data-bs-theme="dark"] .btn-primary:hover {
             background-color: var(--bs-primary-dark, #0b5ed7);
             border-color: var(--bs-primary-dark, #0b5ed7);
         }
-        [data-bs-theme="dark"] .btn-primary:focus { box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25); }
+
+        [data-bs-theme="dark"] .btn-primary:focus {
+            box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+        }
     `],
     providers: [MessageService]
 })

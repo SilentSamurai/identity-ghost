@@ -27,9 +27,9 @@ export class TechnicalTokenService {
     createTechnicalToken(client: Client, additionalScopes: string[], audience?: string[]): TechnicalToken {
         additionalScopes = additionalScopes instanceof Array ? additionalScopes : [];
         const scopeString = ScopeNormalizer.format([...DEFAULT_TECHNICAL_SCOPES, ...additionalScopes]);
-        
+
         const tenant = client.tenant;
-        
+
         return TechnicalToken.create({
             sub: "oauth",
             tenant: {
@@ -58,9 +58,9 @@ export class TechnicalTokenService {
     ): Promise<string> {
         additionalScopes = additionalScopes instanceof Array ? additionalScopes : [];
         const payload = this.createTechnicalToken(client, additionalScopes, audience);
-        
+
         const tenantId = client.tenantId;
-        
+
         const {privateKey, kid} = await this.signingKeyProvider.getSigningKeyWithKid(tenantId);
         return this.tokenGenerator.sign(payload.asPlainObject(), {
             privateKey,

@@ -30,7 +30,6 @@ import {User} from "../entity/user.entity";
 import {AuthService} from "../auth/auth.service";
 import {ValidationPipe} from "../validation/validation.pipe";
 import {ValidationSchema} from "../validation/validation.schema";
-import {Tenant} from "../entity/tenant.entity";
 import {AuthCodeService} from "../auth/auth-code.service";
 import {GRANT_TYPES} from "../casl/contexts";
 import {AuthUserService} from "../casl/authUser.service";
@@ -48,7 +47,7 @@ import {LoginSessionService} from "../auth/login-session.service";
 import {ConsentService} from "../auth/consent.service";
 import {ScopeResolverService} from "../casl/scope-resolver.service";
 import {ClientService} from "../services/client.service";
-import {PromptService, PromptAction} from "../auth/prompt.service";
+import {PromptAction, PromptService} from "../auth/prompt.service";
 import {ResourceIndicatorValidator} from "../auth/resource-indicator.validator";
 
 const logger = new Logger("OAuthTokenController");
@@ -498,18 +497,18 @@ export class OAuthTokenController {
         if (tenantToken.grant_type !== GRANT_TYPES.PASSWORD) {
             throw OAuthException.invalidGrant("The grant type of the source token is not permitted for exchange");
         }
-        
+
         // Validate client credentials and get the Client entity
         // Requirements: 2.1, 2.4
         const client = await this.authService.validateClientCredentials(
             body.client_id,
             body.client_secret,
         );
-        
+
         const user = await this.authUserService.findUserByEmail(
             tenantToken.asTenantToken().email,
         );
-        
+
         // Use the tenant from the Client entity
         const tenant = client.tenant;
 
@@ -616,7 +615,7 @@ export class OAuthTokenController {
             ValidationSchema.ClientCredentialGrantSchema,
         );
         await validationPipe.transform(body, null);
-        
+
         // Validate client credentials and get the Client entity
         // Requirements: 2.1, 3.5
         const client: Client =

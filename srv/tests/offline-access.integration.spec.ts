@@ -18,7 +18,6 @@ import {TokenFixture} from './token.fixture';
 import {ClientEntityClient} from './api-client/client-entity-client';
 import {AdminTenantClient} from './api-client/admin-tenant-client';
 import {HelperFixture} from './helper.fixture';
-import {expect2xx} from './api-client/client';
 
 const CLIENT_ID = 'offline-access-test.local';
 const EMAIL = 'admin@offline-access-test.local';
@@ -162,7 +161,8 @@ describe('Offline Access & Refresh Token Gating Integration Tests', () => {
 
         afterAll(async () => {
             if (clientId) {
-                await clientApi.deleteClient(clientId).catch(() => {});
+                await clientApi.deleteClient(clientId).catch(() => {
+                });
             }
         });
 
@@ -201,7 +201,8 @@ describe('Offline Access & Refresh Token Gating Integration Tests', () => {
 
         afterAll(async () => {
             if (clientId) {
-                await clientApi.deleteClient(clientId).catch(() => {});
+                await clientApi.deleteClient(clientId).catch(() => {
+                });
             }
         });
 
@@ -238,7 +239,8 @@ describe('Offline Access & Refresh Token Gating Integration Tests', () => {
 
         afterAll(async () => {
             if (clientId) {
-                await clientApi.deleteClient(clientId).catch(() => {});
+                await clientApi.deleteClient(clientId).catch(() => {
+                });
             }
         });
 
@@ -277,7 +279,8 @@ describe('Offline Access & Refresh Token Gating Integration Tests', () => {
 
         afterAll(async () => {
             if (clientId) {
-                await clientApi.deleteClient(clientId).catch(() => {});
+                await clientApi.deleteClient(clientId).catch(() => {
+                });
             }
         });
 
@@ -324,7 +327,8 @@ describe('Offline Access & Refresh Token Gating Integration Tests', () => {
 
         afterAll(async () => {
             if (clientId) {
-                await clientApi.deleteClient(clientId).catch(() => {});
+                await clientApi.deleteClient(clientId).catch(() => {
+                });
             }
         });
 
@@ -395,7 +399,8 @@ describe('Offline Access & Refresh Token Gating Integration Tests', () => {
 
         afterAll(async () => {
             if (clientId) {
-                await clientApi.deleteClient(clientId).catch(() => {});
+                await clientApi.deleteClient(clientId).catch(() => {
+                });
             }
         });
 

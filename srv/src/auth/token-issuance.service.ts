@@ -602,19 +602,19 @@ export class TokenIssuanceService {
     ): RefreshTokenDecision {
         // Per RFC 6749 §4.4.3, client_credentials grant MUST NOT include a refresh token
         if (grantType === GRANT_TYPES.CLIENT_CREDENTIALS) {
-            return { eligible: false, reason: 'refresh_token_not_eligible' };
+            return {eligible: false, reason: 'refresh_token_not_eligible'};
         }
 
         // Check if offline_access scope is present in granted scopes (OIDC Core §11)
         if (grantedScopes.includes('offline_access')) {
-            return { eligible: true, reason: 'offline_access_scope' };
+            return {eligible: true, reason: 'offline_access_scope'};
         }
 
         // Check client's allowRefreshToken flag (per-client override)
         if (client?.allowRefreshToken === true) {
-            return { eligible: true, reason: 'client_allow_refresh_token' };
+            return {eligible: true, reason: 'client_allow_refresh_token'};
         }
 
-        return { eligible: false, reason: 'refresh_token_not_eligible' };
+        return {eligible: false, reason: 'refresh_token_not_eligible'};
     }
 }

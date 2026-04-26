@@ -17,7 +17,8 @@ import {FilterSelectOption} from '../../component/filter-bar/filter-select-field
                         <app-fb-col label="Status" name="status" type="select" [options]="statusOptions"></app-fb-col>
                     </app-fb>
                     <div class="text-muted small mt-1" id="KEY_SUMMARY">
-                        Total: {{ filteredKeys.length }} keys · Active: {{ activeCount }} · Deactivated: {{ deactivatedCount }}
+                        Total: {{ filteredKeys.length }} keys · Active: {{ activeCount }} ·
+                        Deactivated: {{ deactivatedCount }}
                     </div>
                 </div>
             </app-page-view-header>
@@ -49,7 +50,8 @@ import {FilterSelectOption} from '../../component/filter-bar/filter-select-field
                         <td>
                             <span *ngIf="key.deactivatedAt" class="badge bg-secondary">Deactivated</span>
                             <span *ngIf="!key.deactivatedAt && key.isCurrent" class="badge bg-success">Current</span>
-                            <span *ngIf="!key.deactivatedAt && !key.isCurrent" class="badge bg-warning text-dark">Active</span>
+                            <span *ngIf="!key.deactivatedAt && !key.isCurrent"
+                                  class="badge bg-warning text-dark">Active</span>
                         </td>
                         <td>{{ key.createdAt | date:'medium' }}</td>
                         <td>{{ key.supersededAt ? (key.supersededAt | date:'medium') : '' }}</td>

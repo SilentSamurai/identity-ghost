@@ -15,11 +15,13 @@ import {SessionService} from '../../../_services/session.service';
                     </div>
                     <div class="mb-3">
                         <label for="appUrl" class="form-label">App URL</label>
-                        <input type="text" class="form-control" id="appUrl" [(ngModel)]="app.appUrl" name="appUrl" required>
+                        <input type="text" class="form-control" id="appUrl" [(ngModel)]="app.appUrl" name="appUrl"
+                               required>
                     </div>
                     <div class="mb-3">
                         <label for="description" class="form-label">Description</label>
-                        <textarea class="form-control" id="description" [(ngModel)]="app.description" name="description" rows="3"></textarea>
+                        <textarea class="form-control" id="description" [(ngModel)]="app.description" name="description"
+                                  rows="3"></textarea>
                     </div>
                 </form>
             </app-dialog-tab>

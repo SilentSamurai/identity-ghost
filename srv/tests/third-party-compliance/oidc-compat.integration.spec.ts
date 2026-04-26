@@ -1,9 +1,9 @@
-import { Issuer, Client, TokenSet, generators } from 'openid-client';
-import { SharedTestFixture } from '../shared-test.fixture';
-import { getTestPorts } from '../test-ports';
-import { TokenFixture } from '../token.fixture';
-import { SearchClient } from '../api-client/search-client';
-import { ClientEntityClient } from '../api-client/client-entity-client';
+import {Client, generators, Issuer, TokenSet} from 'openid-client';
+import {SharedTestFixture} from '../shared-test.fixture';
+import {getTestPorts} from '../test-ports';
+import {TokenFixture} from '../token.fixture';
+import {SearchClient} from '../api-client/search-client';
+import {ClientEntityClient} from '../api-client/client-entity-client';
 import {expect2xx} from "../api-client/client";
 
 /**
@@ -61,7 +61,7 @@ describe('OIDC Compatibility (openid-client v5)', () => {
         });
 
         // 2. Hit /api/oauth/authorize — expect 302 to login page
-        const authorizeRes = await fetch(authUrl, { redirect: 'manual' });
+        const authorizeRes = await fetch(authUrl, {redirect: 'manual'});
         expect(authorizeRes.status).toBe(302);
 
         const location = authorizeRes.headers.get('location');
@@ -80,7 +80,7 @@ describe('OIDC Compatibility (openid-client v5)', () => {
         // 4. POST credentials to /api/oauth/login (simulating the login form)
         const loginRes = await fetch(`${baseUrl}/api/oauth/login`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({
                 email: adminEmail,
                 password: adminPassword,
@@ -96,7 +96,7 @@ describe('OIDC Compatibility (openid-client v5)', () => {
         const loginBody = await loginRes.json();
         expect(loginBody.authentication_code).toBeDefined();
 
-        return { code: loginBody.authentication_code, state };
+        return {code: loginBody.authentication_code, state};
     }
 
     beforeAll(async () => {
@@ -106,7 +106,7 @@ describe('OIDC Compatibility (openid-client v5)', () => {
         baseUrl = `http://127.0.0.1:${ports.app}`;
 
         // 1. Get a super admin token to find the tenant
-        const { accessToken: superAdminToken } = await tokenFixture.fetchAccessToken(
+        const {accessToken: superAdminToken} = await tokenFixture.fetchAccessToken(
             superAdminEmail,
             superAdminPassword,
             superTenantDomain
@@ -114,7 +114,7 @@ describe('OIDC Compatibility (openid-client v5)', () => {
 
         // 2. Find the oidc-compat-test.local tenant (seeded in StartUpService)
         const searchClient = new SearchClient(app, superAdminToken);
-        const tenant = await searchClient.findTenantBy({ domain: tenantDomain });
+        const tenant = await searchClient.findTenantBy({domain: tenantDomain});
 
         if (!tenant) {
             throw new Error(`Tenant ${tenantDomain} not found. Ensure the server is seeded with it.`);
@@ -122,7 +122,7 @@ describe('OIDC Compatibility (openid-client v5)', () => {
         tenantId = tenant.id;
 
         // 3. Get a tenant-scoped token to create/update clients
-        const { accessToken: tenantAccessToken } = await tokenFixture.fetchAccessToken(
+        const {accessToken: tenantAccessToken} = await tokenFixture.fetchAccessToken(
             adminEmail,
             adminPassword,
             tenantDomain
@@ -241,13 +241,13 @@ describe('OIDC Compatibility (openid-client v5)', () => {
             const code_challenge = generators.codeChallenge(code_verifier);
             const nonce = generators.nonce();
 
-            const { code, state } = await authorizeAndLogin(publicClient, {
+            const {code, state} = await authorizeAndLogin(publicClient, {
                 scope: 'openid profile email offline_access',
                 code_challenge,
                 nonce,
             });
 
-            authCodeTokens = await publicClient.callback(redirectUri, { code, state }, {
+            authCodeTokens = await publicClient.callback(redirectUri, {code, state}, {
                 code_verifier,
                 nonce,
                 state,
@@ -273,12 +273,12 @@ describe('OIDC Compatibility (openid-client v5)', () => {
             const code_verifier = generators.codeVerifier();
             const code_challenge = generators.codeChallenge(code_verifier);
 
-            const { code, state } = await authorizeAndLogin(publicClient, {
+            const {code, state} = await authorizeAndLogin(publicClient, {
                 scope: 'openid profile email',
                 code_challenge,
             });
 
-            await expect(publicClient.callback(redirectUri, { code, state }, {
+            await expect(publicClient.callback(redirectUri, {code, state}, {
                 code_verifier: 'wrong-verifier-value',
                 state,
             })).rejects.toThrow();
@@ -288,16 +288,16 @@ describe('OIDC Compatibility (openid-client v5)', () => {
             const code_verifier = generators.codeVerifier();
             const code_challenge = generators.codeChallenge(code_verifier);
 
-            const { code, state } = await authorizeAndLogin(publicClient, {
+            const {code, state} = await authorizeAndLogin(publicClient, {
                 scope: 'openid profile email',
                 code_challenge,
             });
 
             // First exchange succeeds
-            await publicClient.callback(redirectUri, { code, state }, { code_verifier, state });
+            await publicClient.callback(redirectUri, {code, state}, {code_verifier, state});
 
             // Second exchange with the same code must fail
-            await expect(publicClient.callback(redirectUri, { code, state }, {
+            await expect(publicClient.callback(redirectUri, {code, state}, {
                 code_verifier,
                 state,
             })).rejects.toThrow();
@@ -316,12 +316,12 @@ describe('OIDC Compatibility (openid-client v5)', () => {
             const code_verifier = generators.codeVerifier();
             const code_challenge = generators.codeChallenge(code_verifier);
 
-            const { code, state } = await authorizeAndLogin(publicClient, {
+            const {code, state} = await authorizeAndLogin(publicClient, {
                 scope: 'openid profile email offline_access',
                 code_challenge,
             });
 
-            const tokens = await publicClient.callback(redirectUri, { code, state }, { code_verifier, state });
+            const tokens = await publicClient.callback(redirectUri, {code, state}, {code_verifier, state});
             const originalRefreshToken = tokens.refresh_token!;
 
             // Use the refresh token — server should issue a new one
@@ -347,7 +347,7 @@ describe('OIDC Compatibility (openid-client v5)', () => {
 
     describe('Token Introspection', () => {
         it('should introspect an active access token', async () => {
-            const tokens = await client.grant({ grant_type: 'client_credentials' });
+            const tokens = await client.grant({grant_type: 'client_credentials'});
             const introspection = await client.introspect(tokens.access_token!);
             expect(introspection.active).toBe(true);
             expect(introspection.scope).toBeDefined();
@@ -365,12 +365,12 @@ describe('OIDC Compatibility (openid-client v5)', () => {
             const code_verifier = generators.codeVerifier();
             const code_challenge = generators.codeChallenge(code_verifier);
 
-            const { code, state } = await authorizeAndLogin(publicClient, {
+            const {code, state} = await authorizeAndLogin(publicClient, {
                 scope: 'openid profile email offline_access',
                 code_challenge,
             });
 
-            const tokens = await publicClient.callback(redirectUri, { code, state }, {
+            const tokens = await publicClient.callback(redirectUri, {code, state}, {
                 code_verifier,
                 state,
             });
@@ -384,12 +384,12 @@ describe('OIDC Compatibility (openid-client v5)', () => {
             const code_verifier = generators.codeVerifier();
             const code_challenge = generators.codeChallenge(code_verifier);
 
-            const { code, state } = await authorizeAndLogin(publicClient, {
+            const {code, state} = await authorizeAndLogin(publicClient, {
                 scope: 'openid profile email offline_access',
                 code_challenge,
             });
 
-            const tokens = await publicClient.callback(redirectUri, { code, state }, {
+            const tokens = await publicClient.callback(redirectUri, {code, state}, {
                 code_verifier,
                 state,
             });

@@ -164,7 +164,8 @@ describe('Feature: resource-indicator-support, Property 4: Auth code resource ta
                     // The token request's resource should NOT be in the audience
                     expect(jwt.aud).not.toContain(tokenRequestResource);
                 } finally {
-                    await clientApi.deleteClient(clientId).catch(() => {});
+                    await clientApi.deleteClient(clientId).catch(() => {
+                    });
                 }
             }),
             {numRuns: 10},
@@ -223,7 +224,8 @@ describe('Feature: resource-indicator-support, Property 4: Auth code resource ta
             expect(jwt.aud).toContain(authCodeResource);
             expect(jwt.aud).not.toContain(tokenRequestResource);
         } finally {
-            await clientApi.deleteClient(clientId).catch(() => {});
+            await clientApi.deleteClient(clientId).catch(() => {
+            });
         }
     });
 
@@ -284,7 +286,8 @@ describe('Feature: resource-indicator-support, Property 4: Auth code resource ta
             expect(jwt.aud.length).toBe(1);
             expect(jwt.aud).toContain('auth.server.com');
         } finally {
-            await clientApi.deleteClient(clientId).catch(() => {});
+            await clientApi.deleteClient(clientId).catch(() => {
+            });
         }
     });
 });

@@ -57,14 +57,14 @@ import {Filter} from "../../component/model/Filters";
                         </td>
                         <td>{{ user.createdAt | date }}</td>
                         <td class="">
-<!--                            <button-->
-<!--                                (click)="openUpdateModal(user)"-->
-<!--                                class="btn btn-sm btn-primary me-2"-->
-<!--                                type="button"-->
-<!--                                data-test-id="edit"-->
-<!--                            >-->
-<!--                                <i class="fa fa-edit"></i>-->
-<!--                            </button>-->
+                            <!--                            <button-->
+                            <!--                                (click)="openUpdateModal(user)"-->
+                            <!--                                class="btn btn-sm btn-primary me-2"-->
+                            <!--                                type="button"-->
+                            <!--                                data-test-id="edit"-->
+                            <!--                            >-->
+                            <!--                                <i class="fa fa-edit"></i>-->
+                            <!--                            </button>-->
                             <button
                                 (click)="openDeleteModal(user)"
                                 class="btn btn-sm btn-danger"

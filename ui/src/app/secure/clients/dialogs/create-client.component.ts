@@ -22,30 +22,37 @@ import {ClientService, CreateClientRequest} from '../../../_services/client.serv
                     </div>
                     <div class="mb-3">
                         <label for="allowedScopes" class="form-label">Allowed Scopes</label>
-                        <input type="text" class="form-control" id="allowedScopes" [(ngModel)]="allowedScopes" name="allowedScopes">
+                        <input type="text" class="form-control" id="allowedScopes" [(ngModel)]="allowedScopes"
+                               name="allowedScopes">
                     </div>
                     <div class="mb-3">
                         <label for="grantTypes" class="form-label">Grant Types</label>
-                        <input type="text" class="form-control" id="grantTypes" [(ngModel)]="grantTypes" name="grantTypes">
+                        <input type="text" class="form-control" id="grantTypes" [(ngModel)]="grantTypes"
+                               name="grantTypes">
                     </div>
                     <div class="mb-3">
                         <label for="responseTypes" class="form-label">Response Types</label>
-                        <input type="text" class="form-control" id="responseTypes" [(ngModel)]="responseTypes" name="responseTypes">
+                        <input type="text" class="form-control" id="responseTypes" [(ngModel)]="responseTypes"
+                               name="responseTypes">
                     </div>
                     <div class="mb-3 form-check">
-                        <input type="checkbox" class="form-check-input" id="isPublic" [(ngModel)]="isPublic" name="isPublic">
+                        <input type="checkbox" class="form-check-input" id="isPublic" [(ngModel)]="isPublic"
+                               name="isPublic">
                         <label class="form-check-label" for="isPublic">Public Client</label>
                     </div>
                     <div class="mb-3 form-check">
-                        <input type="checkbox" class="form-check-input" id="requirePkce" [(ngModel)]="requirePkce" name="requirePkce">
+                        <input type="checkbox" class="form-check-input" id="requirePkce" [(ngModel)]="requirePkce"
+                               name="requirePkce">
                         <label class="form-check-label" for="requirePkce">Require PKCE</label>
                     </div>
                     <div class="mb-3 form-check">
-                        <input type="checkbox" class="form-check-input" id="allowPasswordGrant" [(ngModel)]="allowPasswordGrant" name="allowPasswordGrant">
+                        <input type="checkbox" class="form-check-input" id="allowPasswordGrant"
+                               [(ngModel)]="allowPasswordGrant" name="allowPasswordGrant">
                         <label class="form-check-label" for="allowPasswordGrant">Allow Password Grant</label>
                     </div>
                     <div class="mb-3 form-check">
-                        <input type="checkbox" class="form-check-input" id="allowRefreshToken" [(ngModel)]="allowRefreshToken" name="allowRefreshToken">
+                        <input type="checkbox" class="form-check-input" id="allowRefreshToken"
+                               [(ngModel)]="allowRefreshToken" name="allowRefreshToken">
                         <label class="form-check-label" for="allowRefreshToken">Allow Refresh Token</label>
                     </div>
                 </form>

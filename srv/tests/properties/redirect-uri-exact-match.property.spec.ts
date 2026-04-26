@@ -2,7 +2,6 @@ import * as fc from 'fast-check';
 import {AuthorizeService} from '../../src/auth/authorize.service';
 import {Client} from '../../src/entity/client.entity';
 import {OAuthException} from '../../src/exceptions/oauth-exception';
-import {IdTokenHintValidator} from '../../src/auth/id-token-hint.validator';
 
 /**
  * Feature: redirect-uri-validation, Property 1: Redirect URI validation accepts iff URI is in registered set

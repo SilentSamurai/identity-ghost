@@ -1,5 +1,5 @@
 import * as fc from 'fast-check';
-import {PromptService, PromptAction, PromptContext} from '../../src/auth/prompt.service';
+import {PromptAction, PromptContext, PromptService} from '../../src/auth/prompt.service';
 import {LoginSession} from '../../src/entity/login-session.entity';
 import {OAuthException} from '../../src/exceptions/oauth-exception';
 
@@ -122,7 +122,10 @@ describe('Feature: oidc-prompt-max-age, Property 7: None exclusivity validation'
     });
 
     it('prompt without none is accepted', () => {
-        const promptWithoutNoneArb = fc.array(fc.constantFrom('login', 'consent', 'select_account'), {minLength: 0, maxLength: 3});
+        const promptWithoutNoneArb = fc.array(fc.constantFrom('login', 'consent', 'select_account'), {
+            minLength: 0,
+            maxLength: 3
+        });
 
         fc.assert(
             fc.property(promptWithoutNoneArb, (values) => {

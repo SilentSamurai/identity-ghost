@@ -85,7 +85,8 @@ describe('Resource Indicator Validation', () => {
                 expect(location.pathname).toEqual('/authorize');
                 expect(location.searchParams.get('resource')).toEqual(VALID_RESOURCE);
             } finally {
-                await clientApi.deleteClient(clientId).catch(() => {});
+                await clientApi.deleteClient(clientId).catch(() => {
+                });
             }
         });
 
@@ -118,7 +119,8 @@ describe('Resource Indicator Validation', () => {
                 expect(location.searchParams.get('error')).toEqual('invalid_target');
                 expect(location.searchParams.get('state')).toEqual('test-state');
             } finally {
-                await clientApi.deleteClient(clientId).catch(() => {});
+                await clientApi.deleteClient(clientId).catch(() => {
+                });
             }
         });
 
@@ -149,7 +151,8 @@ describe('Resource Indicator Validation', () => {
                 expect(location.searchParams.get('error')).toEqual('invalid_target');
                 expect(location.searchParams.get('state')).toEqual('test-state');
             } finally {
-                await clientApi.deleteClient(clientId).catch(() => {});
+                await clientApi.deleteClient(clientId).catch(() => {
+                });
             }
         });
 
@@ -180,7 +183,8 @@ describe('Resource Indicator Validation', () => {
                 expect(location.searchParams.get('error')).toEqual('invalid_target');
                 expect(location.searchParams.get('state')).toEqual('test-state');
             } finally {
-                await clientApi.deleteClient(clientId).catch(() => {});
+                await clientApi.deleteClient(clientId).catch(() => {
+                });
             }
         });
 
@@ -211,7 +215,8 @@ describe('Resource Indicator Validation', () => {
                 expect(location.searchParams.get('error')).toEqual('invalid_target');
                 expect(location.searchParams.get('state')).toEqual('test-state');
             } finally {
-                await clientApi.deleteClient(clientId).catch(() => {});
+                await clientApi.deleteClient(clientId).catch(() => {
+                });
             }
         });
     });
@@ -250,7 +255,8 @@ describe('Resource Indicator Validation', () => {
                 expect(jwt.aud).toContain(VALID_RESOURCE);
                 expect(jwt.aud).toContain('auth.server.com');
             } finally {
-                await clientApi.deleteClient(clientId).catch(() => {});
+                await clientApi.deleteClient(clientId).catch(() => {
+                });
             }
         });
 
@@ -279,7 +285,8 @@ describe('Resource Indicator Validation', () => {
                 expect(response.status).toEqual(400);
                 expect(response.body.error).toEqual('invalid_target');
             } finally {
-                await clientApi.deleteClient(clientId).catch(() => {});
+                await clientApi.deleteClient(clientId).catch(() => {
+                });
             }
         });
 
@@ -318,7 +325,8 @@ describe('Resource Indicator Validation', () => {
                 expect(jwt.aud).toContain(VALID_RESOURCE);
                 expect(jwt.aud).toContain('auth.server.com');
             } finally {
-                await clientApi.deleteClient(clientId).catch(() => {});
+                await clientApi.deleteClient(clientId).catch(() => {
+                });
             }
         });
 
@@ -349,7 +357,8 @@ describe('Resource Indicator Validation', () => {
                 expect(response.status).toEqual(400);
                 expect(response.body.error).toEqual('invalid_target');
             } finally {
-                await clientApi.deleteClient(clientId).catch(() => {});
+                await clientApi.deleteClient(clientId).catch(() => {
+                });
             }
         });
 
@@ -378,7 +387,8 @@ describe('Resource Indicator Validation', () => {
                 expect(response.status).toEqual(400);
                 expect(response.body.error).toEqual('invalid_target');
             } finally {
-                await clientApi.deleteClient(clientId).catch(() => {});
+                await clientApi.deleteClient(clientId).catch(() => {
+                });
             }
         });
 
@@ -407,7 +417,8 @@ describe('Resource Indicator Validation', () => {
                 expect(response.status).toEqual(400);
                 expect(response.body.error).toEqual('invalid_target');
             } finally {
-                await clientApi.deleteClient(clientId).catch(() => {});
+                await clientApi.deleteClient(clientId).catch(() => {
+                });
             }
         });
     });

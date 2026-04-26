@@ -47,7 +47,12 @@ const relativeUriArb = fc.oneof(
     fc.string({minLength: 1, maxLength: 50}).map(s => `/${s.replace(/:/g, '')}`),
     // Relative paths without leading slash — filter out anything URL-parseable
     fc.string({minLength: 1, maxLength: 50}).filter(s => {
-        try { new URL(s); return false; } catch { return true; }
+        try {
+            new URL(s);
+            return false;
+        } catch {
+            return true;
+        }
     }),
     // Double-slash without scheme
     fc.tuple(fc.domain(), fc.string({minLength: 0, maxLength: 20})).map(([domain, path]) => `//${domain}${path}`),
@@ -175,7 +180,7 @@ describe('Feature: resource-indicator-support, Property 2: Allowlist exact strin
                 (resource, existingResources) => {
                     // Ensure the resource is in the allowed list
                     const allowedResources = [...existingResources, resource];
-                    
+
                     // Should not throw
                     expect(() => {
                         ResourceIndicatorValidator.validateResource(resource, allowedResources);
@@ -192,7 +197,7 @@ describe('Feature: resource-indicator-support, Property 2: Allowlist exact strin
                 expect(() => {
                     ResourceIndicatorValidator.validateResource(resource, null);
                 }).toThrow(OAuthException);
-                
+
                 try {
                     ResourceIndicatorValidator.validateResource(resource, null);
                 } catch (e) {
@@ -209,7 +214,7 @@ describe('Feature: resource-indicator-support, Property 2: Allowlist exact strin
                 expect(() => {
                     ResourceIndicatorValidator.validateResource(resource, []);
                 }).toThrow(OAuthException);
-                
+
                 try {
                     ResourceIndicatorValidator.validateResource(resource, []);
                 } catch (e) {
@@ -228,16 +233,16 @@ describe('Feature: resource-indicator-support, Property 2: Allowlist exact strin
                 (resource, allowedResources) => {
                     // Ensure the resource is NOT in the allowed list
                     const filteredResources = allowedResources.filter(r => r !== resource);
-                    
+
                     if (filteredResources.length === 0) {
                         // Skip if filtering resulted in empty array
                         return;
                     }
-                    
+
                     expect(() => {
                         ResourceIndicatorValidator.validateResource(resource, filteredResources);
                     }).toThrow(OAuthException);
-                    
+
                     try {
                         ResourceIndicatorValidator.validateResource(resource, filteredResources);
                     } catch (e) {
@@ -256,7 +261,7 @@ describe('Feature: resource-indicator-support, Property 2: Allowlist exact strin
                 (resource) => {
                     // Create allowedResources with different case
                     const allowedResources = [resource.toUpperCase()];
-                    
+
                     // If the uppercase version is different, it should be rejected
                     if (resource !== resource.toUpperCase()) {
                         expect(() => {

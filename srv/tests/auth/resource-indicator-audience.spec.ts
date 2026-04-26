@@ -70,13 +70,14 @@ describe('Resource Indicator Audience Claim Construction', () => {
                 expect(response.status).toEqual(200);
 
                 const jwt = app.jwtService().decode(response.body.access_token, {json: true}) as any;
-                
+
                 expect(jwt.aud).toBeDefined();
                 expect(Array.isArray(jwt.aud)).toBe(true);
                 expect(jwt.aud.length).toBe(1);
                 expect(jwt.aud).toContain('auth.server.com');
             } finally {
-                await clientApi.deleteClient(clientId).catch(() => {});
+                await clientApi.deleteClient(clientId).catch(() => {
+                });
             }
         });
     });
@@ -109,14 +110,15 @@ describe('Resource Indicator Audience Claim Construction', () => {
                 expect(response.status).toEqual(200);
 
                 const jwt = app.jwtService().decode(response.body.access_token, {json: true}) as any;
-                
+
                 expect(jwt.aud).toBeDefined();
                 expect(Array.isArray(jwt.aud)).toBe(true);
                 expect(jwt.aud.length).toBe(2);
                 expect(jwt.aud).toContain(VALID_RESOURCE);
                 expect(jwt.aud).toContain('auth.server.com');
             } finally {
-                await clientApi.deleteClient(clientId).catch(() => {});
+                await clientApi.deleteClient(clientId).catch(() => {
+                });
             }
         });
     });
@@ -149,12 +151,13 @@ describe('Resource Indicator Audience Claim Construction', () => {
                 expect(response.status).toEqual(200);
 
                 const jwt = app.jwtService().decode(response.body.access_token, {json: true}) as any;
-                
+
                 // Must be an array, never a string
                 expect(Array.isArray(jwt.aud)).toBe(true);
                 expect(typeof jwt.aud).not.toBe('string');
             } finally {
-                await clientApi.deleteClient(clientWithResource.client.clientId).catch(() => {});
+                await clientApi.deleteClient(clientWithResource.client.clientId).catch(() => {
+                });
             }
 
             // Test without resource
@@ -179,12 +182,13 @@ describe('Resource Indicator Audience Claim Construction', () => {
                 expect(response.status).toEqual(200);
 
                 const jwt = app.jwtService().decode(response.body.access_token, {json: true}) as any;
-                
+
                 // Must be an array, never a string
                 expect(Array.isArray(jwt.aud)).toBe(true);
                 expect(typeof jwt.aud).not.toBe('string');
             } finally {
-                await clientApi.deleteClient(clientWithoutResource.client.clientId).catch(() => {});
+                await clientApi.deleteClient(clientWithoutResource.client.clientId).catch(() => {
+                });
             }
         });
     });
@@ -237,14 +241,15 @@ describe('Resource Indicator Audience Claim Construction', () => {
                 expect(refreshResponse.status).toEqual(200);
 
                 const refreshJwt = app.jwtService().decode(refreshResponse.body.access_token, {json: true}) as any;
-                
+
                 // Refreshed token should have the same audience
                 expect(refreshJwt.aud).toBeDefined();
                 expect(Array.isArray(refreshJwt.aud)).toBe(true);
                 expect(refreshJwt.aud).toContain(VALID_RESOURCE);
                 expect(refreshJwt.aud).toContain('auth.server.com');
             } finally {
-                await clientApi.deleteClient(clientId).catch(() => {});
+                await clientApi.deleteClient(clientId).catch(() => {
+                });
             }
         });
     });
@@ -274,7 +279,8 @@ describe('Resource Indicator Audience Claim Construction', () => {
                 expect(response.status).toEqual(400);
                 expect(response.body.error).toEqual('invalid_target');
             } finally {
-                await clientApi.deleteClient(noResourceClient.client.clientId).catch(() => {});
+                await clientApi.deleteClient(noResourceClient.client.clientId).catch(() => {
+                });
             }
         });
     });

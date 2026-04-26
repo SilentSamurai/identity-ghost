@@ -34,8 +34,8 @@ export interface FilterSelectOption {
                 color: var(--bs-body-color);
                 border-color: var(--bs-border-color);
                 transition: background-color 0.3s ease,
-                    color 0.3s ease,
-                    border-color 0.3s ease;
+                color 0.3s ease,
+                border-color 0.3s ease;
             }
 
             .form-select:focus {

@@ -118,7 +118,8 @@ describe('Feature: resource-indicator-support, Property 5: Audience construction
                     // The default audience should also be present
                     expect(jwt.aud).toContain('auth.server.com');
                 } finally {
-                    await clientApi.deleteClient(clientId).catch(() => {});
+                    await clientApi.deleteClient(clientId).catch(() => {
+                    });
                 }
             }),
             {numRuns: 10},
@@ -157,7 +158,8 @@ describe('Feature: resource-indicator-support, Property 5: Audience construction
             expect(jwt.aud.length).toBe(1);
             expect(jwt.aud).toContain('auth.server.com');
         } finally {
-            await clientApi.deleteClient(clientId).catch(() => {});
+            await clientApi.deleteClient(clientId).catch(() => {
+            });
         }
     });
 
@@ -193,7 +195,8 @@ describe('Feature: resource-indicator-support, Property 5: Audience construction
                     expect(Array.isArray(jwt.aud)).toBe(true);
                     expect(typeof jwt.aud).not.toBe('string');
                 } finally {
-                    await clientApi.deleteClient(clientId).catch(() => {});
+                    await clientApi.deleteClient(clientId).catch(() => {
+                    });
                 }
             }),
             {numRuns: 10},
@@ -202,7 +205,7 @@ describe('Feature: resource-indicator-support, Property 5: Audience construction
 
     it('refresh token grant with resource produces token with correct aud', async () => {
         const resource = 'https://refresh-audience-test.example.com/api';
-        
+
         const client = await clientApi.createClient(testTenantId, 'Refresh Token Client', {
             redirectUris: [REDIRECT_URI],
             allowedScopes: 'openid profile email',
@@ -250,7 +253,8 @@ describe('Feature: resource-indicator-support, Property 5: Audience construction
             expect(jwt.aud).toContain(resource);
             expect(jwt.aud).toContain('auth.server.com');
         } finally {
-            await clientApi.deleteClient(clientId).catch(() => {});
+            await clientApi.deleteClient(clientId).catch(() => {
+            });
         }
     });
 });

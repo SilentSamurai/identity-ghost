@@ -2,7 +2,6 @@ import {SharedTestFixture} from '../shared-test.fixture';
 import {TokenFixture} from '../token.fixture';
 import {ClientEntityClient} from '../api-client/client-entity-client';
 import {AdminTenantClient} from '../api-client/admin-tenant-client';
-import {HelperFixture} from '../helper.fixture';
 
 /**
  * Regression test for GitHub issue #93:

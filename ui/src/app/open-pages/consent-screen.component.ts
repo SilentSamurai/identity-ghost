@@ -66,20 +66,52 @@ import {MessageService} from 'primeng/api';
             margin-bottom: 8px;
             border-radius: 4px;
         }
-        .me-3 { margin-right: 12px; }
-        .ms-2 { margin-left: 8px; }
-        .mb-4 { margin-bottom: 24px; }
-        .mb-0 { margin-bottom: 0; }
-        .text-muted { color: #6c757d; }
-        .text-success { color: #198754; }
-        h6 { font-weight: 600; font-size: 14px; }
-        small { font-size: 12px; }
+
+        .me-3 {
+            margin-right: 12px;
+        }
+
+        .ms-2 {
+            margin-left: 8px;
+        }
+
+        .mb-4 {
+            margin-bottom: 24px;
+        }
+
+        .mb-0 {
+            margin-bottom: 0;
+        }
+
+        .text-muted {
+            color: #6c757d;
+        }
+
+        .text-success {
+            color: #198754;
+        }
+
+        h6 {
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        small {
+            font-size: 12px;
+        }
+
         [data-bs-theme="dark"] .list-group-item {
             background-color: var(--bs-dark, #212529);
             border-color: var(--bs-border-color, #495057);
         }
-        [data-bs-theme="dark"] .text-muted { color: var(--bs-secondary-text-emphasis, #adb5bd); }
-        [data-bs-theme="dark"] h6 { color: var(--bs-body-color, #f8f9fa); }
+
+        [data-bs-theme="dark"] .text-muted {
+            color: var(--bs-secondary-text-emphasis, #adb5bd);
+        }
+
+        [data-bs-theme="dark"] h6 {
+            color: var(--bs-body-color, #f8f9fa);
+        }
     `]
 })
 export class ConsentScreenComponent implements OnInit {

@@ -4,12 +4,16 @@ This is an authorization and authentication server. Every decision must reflect 
 
 ## 0. RFC Compliance
 
-This server implements OAuth 2.0 and OpenID Connect. The RFCs are the source of truth for protocol behavior — not convenience, not internal consistency preferences.
+This server implements OAuth 2.0 and OpenID Connect. The RFCs are the source of truth for protocol behavior — not
+convenience, not internal consistency preferences.
 
-- Follow RFC 6749 (OAuth 2.0), RFC 7636 (PKCE), and OpenID Connect Core 1.0 for all protocol-facing behavior: error codes, error delivery method (JSON vs redirect), parameter requirements, and default values.
+- Follow RFC 6749 (OAuth 2.0), RFC 7636 (PKCE), and OpenID Connect Core 1.0 for all protocol-facing behavior: error
+  codes, error delivery method (JSON vs redirect), parameter requirements, and default values.
 - The authorize endpoint error model has two phases per RFC 6749 §4.1.2.1:
-  - **Pre-redirect errors** (JSON 400, never redirect): unknown `client_id`, unregistered `redirect_uri`. These fire before we have a safe URI to redirect to.
-  - **Post-redirect errors** (302 redirect with error params): everything else — missing `state`, invalid `scope`, PKCE violations, nonce violations. Once the `redirect_uri` is confirmed safe, errors go there.
+    - **Pre-redirect errors** (JSON 400, never redirect): unknown `client_id`, unregistered `redirect_uri`. These fire
+      before we have a safe URI to redirect to.
+    - **Post-redirect errors** (302 redirect with error params): everything else — missing `state`, invalid `scope`,
+      PKCE violations, nonce violations. Once the `redirect_uri` is confirmed safe, errors go there.
 - `scope` is optional per RFC 6749 §3.3. When omitted, default to the client's `allowedScopes`.
 - `redirect_uri` is optional per RFC 6749 §3.1.2.3 when the client has exactly one registered URI.
 - `response_type` missing or unsupported both use the `unsupported_response_type` error code per RFC 6749 §4.1.2.1.
@@ -41,13 +45,19 @@ Clean boundaries between layers keep the codebase auditable and secure.
 
 ## 3. UI Section Isolation — Admin vs User
 
-The admin section and the normal user (secure) section must be completely independent. No shared components, no shared API calls.
+The admin section and the normal user (secure) section must be completely independent. No shared components, no shared
+API calls.
 
-- Never share UI components (widgets, form elements, dialogs, tables) between the admin section and the user section. If both need a similar widget, create a separate copy in each section.
-- API call services used by admin pages must live under the admin module. API call services used by user pages must live under the user/secure module. No cross-imports.
-- This prevents accidental privilege escalation where a user-facing component inadvertently calls an admin API endpoint, or an admin component leaks into a user route.
-- Each section should have its own routing, guards, and module boundaries. Treat them as two separate apps that happen to share a shell.
-- When in doubt, duplicate rather than abstract. A small amount of code duplication is far safer than a shared component that serves two trust levels.
+- Never share UI components (widgets, form elements, dialogs, tables) between the admin section and the user section. If
+  both need a similar widget, create a separate copy in each section.
+- API call services used by admin pages must live under the admin module. API call services used by user pages must live
+  under the user/secure module. No cross-imports.
+- This prevents accidental privilege escalation where a user-facing component inadvertently calls an admin API endpoint,
+  or an admin component leaks into a user route.
+- Each section should have its own routing, guards, and module boundaries. Treat them as two separate apps that happen
+  to share a shell.
+- When in doubt, duplicate rather than abstract. A small amount of code duplication is far safer than a shared component
+  that serves two trust levels.
 
 ## 4. Design for Auditability
 
@@ -64,28 +74,36 @@ Concrete patterns for working in the Angular frontend (`ui/`).
 ## Tenant Context
 
 - Normal user flows derive tenant from the JWT token via `SessionService.userTenantId()`. The user never picks a tenant.
-- Admin flows must always pass tenant IDs explicitly. Never fall back to the logged-in user's tenant — admin actions are cross-tenant by nature.
+- Admin flows must always pass tenant IDs explicitly. Never fall back to the logged-in user's tenant — admin actions are
+  cross-tenant by nature.
 - Backend user-scoped routes use `/tenant/my/...`. Admin-scoped routes use `/admin/tenant/{tenantId}/...`.
 
 ## Dialogs
 
-- Dialogs are plain components. Data is passed in via `ModalService.open(Component, { initData: { key: value } })`, which sets properties directly on the component instance.
-- Do not share dialog components between the admin section and the tenant detail/user section. If both need a similar dialog, create separate copies (e.g., `create-app.component.ts` for tenant-scoped use, `create-app-admin.component.ts` for admin cross-tenant use). This follows the UI Section Isolation principle.
+- Dialogs are plain components. Data is passed in via `ModalService.open(Component, { initData: { key: value } })`,
+  which sets properties directly on the component instance.
+- Do not share dialog components between the admin section and the tenant detail/user section. If both need a similar
+  dialog, create separate copies (e.g., `create-app.component.ts` for tenant-scoped use, `create-app-admin.component.ts`
+  for admin cross-tenant use). This follows the UI Section Isolation principle.
 - Dialog results use `activeModal.close(data)` for success and `activeModal.dismiss()` for cancellation/error.
 
 ## Data Loading
 
-- List pages use the `DataSource` / `RestApiModel` pattern backed by `POST /api/search/{Entity}` with `{ pageNo, pageSize, where, orderBy, expand }`.
-- For simple one-off data fetches inside dialogs or components, use `HttpClient` directly with `lastValueFrom()` — no need to wire up a full `DataSource`.
+- List pages use the `DataSource` / `RestApiModel` pattern backed by `POST /api/search/{Entity}` with
+  `{ pageNo, pageSize, where, orderBy, expand }`.
+- For simple one-off data fetches inside dialogs or components, use `HttpClient` directly with `lastValueFrom()` — no
+  need to wire up a full `DataSource`.
 
 ## Services
 
 - `TenantService` — user-scoped, operates on "my" tenant. Used in the secure/user section.
 - `AdminTenantService` — admin-scoped, takes explicit `tenantId` params. Used only in the admin section.
-- `AppService`, `UserService`, etc. — shared services are acceptable only when the backend endpoint is the same for both sections. If admin needs different endpoints, create an admin-specific service.
+- `AppService`, `UserService`, etc. — shared services are acceptable only when the backend endpoint is the same for both
+  sections. If admin needs different endpoints, create an admin-specific service.
 
 ## Authorization in the UI
 
 - CASL abilities are loaded from the backend and stored via `SessionService.savePermissions()`.
-- Use the `ablePure` pipe in templates for showing/hiding UI elements (e.g., `[disabled]="!('create' | ablePure: 'Tenant')"`).
+- Use the `ablePure` pipe in templates for showing/hiding UI elements (e.g.,
+  `[disabled]="!('create' | ablePure: 'Tenant')"`).
 - UI authorization is cosmetic only — the backend always re-validates via `SecurityService`.

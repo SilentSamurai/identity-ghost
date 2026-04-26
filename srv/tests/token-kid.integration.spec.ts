@@ -44,7 +44,12 @@ describe('Token kid integration', () => {
     });
 
     /** Helper: create a tenant with a confidential client for client_credentials */
-    async function createTenantWithClient(suffix: string): Promise<{ id: string; domain: string; clientId: string; clientSecret: string }> {
+    async function createTenantWithClient(suffix: string): Promise<{
+        id: string;
+        domain: string;
+        clientId: string;
+        clientSecret: string
+    }> {
         const ts = Date.now().toString(36);
         const domain = `tkid-${suffix}-${ts}.com`;
         const name = `tkid-${suffix}`.substring(0, 20);
@@ -56,7 +61,9 @@ describe('Token kid integration', () => {
             isPublic: false,
         });
         return {id: tenant.id, domain, clientId: result.client.clientId, clientSecret: result.clientSecret};
-    }    /** Helper: fetch JWKS for a tenant domain */
+    }
+
+    /** Helper: fetch JWKS for a tenant domain */
     async function fetchJwks(domain: string): Promise<{ keys: any[] }> {
         const res = await app.getHttpServer()
             .get(`/${domain}/.well-known/jwks.json`);

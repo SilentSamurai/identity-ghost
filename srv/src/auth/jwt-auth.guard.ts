@@ -4,20 +4,13 @@
  * Implements RFC 6750 Bearer Token usage and RFC 7617 Basic auth for protected resources.
  * Validates credentials, sets up CASL security context, and resolves tenant context.
  */
-import {
-    CanActivate,
-    ExecutionContext,
-    HttpException,
-    Injectable,
-    Logger,
-    UnauthorizedException,
-} from "@nestjs/common";
-import { ExtractJwt } from "passport-jwt";
-import { AuthService } from "./auth.service";
-import { CaslAbilityFactory } from "../casl/casl-ability.factory";
-import { TechnicalToken, TenantToken, Token } from "../casl/contexts";
-import { Response } from "express";
-import { parseBasicAuthHeader } from "../util/http.util";
+import {CanActivate, ExecutionContext, HttpException, Injectable, Logger, UnauthorizedException,} from "@nestjs/common";
+import {ExtractJwt} from "passport-jwt";
+import {AuthService} from "./auth.service";
+import {CaslAbilityFactory} from "../casl/casl-ability.factory";
+import {TechnicalToken, TenantToken, Token} from "../casl/contexts";
+import {Response} from "express";
+import {parseBasicAuthHeader} from "../util/http.util";
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
@@ -26,7 +19,8 @@ export class JwtAuthGuard implements CanActivate {
     constructor(
         private readonly authService: AuthService,
         private readonly caslAbilityFactory: CaslAbilityFactory,
-    ) {}
+    ) {
+    }
 
     async canActivate(context: ExecutionContext): Promise<boolean> {
         const request = context.switchToHttp().getRequest();
@@ -69,7 +63,7 @@ export class JwtAuthGuard implements CanActivate {
     }
 
     private async tryClientSecretPost(request: any, response: Response): Promise<Token> {
-        const { client_id, client_secret } = request.body || {};
+        const {client_id, client_secret} = request.body || {};
         if (client_id && client_secret) {
             try {
                 return await this.validateBasicAuth(client_id, client_secret);

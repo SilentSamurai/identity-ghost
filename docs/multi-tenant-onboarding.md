@@ -1,6 +1,7 @@
 # Multi‑Tenant Onboarding Design
 
 ## Goal
+
 Provide a seamless onboarding experience for companies that need to use the Todo app. The onboarding should:
 
 1. Create a tenant for the company.
@@ -21,6 +22,7 @@ POST /api/companies/onboard
 ```
 
 **Steps**
+
 1. **Create company tenant** – `TenantService.create({name, domain})`.
 2. **Ensure Todo‑app tenant exists** – create if missing.
 3. **Create Todo app** – `AppService.create({name, appUrl, ownerTenantId})`.
@@ -29,34 +31,44 @@ POST /api/companies/onboard
 6. **Return** – `tenantId`, `appUrl`, and welcome message.
 
 ## API Endpoint
+
 ```ts
 // companies.controller.ts
 @Post('onboard')
-async onboardCompany(@Body() dto: CreateCompanyDto) {
-  // implementation as described above
+async
+onboardCompany(@Body()
+dto: CreateCompanyDto
+)
+{
+    // implementation as described above
 }
 ```
 
 ## Data Model
+
 - **Tenant** – holds company identity, users, roles, groups, apps, subscriptions.
 - **App** – owned by Todo‑app tenant.
 - **Subscription** – links company tenant to Todo app.
 
 ## Error handling
+
 - Validate input.
 - Catch database errors (e.g., duplicate domain). Return 400.
 - Wrap all DB operations in a transaction; rollback on failure.
 
 ## Security
+
 - API key or OAuth token required for this endpoint.
 - Rate limit to prevent abuse.
 - No direct tenant ID exposure; return sanitized response.
 
 ## Extensibility
+
 - Add optional parameters (custom domain, pre‑selected subscription plan).
 - Hook into billing service after subscription.
 
 ## Reference
+
 - Azure multi‑tenant patterns.
 - Stripe Connect onboarding.
 - Auth0 Tenant API.
@@ -64,6 +76,7 @@ async onboardCompany(@Body() dto: CreateCompanyDto) {
 ---
 
 ## Checklist
+
 - [ ] Create `docs/multi-tenant-onboarding.md`.
 - [ ] Add to `docs/README.md` if exists.
 - [ ] Include diagrams if needed.
@@ -71,6 +84,7 @@ async onboardCompany(@Body() dto: CreateCompanyDto) {
 ---
 
 ## Next Steps
+
 1. Write the API implementation.
 2. Add unit tests.
 3. Deploy to staging and test with a mock tenant.

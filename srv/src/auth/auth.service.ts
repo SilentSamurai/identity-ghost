@@ -182,7 +182,7 @@ export class AuthService {
      * Validate client credentials for confidential clients.
      * Resolves the Client entity by clientId or alias and validates the secret
      * using timing-safe comparison via ClientService.validateClientSecret.
-     * 
+     *
      * Requirements: 2.1, 2.2, 2.4, 2.5, 2.6
      */
     async validateClientCredentials(
@@ -217,7 +217,7 @@ export class AuthService {
      * Per RFC 6749 §6, public clients cannot authenticate with a secret
      * but must still provide a valid client_id so the server can verify
      * the refresh token was issued to that client.
-     * 
+     *
      * Requirements: 2.3, 2.5
      */
     async validatePublicClient(clientId: string): Promise<Client> {

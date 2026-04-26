@@ -42,7 +42,8 @@ import {ProfileComponent} from '../open-pages/profile.component';
                 >
                     <ul class="navbar-nav me-auto">
                         <li class="nav-item">
-                            <a class="nav-link text-white" routerLink="/admin/TN01" routerLinkActive="active">Tenants</a>
+                            <a class="nav-link text-white" routerLink="/admin/TN01"
+                               routerLinkActive="active">Tenants</a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link text-white" routerLink="/admin/UR01" routerLinkActive="active">Users</a>
@@ -57,7 +58,8 @@ import {ProfileComponent} from '../open-pages/profile.component';
                             <a class="nav-link text-white" routerLink="/admin/AP01" routerLinkActive="active">Apps</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link text-white" routerLink="/admin/CL01" routerLinkActive="active">Clients</a>
+                            <a class="nav-link text-white" routerLink="/admin/CL01"
+                               routerLinkActive="active">Clients</a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link text-white" routerLink="/admin/KY01" routerLinkActive="active">Keys</a>

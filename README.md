@@ -3,7 +3,8 @@
 [![Build, Test & Create Docker Image](https://github.com/SilentSamurai/auth-server/actions/workflows/build.yaml/badge.svg)](https://github.com/SilentSamurai/auth-server/actions/workflows/build.yaml)
 [![Build & Release Docker Image](https://github.com/SilentSamurai/auth-server/actions/workflows/release.yaml/badge.svg)](https://github.com/SilentSamurai/auth-server/actions/workflows/release.yaml)
 
-A production-ready, OIDC-compatible OAuth Authorization service built with [NestJS](https://nestjs.com), [Angular](https://angular.io/), and [TypeScript](https://www.typescriptlang.org/).
+A production-ready, OIDC-compatible OAuth Authorization service built
+with [NestJS](https://nestjs.com), [Angular](https://angular.io/), and [TypeScript](https://www.typescriptlang.org/).
 
 ## 📂 Project Structure
 
@@ -29,7 +30,8 @@ A production-ready, OIDC-compatible OAuth Authorization service built with [Nest
 
 ## ✨ Features
 
-* **OIDC & OAuth2**: Support for standard flows including Authorization Code (with PKCE), Client Credentials, and Refresh Token rotation.
+* **OIDC & OAuth2**: Support for standard flows including Authorization Code (with PKCE), Client Credentials, and
+  Refresh Token rotation.
 * **User Management**: Registration with email verification, password reset, and profile management.
 * **Role-Based Access Control**: Permissions powered by **CASL**.
 * **Security**: JWT-based authentication, password hashing with Argon2, and CORS protection.
@@ -69,6 +71,7 @@ task serve
 ### Manual Setup
 
 #### Backend (srv)
+
 ```bash
 cd srv
 npm install
@@ -77,6 +80,7 @@ npm run start:debug
 ```
 
 #### Frontend (ui)
+
 ```bash
 cd ui
 npm install
@@ -87,35 +91,39 @@ npm run ui:serve
 
 ## 🛠️ Configuration
 
-The backend loads configuration from `.env` files. By default, it looks for `./envs/.env.development`. You can override this using the `ENV_FILE` environment variable.
+The backend loads configuration from `.env` files. By default, it looks for `./envs/.env.development`. You can override
+this using the `ENV_FILE` environment variable.
 
 ### Key Environment Variables
 
-| Variable | Purpose | Default |
-|----------|---------|---------|
-| `PORT` | Backend HTTP port | `9000` |
-| `NODE_ENV` | Environment mode (`development`/`production`) | `development` |
-| `DATABASE_HOST` | PostgreSQL host | `localhost` |
-| `ENABLE_FAKE_SMTP_SERVER` | Enable built-in dev SMTP server | `true` |
-| `ENABLE_CORS` | Enable CORS protection | `true` |
-| `ENABLE_HTTPS` | Enable TLS/HTTPS | `false` |
+| Variable                  | Purpose                                       | Default       |
+|---------------------------|-----------------------------------------------|---------------|
+| `PORT`                    | Backend HTTP port                             | `9000`        |
+| `NODE_ENV`                | Environment mode (`development`/`production`) | `development` |
+| `DATABASE_HOST`           | PostgreSQL host                               | `localhost`   |
+| `ENABLE_FAKE_SMTP_SERVER` | Enable built-in dev SMTP server               | `true`        |
+| `ENABLE_CORS`             | Enable CORS protection                        | `true`        |
+| `ENABLE_HTTPS`            | Enable TLS/HTTPS                              | `false`       |
 
 ---
 
 ## 🚀 Useful Scripts
 
 ### Backend (`srv`)
+
 * `npm run start:debug`: Start with watch mode and debugger.
 * `npm run test`: Run Jest tests.
 * `npm run typeorm`: Execute TypeORM CLI.
 * `npm run generate-migration`: Create a new DB migration.
 
 ### Frontend (`ui`)
+
 * `npm run ui:serve`: Start Angular dev server with proxy.
 * `npm run test`: Run Karma unit tests.
 * `npm run e2e:test`: Run Cypress end-to-end tests.
 
 ### Orchestration (`root`)
+
 * `task build`: Build all components.
 * `task test`: Run all tests (backend & frontend).
 * `task serve`: Run both components in dev mode.
@@ -125,12 +133,14 @@ The backend loads configuration from `.env` files. By default, it looks for `./e
 ## 🧪 Testing
 
 ### Backend
+
 ```bash
 cd srv
 npm test
 ```
 
 ### Frontend
+
 ```bash
 cd ui
 npm test          # Unit tests
@@ -138,6 +148,7 @@ npm run e2e:test  # Cypress E2E
 ```
 
 ### OIDC Compatibility
+
 ```bash
 cd compat-tests
 npm install
@@ -149,11 +160,13 @@ npm test
 ## 🐳 Docker & Deployment
 
 ### Docker Compose
+
 ```bash
 docker-compose up --build
 ```
 
 ### Kubernetes (Helm)
+
 ```bash
 helm upgrade --install auth-server ./helm/auth-server --namespace auth-server --create-namespace
 ```

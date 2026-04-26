@@ -158,7 +158,8 @@ describe('Feature: resource-indicator-support, Property 3: Auth code resource ro
                     expect(Array.isArray(jwt.aud)).toBe(true);
                     expect(jwt.aud).toContain(resource);
                 } finally {
-                    await clientApi.deleteClient(clientId).catch(() => {});
+                    await clientApi.deleteClient(clientId).catch(() => {
+                    });
                 }
             }),
             {numRuns: 10},
@@ -219,7 +220,8 @@ describe('Feature: resource-indicator-support, Property 3: Auth code resource ro
                 // The resource should be preserved exactly as provided
                 expect(jwt.aud).toContain(resource);
             } finally {
-                await clientApi.deleteClient(clientId).catch(() => {});
+                await clientApi.deleteClient(clientId).catch(() => {
+                });
             }
         }
     });

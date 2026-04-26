@@ -88,7 +88,7 @@ describe('RegistrationController', () => {
 
     it('should prevent signup when not allowed by tenant', async () => {
         jest.spyOn(clientService, 'findByClientIdOrAlias').mockResolvedValue({
-            tenant: { allowSignUp: false }
+            tenant: {allowSignUp: false}
         } as any);
 
         const response = await getHttpServer()

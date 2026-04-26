@@ -39,6 +39,7 @@ import {MessageService} from 'primeng/api';
             cursor: pointer;
             transition: all 0.2s;
         }
+
         .list-group-item:hover {
             background-color: #f8f9fa;
         }

@@ -58,7 +58,8 @@ function killPort(port: number): void {
                 try {
                     execSync(`taskkill /F /PID ${pid}`, {timeout: 5000});
                     console.log(`[globalSetup] Killed stale process PID ${pid} on port ${port}`);
-                } catch { /* already dead */ }
+                } catch { /* already dead */
+                }
             }
         } else {
             execSync(`lsof -ti :${port} | xargs kill -9`, {timeout: 5000});
@@ -81,7 +82,7 @@ function cleanupTestPorts(ports: TestPorts): void {
 
 export default async function globalSetup(): Promise<void> {
     const ports = getTestPorts();
-    
+
     // Kill any stale processes on the test ports
     cleanupTestPorts(ports);
 

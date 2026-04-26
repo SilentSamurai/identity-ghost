@@ -77,7 +77,8 @@ describe('Client Credentials Migration', () => {
         });
 
         afterAll(async () => {
-            await clientApi.deleteClient(confidentialClientId).catch(() => {});
+            await clientApi.deleteClient(confidentialClientId).catch(() => {
+            });
         });
 
         it('should return a valid TechnicalToken', async () => {
@@ -119,7 +120,8 @@ describe('Client Credentials Migration', () => {
         });
 
         afterAll(async () => {
-            await clientApi.deleteClient(confidentialClientId).catch(() => {});
+            await clientApi.deleteClient(confidentialClientId).catch(() => {
+            });
         });
 
         it('should return invalid_client for wrong secret', async () => {
@@ -231,7 +233,8 @@ describe('Client Credentials Migration', () => {
                 expect(refreshResponse.status).toEqual(400);
                 expect(refreshResponse.body.error).toEqual('invalid_grant');
             } finally {
-                await clientApi.deleteClient(otherClient.client.clientId).catch(() => {});
+                await clientApi.deleteClient(otherClient.client.clientId).catch(() => {
+                });
             }
         });
     });
@@ -291,7 +294,8 @@ describe('Client Credentials Migration', () => {
         });
 
         afterAll(async () => {
-            await clientApi.deleteClient(rotationClientId).catch(() => {});
+            await clientApi.deleteClient(rotationClientId).catch(() => {
+            });
         });
 
         it('should accept both old and new secrets after rotation', async () => {
@@ -363,7 +367,8 @@ describe('Client Credentials Migration', () => {
                 const uuidV4Regex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
                 expect(jwt.client_id).toMatch(uuidV4Regex);
             } finally {
-                await clientApi.deleteClient(result.client.clientId).catch(() => {});
+                await clientApi.deleteClient(result.client.clientId).catch(() => {
+                });
             }
         });
     });
