@@ -13,6 +13,7 @@ import {ResetPasswordComponent} from './open-pages/reset-password.component';
 import {CenteredCardComponent} from './component/centered-card/centered-card.component';
 
 import {authInterceptorProviders} from './_helpers/auth.interceptor';
+import {httpErrorInterceptorProviders} from './_helpers/http-error.interceptor';
 import {NgbCollapseModule, NgbDropdown, NgbModule,} from '@ng-bootstrap/ng-bootstrap';
 import {TableModule} from 'primeng/table';
 import {BrowserAnimationsModule} from '@angular/platform-browser/animations';
@@ -75,6 +76,7 @@ import {OpenNavbarComponent} from './open-pages/open-navbar.component';
     ],
     providers: [
         authInterceptorProviders,
+        httpErrorInterceptorProviders,
         NgbDropdown,
         MessageService,
         ConfirmationService,

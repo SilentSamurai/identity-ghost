@@ -325,26 +325,24 @@ export class AuthorizeLoginComponent implements OnInit {
         // }
         this.loading = false;
 
-        // Get query parameters
-        this.route.queryParams.subscribe(params => {
-            this.clientId = params['client_id'];
-            this.state = params['state'];
-            this.scope = params['scope'];
-            this.responseType = params['response_type'];
-            this.prompt = params['prompt'] || '';
-            this.maxAge = params['max_age'] !== undefined ? Number(params['max_age']) : undefined;
+        // Read remaining query parameters from snapshot
+        this.clientId = params.get('client_id') || '';
+        this.state = params.get('state') || '';
+        this.scope = params.get('scope') || '';
+        this.responseType = params.get('response_type') || '';
+        this.prompt = params.get('prompt') || '';
+        this.maxAge = params.has('max_age') ? Number(params.get('max_age')) : undefined;
 
-            // Generate and store nonce for OIDC flows
-            if (this.scope && this.scope.split(' ').includes('openid')) {
-                const nonce = this.nonceService.generate();
-                this.nonceService.store(nonce);
-            }
+        // Generate and store nonce for OIDC flows
+        if (this.scope && this.scope.split(' ').includes('openid')) {
+            const nonce = this.nonceService.generate();
+            this.nonceService.store(nonce);
+        }
 
-            // Handle prompt=none: skip login form, attempt silent auth
-            if (this.prompt === 'none') {
-                this.handleSilentAuth();
-            }
-        });
+        // Handle prompt=none: skip login form, attempt silent auth
+        if (this.prompt === 'none') {
+            this.handleSilentAuth();
+        }
     }
 
     onContinue() {
@@ -418,7 +416,7 @@ export class AuthorizeLoginComponent implements OnInit {
             this.redirectToClient(authenticationCode);
         } catch (err: any) {
             console.error(err);
-            this.errorMessage = err.error.message;
+            this.errorMessage = err.error?.message || 'Login failed';
             this.isLoginFailed = true;
         } finally {
             this.loading = false;

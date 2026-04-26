@@ -279,9 +279,13 @@ export class TN02AComponent implements OnInit {
     }
 
     async ngOnInit() {
+        this.tenant_id = this.actRoute.snapshot.params['tenantId'];
+        await this.loadData();
+    }
+
+    async loadData() {
         this.loading = true;
         try {
-            this.tenant_id = this.actRoute.snapshot.params['tenantId'];
             this.credentials = await this.adminTenantService.getTenantCredentials(this.tenant_id);
             this.tenant = await this.adminTenantService.getTenantDetails(this.tenant_id);
             const members = await this.adminTenantService.getMembers(this.tenant_id);
@@ -355,7 +359,7 @@ export class TN02AComponent implements OnInit {
             initData: {tenant: this.tenant, tenantId: this.tenant_id}
         });
         if (modalRef.is_ok()) {
-            await this.ngOnInit();
+            await this.loadData();
         }
     }
 
@@ -364,7 +368,7 @@ export class TN02AComponent implements OnInit {
             initData: {tenant: this.tenant}
         });
         if (modalRef.is_ok()) {
-            await this.ngOnInit();
+            await this.loadData();
         }
     }
 
@@ -373,7 +377,7 @@ export class TN02AComponent implements OnInit {
             initData: {tenant: this.tenant}
         });
         if (modalRef.is_ok()) {
-            await this.ngOnInit();
+            await this.loadData();
         }
     }
 
@@ -394,7 +398,7 @@ export class TN02AComponent implements OnInit {
             },
         });
         if (deleted) {
-            await this.ngOnInit();
+            await this.loadData();
         }
     }
 
@@ -416,7 +420,7 @@ export class TN02AComponent implements OnInit {
             },
         });
         if (removed) {
-            await this.ngOnInit();
+            await this.loadData();
         }
     }
 
@@ -449,7 +453,7 @@ export class TN02AComponent implements OnInit {
             initData: {tenantId: this.tenant.id}
         });
         if (modalRef.is_ok()) {
-            await this.ngOnInit();
+            await this.loadData();
         }
     }
 
@@ -470,7 +474,7 @@ export class TN02AComponent implements OnInit {
             },
         });
         if (deleted) {
-            await this.ngOnInit();
+            await this.loadData();
         }
     }
 

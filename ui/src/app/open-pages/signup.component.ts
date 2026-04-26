@@ -203,21 +203,14 @@ export class SignUpComponent implements OnInit {
             client_id: ['', [Validators.required]]
         });
 
-        // React to query param changes to handle same-route navigation updates
-        this.actRoute.queryParamMap.subscribe(params => {
-            const clientIdParam = params.get('client_id');
-            if (clientIdParam && clientIdParam.length > 0) {
-                if (this.signupForm.get('client_id')?.value !== clientIdParam) {
-                    this.signupForm.patchValue({client_id: clientIdParam});
-                }
-                this.error = '';
-            } else {
-                // clear client id if removed from URL and show error like authorization page
-                this.signupForm.get('client_id')?.reset('');
-                this.error = 'Invalid client_id || client_id not found';
-            }
-            this.loading = false;
-        });
+        const clientIdParam = this.actRoute.snapshot.queryParamMap.get('client_id');
+        if (clientIdParam && clientIdParam.length > 0) {
+            this.signupForm.patchValue({client_id: clientIdParam});
+            this.error = '';
+        } else {
+            this.error = 'Invalid client_id || client_id not found';
+        }
+        this.loading = false;
     }
 
     async onSubmit(): Promise<void> {

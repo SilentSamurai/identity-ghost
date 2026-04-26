@@ -29,10 +29,10 @@ export class TenantAdminAuthGuardService {
             !this.permissionService.isAuthorized(
                 Actions.Manage,
                 Subjects.TENANT,
-                {tenantId},
+                {id: tenantId},
             )
         ) {
-            return true;
+            return false;
         }
         return true;
     }
@@ -46,8 +46,7 @@ export class TenantAdminAuthGuardService {
         | boolean
         | UrlTree {
         if (!this.check(route, state)) {
-            // this.authDefaultService.signOut(state.url);
-            return false;
+            return this.router.parseUrl('/error/403');
         }
         return true;
     }
@@ -70,7 +69,6 @@ export class TenantAccessAuthGuard {
             return false;
         }
         const tenantId = route.paramMap.get('tenantId');
-        console.log(route);
         if (!tenantId) {
             return false;
         }
@@ -78,10 +76,10 @@ export class TenantAccessAuthGuard {
             !this.permissionService.isAuthorized(
                 Actions.Read,
                 Subjects.TENANT,
-                {tenantId},
+                {id: tenantId},
             )
         ) {
-            return true;
+            return false;
         }
         return true;
     }
@@ -95,8 +93,7 @@ export class TenantAccessAuthGuard {
         | boolean
         | UrlTree {
         if (!this.check(route, state)) {
-            // this.authDefaultService.signOut(state.url);
-            return false;
+            return this.router.parseUrl('/error/403');
         }
         return true;
     }

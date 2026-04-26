@@ -2,7 +2,6 @@ import {Component, OnInit, ViewChild} from '@angular/core';
 import {NgbModal} from '@ng-bootstrap/ng-bootstrap';
 import {CreateTenantComponent} from './dialogs/create-tenant.component';
 import {UpdateTenantComponent} from './dialogs/update-tenant.component';
-import {TenantService} from '../../_services/tenant.service';
 import {AdminTenantService} from '../../_services/admin-tenant.service';
 import {SessionService} from '../../_services/session.service';
 import {AppTableComponent} from '../../component/table/app-table.component';
@@ -102,7 +101,6 @@ export class TN01AComponent implements OnInit {
 
     constructor(
         private tokenStorageService: SessionService,
-        private tenantService: TenantService,
         private adminTenantService: AdminTenantService,
         private authDefaultService: AuthDefaultService,
         private confirmationService: ConfirmationService,
@@ -110,7 +108,7 @@ export class TN01AComponent implements OnInit {
         private permissionService: PermissionService,
         private modalService: NgbModal,
     ) {
-        this.dataSource = this.tenantService.createDataModel();
+        this.dataSource = this.adminTenantService.createDataModel();
     }
 
     async ngOnInit() {

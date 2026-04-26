@@ -54,7 +54,7 @@ export class AuthService {
         );
     }
 
-    fetchAccessToken(code: string, verifier: string, client_id: string, subscriber_tenant_hint?: string): Observable<any> {
+    fetchAccessToken(code: string, verifier: string, client_id: string, subscriber_tenant_hint?: string): Promise<any> {
         const body: any = {
             grant_type: 'authorization_code',
             code,
@@ -66,10 +66,12 @@ export class AuthService {
             body.subscriber_tenant_hint = subscriber_tenant_hint;
         }
 
-        return this.http.post(
-            `${AUTH_API}/token`,
-            body,
-            httpOptions,
+        return lastValueFrom(
+            this.http.post(
+                `${AUTH_API}/token`,
+                body,
+                httpOptions,
+            ),
         );
     }
 

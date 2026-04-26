@@ -515,11 +515,15 @@ export class TN02Component implements OnInit {
     }
 
     async ngOnInit() {
+        this.tenant_id = this.actRoute.snapshot.params['tenantId'];
+        this.isTenantAdmin = this.tokenStorageService.isTenantAdmin();
+        await this.loadData();
+    }
+
+    async loadData() {
         this.loading = true;
         try {
-            this.tenant_id = this.actRoute.snapshot.params['tenantId'];
-            if (this.tokenStorageService.isTenantAdmin()) {
-                this.isTenantAdmin = true;
+            if (this.isTenantAdmin) {
                 this.credentials = await this.tenantService.getTenantCredentials();
             }
             this.tenant = await this.tenantService.getTenantDetails();
@@ -551,7 +555,7 @@ export class TN02Component implements OnInit {
             }
         });
         if (modalRef.is_ok()) {
-            await this.ngOnInit();
+            await this.loadData();
         }
     }
 
@@ -560,7 +564,7 @@ export class TN02Component implements OnInit {
             initData: {tenant: this.tenant}
         });
         if (modalRef.is_ok()) {
-            await this.ngOnInit();
+            await this.loadData();
         }
     }
 
@@ -571,7 +575,7 @@ export class TN02Component implements OnInit {
             }
         });
         if (modalRef.is_ok()) {
-            await this.ngOnInit();
+            await this.loadData();
         }
     }
 
@@ -602,7 +606,7 @@ export class TN02Component implements OnInit {
             },
         });
         if (deletedRole) {
-            await this.ngOnInit();
+            await this.loadData();
         }
     }
 
@@ -633,7 +637,7 @@ export class TN02Component implements OnInit {
             },
         });
         if (removedMember) {
-            await this.ngOnInit();
+            await this.loadData();
         }
     }
 
@@ -679,7 +683,7 @@ export class TN02Component implements OnInit {
             initData: {tenantId: this.tenant.id}
         });
         if (modalRef.is_ok()) {
-            await this.ngOnInit();
+            await this.loadData();
         }
     }
 
@@ -688,7 +692,7 @@ export class TN02Component implements OnInit {
             initData: {app}
         });
         if (modalRef.is_ok()) {
-            await this.ngOnInit();
+            await this.loadData();
         }
     }
 
@@ -717,7 +721,7 @@ export class TN02Component implements OnInit {
             },
         });
         if (deletedApp) {
-            await this.ngOnInit();
+            await this.loadData();
         }
     }
 
@@ -726,7 +730,7 @@ export class TN02Component implements OnInit {
             initData: {tenant: this.tenant}
         });
         if (result.is_ok()) {
-            await this.ngOnInit();
+            await this.loadData();
         }
     }
 
@@ -755,7 +759,7 @@ export class TN02Component implements OnInit {
             },
         });
         if (unsubscribed) {
-            await this.ngOnInit();
+            await this.loadData();
         }
     }
 
@@ -788,7 +792,7 @@ export class TN02Component implements OnInit {
             },
         });
         if (published) {
-            await this.ngOnInit();
+            await this.loadData();
         }
     }
 
@@ -806,7 +810,7 @@ export class TN02Component implements OnInit {
                     initData: {clientSecret: data.clientSecret}
                 });
             }
-            await this.ngOnInit();
+            await this.loadData();
         }
     }
 
@@ -827,7 +831,7 @@ export class TN02Component implements OnInit {
             },
         });
         if (deleted) {
-            await this.ngOnInit();
+            await this.loadData();
         }
     }
 
@@ -836,7 +840,7 @@ export class TN02Component implements OnInit {
             initData: {tenantId: this.tenant_id}
         });
         if (result.is_ok()) {
-            await this.ngOnInit();
+            await this.loadData();
         }
     }
 
@@ -857,7 +861,7 @@ export class TN02Component implements OnInit {
             },
         });
         if (deleted) {
-            await this.ngOnInit();
+            await this.loadData();
         }
     }
 }

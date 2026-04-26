@@ -129,7 +129,8 @@ export class StartUpService implements OnModuleInit {
                     domain: "client-creds-migration-test.local",
                     signUp: false
                 },
-                {name: "Client Binding Test Tenant", domain: "client-binding-test.local", signUp: false}
+                {name: "Client Binding Test Tenant", domain: "client-binding-test.local", signUp: false},
+                {name: "Auth Code Single Use Test Tenant", domain: "auth-code-single-use-test.local", signUp: false}
             ];
 
             // 4) Create each tenant and assign the existing user as owner

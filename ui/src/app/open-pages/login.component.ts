@@ -3,7 +3,6 @@ import {AuthService} from '../_services/auth.service';
 import {SessionService} from '../_services/session.service';
 import {NonceService} from '../_services/nonce.service';
 import {ActivatedRoute, Router} from '@angular/router';
-import {lastValueFrom} from 'rxjs';
 import {FormBuilder, FormGroup, Validators} from '@angular/forms';
 import {MessageService} from 'primeng/api';
 
@@ -345,7 +344,7 @@ export class LoginComponent implements OnInit {
             await this.redirect(authenticationCode, clientId);
         } catch (err: any) {
             console.error(err);
-            this.errorMessage = err.error.message;
+            this.errorMessage = err.error?.message || 'Login failed';
             this.isLoginFailed = true;
         } finally {
             this.loading = false;
@@ -388,9 +387,7 @@ export class LoginComponent implements OnInit {
     private async setAccessToken(code: string, clientId: string) {
         try {
             let verifier = this.tokenStorage.getCodeVerifier();
-            const data = await lastValueFrom(
-                this.authService.fetchAccessToken(code, verifier, clientId),
-            );
+            const data = await this.authService.fetchAccessToken(code, verifier, clientId);
 
             // Validate nonce in ID token if a nonce was sent in the authorization request
             const storedNonce = this.nonceService.retrieve();

@@ -2,7 +2,6 @@ import {Component, OnInit} from '@angular/core';
 import {UserService} from '../../_services/user.service';
 import {NgbModal} from '@ng-bootstrap/ng-bootstrap';
 import {ActivatedRoute, Router} from '@angular/router';
-import {TenantService} from '../../_services/tenant.service';
 import {AdminTenantService} from '../../_services/admin-tenant.service';
 import {MessageService} from 'primeng/api';
 import {AuthDefaultService} from '../../_services/auth.default.service';
@@ -107,7 +106,6 @@ export class TNRL01ASelectionComponent implements OnInit {
 
     constructor(
         private userService: UserService,
-        private tenantService: TenantService,
         private adminTenantService: AdminTenantService,
         private route: ActivatedRoute,
         private router: Router,
@@ -121,7 +119,7 @@ export class TNRL01ASelectionComponent implements OnInit {
         this.authDefaultService.setTitle(
             'TNRL01: Manage Role Assignments of Tenant',
         );
-        this.tenantsDM = this.tenantService.createDataModel();
+        this.tenantsDM = this.adminTenantService.createDataModel();
         this.usersDM = this.userService.createDataModel();
     }
 
@@ -151,7 +149,7 @@ export class TNRL01ASelectionComponent implements OnInit {
             this.messageService.add({
                 severity: 'error',
                 summary: 'Failed',
-                detail: exception.error.message,
+                detail: exception.error?.message || 'Operation failed',
             });
             return false;
         }

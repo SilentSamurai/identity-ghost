@@ -37,13 +37,15 @@ export class TenantService {
     }
 
     createTenant(name: string, domain: string) {
-        return this.http.post(
-            `${API_URL}/tenant/create`,
-            {
-                name,
-                domain,
-            },
-            this.getHttpOptions(),
+        return lastValueFrom(
+            this.http.post(
+                `${API_URL}/tenant/create`,
+                {
+                    name,
+                    domain,
+                },
+                this.getHttpOptions(),
+            ),
         );
     }
 
@@ -65,10 +67,12 @@ export class TenantService {
             throw new NoChangesException();
         }
 
-        return this.http.patch(
-            `${API_URL}/tenant/my`,
-            requestBody,
-            this.getHttpOptions(),
+        return lastValueFrom(
+            this.http.patch(
+                `${API_URL}/tenant/my`,
+                requestBody,
+                this.getHttpOptions(),
+            ),
         );
     }
 

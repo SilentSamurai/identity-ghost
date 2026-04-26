@@ -2,7 +2,7 @@ import {Component, EventEmitter, OnInit, Output} from '@angular/core';
 import {NgbActiveModal} from '@ng-bootstrap/ng-bootstrap';
 import {MessageService} from 'primeng/api';
 import {GroupService} from '../../../_services/group.service';
-import {TenantService} from '../../../_services/tenant.service';
+import {AdminTenantService} from '../../../_services/admin-tenant.service';
 import {DataSource} from '../../../component/model/DataSource';
 
 @Component({
@@ -97,11 +97,11 @@ export class CreateGroupComponent implements OnInit {
 
     constructor(
         private groupService: GroupService,
-        private tenantService: TenantService,
+        private adminTenantService: AdminTenantService,
         private messageService: MessageService,
         public activeModal: NgbActiveModal,
     ) {
-        this.tenantsDM = this.tenantService.createDataModel();
+        this.tenantsDM = this.adminTenantService.createDataModel();
     }
 
     ngOnInit(): void {

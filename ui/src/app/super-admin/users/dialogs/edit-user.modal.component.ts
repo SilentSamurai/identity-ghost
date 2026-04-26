@@ -1,7 +1,6 @@
 import {Component, EventEmitter, Input, OnInit, Output} from '@angular/core';
 import {UserService} from '../../../_services/user.service';
 import {NgbActiveModal} from '@ng-bootstrap/ng-bootstrap';
-import {lastValueFrom} from 'rxjs';
 import {MessageService} from 'primeng/api';
 
 @Component({
@@ -95,12 +94,11 @@ export class EditUserModalComponent implements OnInit {
 
     async onSubmit() {
         try {
-            let editedUser: any = this.userService.editUser(
+            let editedUser: any = await this.userService.editUser(
                 this.user.id,
                 this.user.name === this.form.name ? null : this.form.name,
                 this.user.email === this.form.email ? null : this.form.email,
             );
-            editedUser = await lastValueFrom(editedUser);
             this.messageService.add({
                 severity: 'success',
                 summary: 'Success',
@@ -113,7 +111,7 @@ export class EditUserModalComponent implements OnInit {
             this.messageService.add({
                 severity: 'error',
                 summary: 'Error',
-                detail: e.error.message,
+                detail: e.error?.message || 'User update failed',
             });
         }
     }

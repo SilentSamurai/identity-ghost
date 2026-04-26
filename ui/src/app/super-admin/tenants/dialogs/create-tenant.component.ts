@@ -1,7 +1,7 @@
 import {Component, EventEmitter, OnInit, Output,} from '@angular/core';
 import {NgbActiveModal} from '@ng-bootstrap/ng-bootstrap';
 import {lastValueFrom} from 'rxjs';
-import {TenantService} from '../../../_services/tenant.service';
+import {AdminTenantService} from '../../../_services/admin-tenant.service';
 import {MessageService} from 'primeng/api';
 
 @Component({
@@ -92,7 +92,7 @@ export class CreateTenantComponent implements OnInit {
     krishna: any;
 
     constructor(
-        private tenantService: TenantService,
+        private adminTenantService: AdminTenantService,
         private messageService: MessageService,
         public activeModal: NgbActiveModal,
     ) {
@@ -104,7 +104,7 @@ export class CreateTenantComponent implements OnInit {
     async onSubmit() {
         try {
             const createdTenant = await lastValueFrom(
-                this.tenantService.createTenant(
+                this.adminTenantService.createTenant(
                     this.form.name,
                     this.form.domain,
                 ),

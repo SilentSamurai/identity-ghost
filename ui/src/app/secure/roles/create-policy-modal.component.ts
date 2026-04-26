@@ -1,4 +1,5 @@
-import {Component, Input, OnInit} from '@angular/core';
+import {Component, DestroyRef, inject, Input, OnInit} from '@angular/core';
+import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {FormBuilder, FormGroup, Validators} from '@angular/forms';
 import {NgbActiveModal} from '@ng-bootstrap/ng-bootstrap';
 import {MessageService} from 'primeng/api';
@@ -123,6 +124,7 @@ import {PolicyService} from '../../_services/policy.service';
     `,
 })
 export class CreatePolicyModalComponent implements OnInit {
+    private destroyRef = inject(DestroyRef);
     @Input() role_id: string = '';
     @Input() policyId?: string;
     @Input() viewOnly: boolean = false;
@@ -169,7 +171,7 @@ export class CreatePolicyModalComponent implements OnInit {
             this.loadPolicy(this.policyId);
         }
 
-        this.policyForm.get('action')?.valueChanges.subscribe((value) => {
+        this.policyForm.get('action')?.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((value) => {
             const customActionControl = this.policyForm.get('customAction');
             if (value === 'OTHER') {
                 customActionControl?.setValidators([Validators.required]);

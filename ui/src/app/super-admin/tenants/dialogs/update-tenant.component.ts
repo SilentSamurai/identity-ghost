@@ -1,8 +1,7 @@
 import {Component, EventEmitter, Input, OnInit, Output} from '@angular/core';
 import {NgbActiveModal} from '@ng-bootstrap/ng-bootstrap';
-import {lastValueFrom} from 'rxjs';
 import {MessageService} from 'primeng/api';
-import {NoChangesException, TenantService,} from '../../../_services/tenant.service';
+import {AdminTenantService} from '../../../_services/admin-tenant.service';
 
 @Component({
     selector: 'app-update-tenant',
@@ -103,7 +102,7 @@ export class UpdateTenantComponent implements OnInit {
     krishna: any;
 
     constructor(
-        private tenantService: TenantService,
+        private adminTenantService: AdminTenantService,
         private messageService: MessageService,
         public activeModal: NgbActiveModal,
     ) {
@@ -120,13 +119,25 @@ export class UpdateTenantComponent implements OnInit {
 
     async onSubmit() {
         try {
-            let editedTenant = await lastValueFrom(
-                this.tenantService.editTenant(
-                    this.tenant.name === this.form.name ? null : this.form.name,
-                    this.tenant.allowSignUp === this.form.allowSignUp
-                        ? null
-                        : this.form.allowSignUp,
-                ),
+            const body: { name?: string; allowSignUp?: boolean } = {};
+            if (this.tenant.name !== this.form.name) {
+                body.name = this.form.name;
+            }
+            if (this.tenant.allowSignUp !== this.form.allowSignUp) {
+                body.allowSignUp = this.form.allowSignUp;
+            }
+            if (Object.keys(body).length === 0) {
+                this.messageService.add({
+                    severity: 'info',
+                    summary: 'Info',
+                    detail: 'No changes were made to the tenant',
+                });
+                this.activeModal.close(this.tenant);
+                return;
+            }
+            let editedTenant = await this.adminTenantService.updateTenant(
+                this.tenant.id,
+                body,
             );
             this.messageService.add({
                 severity: 'success',
@@ -136,20 +147,11 @@ export class UpdateTenantComponent implements OnInit {
             this.passEntry.emit(editedTenant);
             this.activeModal.close(editedTenant);
         } catch (e: any) {
-            if (e instanceof NoChangesException) {
-                this.messageService.add({
-                    severity: 'info',
-                    summary: 'Info',
-                    detail: 'No changes were made to the tenant',
-                });
-                this.activeModal.close(this.tenant);
-            } else {
-                this.messageService.add({
-                    severity: 'error',
-                    summary: 'Error',
-                    detail: 'Tenant Update Failed: ' + e.message,
-                });
-            }
+            this.messageService.add({
+                severity: 'error',
+                summary: 'Error',
+                detail: 'Tenant Update Failed: ' + e.message,
+            });
         }
     }
 }

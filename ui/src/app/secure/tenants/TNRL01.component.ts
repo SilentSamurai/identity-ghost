@@ -3,7 +3,6 @@ import {UserService} from '../../_services/user.service';
 import {NgbModal} from '@ng-bootstrap/ng-bootstrap';
 import {ActivatedRoute, Router} from '@angular/router';
 import {TenantService} from '../../_services/tenant.service';
-import {lastValueFrom} from 'rxjs';
 import {MessageService} from 'primeng/api';
 import {AuthDefaultService} from '../../_services/auth.default.service';
 import {CloseType, ValueHelpResult,} from '../../component/value-help/value-help.component';
@@ -161,7 +160,7 @@ export class TNRL01Component implements AfterContentInit {
         }
 
         this.tenant = await this.tenantService.getTenantDetails();
-        this.user = await lastValueFrom(this.userService.getUser(this.userId));
+        this.user = await this.userService.getUser(this.userId);
         try {
             await this.loadTable();
             this.tenantRoles = this.tenant.roles;
@@ -172,7 +171,7 @@ export class TNRL01Component implements AfterContentInit {
             this.messageService.add({
                 severity: 'error',
                 summary: 'Failed',
-                detail: exception.error.message,
+                detail: exception.error?.message || 'Operation failed',
             });
         }
     }

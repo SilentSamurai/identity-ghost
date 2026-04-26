@@ -2,7 +2,7 @@ import {Component, OnInit} from '@angular/core';
 import {UserService} from '../../_services/user.service';
 import {NgbModal} from '@ng-bootstrap/ng-bootstrap';
 import {ActivatedRoute, Router} from '@angular/router';
-import {TenantService} from '../../_services/tenant.service';
+import {AdminTenantService} from '../../_services/admin-tenant.service';
 import {MessageService} from 'primeng/api';
 import {AuthDefaultService} from '../../_services/auth.default.service';
 import {DataSource} from "../../component/model/DataSource";
@@ -72,7 +72,7 @@ export class TN02ASelectionComponent implements OnInit {
 
     constructor(
         private userService: UserService,
-        private tenantService: TenantService,
+        private adminTenantService: AdminTenantService,
         private route: ActivatedRoute,
         private router: Router,
         private authDefaultService: AuthDefaultService,
@@ -83,7 +83,7 @@ export class TN02ASelectionComponent implements OnInit {
 
     async ngOnInit(): Promise<void> {
         this.authDefaultService.setTitle('TN02: Select Tenant');
-        this.tenantsDM = this.tenantService.createDataModel();
+        this.tenantsDM = this.adminTenantService.createDataModel();
     }
 
     async continue() {

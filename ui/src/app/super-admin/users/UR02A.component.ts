@@ -3,7 +3,6 @@ import {ActivatedRoute} from '@angular/router';
 import {NgbModal} from '@ng-bootstrap/ng-bootstrap';
 import {EditUserModalComponent} from './dialogs/edit-user.modal.component';
 import {UserService} from '../../_services/user.service';
-import {lastValueFrom} from 'rxjs';
 import {ConfirmationService} from '../../component/dialogs/confirmation.service';
 import {MessageService} from 'primeng/api';
 import {Location} from '@angular/common';
@@ -144,13 +143,14 @@ export class UR02AComponent implements OnInit {
     }
 
     async ngOnInit(): Promise<void> {
-        this.authDefaultService.setTitle('UR02: Manage User');
         this.userId = this.actRoute.snapshot.params['userId'];
-        console.log(this.userId);
-        this.user = await lastValueFrom(this.userService.getUser(this.userId));
-        this.tenants = await lastValueFrom(
-            this.userService.getUserTenants(this.userId),
-        );
+        await this.loadData();
+    }
+
+    async loadData() {
+        this.authDefaultService.setTitle('UR02: Manage User');
+        this.user = await this.userService.getUser(this.userId);
+        this.tenants = await this.userService.getUserTenants(this.userId);
         this.tenantsDM.setData(this.tenants);
     }
 
@@ -207,7 +207,7 @@ export class UR02AComponent implements OnInit {
                         summary: 'Success',
                         detail: 'User Verified',
                     });
-                    await this.ngOnInit();
+                    await this.loadData();
                 } catch (e) {
                     this.messageService.add({
                         severity: 'error',
@@ -237,7 +237,7 @@ export class UR02AComponent implements OnInit {
                         summary: 'Success',
                         detail: `User ${action}ed`,
                     });
-                    await this.ngOnInit();
+                    await this.loadData();
                 } catch (e) {
                     this.messageService.add({
                         severity: 'error',

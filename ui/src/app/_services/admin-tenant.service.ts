@@ -1,6 +1,9 @@
 import {Injectable} from '@angular/core';
 import {HttpClient, HttpHeaders} from '@angular/common/http';
 import {lastValueFrom} from 'rxjs';
+import {RestApiModel} from '../component/model/RestApiModel';
+import {query} from '../component/model/Query';
+import {DataSource} from '../component/model/DataSource';
 
 const API_URL = '/api';
 
@@ -229,6 +232,23 @@ export class AdminTenantService {
         if (queryParts.length) url += '?' + queryParts.join('&');
         return lastValueFrom(
             this.http.get(url, this.getHttpOptions()),
+        );
+    }
+
+    createTenant(name: string, domain: string) {
+        return this.http.post(
+            `${API_URL}/tenant/create`,
+            {name, domain},
+            this.getHttpOptions(),
+        );
+    }
+
+    createDataModel(): DataSource<any> {
+        return new RestApiModel(
+            this.http,
+            `${API_URL}/search/Tenants`,
+            ['id'],
+            query({expand: ['Tenants']}),
         );
     }
 

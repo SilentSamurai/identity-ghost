@@ -18,10 +18,10 @@ import {expect2xx} from "../api-client/client";
  */
 describe('single-use enforcement of authorization codes', () => {
     let app: SharedTestFixture;
-    const clientId = "auth.server.com";
+    const clientId = "auth-code-single-use-test.local";
     const verifier = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq";
     const challenge = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq";
-    const email = "admin@auth.server.com";
+    const email = "admin@auth-code-single-use-test.local";
     const password = "admin9000";
 
     beforeAll(async () => {

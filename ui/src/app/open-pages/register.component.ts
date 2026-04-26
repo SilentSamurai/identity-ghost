@@ -330,13 +330,13 @@ export class RegisterComponent implements OnInit {
         } catch (e: any) {
             console.error(e);
             this.isSignUpFailed = true;
-            this.errorMessage = e.error.message;
+            this.errorMessage = e.error?.message || 'Registration failed';
 
             // Show error toast
             this.messageService.add({
                 severity: 'error',
                 summary: 'Error',
-                detail: e.error.message || 'Registration failed. Please try again.'
+                detail: e.error?.message || 'Registration failed. Please try again.'
             });
         } finally {
             this.loading = false;

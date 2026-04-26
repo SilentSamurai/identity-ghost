@@ -104,7 +104,7 @@ export class CreateUserModalComponent implements OnInit {
             this.messageService.add({
                 severity: 'error',
                 summary: 'Error',
-                detail: e.error.message,
+                detail: e.error?.message || 'User creation failed',
             });
         }
     }
