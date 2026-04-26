@@ -226,8 +226,10 @@ import {ModalService} from '../../component/dialogs/modal.service';
                                 <td>{{ key.kid ? key.kid.substring(0, 8) + '\u2026' : '' }}</td>
                                 <td>
                                     <span *ngIf="key.deactivatedAt" class="badge bg-secondary">Deactivated</span>
-                                    <span *ngIf="!key.deactivatedAt && key.isCurrent" class="badge bg-success">Current</span>
-                                    <span *ngIf="!key.deactivatedAt && !key.isCurrent" class="badge bg-warning text-dark">
+                                    <span *ngIf="!key.deactivatedAt && key.isCurrent"
+                                          class="badge bg-success">Current</span>
+                                    <span *ngIf="!key.deactivatedAt && !key.isCurrent"
+                                          class="badge bg-warning text-dark">
                                         Active
                                         <small class="ms-1">{{ getOverlapCountdown(key) }}</small>
                                     </span>

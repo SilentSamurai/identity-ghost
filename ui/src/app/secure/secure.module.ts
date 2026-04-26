@@ -23,7 +23,6 @@ import {TNRL01Component} from './tenants/TNRL01.component';
 import {AbilityModule} from '@casl/angular';
 import {SkeletonModule} from 'primeng/skeleton';
 import {CreateSubscriptionComponent} from "./tenants/dialogs/create-subscription.component";
-import {CL01Component} from './clients/CL01.component';
 import {CL02Component} from './clients/CL02.component';
 import {CreateClientComponent} from './clients/dialogs/create-client.component';
 import {EditClientComponent} from './clients/dialogs/edit-client.component';
@@ -45,7 +44,6 @@ import {UpdateRoleModalComponent} from './roles/update-role-modal.component';
         AddRoleComponent,
         RL02Component,
         CreateSubscriptionComponent,
-        CL01Component,
         CL02Component,
         CreateClientComponent,
         EditClientComponent,

@@ -195,7 +195,7 @@ export class CL02Component implements OnInit {
             },
         });
         if (deleted) {
-            await this.router.navigate(['/CL01', this.tenantId]);
+            await this.router.navigate(['/TN02', this.tenantId], {fragment: 'CLIENTS'});
         }
     }
 }

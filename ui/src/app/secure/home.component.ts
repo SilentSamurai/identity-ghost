@@ -83,7 +83,9 @@ export class HomeComponent implements OnInit {
                     icon: 'fa-key',
                     command: async () => {
                         const tenant_id = this.user.tenant.id;
-                        await this.router.navigate(['/CL01', tenant_id]);
+                        await this.router.navigate(['/TN02', tenant_id], {
+                            fragment: 'CLIENTS',
+                        });
                     },
                 },
             ],

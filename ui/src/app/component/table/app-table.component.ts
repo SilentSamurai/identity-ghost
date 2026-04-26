@@ -125,7 +125,8 @@ import {exportToCsv} from './csv-export';
                 </tr>
 
                 <!-- Loading indicator -->
-                <tr style="height:40px" *ngIf="state.kind === 'loading' || (state.kind === 'data' && state.loadingMore)">
+                <tr style="height:40px"
+                    *ngIf="state.kind === 'loading' || (state.kind === 'data' && state.loadingMore)">
                     <td>
                         <div class="loading-text"></div>
                         <p-skeleton [ngStyle]="{width: '100%'}"></p-skeleton>

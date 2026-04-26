@@ -12,3 +12,4 @@ and [Nest.js](https://nestjs.com/).
 - Reset password via email.
 - Change email address via email.
 - API [documentation](https://silentsamurai.github.io/auth-server) available.
+- **Onboarding**: One‑click tenant onboarding for SaaS users (see `docs/multi-tenant-onboarding.md`).
