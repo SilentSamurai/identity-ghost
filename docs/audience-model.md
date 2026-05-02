@@ -10,15 +10,82 @@ This Auth Server follows [RFC 9068](https://datatracker.ietf.org/doc/html/rfc906
 
 ## How `aud` Values Are Assigned
 
+### Default Audience
+
 Every access token issued by the Auth Server includes an `aud` claim set to the server's configured domain:
 
 ```
 aud: [SUPER_TENANT_DOMAIN]
 ```
 
-`SUPER_TENANT_DOMAIN` is the environment variable that defines the issuer URL. It serves double duty as both the `iss`
-and the default audience value. This means the Auth Server itself is the default intended audience for all tokens it
-issues.
+`SUPER_TENANT_DOMAIN` is the environment variable that defines the Auth Server's domain (e.g. `auth.example.com`). It
+is the default audience value for all tokens.
+
+> **Note:** `SUPER_TENANT_DOMAIN` and `ISSUER` are separate environment variables. The `iss` claim is set from the
+> `ISSUER` variable (typically a full URL such as `https://auth.example.com`), while the default `aud` is set from
+> `SUPER_TENANT_DOMAIN` (the bare domain). In production deployments these values are typically configured to match,
+> but they are independent settings.
+
+### Resource Indicator Audience (RFC 8707)
+
+When a client includes a `resource` parameter in the token request, the `aud` array contains both the requested
+resource server URI and the default `SUPER_TENANT_DOMAIN`:
+
+```
+aud: [resource_uri, SUPER_TENANT_DOMAIN]
+```
+
+This applies to all grant types: `authorization_code`, `password`, `refresh_token`, and `client_credentials`.
+
+The `resource` parameter must be an absolute URI (per RFC 3986 §4.3) with no fragment component, and must be listed in
+the client's configured `allowedResources`. Requests with an unregistered resource URI are rejected with
+`invalid_target`.
+
+## Token Types
+
+### User Access Tokens (TenantToken)
+
+Issued for `authorization_code`, `password`, and `refresh_token` grants. Contains both `scopes` (OIDC values) and
+`roles` (role enums).
+
+Default audience:
+
+```json
+{
+    "aud": ["auth.example.com"]
+}
+```
+
+With resource indicator:
+
+```json
+{
+    "aud": ["https://api.example.com", "auth.example.com"]
+}
+```
+
+### Technical Access Tokens (TechnicalToken)
+
+Issued for the `client_credentials` grant (machine-to-machine). Contains `scopes` but no `roles` field — there is no
+user identity. Follows the same audience model as user tokens.
+
+Default audience:
+
+```json
+{
+    "aud": ["auth.example.com"]
+}
+```
+
+With resource indicator:
+
+```json
+{
+    "aud": ["https://api.example.com", "auth.example.com"]
+}
+```
+
+Per RFC 6749 §4.4.3, `client_credentials` tokens never include a `refresh_token`.
 
 ## Format
 
@@ -28,41 +95,12 @@ resource servers — there is no need to handle both string and array formats.
 ```json
 {
     "aud": [
-        "https://auth.example.com"
+        "auth.example.com"
     ]
 }
 ```
 
-A bare string `aud` (e.g. `"aud": "https://auth.example.com"`) is never emitted and will be rejected during token
-validation.
-
-## Examples of Valid `aud` Arrays
-
-**Single audience (default)**
-
-The standard case for all tokens issued today:
-
-```json
-{
-    "aud": [
-        "https://auth.example.com"
-    ]
-}
-```
-
-**Multiple audiences (future)**
-
-When RFC 8707 resource indicators are supported, a client may request access to specific resource servers. The `aud`
-array will then contain those resource server URIs:
-
-```json
-{
-    "aud": [
-        "https://auth.example.com",
-        "https://api.example.com"
-    ]
-}
-```
+A bare string `aud` (e.g. `"aud": "auth.example.com"`) is never emitted and will be rejected during token validation.
 
 ## Validating the `aud` Claim (Resource Server Guidance)
 
@@ -70,8 +108,8 @@ Resource servers that accept tokens from this Auth Server should validate the `a
 
 1. **Verify `aud` is an array.** Reject the token if `aud` is a bare string or missing entirely.
 
-2. **Check for your identifier.** The resource server's own identifier (its URI or the `SUPER_TENANT_DOMAIN` value) must
-   appear in the `aud` array. If it does not, reject the token.
+2. **Check for your identifier.** The resource server's own identifier (its URI or the `SUPER_TENANT_DOMAIN` value)
+   must appear in the `aud` array. If it does not, reject the token.
 
 3. **Use exact string matching.** Compare audience values as exact strings — no pattern matching or normalization.
 
@@ -144,11 +182,32 @@ This Auth Server always issues ID tokens with:
 Resource indicators (RFC 8707) affect access token audience only. ID token audience remains `[clientId]` regardless of
 the `resource` parameter.
 
-## Future: RFC 8707 Resource Indicators
+## RFC 8707 Resource Indicators
 
-The current audience model uses a single default value. When [RFC 8707](https://datatracker.ietf.org/doc/html/rfc8707)
-resource indicators are implemented, clients will be able to request tokens scoped to specific resource servers by
-including `resource` parameters in the token request. The `aud` array will then contain the requested resource server
-URIs instead of (or in addition to) the default value.
+[RFC 8707](https://datatracker.ietf.org/doc/html/rfc8707) resource indicators are supported. Clients can request tokens
+scoped to specific resource servers by including a `resource` parameter in the token request.
 
-Until then, all tokens carry `aud: [SUPER_TENANT_DOMAIN]`.
+### Requirements
+
+- The `resource` value must be an absolute URI (RFC 3986 §4.3) with no fragment component.
+- The client must have the resource URI listed in its `allowedResources` configuration.
+- Requests with an invalid or unregistered resource URI are rejected with `invalid_target`.
+
+### Audience Construction
+
+When a `resource` parameter is provided, the `aud` array is constructed as:
+
+```json
+{
+    "aud": ["https://api.example.com", "auth.example.com"]
+}
+```
+
+The resource URI appears first, followed by `SUPER_TENANT_DOMAIN`. When no `resource` parameter is provided, the
+default single-element audience is used:
+
+```json
+{
+    "aud": ["auth.example.com"]
+}
+```

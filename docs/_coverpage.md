@@ -2,9 +2,9 @@
 
 ![logo](_media/icon.svg ':size=50')
 
-# My Identity <small>1.0</small>
+# Auth Server <small>1.0</small>
 
-> OAuth 2.0 authentication site.
+> OAuth 2.0 / OpenID Connect Authorization Server.
 
 - Simple and lightweight
 - Protected with RSA

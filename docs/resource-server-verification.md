@@ -1,9 +1,9 @@
-### Resource Server Token Verification
+# Resource Server Verification
 
 This guide explains how resource servers should verify access tokens issued by this Auth Server in a multi-tenant
 environment.
 
-#### Overview
+## Overview
 
 The Auth Server uses a **shared-issuer model** where all tenants share a single `iss` (issuer) claim value. Tenant
 isolation is enforced through:
@@ -17,7 +17,7 @@ reuse.
 
 ---
 
-### Verification Checklist
+## Verification Checklist
 
 Follow these steps in order when verifying an access token:
 
@@ -32,9 +32,9 @@ Follow these steps in order when verifying an access token:
 
 ---
 
-### Step-by-Step Verification
+## Step-by-Step Verification
 
-#### 1. Extract the `kid` from the JWT Header
+### 1. Extract the `kid` from the JWT Header
 
 The JWT header contains the Key ID (`kid`) that identifies which key was used to sign the token.
 
@@ -44,7 +44,7 @@ const kid = header.kid;
 const alg = header.alg; // Must be "RS256"
 ```
 
-#### 2. Fetch the JWKS for the Expected Tenant
+### 2. Fetch the JWKS for the Expected Tenant
 
 Request the JSON Web Key Set from the tenant-specific endpoint. You must know the tenant domain in advance.
 
@@ -70,7 +70,7 @@ Accept: application/json
 }
 ```
 
-#### 3. Find the JWK with Matching `kid`
+### 3. Find the JWK with Matching `kid`
 
 Locate the key in the JWKS that matches the `kid` from the JWT header.
 
@@ -81,7 +81,7 @@ if (!jwk) {
 }
 ```
 
-#### 4. Verify the RS256 Signature
+### 4. Verify the RS256 Signature
 
 Use the JWK to verify the token signature.
 
@@ -98,7 +98,7 @@ const pem = keyObject.export({type: 'spki', format: 'pem'});
 const payload = jwt.verify(token, pem, {algorithms: ['RS256']});
 ```
 
-#### 5. Validate Standard Claims
+### 5. Validate Standard Claims
 
 Verify the standard JWT claims:
 
@@ -109,7 +109,7 @@ Verify the standard JWT claims:
 | `iss` | Must match the Auth Server issuer (e.g., `auth.server.com`) |
 | `aud` | Must include your resource server's audience                |
 
-#### 6. Confirm `tenant_id` Matches Expected Tenant
+### 6. Confirm `tenant_id` Matches Expected Tenant
 
 **This is the critical step for multi-tenant isolation.**
 
@@ -124,7 +124,7 @@ issued for Tenant A from being used to access Tenant B's resources.
 
 ---
 
-### Complete Verification Example
+## Complete Verification Example
 
 ```javascript
 const {createPublicKey} = require('crypto');
@@ -180,7 +180,7 @@ async function verifyToken(token, expectedTenantDomain, expectedTenantId) {
 
 ---
 
-### Common Mistakes
+## Common Mistakes
 
 | Mistake                                         | Consequence                                         | Prevention                                                               |
 |-------------------------------------------------|-----------------------------------------------------|--------------------------------------------------------------------------|
@@ -192,7 +192,7 @@ async function verifyToken(token, expectedTenantDomain, expectedTenantId) {
 
 ---
 
-### Why Tenant-Scoped Verification Matters
+## Why Tenant-Scoped Verification Matters
 
 In a shared-issuer model, the `iss` claim is identical for all tenants. Without checking `tenant_id`:
 
@@ -206,26 +206,69 @@ tenant's context.
 
 ---
 
-### Token Claims Reference
+## Token Claims Reference
+
+Access tokens are RS256-signed JWTs. The payload contains the following claims:
+
+### Standard Claims
+
+| Claim | Description                                              | Example                                |
+|-------|----------------------------------------------------------|----------------------------------------|
+| `iss` | Issuer — always the Auth Server domain                   | `auth.server.com`                      |
+| `sub` | Subject — user ID (UUID) for user tokens; `oauth` for client_credentials tokens | `550e8400-e29b-41d4-a716-446655440000` |
+| `aud` | Audience — JSON array of intended recipients             | `["my-api", "auth.server.com"]`        |
+| `exp` | Expiration time (Unix timestamp)                         | `1700000000`                           |
+| `nbf` | Not valid before (Unix timestamp)                        | `1699999000`                           |
+| `iat` | Issued at (Unix timestamp)                               | `1699999000`                           |
+| `jti` | JWT ID — unique token identifier                         | `550e8400-e29b-41d4-a716-446655440001` |
+
+### Auth Server Claims
 
 | Claim        | Description                                              | Example                                |
 |--------------|----------------------------------------------------------|----------------------------------------|
-| `iss`        | Issuer — always the Auth Server domain                   | `auth.server.com`                      |
-| `sub`        | Subject — user ID (UUID) or `oauth` for technical tokens | `550e8400-e29b-41d4-a716-446655440000` |
-| `aud`        | Audience — array of intended recipients                  | `["my-api"]`                           |
-| `exp`        | Expiration time (Unix timestamp)                         | `1700000000`                           |
-| `nbf`        | Not valid before (Unix timestamp)                        | `1699999000`                           |
-| `iat`        | Issued at (Unix timestamp)                               | `1699999000`                           |
-| `jti`        | JWT ID — unique token identifier                         | `550e8400-e29b-41d4-a716-446655440001` |
 | `tenant_id`  | Issuing tenant's UUID                                    | `550e8400-e29b-41d4-a716-446655440002` |
-| `scope`      | Space-delimited OAuth scopes                             | `openid profile email`                 |
-| `roles`      | Array of role names (user tokens only)                   | `["TENANT_ADMIN"]`                     |
+| `tenant`     | Issuing tenant object: `{id, name, domain}`              | `{"id":"...","name":"Acme","domain":"acme.local"}` |
+| `scope`      | Space-delimited OIDC scopes (never contains role names)  | `openid profile email`                 |
+| `roles`      | Array of role names (user tokens only; absent on client_credentials tokens) | `["TENANT_ADMIN"]` |
 | `client_id`  | OAuth client that requested the token                    | `my-client.local`                      |
-| `grant_type` | OAuth grant used to obtain the token                     | `password`, `client_credentials`, etc. |
+| `grant_type` | OAuth grant used to obtain the token                     | `authorization_code`, `password`, `client_credentials`, `refresh_token` |
+
+### App-Owned Roles
+
+When a user has roles assigned via app subscriptions, those roles appear in the `roles` array using the format
+`"appName:roleName"`:
+
+```json
+{
+  "roles": ["TENANT_ADMIN", "my-app:editor", "my-app:viewer"]
+}
+```
+
+### Subscribed User Tokens
+
+When a token is issued for a user accessing a tenant via an app subscription (rather than direct membership), the
+token also includes a `userTenant` claim identifying the user's home tenant:
+
+```json
+{
+  "tenant_id": "issuing-tenant-uuid",
+  "tenant": {"id": "issuing-tenant-uuid", "name": "App Tenant", "domain": "app.local"},
+  "userTenant": {"id": "user-home-tenant-uuid", "name": "User Tenant", "domain": "user.local"}
+}
+```
+
+### Token Type Differences
+
+| Claim        | User Token (`TenantToken`)         | Machine Token (`TechnicalToken`)   |
+|--------------|------------------------------------|------------------------------------|
+| `sub`        | User UUID                          | `oauth`                            |
+| `roles`      | Present (array of role names)      | Absent                             |
+| `grant_type` | `authorization_code`, `password`, or `refresh_token` | `client_credentials` |
+| `scope`      | OIDC scopes granted to the user    | OIDC scopes granted to the client  |
 
 ---
 
-### Error Handling
+## Error Handling
 
 When token verification fails, return HTTP 401 with:
 
