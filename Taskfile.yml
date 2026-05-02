@@ -107,58 +107,6 @@ tasks:
         cmds:
             - npm run e2e:spec --spec={{.CLI_ARGS}}
 
-    # ─── Kubernetes ───
-
-    download-and-import-image:
-        desc: Download latest release and import images into k3s
-        cmds:
-            - |
-                set -e
-                command_exists() {
-                    command -v "$1" >/dev/null 2>&1
-                }
-                
-                echo "🧹 Removing old tar files..."
-                rm -f *.tar || true
-                
-                for cmd in curl jq xargs sed find; do
-                    if ! command_exists "$cmd"; then
-                        echo "❌ Missing required command: $cmd"
-                        exit 1
-                    fi
-                done
-                
-                SUDO=''
-                if [ "$(id -u)" -ne 0 ]; then
-                  SUDO='sudo'
-                fi
-                
-                echo "📦 Downloading latest release tarball from GitHub..."
-                curl -s https://api.github.com/repos/SilentSamurai/auth-server/releases/latest \
-                | jq -r '.assets[].browser_download_url' \
-                | xargs -L1 curl -O -L -#
-                
-                echo "🧼 Removing previous auth-server images from k3s..."
-                $SUDO k3s ctr images ls | grep auth-server | awk '{print $1}' | xargs -r -L1 $SUDO k3s ctr images rm || true
-                
-                echo "📥 Importing downloaded tarballs into k3s..."
-                find . -name '*.tar' | xargs -r -L1 $SUDO k3s ctr images import
-                
-                echo "✅ Current k3s auth-server images:"
-                $SUDO k3s ctr images ls | grep auth-server || echo "No images found"
-
-    deploy-auth-server:
-        desc: Deploy auth-server via Helm to Kubernetes
-        dir: ./helm
-        cmds:
-            - helm upgrade --install auth-server ./auth-server --namespace auth-server --create-namespace
-
-    dry-run-auth-server:
-        desc: Helm dry-run deployment with debug output
-        dir: ./helm
-        cmds:
-            - helm upgrade --install auth-server ./auth-server --namespace auth-server --create-namespace --dry-run --debug
-
     kill-ports:
         desc: Kill processes listening on ports 9001 and 4200
         cmds:
