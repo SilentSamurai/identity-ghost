@@ -1,8 +1,8 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
-const { parse } = require("node:url");
-const { assert } = require('node:console');
+const {parse} = require("node:url");
+const {assert} = require('node:console');
 
 // Store onboard and offboard requests for verification
 const onboardRequests = [];
@@ -16,7 +16,9 @@ const server = http.createServer((req, res) => {
     // Handle onboard endpoint
     if (pathname === '/api/onboard/tenant') {
         let body = '';
-        req.on('data', chunk => { body += chunk.toString(); });
+        req.on('data', chunk => {
+            body += chunk.toString();
+        });
         req.on('end', async () => {
             try {
                 const data = JSON.parse(body);
@@ -30,8 +32,8 @@ const server = http.createServer((req, res) => {
                     }
                 }
                 if (!token) {
-                    res.writeHead(401, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ error: 'Missing or invalid Authorization header' }));
+                    res.writeHead(401, {'Content-Type': 'application/json'});
+                    res.end(JSON.stringify({error: 'Missing or invalid Authorization header'}));
                     return;
                 }
                 const tenantId = data.tenantId;
@@ -41,8 +43,8 @@ const server = http.createServer((req, res) => {
                     await verifyToken(token);
                 } catch (err) {
                     console.error('Token verification failed:', err);
-                    res.writeHead(401, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ error: 'Token verification failed', details: err }));
+                    res.writeHead(401, {'Content-Type': 'application/json'});
+                    res.end(JSON.stringify({error: 'Token verification failed', details: err}));
                     return;
                 }
 
@@ -61,12 +63,12 @@ const server = http.createServer((req, res) => {
                 });
 
                 // Return success response
-                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.writeHead(200, {'Content-Type': 'application/json'});
                 res.end(JSON.stringify({appNames: []}));
             } catch (error) {
                 console.error('Error processing onboard request:', error);
-                res.writeHead(400, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: 'Invalid request body' }));
+                res.writeHead(400, {'Content-Type': 'application/json'});
+                res.end(JSON.stringify({error: 'Invalid request body'}));
             }
         });
         return;
@@ -75,7 +77,9 @@ const server = http.createServer((req, res) => {
     // Handle offboard endpoint
     if (pathname.startsWith('/api/offboard/tenant')) {
         let body = '';
-        req.on('data', chunk => { body += chunk.toString(); });
+        req.on('data', chunk => {
+            body += chunk.toString();
+        });
         req.on('end', async () => {
             try {
                 const data = JSON.parse(body);
@@ -89,8 +93,8 @@ const server = http.createServer((req, res) => {
                     }
                 }
                 if (!token) {
-                    res.writeHead(401, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ error: 'Missing or invalid Authorization header' }));
+                    res.writeHead(401, {'Content-Type': 'application/json'});
+                    res.end(JSON.stringify({error: 'Missing or invalid Authorization header'}));
                     return;
                 }
                 const tenantId = data.tenantId;
@@ -100,8 +104,8 @@ const server = http.createServer((req, res) => {
                     await verifyToken(token);
                 } catch (err) {
                     console.error('Token verification failed:', err);
-                    res.writeHead(401, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ error: 'Token verification failed', details: err }));
+                    res.writeHead(401, {'Content-Type': 'application/json'});
+                    res.end(JSON.stringify({error: 'Token verification failed', details: err}));
                     return;
                 }
 
@@ -120,12 +124,12 @@ const server = http.createServer((req, res) => {
                 });
 
                 // Return success response
-                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.writeHead(200, {'Content-Type': 'application/json'});
                 res.end(JSON.stringify({appNames: []}));
             } catch (error) {
                 console.error('Error processing offboard request:', error);
-                res.writeHead(400, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: 'Invalid request body' }));
+                res.writeHead(400, {'Content-Type': 'application/json'});
+                res.end(JSON.stringify({error: 'Invalid request body'}));
             }
         });
         return;
@@ -133,14 +137,14 @@ const server = http.createServer((req, res) => {
 
     // Add endpoint to get onboard request history
     if (pathname === '/onboard/history') {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.writeHead(200, {'Content-Type': 'application/json'});
         res.end(JSON.stringify(onboardRequests));
         return;
     }
 
     // Add endpoint to get offboard request history
     if (pathname === '/offboard/history') {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.writeHead(200, {'Content-Type': 'application/json'});
         res.end(JSON.stringify(offboardRequests));
         return;
     }
@@ -150,7 +154,7 @@ const server = http.createServer((req, res) => {
         const tenantId = pathname.split('/').pop();
         const requests = onboardRequests.filter(req => req.tenantId === tenantId);
 
-        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.writeHead(200, {'Content-Type': 'application/json'});
         res.end(JSON.stringify({
             wasOnboarded: requests.length > 0,
             requestCount: requests.length,
@@ -164,7 +168,7 @@ const server = http.createServer((req, res) => {
         const tenantId = pathname.split('/').pop();
         const requests = offboardRequests.filter(req => req.tenantId === tenantId);
 
-        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.writeHead(200, {'Content-Type': 'application/json'});
         res.end(JSON.stringify({
             wasOffboarded: requests.length > 0,
             requestCount: requests.length,
@@ -179,7 +183,7 @@ const server = http.createServer((req, res) => {
         const tenantOnboardRequests = onboardRequests.filter(req => req.tenantId === tenantId);
         const tenantOffboardRequests = offboardRequests.filter(req => req.tenantId === tenantId);
 
-        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.writeHead(200, {'Content-Type': 'application/json'});
         res.end(JSON.stringify({
             tenantId,
             wasOnboarded: tenantOnboardRequests.length > 0,
@@ -216,7 +220,7 @@ const server = http.createServer((req, res) => {
                 } else {
                     // Serve the file with appropriate content type
                     const contentType = getContentType(filePath);
-                    res.writeHead(200, { 'Content-Type': contentType });
+                    res.writeHead(200, {'Content-Type': contentType});
                     res.end(data);
                 }
             });
@@ -254,12 +258,19 @@ function parseJwt(token) {
 
 
 async function verifyToken(token) {
-    // Parse JWT manually
     const decoded = parseJwt(token);
+    assert(decoded != null, 'Failed to decode token');
+    assert(decoded.sub != undefined, 'Missing sub claim');
+    assert(decoded.exp != undefined, 'Missing exp claim');
+    assert(decoded.iat != undefined, 'Missing iat claim');
+    assert(decoded.iss != undefined, 'Missing iss claim');
+    assert(decoded.aud != undefined, 'Missing aud claim');
     assert(decoded.grant_type === "client_credentials", 'Invalid grant type');
-    assert(decoded.tenant != undefined, 'Missing tenant ID');
-    assert(decoded.tenant.domain != undefined, 'Missing tenant domain');
-    assert(decoded.tenant.domain === "shire.local", 'Invalid tenant domain');
+    assert(decoded.tenant_id != undefined, 'Missing tenant_id claim');
+    assert(decoded.scope != undefined, 'Missing scope claim');
+    // Verify token is not expired
+    const now = Math.floor(Date.now() / 1000);
+    assert(decoded.exp > now, 'Token is expired');
 }
 
 // Helper function to determine the content type based on file extension

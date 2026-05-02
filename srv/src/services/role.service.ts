@@ -6,8 +6,7 @@ import {Tenant} from "../entity/tenant.entity";
 import {Role} from "../entity/role.entity";
 import {User} from "../entity/user.entity";
 import {UserRole} from "../entity/user.roles.entity";
-import {AuthContext} from "../casl/contexts";
-import {SecurityService} from "../casl/security.service";
+import {Permission} from "../auth/auth.decorator";
 import {Action} from "../casl/actions.enum";
 import {SubjectEnum} from "../entity/subjectEnum";
 import {App} from "../entity/app.entity";
@@ -16,7 +15,6 @@ import {App} from "../entity/app.entity";
 export class RoleService {
     constructor(
         private readonly configService: Environment,
-        private readonly securityService: SecurityService,
         @InjectRepository(User) private usersRepository: Repository<User>,
         @InjectRepository(Role) private roleRepository: Repository<Role>,
         @InjectRepository(UserRole)
@@ -27,13 +25,12 @@ export class RoleService {
     }
 
     async create(
-        authContext: AuthContext,
+        permission: Permission,
         name: string,
         tenant: Tenant,
         removable: boolean = true,
     ): Promise<Role> {
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Create,
             SubjectEnum.ROLE,
         );
@@ -48,16 +45,15 @@ export class RoleService {
     }
 
     async updateRole(
-        authContext: AuthContext,
+        permission: Permission,
         roleId: string,
         name: string,
         newDescription: string,
         appId?: string,
     ): Promise<Role> {
-        const role = await this.findById(authContext, roleId);
+        const role = await this.findById(permission, roleId);
 
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Update,
             SubjectEnum.TENANT,
             {id: role.tenant.id},
@@ -82,7 +78,7 @@ export class RoleService {
         return this.roleRepository.save(role);
     }
 
-    async findById(authContext: AuthContext, id: string) {
+    async findById(permission: Permission, id: string) {
         let role: Role = await this.roleRepository.findOne({
             where: {id: id},
             relations: {
@@ -93,8 +89,7 @@ export class RoleService {
         if (role === null) {
             throw new NotFoundException("role not found");
         }
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Read,
             SubjectEnum.ROLE,
             {tenantId: role.tenant.id},
@@ -103,11 +98,10 @@ export class RoleService {
     }
 
     async deleteByTenant(
-        authContext: AuthContext,
+        permission: Permission,
         tenant: Tenant,
     ): Promise<number> {
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Delete,
             SubjectEnum.ROLE,
             {tenantId: tenant.id},
@@ -125,9 +119,8 @@ export class RoleService {
         return deleteResult1.affected;
     }
 
-    async countByRole(authContext: AuthContext, role: Role): Promise<number> {
-        this.securityService.isAuthorized(
-            authContext,
+    async countByRole(permission: Permission, role: Role): Promise<number> {
+        permission.isAuthorized(
             Action.Read,
             SubjectEnum.ROLE,
             {tenantId: role.tenant.id},
@@ -144,16 +137,15 @@ export class RoleService {
         return count;
     }
 
-    async isUserAssignedToRole(authContext: AuthContext, role: Role) {
-        let count = await this.countByRole(authContext, role);
+    async isUserAssignedToRole(permission: Permission, role: Role) {
+        let count = await this.countByRole(permission, role);
         return count > 0;
     }
 
-    async deleteById(authContext: AuthContext, id: string): Promise<Role> {
-        let role: Role = await this.findById(authContext, id);
-        const count = await this.countByRole(authContext, role);
-        this.securityService.isAuthorized(
-            authContext,
+    async deleteById(permission: Permission, id: string): Promise<Role> {
+        let role: Role = await this.findById(permission, id);
+        const count = await this.countByRole(permission, role);
+        permission.isAuthorized(
             Action.Delete,
             SubjectEnum.ROLE,
             {tenantId: role.tenant.id},
@@ -168,12 +160,11 @@ export class RoleService {
     }
 
     async findByNameAndTenant(
-        authContext: AuthContext,
+        permission: Permission,
         name: string,
         tenant: Tenant,
     ): Promise<Role> {
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Read,
             SubjectEnum.TENANT,
             {id: tenant.id},
@@ -196,11 +187,10 @@ export class RoleService {
     }
 
     async getTenantRoles(
-        authContext: AuthContext,
+        permission: Permission,
         tenant: Tenant,
     ): Promise<Role[]> {
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Read,
             SubjectEnum.ROLE,
             {tenantId: tenant.id},
@@ -214,12 +204,11 @@ export class RoleService {
     }
 
     async getMemberRoles(
-        authContext: AuthContext,
+        permission: Permission,
         tenant: Tenant,
         user: User,
     ): Promise<Role[]> {
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Read,
             SubjectEnum.ROLE,
             {tenantId: tenant.id},
@@ -229,17 +218,17 @@ export class RoleService {
                 tenant: {id: tenant.id},
                 users: {id: user.id},
             },
+            relations: ['app'],
         });
     }
 
     async hasAllRoles(
-        authContext: AuthContext,
+        permission: Permission,
         roles: string[],
         tenant: Tenant,
         user: User,
     ): Promise<boolean> {
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Read,
             SubjectEnum.TENANT,
             {id: tenant.id},
@@ -247,7 +236,7 @@ export class RoleService {
 
         for (let name of roles) {
             let role = await this.findByNameAndTenant(
-                authContext,
+                permission,
                 name,
                 tenant,
             );
@@ -264,13 +253,12 @@ export class RoleService {
     }
 
     async hasAnyOfRoles(
-        authContext: AuthContext,
+        permission: Permission,
         roles: string[],
         tenant: Tenant,
         user: User,
     ): Promise<boolean> {
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Read,
             SubjectEnum.TENANT,
             {id: tenant.id},
@@ -278,7 +266,7 @@ export class RoleService {
 
         for (let name of roles) {
             let role = await this.findByNameAndTenant(
-                authContext,
+                permission,
                 name,
                 tenant,
             );
@@ -295,19 +283,18 @@ export class RoleService {
     }
 
     async updateUserRoles(
-        authContext: AuthContext,
+        permission: Permission,
         roles: string[],
         tenant: Tenant,
         user: User,
     ): Promise<Role[]> {
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Update,
             SubjectEnum.TENANT,
             {id: tenant.id},
         );
 
-        let memberRoles = await this.getMemberRoles(authContext, tenant, user);
+        let memberRoles = await this.getMemberRoles(permission, tenant, user);
         const previousRoleMap: Map<string, Role> = new Map<string, Role>();
         const currentRoleMap: Map<string, string> = new Map<string, string>();
         memberRoles.forEach((role) => previousRoleMap.set(role.name, role));
@@ -327,64 +314,64 @@ export class RoleService {
             }
         });
 
-        await this.addRoles(authContext, user, tenant, addRoles);
-        await this.removeRoles(authContext, user, tenant, removeRoles);
+        await this.addRoles(permission, user, tenant, addRoles);
+        await this.removeRoles(permission, user, tenant, removeRoles);
 
-        return this.getMemberRoles(authContext, tenant, user);
+        return this.getMemberRoles(permission, tenant, user);
     }
 
     async removeRoles(
-        authContext: AuthContext,
+        permission: Permission,
         user: User,
         tenant: Tenant,
         roles: string[] | Role[],
         from_group = false,
     ) {
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Update,
             SubjectEnum.TENANT,
             {id: tenant.id},
         );
 
-        return await Promise.all(
-            roles.map(async (role: string | Role) => {
-                if (typeof role == "string") {
-                    let name = role as string;
-                    role = await this.roleRepository.findOne({
-                        where: {
-                            name,
-                            tenant: {id: tenant.id},
-                        },
-                        relations: {
-                            users: true,
-                        },
-                    });
-                }
-                if (role !== null) {
-                    let userRole = await this.userRoleRepository.findOne({
-                        where: {
-                            tenantId: tenant.id,
-                            userId: user.id,
-                            roleId: role.id,
-                            from_group: from_group,
-                        },
-                    });
-                    await this.userRoleRepository.remove(userRole);
-                }
-            }),
-        );
+        const results: void[] = [];
+        for (const roleInput of roles) {
+            let role: string | Role = roleInput;
+            if (typeof role == "string") {
+                let name = role as string;
+                role = await this.roleRepository.findOne({
+                    where: {
+                        name,
+                        tenant: {id: tenant.id},
+                    },
+                    relations: {
+                        users: true,
+                    },
+                });
+            }
+            if (role !== null) {
+                let userRole = await this.userRoleRepository.findOne({
+                    where: {
+                        tenantId: tenant.id,
+                        userId: user.id,
+                        roleId: (role as Role).id,
+                        from_group: from_group,
+                    },
+                });
+                await this.userRoleRepository.remove(userRole);
+            }
+            results.push(undefined);
+        }
+        return results;
     }
 
     async addRoles(
-        authContext: AuthContext,
+        permission: Permission,
         user: User,
         tenant: Tenant,
         roles: string[] | Role[],
         from_group = false,
     ) {
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Update,
             SubjectEnum.TENANT,
             {id: tenant.id},

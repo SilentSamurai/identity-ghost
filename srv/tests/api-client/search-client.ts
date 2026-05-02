@@ -1,15 +1,23 @@
-import {TestAppFixture} from "../test-app.fixture";
-import {expect2xx, HttpClient} from "./client";
+import {expect2xx, HttpClient, TestFixture} from "./client";
 
 
 export class SearchClient extends HttpClient {
 
-    constructor(app: TestAppFixture, accessToken: string) {
+    constructor(app: TestFixture, accessToken: string) {
         super(app, accessToken);
     }
 
     public async findTenantBy(query: any) {
         return this.searchApi("Tenants", query);
+    }
+
+    public async searchTenantByDomain(domain: string): Promise<any[]> {
+        const where = [{field: 'domain', label: 'domain', value: domain, operator: 'equals'}];
+        const response = await this.post('/api/search/Tenants').send({pageNo: 0, pageSize: 50, where});
+        if (response.status >= 200 && response.status < 300) {
+            return response.body.data ?? [];
+        }
+        return [];
     }
 
     async findByUser(query: any) {

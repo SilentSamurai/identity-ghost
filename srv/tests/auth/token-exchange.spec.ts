@@ -1,72 +1,57 @@
-import {TestAppFixture} from "../test-app.fixture";
+import {SharedTestFixture} from "../shared-test.fixture";
 import {TokenFixture} from "../token.fixture";
 
 describe('e2e token exchange flow', () => {
-    let app: TestAppFixture;
+    let app: SharedTestFixture;
     let superAdminToken = "";
     let clientId = "";
     let tenant = {
         id: ""
     };
     let clientSecret = "";
+    let tenantDomain = "";
 
     beforeAll(async () => {
-        app = await new TestAppFixture().init();
-    });
+        app = new SharedTestFixture();
 
-    afterAll(async () => {
-        await app.close();
-    });
-
-    it(`/POST Access Token`, async () => {
-        let tokenFixture = new TokenFixture(app);
-        let response = await tokenFixture.fetchAccessToken(
+        // Obtain super admin token
+        const tokenFixture = new TokenFixture(app);
+        const response = await tokenFixture.fetchAccessToken(
             "admin@auth.server.com",
             "admin9000",
             "auth.server.com"
         );
-        const jwt = response.jwt;
         superAdminToken = response.accessToken;
-        expect(jwt.tenant.domain).toEqual("auth.server.com");
+        expect(response.jwt.tenant.domain).toEqual("auth.server.com");
 
-    });
-
-    it(`/POST Create Tenant`, async () => {
-        const response = await app.getHttpServer()
+        // Create tenant
+        const uniqueDomain = `tok-exch-${Date.now()}.com`;
+        const tenantResponse = await app.getHttpServer()
             .post('/api/tenant/create')
             .send({
                 "name": "tenant-1",
-                "domain": "test-wesite.com"
+                "domain": uniqueDomain
             })
             .set('Authorization', `Bearer ${superAdminToken}`)
             .set('Accept', 'application/json');
 
-        expect(response.status).toEqual(201);
-        console.log(response.body);
+        expect(tenantResponse.status).toEqual(201);
+        expect(tenantResponse.body.id).toBeDefined();
+        expect(tenantResponse.body.name).toEqual("tenant-1");
+        expect(tenantResponse.body.domain).toEqual(uniqueDomain);
+        tenant = tenantResponse.body;
+        tenantDomain = uniqueDomain;
 
-        expect(response.body.id).toBeDefined();
-        expect(response.body.name).toEqual("tenant-1");
-        expect(response.body.domain).toEqual("test-wesite.com");
-        expect(response.body.clientId).toBeDefined();
-        tenant = response.body;
+        // Create confidential client for the new tenant
+        const creds = await tokenFixture.createConfidentialClient(superAdminToken, tenant.id);
+        clientId = creds.clientId;
+        clientSecret = creds.clientSecret;
+        expect(clientId).toBeDefined();
+        expect(clientSecret).toBeDefined();
     });
 
-    it(`/GET Tenant Credentials`, async () => {
-        const response = await app.getHttpServer()
-            .get(`/api/tenant/${tenant.id}/credentials`)
-            .set('Authorization', `Bearer ${superAdminToken}`)
-            .set('Accept', 'application/json');
-
-        expect(response.status).toEqual(200);
-        console.log(response.body);
-
-        expect(response.body.id).toBeDefined();
-        expect(response.body.clientId).toBeDefined();
-        expect(response.body.clientSecret).toBeDefined();
-        expect(response.body.publicKey).toBeDefined();
-        clientId = response.body.clientId;
-        clientSecret = response.body.clientSecret;
-
+    afterAll(async () => {
+        await app.close();
     });
 
     it(`/POST Token Exchange`, async () => {
@@ -87,13 +72,14 @@ describe('e2e token exchange flow', () => {
 
         let decode = app.jwtService().decode(response.body.access_token, {json: true}) as any;
         expect(decode.sub).toBeDefined();
-        expect(decode.email).toBeDefined();
-        expect(decode.name).toBeDefined();
         expect(decode.grant_type).toBeDefined();
         expect(decode.tenant.id).toBeDefined();
         expect(decode.tenant.name).toBeDefined();
         expect(decode.tenant.domain).toBeDefined();
-        expect(decode.tenant.domain).toEqual("test-wesite.com");
+        expect(decode.tenant.domain).toEqual(tenantDomain);
+        // Profile data must not be in the JWT payload (RFC 9068 compliance)
+        expect(decode.email).toBeUndefined();
+        expect(decode.name).toBeUndefined();
     });
 
     it(`/POST Token Wrong Exchange`, async () => {
@@ -119,7 +105,7 @@ describe('e2e token exchange flow', () => {
             })
             .set('Accept', 'application/json');
 
-        expect(response.status).toEqual(404);
+        expect(response.status).toEqual(401);
     });
 
     it(`/POST Token Wrong client_secret`, async () => {

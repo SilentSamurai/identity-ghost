@@ -37,7 +37,7 @@ import {randomId} from '../util/utils';
                         [type]="showPassword ? 'text' : 'password'"
                         [attr.readonly]="readonly ? true : null "
                     />
-                    <button type="button" (click)="togglePassword()" class="btn btn-outline-secondary ">
+                    <button type="button" (click)="togglePassword()" class="btn btn-outline-secondary " aria-label="Toggle password visibility">
                         <i class="fa" [ngClass]="showPassword ? 'fa-eye-slash' : 'fa-eye'"></i>
                     </button>
                 </div>

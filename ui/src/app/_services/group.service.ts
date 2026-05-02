@@ -35,10 +35,10 @@ export class GroupService {
         );
     }
 
-    async getGroupsByTenant(tenantId: string): Promise<any[]> {
+    async getGroupsByTenant(): Promise<any[]> {
         return (await lastValueFrom(
             this.http.get(
-                `${API_URL}/tenant/${tenantId}/groups`,
+                `${API_URL}/tenant/my/groups`,
                 this.getHttpOptions(),
             ),
         )) as any[];

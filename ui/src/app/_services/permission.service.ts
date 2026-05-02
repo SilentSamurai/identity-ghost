@@ -49,11 +49,6 @@ export class PermissionService {
         subjectStr: Subjects,
         condition: any = null,
     ): boolean {
-        // console.log("[PermissionService] isAuthorized check:", {
-        //     action,
-        //     subject: subjectStr,
-        //     condition
-        // });
         let result: boolean;
         if (condition === 'all') {
             // Global permission check (e.g., super admin rules like can(manage, 'all'))
@@ -63,12 +58,6 @@ export class PermissionService {
         } else {
             result = this.ability.can(action, subjectStr);
         }
-        console.log(`[PermissionService] isAuthorized result:`, {
-            action,
-            subject: subjectStr,
-            condition,
-            result,
-        });
         return result;
     }
 }

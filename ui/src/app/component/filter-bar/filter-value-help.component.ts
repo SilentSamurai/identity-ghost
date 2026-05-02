@@ -1,7 +1,7 @@
 import {Component, Input, OnInit} from '@angular/core';
 import {Operators} from '../model/Operator';
 import {NgbActiveModal} from '@ng-bootstrap/ng-bootstrap';
-import {InternalFilter} from './filter-field.component';
+import {Condition, InternalFilter} from './filter-field.component';
 
 @Component({
     selector: 'app-fvh',
@@ -14,7 +14,7 @@ import {InternalFilter} from './filter-field.component';
                 <div
                     class="row my-2"
                     *ngFor="
-                        let condition of internalFilter.conditions;
+                        let condition of editConditions;
                         index as i
                     "
                 >
@@ -22,7 +22,6 @@ import {InternalFilter} from './filter-field.component';
                         <button
                             aria-expanded="false"
                             class="btn btn-outline-secondary dropdown-toggle text-start"
-                            data-bs-toggle="dropdown"
                             ngbDropdown
                             ngbDropdownToggle
                             type="button"
@@ -56,6 +55,7 @@ import {InternalFilter} from './filter-field.component';
                         <button
                             class="btn btn-sm py-0"
                             (click)="removeFilter(i)"
+                            aria-label="Remove filter"
                         >
                             <i class="fa fa-close"></i>
                         </button>
@@ -88,35 +88,35 @@ import {InternalFilter} from './filter-field.component';
 export class FilterValueHelpComponent implements OnInit {
     @Input() internalFilter!: InternalFilter;
 
+    editConditions: Condition[] = [];
+
     readonly Operators = Operators;
 
     constructor(private activeModal: NgbActiveModal) {
     }
 
     async ngOnInit(): Promise<void> {
+        this.editConditions = this.internalFilter.conditions.map(
+            c => new Condition(c.operator, c.value)
+        );
     }
 
-    openValueHelp() {
+    addFilter() {
+        this.editConditions.push(new Condition(Operators.MATCHES, ''));
+    }
+
+    removeFilter(index: number) {
+        if (this.editConditions.length > 1) {
+            this.editConditions.splice(index, 1);
+        }
     }
 
     cancel() {
         this.activeModal.close();
     }
 
-    addFilter() {
-        this.internalFilter.conditions.push({
-            operator: Operators.operatorFromSymbol('=*'),
-            value: '',
-        });
-    }
-
-    removeFilter(index: number) {
-        if (this.internalFilter.conditions.length > 1) {
-            this.internalFilter.conditions.splice(index, 1);
-        }
-    }
-
     confirm() {
+        this.internalFilter.conditions = this.editConditions;
         this.activeModal.close(this.internalFilter);
     }
 }

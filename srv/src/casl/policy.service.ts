@@ -2,14 +2,13 @@ import {Injectable, Logger, NotFoundException} from "@nestjs/common";
 import {Role} from "../entity/role.entity";
 import {Environment} from "../config/environment.service";
 import {Policy} from "../entity/authorization.entity";
-import {AuthContext} from "./contexts";
 import {InjectRepository} from "@nestjs/typeorm";
 import {Repository} from "typeorm";
 import {Action, Effect} from "./actions.enum";
-import {SecurityService} from "./security.service";
 import {SubjectEnum} from "../entity/subjectEnum";
 import {CacheService} from "./cache.service";
 import {Tenant} from "../entity/tenant.entity";
+import {Permission} from "../auth/auth.decorator";
 
 @Injectable()
 export class PolicyService {
@@ -17,7 +16,6 @@ export class PolicyService {
 
     constructor(
         private readonly configService: Environment,
-        private readonly securityService: SecurityService,
         private readonly cacheService: CacheService,
         @InjectRepository(Policy)
         private authorizationRepository: Repository<Policy>,
@@ -25,15 +23,14 @@ export class PolicyService {
     }
 
     public async createAuthorization(
-        authContext: AuthContext,
+        permission: Permission,
         role: Role,
         effect: Effect,
         action: Action,
         subject: string,
         conditions: any,
     ) {
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Create,
             SubjectEnum.POLICY,
             {tenantId: role.tenant.id},
@@ -51,12 +48,11 @@ export class PolicyService {
     }
 
     public async findByRole(
-        authContext: AuthContext,
+        permission: Permission,
         role: Role,
         tenant: Tenant,
     ) {
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Read,
             SubjectEnum.POLICY,
             {tenantId: tenant.id},
@@ -80,7 +76,7 @@ export class PolicyService {
     }
 
     public async findById(
-        authContext: AuthContext,
+        permission: Permission,
         id: string,
     ): Promise<Policy> {
         const auth = await this.authorizationRepository.findOne({
@@ -93,8 +89,7 @@ export class PolicyService {
             throw new NotFoundException("Policy Not Found");
         }
 
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Read,
             SubjectEnum.POLICY,
             {roleId: auth.role.id},
@@ -104,7 +99,7 @@ export class PolicyService {
     }
 
     public async updateAuthorization(
-        authContext: AuthContext,
+        permission: Permission,
         id: string,
         body: {
             effect?: Effect;
@@ -113,10 +108,9 @@ export class PolicyService {
             conditions?: { [string: string]: string } | null;
         },
     ): Promise<any> {
-        const auth = await this.findById(authContext, id);
+        const auth = await this.findById(permission, id);
 
-        this.securityService.isAuthorized(
-            authContext,
+        permission.isAuthorized(
             Action.Update,
             SubjectEnum.POLICY,
             {roleId: auth.role.id},
@@ -139,12 +133,11 @@ export class PolicyService {
     }
 
     public async removeAuthorization(
-        authContext: AuthContext,
+        permission: Permission,
         id: string,
     ): Promise<any> {
-        const auth = await this.findById(authContext, id);
-        this.securityService.isAuthorized(
-            authContext,
+        const auth = await this.findById(permission, id);
+        permission.isAuthorized(
             Action.Update,
             SubjectEnum.POLICY,
             {roleId: auth.role.id},

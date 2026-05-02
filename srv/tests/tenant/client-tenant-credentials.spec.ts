@@ -1,19 +1,19 @@
-import {TestAppFixture} from "../test-app.fixture";
+import {SharedTestFixture} from "../shared-test.fixture";
 import {TokenFixture} from "../token.fixture";
+import {ClientEntityClient} from "../api-client/client-entity-client";
 import {expect2xx} from "../api-client/client";
 
 describe('e2e tenant technical credential', () => {
-    let app: TestAppFixture;
-    let tenant = {
-        id: "",
-        clientId: "",
-        clientSecret: ""
-    };
+    let app: SharedTestFixture;
+    let tenant: any;
     let technicalAccessToken = "";
     let adminAccessToken = "";
+    let tenantDomain = "";
+    let clientId = "";
+    let clientSecret = "";
 
     beforeAll(async () => {
-        app = await new TestAppFixture().init();
+        app = new SharedTestFixture();
     });
 
     afterAll(async () => {
@@ -31,39 +31,48 @@ describe('e2e tenant technical credential', () => {
     });
 
     it(`/POST Create Tenant`, async () => {
+        const uniqueDomain = `cli-cred-${Date.now()}.com`;
         const response = await app.getHttpServer()
             .post('/api/tenant/create')
             .send({
                 "name": "tenant-1",
-                "domain": "test-wesite.com"
+                "domain": uniqueDomain
             })
             .set('Authorization', `Bearer ${adminAccessToken}`)
             .set('Accept', 'application/json');
 
-        console.log(response.body);
-
         expect(response.status).toEqual(201);
         expect(response.body.id).toBeDefined();
         expect(response.body.name).toEqual("tenant-1");
-        expect(response.body.domain).toEqual("test-wesite.com");
-        expect(response.body.clientId).toBeDefined();
+        expect(response.body.domain).toEqual(uniqueDomain);
         tenant = response.body;
+        tenantDomain = uniqueDomain;
+    });
+
+    it(`Create confidential Client entity for client_credentials grant`, async () => {
+        const clientApi = new ClientEntityClient(app, adminAccessToken);
+        const result = await clientApi.createClient(tenant.id, 'Credential Test Client', {
+            allowedScopes: 'openid profile email',
+            grantTypes: 'client_credentials',
+        });
+        clientId = result.client.clientId;
+        clientSecret = result.clientSecret;
+        expect(clientId).toBeDefined();
+        expect(clientSecret).toBeDefined();
     });
 
     it(`/GET Tenant Credentials with admin token`, async () => {
         const response = await app.getHttpServer()
-            .get(`/api/tenant/${tenant.id}/credentials`)
+            .get(`/api/admin/tenant/${tenant.id}/credentials`)
             .set('Authorization', `Bearer ${adminAccessToken}`)
             .set('Accept', 'application/json');
 
         expect(response.status).toEqual(200);
-        console.log(response.body);
-
         expect(response.body.id).toBeDefined();
         expect(response.body.clientId).toBeDefined();
-        expect(response.body.clientSecret).toBeDefined();
+        // clientSecret is no longer returned from credentials endpoint
+        expect(response.body.clientSecret).toBeUndefined();
         expect(response.body.publicKey).toBeDefined();
-        tenant.clientSecret = response.body.clientSecret;
     });
 
     it(`/POST Client Credentials`, async () => {
@@ -71,12 +80,12 @@ describe('e2e tenant technical credential', () => {
             .post('/api/oauth/token')
             .send({
                 "grant_type": "client_credentials",
-                "client_id": tenant.clientId,
-                "client_secret": tenant.clientSecret
+                "client_id": clientId,
+                "client_secret": clientSecret
             })
             .set('Accept', 'application/json');
 
-        expect(response.status).toEqual(201);
+        expect(response.status).toEqual(200);
         expect(response.body.access_token).toBeDefined();
         expect(response.body.expires_in).toBeDefined();
         expect(response.body.token_type).toEqual('Bearer');
@@ -88,7 +97,7 @@ describe('e2e tenant technical credential', () => {
             .post('/api/oauth/token')
             .send({
                 "grant_type": "client_credentials",
-                "client_id": tenant.clientId,
+                "client_id": clientId,
                 "client_secret": "dsgsdg"
             })
             .set('Accept', 'application/json');
@@ -97,70 +106,51 @@ describe('e2e tenant technical credential', () => {
     });
 
     it(`/GET Tenant Credentials`, async () => {
-
         const response = await app.getHttpServer()
-            .get(`/api/tenant/${tenant.id}/credentials`)
+            .get(`/api/tenant/my/credentials`)
             .set('Authorization', `Bearer ${technicalAccessToken}`)
             .set('Accept', 'application/json');
 
-        console.log(" Tenant Credentials", response.body);
         expect2xx(response);
-
-
         expect(response.body.id).toBeDefined();
         expect(response.body.clientId).toBeDefined();
-        expect(response.body.clientSecret).toBeDefined();
+        // clientSecret is no longer returned
+        expect(response.body.clientSecret).toBeUndefined();
         expect(response.body.publicKey).toBeDefined();
     });
 
     it(`/GET Tenant Details`, async () => {
         const response = await app.getHttpServer()
-            .get(`/api/tenant/${tenant.id}`)
+            .get(`/api/tenant/my/info`)
             .set('Authorization', `Bearer ${technicalAccessToken}`)
             .set('Accept', 'application/json');
 
-        if (response.status !== 200) {
-            console.log(response);
-        }
         expect(response.status).toEqual(200);
-
         expect(response.body.id).toBeDefined();
         expect(response.body.name).toEqual("tenant-1");
-        expect(response.body.domain).toEqual("test-wesite.com");
-        expect(response.body.clientId).toBeDefined();
+        expect(response.body.domain).toEqual(tenantDomain);
     });
 
     it(`/GET Tenant Members`, async () => {
         const response = await app.getHttpServer()
-            .get(`/api/tenant/${tenant.id}/members`)
+            .get(`/api/tenant/my/members`)
             .set('Authorization', `Bearer ${technicalAccessToken}`)
             .set('Accept', 'application/json');
 
-        if (response.status !== 200) {
-            console.log(response);
-        }
         expect(response.status).toEqual(200);
-
-
         expect(response.body).toBeInstanceOf(Array);
         expect(response.body).toHaveLength(1);
         expect(response.body[0].id).toBeDefined();
         expect(response.body[0].name).toBeDefined();
-
     });
 
     it(`/GET Tenant Roles`, async () => {
         const response = await app.getHttpServer()
-            .get(`/api/tenant/${tenant.id}/roles`)
+            .get(`/api/tenant/my/roles`)
             .set('Authorization', `Bearer ${technicalAccessToken}`)
             .set('Accept', 'application/json');
 
-        if (response.status !== 200) {
-            console.log(response);
-        }
-
         expect(response.status).toEqual(200);
-
         expect(response.body).toBeInstanceOf(Array);
         expect(response.body.length).toBeGreaterThanOrEqual(2);
         for (let role of response.body) {
@@ -170,7 +160,7 @@ describe('e2e tenant technical credential', () => {
 
     it(`/PATCH Update Tenant`, async () => {
         const response = await app.getHttpServer()
-            .patch(`/api/tenant/${tenant.id}`)
+            .patch(`/api/tenant/my`)
             .set('Authorization', `Bearer ${technicalAccessToken}`)
             .send({
                 domain: "updated-test-wesite.com",
@@ -178,24 +168,22 @@ describe('e2e tenant technical credential', () => {
             })
             .set('Accept', 'application/json');
 
-        console.log(response.body);
         expect(response.status).toEqual(403);
     });
 
     it(`/POST Create Role`, async () => {
         const name = "auditor";
         const response = await app.getHttpServer()
-            .post(`/api/tenant/${tenant.id}/role/${name}`)
+            .post(`/api/tenant/my/role/${name}`)
             .set('Authorization', `Bearer ${technicalAccessToken}`)
             .set('Accept', 'application/json');
 
-        console.log(response.body);
         expect(response.status).toEqual(403);
     });
 
     it(`/POST Add Members`, async () => {
         const response = await app.getHttpServer()
-            .post(`/api/tenant/${tenant.id}/members/add`)
+            .post(`/api/tenant/my/members/add`)
             .set('Authorization', `Bearer ${technicalAccessToken}`)
             .set('Accept', 'application/json')
             .send({
@@ -204,29 +192,25 @@ describe('e2e tenant technical credential', () => {
                 ]
             });
 
-        console.log(response.body);
         expect(response.status).toEqual(403);
     });
-
 
     it(`/PUT Update Member Role`, async () => {
         const email = "legolas@mail.com";
         const response = await app.getHttpServer()
-            .put(`/api/tenant/${tenant.id}/member/${email}/roles`)
+            .put(`/api/tenant/my/member/${email}/roles`)
             .set('Authorization', `Bearer ${technicalAccessToken}`)
             .send({
                 "roles": ["TENANT_VIEWER", "auditor"]
             })
             .set('Accept', 'application/json');
 
-        console.log(response.body);
         expect(response.status).toEqual(403);
     });
 
-
     it(`/DELETE Remove Members`, async () => {
         const response = await app.getHttpServer()
-            .delete(`/api/tenant/${tenant.id}/members/delete`)
+            .delete(`/api/tenant/my/members/delete`)
             .set('Authorization', `Bearer ${technicalAccessToken}`)
             .set('Accept', 'application/json')
             .send({
@@ -235,33 +219,25 @@ describe('e2e tenant technical credential', () => {
                 ]
             });
 
-        console.log(response.body);
         expect(response.status).toEqual(403);
-
     });
 
     it(`/DELETE Remove Role`, async () => {
         const name = "auditor";
         const response = await app.getHttpServer()
-            .delete(`/api/tenant/${tenant.id}/role/${name}`)
+            .delete(`/api/tenant/my/role/${name}`)
             .set('Authorization', `Bearer ${technicalAccessToken}`)
             .set('Accept', 'application/json');
 
-        console.log(response.body);
         expect(response.status).toEqual(403);
-
     });
 
     it(`/DELETE Remove Tenant`, async () => {
         const response = await app.getHttpServer()
-            .delete(`/api/tenant/${tenant.id}`)
+            .delete(`/api/tenant/my`)
             .set('Authorization', `Bearer ${technicalAccessToken}`)
             .set('Accept', 'application/json');
 
-        console.log(response.body);
         expect(response.status).toEqual(403);
-
     });
-
 });
-

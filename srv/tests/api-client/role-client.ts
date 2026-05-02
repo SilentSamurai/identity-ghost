@@ -1,15 +1,14 @@
-import {TestAppFixture} from "../test-app.fixture";
-import {expect2xx, HttpClient} from "./client";
+import {expect2xx, HttpClient, TestFixture} from "./client";
 
 export class RoleClient extends HttpClient {
 
-    constructor(app: TestAppFixture, accessToken: string) {
+    constructor(app: TestFixture, accessToken: string) {
         super(app, accessToken);
     }
 
     public async createRole(name: string, tenantId: string) {
         const response = await this.app.getHttpServer()
-            .post(`/api/tenant/${tenantId}/role/${name}`)
+            .post(`/api/tenant/my/role/${name}`)
             .set('Authorization', `Bearer ${this.accessToken}`)
             .set('Accept', 'application/json');
 

@@ -6,7 +6,7 @@
     <meta content="width=device-width, initial-scale=1.0" name="viewport">
     <title>Login Page</title>
     <link crossorigin="anonymous" href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css"
-        integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" rel="stylesheet">
+          integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" rel="stylesheet">
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -36,56 +36,89 @@
 </head>
 
 <body>
-    <div class="container">
-        <div class="row">
+<div class="container">
+    <div class="row">
 
-            <div class="card">
-                <pre><code id="decodedToken"></code></pre>
-            </div>
-
-
+        <div class="card">
+            <pre><code id="decodedToken"></code></pre>
         </div>
-        <div class="row justify-content-center">
-            <div class="col-4 ">
-                <button class="login-button w-100" id="login-btn" onclick="refer()">
-                    Login
-                </button>
-            </div>
 
-        </div>
+
     </div>
+    <div class="row justify-content-center">
+        <div class="col-4 ">
+            <button class="login-button w-100" id="login-btn" onclick="refer()">
+                Login
+            </button>
+        </div>
+
+    </div>
+</div>
 
 
 </body>
 <script crossorigin="anonymous" integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM"
-    src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js"></script>
+        src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 
+    /**
+     * Generate a cryptographically random code_verifier per RFC 7636 §4.1.
+     * 64 characters from the unreserved character set [A-Z, a-z, 0-9, "-", ".", "_", "~"].
+     */
+    function generateCodeVerifier() {
+        const CHARSET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+        const length = 64;
+        const randomValues = new Uint8Array(length);
+        window.crypto.getRandomValues(randomValues);
+        return Array.from(randomValues, (byte) => CHARSET[byte % CHARSET.length]).join('');
+    }
 
-    const code_verifier = "abcd-asfasf";
+    /**
+     * Generate a cryptographically random state parameter (32 bytes, base64url-encoded).
+     * Per RFC 6749 §10.12, state protects against CSRF attacks on the redirect callback.
+     */
+    function generateState() {
+        const bytes = new Uint8Array(32);
+        window.crypto.getRandomValues(bytes);
+        return base64urlencode(bytes.buffer);
+    }
 
     async function refer() {
-        const redirect_uri = window.location.origin + window.location.pathname
-        const code_challenge = code_verifier
+        const redirect_uri = window.location.origin + window.location.pathname;
         const domain = "shire.local";
-        const code_challenge_method = "plain";
-        window.location.href = `http://localhost:4200/authorize?redirect_uri=${redirect_uri}&code_challenge=${code_challenge}&client_id=${domain}&code_challenge_method=${code_challenge_method}`;
+        const code_challenge_method = "S256";
+
+        // Generate and store cryptographically random code_verifier
+        const code_verifier = generateCodeVerifier();
+        sessionStorage.setItem('pkce-code-verifier', code_verifier);
+
+        const code_challenge = await generateCodeChallengeFromVerifier(code_verifier);
+
+        // Generate and store state parameter for CSRF protection
+        const state = generateState();
+        sessionStorage.setItem('oauth-state', state);
+
+        window.location.href = `http://localhost:4200/authorize?redirect_uri=${redirect_uri}&response_type=code&code_challenge=${code_challenge}&client_id=${domain}&code_challenge_method=${code_challenge_method}&state=${encodeURIComponent(state)}`;
     }
 
     async function getAuthToken(code, subscriber_tenant_hint) {
+        const code_verifier = sessionStorage.getItem('pkce-code-verifier');
+        if (!code_verifier) {
+            document.getElementById('decodedToken').innerText = 'Error: No stored code_verifier found.';
+            return;
+        }
+        sessionStorage.removeItem('pkce-code-verifier');
 
         const response = await fetch('http://localhost:9001/api/oauth/token', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                // Add any additional headers if needed
             },
             body: JSON.stringify({
                 grant_type: "authorization_code",
                 code,
                 code_verifier: code_verifier,
                 client_id: "shire.local",
-                // subscriber_tenant_hint: subscriber_tenant_hint
             }),
         })
         if (response.ok) {
@@ -99,11 +132,22 @@
 
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.has('code')) {
-        getAuthToken(urlParams.get('code'), urlParams.get('subscriber_tenant_hint'))
+        const returnedState = urlParams.get('state');
+        const storedState = sessionStorage.getItem('oauth-state');
+
+        // Validate state parameter to prevent CSRF attacks (RFC 6749 §10.12)
+        if (!storedState) {
+            document.getElementById('decodedToken').innerText = 'Error: No stored state found. Possible CSRF attack.';
+        } else if (!returnedState || returnedState !== storedState) {
+            document.getElementById('decodedToken').innerText = 'Error: State parameter mismatch. Possible CSRF attack.';
+        } else {
+            // State matches - clear it and proceed with token exchange
+            sessionStorage.removeItem('oauth-state');
+            getAuthToken(urlParams.get('code'), urlParams.get('subscriber_tenant_hint'));
+        }
     }
 
     function sha256(plain) {
-        // returns promise ArrayBuffer
         const encoder = new TextEncoder();
         const data = encoder.encode(plain);
         return window.crypto.subtle.digest("SHA-256", data);
@@ -128,7 +172,6 @@
     }
 
     function decodeToken(token) {
-        // token = token.trim()
         if (!token) {
             alert('Please enter a bearer token');
             return;
@@ -142,7 +185,7 @@
                 signature: tokenParts[2]
             };
             document.getElementById('decodedToken').innerText = JSON.stringify(decodedToken, null, 4);
-            return decodedToken.payload.name;
+            return decodedToken.payload.sub;
         } catch (error) {
             document.getElementById('decodedToken').innerText = 'Error decoding token: ' + error.message;
         }

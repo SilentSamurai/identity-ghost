@@ -3,7 +3,6 @@ import {UserService} from '../../_services/user.service';
 import {NgbModal} from '@ng-bootstrap/ng-bootstrap';
 import {ActivatedRoute, Router} from '@angular/router';
 import {TenantService} from '../../_services/tenant.service';
-import {lastValueFrom} from 'rxjs';
 import {MessageService} from 'primeng/api';
 import {AuthDefaultService} from '../../_services/auth.default.service';
 import {CloseType, ValueHelpResult,} from '../../component/value-help/value-help.component';
@@ -12,7 +11,7 @@ import {StaticSource} from "../../component/model/StaticSource";
 @Component({
     selector: 'app-TNRL01',
     template: `
-        <nav-bar></nav-bar>
+        <secure-nav-bar></secure-nav-bar>
         <app-object-page *ngIf="!loading">
             <app-op-title>
                 {{ user.email }}
@@ -94,7 +93,7 @@ import {StaticSource} from "../../component/model/StaticSource";
                                             tenant.id,
                                             role.id,
                                         ]"
-                                        href="javascript:void(0)"
+                                        
                                     >{{ role.name }}</a
                                     >
                                 </td>
@@ -106,6 +105,7 @@ import {StaticSource} from "../../component/model/StaticSource";
                                         (click)="onRemoveAssignment(role)"
                                         class="btn btn-sm"
                                         type="button"
+                                        aria-label="Remove role assignment"
                                     >
                                         <i class="fa fa-solid fa-trash"></i>
                                     </button>
@@ -160,8 +160,8 @@ export class TNRL01Component implements AfterContentInit {
             await this.router.navigate(['/home']);
         }
 
-        this.tenant = await this.tenantService.getTenantDetails(this.tenantId);
-        this.user = await lastValueFrom(this.userService.getUser(this.userId));
+        this.tenant = await this.tenantService.getTenantDetails();
+        this.user = await this.userService.getUser(this.userId);
         try {
             await this.loadTable();
             this.tenantRoles = this.tenant.roles;
@@ -172,7 +172,7 @@ export class TNRL01Component implements AfterContentInit {
             this.messageService.add({
                 severity: 'error',
                 summary: 'Failed',
-                detail: exception.error.message,
+                detail: exception.error?.message || 'Operation failed',
             });
         }
     }
@@ -183,7 +183,6 @@ export class TNRL01Component implements AfterContentInit {
     async loadTable() {
         if (this.tenantId && this.userId) {
             this.member = await this.tenantService.getMemberDetails(
-                this.tenantId,
                 this.userId,
             );
             // $event.update(this.member, false);
@@ -201,7 +200,6 @@ export class TNRL01Component implements AfterContentInit {
         try {
             await this.tenantService.addRolesToMember(
                 valueHelpResult.selection,
-                this.tenantId,
                 this.userId,
             );
             this.messageService.add({
@@ -225,7 +223,6 @@ export class TNRL01Component implements AfterContentInit {
         try {
             await this.tenantService.removeRolesFromMember(
                 [role],
-                this.tenantId,
                 this.userId,
             );
             this.messageService.add({

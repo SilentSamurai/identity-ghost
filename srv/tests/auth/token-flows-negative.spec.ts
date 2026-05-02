@@ -1,14 +1,25 @@
-import {TestAppFixture} from "../test-app.fixture";
+/**
+ * Integration tests for negative OAuth token flow scenarios.
+ *
+ * Tests error responses for:
+ * - Invalid credentials (wrong password)
+ * - Missing grant type
+ * - Invalid grant types
+ * - Invalid refresh tokens
+ *
+ * Verifies OAuth 2.0 RFC 6749 compliant error responses.
+ */
+import {SharedTestFixture} from "../shared-test.fixture";
 
 describe('e2e negative token flow', () => {
-    let app: TestAppFixture;
+    let app: SharedTestFixture;
     let refreshToken = "";
     let accessToken = "";
     let clientId = "";
     let clientSecret = "";
 
     beforeAll(async () => {
-        app = await new TestAppFixture().init();
+        app = new SharedTestFixture();
     });
 
     afterAll(async () => {
@@ -26,7 +37,8 @@ describe('e2e negative token flow', () => {
             })
             .set('Accept', 'application/json');
 
-        expect(response.status).toEqual(401);
+        expect(response.status).toEqual(400);
+        expect(response.body.error).toEqual('invalid_grant');
     });
 
     it(`/POST Missing Grant Type `, async () => {
@@ -182,7 +194,8 @@ describe('e2e negative token flow', () => {
             })
             .set('Accept', 'application/json');
 
-        expect(response.status).toEqual(404);
+        expect(response.status).toEqual(401);
+        expect(response.body.error).toEqual('invalid_client');
     });
 
     it(`/POST password Gibberish `, async () => {
@@ -197,7 +210,7 @@ describe('e2e negative token flow', () => {
             .set('Accept', 'application/json');
 
         console.log(response.body)
-        expect(response.status).toEqual(404);
+        expect(response.status).toEqual(400);
     });
 
     it(`/POST grant_type null Client Credentials`, async () => {

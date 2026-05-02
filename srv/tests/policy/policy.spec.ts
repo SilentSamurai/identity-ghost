@@ -1,4 +1,12 @@
-import {TestAppFixture} from "../test-app.fixture";
+/**
+ * Tests CRUD operations on CASL authorization policies.
+ *
+ * Policies are rules (allow/deny) attached to roles that define what actions are permitted
+ * on which subjects, optionally with conditions. Covers: create, read by ID, read by role,
+ * cache hit on repeated read, update (effect + action), delete, 404 on missing, and
+ * fetching the current user's resolved permissions.
+ */
+import {SharedTestFixture} from "../shared-test.fixture";
 import {PolicyClient} from "../api-client/policy-client";
 import {TokenFixture} from "../token.fixture";
 import {TenantClient} from "../api-client/tenant-client";
@@ -6,14 +14,14 @@ import {SearchClient} from "../api-client/search-client";
 import {Action, Effect} from "../../src/casl/actions.enum";
 
 describe('PolicyController (e2e)', () => {
-    let app: TestAppFixture;
+    let app: SharedTestFixture;
     let accessToken: string;
     let authorizationId: string;
     let policyClient: PolicyClient;
     let role;
 
     beforeAll(async () => {
-        app = await new TestAppFixture().init();
+        app = new SharedTestFixture();
         const tokenFixture = new TokenFixture(app);
         const tokenResponse = await tokenFixture.fetchAccessToken(
             "admin@auth.server.com",
@@ -121,8 +129,14 @@ describe('PolicyController (e2e)', () => {
         }
     });
 
-    it('get current user permissions', async () => {
+    it('get current user external permissions returns empty for internal-only roles', async () => {
         const permissions = await policyClient.getMyPermission();
+        expect(permissions).toBeInstanceOf(Array);
+        expect(permissions.length).toBe(0);
+    });
+
+    it('get current user internal permissions', async () => {
+        const permissions = await policyClient.getMyInternalPermissions();
         expect(permissions).toBeInstanceOf(Array);
         expect(permissions.length).toBeGreaterThan(0);
         for (let permission of permissions) {

@@ -17,7 +17,7 @@ import {AppService} from '../../_services/app.service';
 @Component({
     selector: 'app-RL02',
     template: `
-        <nav-bar></nav-bar>
+        <secure-nav-bar></secure-nav-bar>
         <app-object-page *ngIf="!loading">
             <app-op-title>
                 {{ role.name }}
@@ -138,6 +138,7 @@ import {AppService} from '../../_services/app.service';
                                         (click)="onUserRemove(user)"
                                         class="btn btn-sm"
                                         type="button"
+                                        aria-label="Remove user"
                                     >
                                         <i class="fa fa-solid fa-trash"></i>
                                     </button>
@@ -201,6 +202,7 @@ import {AppService} from '../../_services/app.service';
                                     <button
                                         class="btn btn-sm btn-success me-2"
                                         (click)="openViewPolicyModal(policy.id)"
+                                        aria-label="View policy"
                                     >
                                         <i class="fa fa-eye"></i>
                                     </button>
@@ -209,12 +211,14 @@ import {AppService} from '../../_services/app.service';
                                         (click)="
                                             openUpdatePolicyModal(policy.id)
                                         "
+                                        aria-label="Edit policy"
                                     >
                                         <i class="fa fa-pencil"></i>
                                     </button>
                                     <button
                                         class="btn btn-sm btn-danger"
                                         (click)="onPolicyRemove(policy)"
+                                        aria-label="Delete policy"
                                     >
                                         <i class="fa fa-trash"></i>
                                     </button>
@@ -228,7 +232,7 @@ import {AppService} from '../../_services/app.service';
 
         <div class="text-center mt-5" *ngIf="loading">
             <div class="spinner-border" role="status">
-                <span class="sr-only">Loading...</span>
+                <span class="visually-hidden">Loading...</span>
             </div>
         </div>
         <p-confirmDialog></p-confirmDialog>
@@ -313,7 +317,6 @@ export class RL02Component implements OnInit {
             accept: async () => {
                 await this.tenantService.deleteRole(
                     this.role.name,
-                    this.role.tenantId,
                 );
                 this.messageService.add({
                     severity: 'info',
@@ -350,7 +353,6 @@ export class RL02Component implements OnInit {
             accept: async () => {
                 await this.tenantService.removeRolesFromMember(
                     [this.role],
-                    this.tenantId,
                     user.id,
                 );
                 this.messageService.add({
@@ -365,7 +367,7 @@ export class RL02Component implements OnInit {
 
     async onUserVhOpen() {
         try {
-            const members = await this.tenantService.getMembers(this.tenantId);
+            const members = await this.tenantService.getMembers();
             this.usersDM.setData(members);
         } catch (e) {
             this.messageService.add({
@@ -383,7 +385,6 @@ export class RL02Component implements OnInit {
                 for (let user of selectedUser) {
                     await this.tenantService.addRolesToMember(
                         [this.role],
-                        this.tenantId,
                         user.id,
                     );
                 }
@@ -493,7 +494,7 @@ export class RL02Component implements OnInit {
 
     async onAppVhOpen() {
         try {
-            const apps = await this.appService.getAppCreatedByTenantId(this.tenantId);
+            const apps = await this.appService.getAppCreatedByTenantId();
             this.appsDM.setData(apps);
         } catch (e) {
             this.messageService.add({

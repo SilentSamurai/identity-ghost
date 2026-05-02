@@ -1,157 +1,97 @@
 // ***********************************************
-// This example namespace declaration will help
-// with Intellisense and code completion in your
-// IDE or Text Editor.
+// Custom Cypress Commands
 // ***********************************************
-// declare namespace Cypress {
-//   interface Chainable<Subject = any> {
-//     customCommand(param: any): typeof customCommand;
-//   }
-// }
-//
-// function customCommand(param: any): void {
-//   console.warn(param);
-// }
-//
-// NOTE: You can use it like so:
-// Cypress.Commands.add('customCommand', customCommand);
-//
-// ***********************************************
-// This example commands.js shows you how to
-// create various custom commands and overwrite
-// existing commands.
-//
-// For more comprehensive examples of custom
-// commands please read more here:
-// https://on.cypress.io/custom-commands
-// ***********************************************
-//
-//
-// -- This is a parent command --
-// Cypress.Commands.add("login", (email, password) => { ... })
-//
-//
-// -- This is a child command --
-// Cypress.Commands.add("drag", { prevSubject: 'element'}, (subject, options) => { ... })
-//
-//
-// -- This is a dual command --
-// Cypress.Commands.add("dismiss", { prevSubject: 'optional'}, (subject, options) => { ... })
-//
-//
-// -- This will overwrite an existing command --
-// Cypress.Commands.overwrite("visit", (originalFn, url, options) => { ... })
 
-// @ts-ignore
+// Admin-context: login as super-admin and navigate to /admin
 Cypress.Commands.add('adminLogin', (email: string, password: string) => {
-    // Go directly to login with a preset client_id so step 2 is visible
-    cy.visit('/admin-login');
-    // cy.get('#domain-pre').type("auth.server.com")
+    cy.clearCookies();
+    cy.clearLocalStorage();
+    cy.window().then((win) => win.sessionStorage.clear());
 
-    // After filtering, we can assert that there is only the one
-    // incomplete item in the list.
-    // cy.get('#continue-btn').click()
+    cy.visit(`/login?client_id=${Cypress.env('superAdminClientId')}`);
 
-    cy.get('#username').type(email);
-    cy.get('#password').type(password);
+    cy.get('#username').should('be.visible').type(email);
+    cy.get('#password').should('be.visible').type(password);
 
-    cy.intercept('POST', '**/api/oauth/token*').as('authCode')
+    cy.intercept('POST', '**/api/oauth/token*').as('authCode');
 
     cy.get('#login-btn').click();
 
-    cy.wait('@authCode').should((interception: any) => {
-        const {request, response} = interception;
-        expect(response?.statusCode).to.be.oneOf([201, 200]);
-        // expect(response && response.body).to.include('authentication_code')
-    })
+    cy.wait('@authCode').should((interception) => {
+        expect(interception.response?.statusCode).to.be.oneOf([201, 200]);
+    });
 
     cy.url().should('include', '/home');
-
-    // Then assert the page title
-    cy.contains('Home');
+    cy.visit('/admin');
+    cy.url().should('include', '/admin');
 });
 
-// @ts-ignore
+// User-context: login as tenant user
 Cypress.Commands.add('login', (email: string, password: string, domain: string) => {
-    // Ensure we land on the login page with client_id preset so username/password are visible
+    cy.clearCookies();
+    cy.clearLocalStorage();
+    cy.window().then((win) => win.sessionStorage.clear());
+
     cy.visit(`/login?client_id=${domain}`);
-    // cy.get('#domain-pre').type(tenant)
 
-    // After filtering, we can assert that there is only the one
-    // incomplete item in the list.
-    // cy.get('#continue-btn').click()
+    cy.get('#username').should('be.visible').type(email);
+    cy.get('#password').should('be.visible').type(password);
 
-    cy.get('#username').type(email)
-    cy.get('#password').type(password)
-
-    cy.intercept('POST', '**/api/oauth/token*').as('authCode')
+    cy.intercept('POST', '**/api/oauth/token*').as('authCode');
 
     cy.get('#login-btn').click();
 
-    cy.wait('@authCode').should(({request, response}) => {
+    cy.wait('@authCode').should(({response}) => {
         expect(response?.statusCode).to.be.oneOf([201, 200]);
-        // expect(response && response.body).to.include('authentication_code')
-    })
+    });
 
     cy.url().should('include', '/home');
-
-    // Then assert the page title
     cy.contains('Home');
 });
 
-// @ts-ignore
-Cypress.Commands.add('goToTenantObjectPage', (tenantDomain: string) => {
-    cy.visit('/home');
-    cy.get('#Tenants_HOME_NAV').click();
-    cy.get('a[href="/TN02"]').click();
+// Admin-context: navigate to tenant object page via value help
+Cypress.Commands.add('adminGoToTenantObjectPage', (tenantDomain: string) => {
+    cy.intercept('GET', '**/api/admin/tenant/*/members').as('getTenantDetails');
+    cy.goToAdminPage('TN02');
     cy.get('#Tenant-vh-btn').click();
     cy.get('#FILTER_FIELD_domain').type(tenantDomain);
     cy.get('#default_FILTER_BAR_GO_BTN').click();
     cy.contains('td', tenantDomain).click();
     cy.get('#Tenant_VH_SELECT_BTN').click();
-    cy.intercept('GET', '**/api/tenant/*/members').as('getTenantDetails');
     cy.get('#TN02_SEL_CONT_BTN').click();
-    cy.url().should('match', /TN02\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/);
-    cy.wait('@getTenantDetails').should((interception: any) => {
-        const {request, response} = interception;
-        expect(!!response && response.statusCode).to.be.oneOf([200, 304]);
+    cy.url().should('match', /admin\/TN02\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/);
+    cy.wait('@getTenantDetails').should((interception) => {
+        expect(interception.response?.statusCode).to.be.oneOf([200, 304]);
     });
 });
 
-
-// @ts-ignore
-Cypress.Commands.add('createTenant', (tenantName: string, tenantDomain: string) => {
-    cy.visit('/');
-    cy.url().should('include', '/home');
-    cy.get('#Tenants_HOME_NAV').click();
-    cy.get('a[href="/TN01"]').click();
+// Admin-context: create tenant via /admin/TN01
+Cypress.Commands.add('adminCreateTenant', (tenantName: string, tenantDomain: string) => {
+    cy.goToAdminPage('TN01');
     cy.get('#CREATE_TENANT_DIALOG_BTN').click();
     cy.get('#create\\.tenant\\.name').type(tenantName);
     cy.get('#create\\.tenant\\.domain').type(tenantDomain);
     cy.intercept('POST', '**/tenant/create*').as('createTenant');
     cy.get('#CREATE_TENANT_SUBMIT_BTN').click();
-    cy.wait('@createTenant').should((interception: any) => {
-        const {request, response} = interception;
-        expect(!!response && response.statusCode).to.be.oneOf([201]);
+    cy.wait('@createTenant').should((interception) => {
+        expect(interception.response?.statusCode).to.be.oneOf([201]);
     });
 });
 
-// @ts-ignore
-Cypress.Commands.add('deleteTenant', (tenantDomain: string) => {
-
-    cy.goToTenantObjectPage(tenantDomain);
-
+// Admin-context: delete tenant via /admin/TN02
+Cypress.Commands.add('adminDeleteTenant', (tenantDomain: string) => {
+    cy.adminGoToTenantObjectPage(tenantDomain);
+    cy.intercept('DELETE', '**/api/admin/tenant/*').as('DeleteTenant');
     cy.get('#DELETE_TENANT_BTN').click();
-    cy.intercept('DELETE', '**/api/tenant/*').as('DeleteTenant');
     cy.get('#CONFIRMATION_YES_BTN').click();
-    cy.wait('@DeleteTenant').should(({request, response}) => {
-        expect(response && response.statusCode).to.be.oneOf([200]);
+    cy.wait('@DeleteTenant').should(({response}) => {
+        expect(response?.statusCode).to.be.oneOf([200]);
     });
 });
 
-// @ts-ignore
-Cypress.Commands.add('subscribeToApp', (tenantDomain: string, appName: string) => {
-    cy.goToTenantObjectPage(tenantDomain);
+// Admin-context: subscribe to app via /admin/TN02
+Cypress.Commands.add('adminSubscribeToApp', (tenantDomain: string, appName: string) => {
+    cy.adminGoToTenantObjectPage(tenantDomain);
     cy.subscribeAppFromOverview(appName);
 });
 
@@ -164,28 +104,23 @@ Cypress.Commands.add('subscribeAppFromOverview', (appName: string) => {
         .find('button')
         .contains('Select').click();
 
-    cy.intercept('POST', '**/api/apps/*/subscribe/*').as('SubscribeApp');
+    cy.intercept('POST', '**/api/apps/*/my/subscribe').as('SubscribeApp');
 
     cy.get('#SUBSCRIBE_BTN').click();
 
-
-    cy.wait('@SubscribeApp').should((interception: any) => {
-        const {request, response} = interception;
-        expect(!!response && (response.statusCode === 201 || response.statusCode === 200)).to.be.true;
+    cy.wait('@SubscribeApp').should((interception) => {
+        expect(interception.response?.statusCode).to.be.oneOf([201, 200]);
     });
     cy.contains('td', appName).should('exist');
 });
 
-// @ts-ignore
-Cypress.Commands.add('addAppToTenant', (domain: string, appName: string, appUrl: string, description: string) => {
-
-    cy.goToTenantObjectPage(domain);
+// Admin-context: add app to tenant via /admin/TN02
+Cypress.Commands.add('adminAddAppToTenant', (domain: string, appName: string, appUrl: string, description: string) => {
+    cy.adminGoToTenantObjectPage(domain);
     cy.addAppFromOverview(appName, appUrl, description);
 });
 
 Cypress.Commands.add('addAppFromOverview', (appName: string, appUrl: string, description: string) => {
-
-    // Go to the Apps section (assumes already on the tenant object page)
     cy.contains('button', 'Apps').click();
     cy.contains('button', 'Create').click();
 
@@ -197,22 +132,21 @@ Cypress.Commands.add('addAppFromOverview', (appName: string, appUrl: string, des
 
     cy.get('.modal-footer').contains('button', 'Create').click();
 
-    cy.wait('@CreateApp').should((interception: any) => {
-        const {request, response} = interception;
-        expect(!!response && response.statusCode).to.be.oneOf([201, 200]);
+    cy.wait('@CreateApp').should((interception) => {
+        expect(interception.response?.statusCode).to.be.oneOf([201, 200]);
     });
 
     cy.contains("td", appName).should("exist");
 });
 
-// @ts-ignore
-Cypress.Commands.add('openTenantOverviewTile', () => {
-    cy.visit('/home');
+// User-context: open tenant overview tile from /home
+Cypress.Commands.add('userOpenTenantOverview', () => {
+    cy.goToSecurePage('home');
     cy.contains('app-tile', 'Tenant Overview').click();
 });
 
-// @ts-ignore
-Cypress.Commands.add('openSubscribedApp', (appName: string) => {
+// User-context: open a subscribed app from the tenant overview
+Cypress.Commands.add('userOpenSubscribedApp', (appName: string) => {
     cy.contains('button', 'Subscriptions').click();
     cy.contains('td', appName)
         .parent()
@@ -221,29 +155,63 @@ Cypress.Commands.add('openSubscribedApp', (appName: string) => {
         .click();
 });
 
-// @ts-ignore
+// User-context: add a member to tenant via /home tenant overview
+Cypress.Commands.add('userAddMemberToTenant', (email: string) => {
+    cy.userOpenTenantOverview();
+    cy.contains('button', 'Members').click();
+    cy.get('#OPEN_ADD_MEMBER_DIALOG_BTN').click();
+    cy.get('#add\\.member\\.name').type(email);
+    cy.intercept('POST', '**/api/tenant/*/members/add').as('createMember');
+    cy.get('#ADD_TENANT_MEMBER_BTN').click();
+    cy.wait('@createMember').should((interception) => {
+        expect(interception.response?.statusCode).to.be.oneOf([201]);
+    });
+    cy.contains('td', email).should('exist');
+});
+
+// User-context: publish an app via /home tenant overview
+Cypress.Commands.add('userPublishApp', (appName: string) => {
+    cy.userOpenTenantOverview();
+    cy.contains('button', 'Apps').click();
+    cy.intercept('PATCH', '**/api/apps/*/publish').as('publishApp');
+    cy.contains('td', appName)
+        .parent()
+        .find('button')
+        .contains('Publish')
+        .click();
+    cy.get('#CONFIRMATION_YES_BTN').click();
+    cy.wait('@publishApp').should((interception) => {
+        expect(interception.response?.statusCode).to.be.oneOf([200, 201]);
+    });
+});
+
+// User-context: open client list from /home
+Cypress.Commands.add('userOpenClientList', () => {
+    cy.userOpenTenantOverview();
+    cy.contains('button', 'Clients').click();
+});
+
+// Context-neutral commands
+
 Cypress.Commands.add('unsubscribeFromApp', (appName: string) => {
     cy.contains('button', 'Subscriptions').click();
     cy.contains('td', appName)
         .parent()
         .find('button')
-        .filter((i, el) => el.innerHTML.includes('fa-trash'))
+        .filter((_i, el) => el.innerHTML.includes('fa-trash'))
         .click();
 
-    cy.intercept('POST', '**/api/apps/*/unsubscribe/*').as('UnsubscribeApp');
+    cy.intercept('POST', '**/api/apps/*/my/unsubscribe').as('UnsubscribeApp');
 
     cy.get('#CONFIRMATION_YES_BTN').click();
 
-
-    cy.wait('@UnsubscribeApp').should((interception: any) => {
-        const {request, response} = interception;
-        expect(!!response && (response.statusCode === 200 || response.statusCode === 201)).to.be.true;
+    cy.wait('@UnsubscribeApp').should((interception) => {
+        expect(interception.response?.statusCode).to.be.oneOf([200, 201]);
     });
 
     cy.contains('td', appName).should('not.exist');
 });
 
-// @ts-ignore
 Cypress.Commands.add('deleteAppFromOverview', (appName: string) => {
     cy.contains('button', 'Apps').click();
     cy.contains('td', appName)
@@ -252,15 +220,13 @@ Cypress.Commands.add('deleteAppFromOverview', (appName: string) => {
         .click();
     cy.intercept('DELETE', '**/api/apps/*').as('DeleteApp');
     cy.get('#CONFIRMATION_YES_BTN').click();
-    cy.wait('@DeleteApp').should((interception: any) => {
-        const {request, response} = interception;
-        expect(!!response && (response.statusCode === 200 || response.statusCode === 201)).to.be.true;
+    cy.wait('@DeleteApp').should((interception) => {
+        expect(interception.response?.statusCode).to.be.oneOf([200, 201]);
     });
     cy.contains('td', appName).should('not.exist');
 });
 
-// @ts-ignore
-Cypress.Commands.add('loginWithAmbiguousUser', (email: string, password: string, clientId: string) => {
+Cypress.Commands.add('loginWithAmbiguousUser', (email: string, password: string, _clientId: string) => {
     cy.visit('/');
     cy.get('#username').type(email);
     cy.get('#password').type(password);
@@ -269,50 +235,22 @@ Cypress.Commands.add('loginWithAmbiguousUser', (email: string, password: string,
     return cy.wait('@login');
 });
 
-// @ts-ignore
-Cypress.Commands.add('addMemberToTenant', (tenantDomain: string, email: string, password: string) => {
-    cy.openTenantOverviewTile();
-    cy.contains('button', 'Members').click();
-    cy.get('#OPEN_ADD_MEMBER_DIALOG_BTN').click();
-    cy.get('#add\\.member\\.name').type(email);
-    cy.intercept('POST', '**/api/tenant/*/members/add').as('createMember');
-    cy.get('#ADD_TENANT_MEMBER_BTN').click();
-    cy.wait('@createMember').should((interception: any) => {
-        const {response} = interception;
-        expect(response?.statusCode).to.be.oneOf([201]);
-    });
-    cy.contains('td', email).should('exist');
+// Navigate to an admin page (requires adminLogin first)
+Cypress.Commands.add('goToAdminPage', (page: string) => {
+    const path = page.startsWith('/') ? `/admin${page}` : `/admin/${page}`;
+    cy.visit(path);
+    cy.url().should('include', '/admin');
 });
 
-// @ts-ignore
-Cypress.Commands.add('publishApp', (appName: string) => {
-    cy.openTenantOverviewTile();
-    cy.contains('button', 'Apps').click();
-    cy.contains('td', appName)
-        .parent()
-        .find('button')
-        .contains('Publish')
-        .click();
-    cy.intercept('PATCH', '**/api/apps/*/publish').as('publishApp');
-    cy.get('#CONFIRMATION_YES_BTN').click();
-    cy.wait('@publishApp').should((interception: any) => {
-        const {response} = interception;
-        expect(response?.statusCode).to.be.oneOf([200, 201]);
-    });
-    // Verify app is published by checking that the Publish button is gone
-    cy.contains('td', appName)
-        .parent()
-        .find('button')
-        .contains('Publish')
-        .should('not.exist');
+// Navigate to a secure normal-user page (requires login first)
+Cypress.Commands.add('goToSecurePage', (page: string) => {
+    const path = page.startsWith('/') ? page : `/${page}`;
+    cy.visit(path);
+    cy.url().should('not.include', '/login');
 });
 
 Cypress.Commands.add('logout', () => {
     cy.get('#dropdownUser1').click();
-    cy.contains('a.dropdown-item', 'Sign Out').click();
+    cy.contains('button.dropdown-item', 'Sign Out').click();
     cy.url().should('include', '/login');
 });
-
- 
-
-

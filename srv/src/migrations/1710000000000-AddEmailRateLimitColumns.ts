@@ -1,4 +1,4 @@
-import { MigrationInterface, QueryRunner, TableColumn } from "typeorm";
+import {MigrationInterface, QueryRunner, TableColumn} from "typeorm";
 
 export class AddEmailRateLimitColumns1710000000000 implements MigrationInterface {
     name = 'AddEmailRateLimitColumns1710000000000'

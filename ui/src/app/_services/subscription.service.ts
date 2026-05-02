@@ -21,20 +21,20 @@ export class SubscriptionService {
         };
     }
 
-    async subscribeToApp(appId: string, tenantId: string) {
+    async subscribeToApp(appId: string) {
         return lastValueFrom(
             this.http.post(
-                `${API_URL}/apps/${appId}/subscribe/${tenantId}`,
+                `${API_URL}/apps/${appId}/my/subscribe`,
                 {},
                 this.getHttpOptions(),
             ),
         );
     }
 
-    async unsubscribeFromApp(appId: string, tenantId: string) {
+    async unsubscribeFromApp(appId: string) {
         return lastValueFrom(
             this.http.post(
-                `${API_URL}/apps/${appId}/unsubscribe/${tenantId}`,
+                `${API_URL}/apps/${appId}/my/unsubscribe`,
                 {},
                 this.getHttpOptions(),
             ),
@@ -50,9 +50,9 @@ export class SubscriptionService {
         );
     }
 
-    async getTenantSubscription(tenantId: string) {
+    async getTenantSubscription() {
         return lastValueFrom(
-            this.http.get(`${API_URL}/apps/subscribed-by/${tenantId}/`)
+            this.http.get(`${API_URL}/apps/my/subscriptions`)
         );
     }
 

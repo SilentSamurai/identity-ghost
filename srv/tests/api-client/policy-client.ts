@@ -1,12 +1,11 @@
-import {TestAppFixture} from "../test-app.fixture";
-import {expect2xx, HttpClient} from "./client";
+import {expect2xx, HttpClient, TestFixture} from "./client";
 import {Action, Effect} from "../../src/casl/actions.enum";
 
 
 export class PolicyClient extends HttpClient {
 
 
-    constructor(app: TestAppFixture, accessToken: string) {
+    constructor(app: TestFixture, accessToken: string) {
         super(app, accessToken);
     }
 
@@ -91,6 +90,14 @@ export class PolicyClient extends HttpClient {
         const response = await this.get("/api/v1/my/permissions")
 
         console.log("My Permission Response:", response.body);
+        expect2xx(response);
+        return response.body;
+    }
+
+    async getMyInternalPermissions() {
+        const response = await this.get("/api/v1/my/internal-permissions")
+
+        console.log("My Internal Permission Response:", response.body);
         expect2xx(response);
         return response.body;
     }

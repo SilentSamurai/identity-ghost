@@ -13,6 +13,7 @@ import {ResetPasswordComponent} from './open-pages/reset-password.component';
 import {CenteredCardComponent} from './component/centered-card/centered-card.component';
 
 import {authInterceptorProviders} from './_helpers/auth.interceptor';
+import {httpErrorInterceptorProviders} from './_helpers/http-error.interceptor';
 import {NgbCollapseModule, NgbDropdown, NgbModule,} from '@ng-bootstrap/ng-bootstrap';
 import {TableModule} from 'primeng/table';
 import {BrowserAnimationsModule} from '@angular/platform-browser/animations';
@@ -30,7 +31,7 @@ import {Ability, createMongoAbility, PureAbility,} from '@casl/ability';
 import {AuthorizeLoginComponent} from "./open-pages/authorize-login.component";
 import {NgOptimizedImage} from "@angular/common";
 import {TenantSelectionComponent} from './open-pages/tenant-selection.component';
-import {AdminLoginComponent} from './open-pages/admin-login.component';
+import {ConsentScreenComponent} from './open-pages/consent-screen.component';
 import {WelcomeComponent} from './open-pages/welcome.component';
 import {SignUpComponent} from './open-pages/signup.component';
 import {OpenNavbarComponent} from './open-pages/open-navbar.component';
@@ -46,10 +47,10 @@ import {OpenNavbarComponent} from './open-pages/open-navbar.component';
         HttpErrorComponent,
         AuthorizeLoginComponent,
         TenantSelectionComponent,
+        ConsentScreenComponent,
         ForgotPasswordComponent,
         ResetPasswordComponent,
         CenteredCardComponent,
-        AdminLoginComponent,
         WelcomeComponent,
         SignUpComponent,
         OpenNavbarComponent
@@ -75,6 +76,7 @@ import {OpenNavbarComponent} from './open-pages/open-navbar.component';
     ],
     providers: [
         authInterceptorProviders,
+        httpErrorInterceptorProviders,
         NgbDropdown,
         MessageService,
         ConfirmationService,

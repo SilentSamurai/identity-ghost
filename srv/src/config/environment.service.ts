@@ -21,10 +21,18 @@ export class Environment {
             path: envPath,
         });
 
-        console.log("Environment variables:");
-        Object.keys(process.env).forEach(function (key) {
-            console.log(key + "=" + process.env[key]);
-        });
+        const DIAGNOSTIC_KEYS = [
+            "NODE_ENV", "PORT", "SERVICE_NAME", "ENV_FILE",
+            "DATABASE_HOST", "DATABASE_PORT", "DATABASE_NAME",
+            "MAIL_HOST", "MAIL_PORT",
+            "LOG_LEVEL",
+        ];
+        console.log("Environment diagnostics:");
+        for (const key of DIAGNOSTIC_KEYS) {
+            if (key in process.env) {
+                console.log(`  ${key}=${process.env[key]}`);
+            }
+        }
     }
 
     // static configTest(print = false): any {

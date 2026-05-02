@@ -21,43 +21,70 @@ export class AuthService {
         client_id: string,
         code_challenge: string,
         method: string,
+        subscriber_tenant_hint?: string,
+        nonce?: string,
+        prompt?: string,
+        max_age?: number,
     ): Promise<any> {
+        const body: any = {
+            code_challenge: code_challenge,
+            code_challenge_method: method,
+            client_id,
+            email,
+            password,
+        };
+        if (subscriber_tenant_hint) {
+            body.subscriber_tenant_hint = subscriber_tenant_hint;
+        }
+        if (nonce) {
+            body.nonce = nonce;
+        }
+        if (prompt) {
+            body.prompt = prompt;
+        }
+        if (max_age !== undefined && max_age !== null) {
+            body.max_age = max_age;
+        }
         return await lastValueFrom(
             this.http.post(
                 `${AUTH_API}/login`,
-                {
-                    code_challenge: code_challenge,
-                    code_challenge_method: method,
-                    client_id,
-                    email,
-                    password,
-                },
+                body,
                 httpOptions,
             ),
         );
     }
 
-    fetchAccessToken(code: string, verifier: string, client_id: string, subscriber_tenant_hint?: string): Observable<any> {
+    fetchAccessToken(code: string, verifier: string, client_id: string, subscriber_tenant_hint?: string): Promise<any> {
         const body: any = {
             grant_type: 'authorization_code',
             code,
             code_verifier: verifier,
             client_id
         };
-        
+
         if (subscriber_tenant_hint) {
             body.subscriber_tenant_hint = subscriber_tenant_hint;
         }
 
-        return this.http.post(
-            `${AUTH_API}/token`,
-            body,
-            httpOptions,
+        return lastValueFrom(
+            this.http.post(
+                `${AUTH_API}/token`,
+                body,
+                httpOptions,
+            ),
         );
     }
 
     async fetchPermissions(): Promise<any> {
-        return await lastValueFrom(this.http.get('/api/v1/my/permissions'));
+        return await lastValueFrom(this.http.get('/api/v1/my/internal-permissions'));
+    }
+
+    async fetchMyProfile(): Promise<any> {
+        return await lastValueFrom(this.http.get('/api/users/me'));
+    }
+
+    async fetchUserInfo(): Promise<any> {
+        return await lastValueFrom(this.http.get(`${AUTH_API}/userinfo`));
     }
 
     validateAuthCode(authCode: string, clientId: string): Promise<any> {
@@ -67,20 +94,6 @@ export class AuthService {
                 {
                     auth_code: authCode,
                     client_id: clientId,
-                },
-                httpOptions,
-            ),
-        );
-    }
-
-    updateSubscriberTenantHint(authCode: string, clientId: string, subscriberTenantHint: string): Promise<any> {
-        return lastValueFrom(
-            this.http.post(
-                `${AUTH_API}/update-subscriber-tenant-hint`,
-                {
-                    auth_code: authCode,
-                    client_id: clientId,
-                    subscriber_tenant_hint: subscriberTenantHint,
                 },
                 httpOptions,
             ),
@@ -129,14 +142,114 @@ export class AuthService {
         );
     }
 
-    checkTenantAmbiguity(authCode: string, clientId: string): Observable<any> {
+    refreshAccessToken(refreshToken: string, clientId: string): Observable<any> {
         return this.http.post(
-            `${AUTH_API}/check-tenant-ambiguity`,
+            `${AUTH_API}/token`,
             {
-                auth_code: authCode,
-                client_id: clientId
+                grant_type: 'refresh_token',
+                refresh_token: refreshToken,
+                client_id: clientId,
             },
-            httpOptions
+            httpOptions,
         );
     }
+
+    async logout(refreshToken: string): Promise<void> {
+        await lastValueFrom(
+            this.http.post(
+                `${AUTH_API}/logout`,
+                {
+                    refresh_token: refreshToken,
+                },
+                httpOptions,
+            ),
+        );
+    }
+
+    async submitConsent(params: {
+        email: string;
+        password: string;
+        client_id: string;
+        code_challenge: string;
+        code_challenge_method: string;
+        approved_scopes: string[];
+        consent_action: 'approve' | 'deny';
+        redirect_uri?: string;
+        scope?: string;
+        nonce?: string;
+        subscriber_tenant_hint?: string;
+        prompt?: string;
+    }): Promise<any> {
+        const body: any = {
+            email: params.email,
+            password: params.password,
+            client_id: params.client_id,
+            code_challenge: params.code_challenge,
+            code_challenge_method: params.code_challenge_method,
+            approved_scopes: params.approved_scopes,
+            consent_action: params.consent_action,
+        };
+        if (params.redirect_uri) {
+            body.redirect_uri = params.redirect_uri;
+        }
+        if (params.scope) {
+            body.scope = params.scope;
+        }
+        if (params.nonce) {
+            body.nonce = params.nonce;
+        }
+        if (params.subscriber_tenant_hint) {
+            body.subscriber_tenant_hint = params.subscriber_tenant_hint;
+        }
+        if (params.prompt) {
+            body.prompt = params.prompt;
+        }
+        return await lastValueFrom(
+            this.http.post(
+                `${AUTH_API}/consent`,
+                body,
+                httpOptions,
+            ),
+        );
+    }
+
+    async silentAuth(params: {
+        client_id: string;
+        user_id: string;
+        tenant_id: string;
+        code_challenge: string;
+        code_challenge_method: string;
+        redirect_uri?: string;
+        scope?: string;
+        nonce?: string;
+        max_age?: number;
+    }): Promise<any> {
+        const body: any = {
+            client_id: params.client_id,
+            user_id: params.user_id,
+            tenant_id: params.tenant_id,
+            code_challenge: params.code_challenge,
+            code_challenge_method: params.code_challenge_method,
+        };
+        if (params.redirect_uri) {
+            body.redirect_uri = params.redirect_uri;
+        }
+        if (params.scope) {
+            body.scope = params.scope;
+        }
+        if (params.nonce) {
+            body.nonce = params.nonce;
+        }
+        if (params.max_age !== undefined && params.max_age !== null) {
+            body.max_age = params.max_age;
+        }
+        return await lastValueFrom(
+            this.http.post(
+                `${AUTH_API}/silent-auth`,
+                body,
+                httpOptions,
+            ),
+        );
+    }
+
 }

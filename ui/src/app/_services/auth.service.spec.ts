@@ -52,19 +52,15 @@ describe('AuthService', () => {
         expect(result).toEqual(mockResponse);
     });
 
-    it('should fetch access token', (done) => {
+    it('should fetch access token', async () => {
         const mockToken = {
             access_token: 'test_access_token',
             token_type: 'Bearer',
             expires_in: 3600,
         };
 
-        service
-            .fetchAccessToken('auth_code_123', 'verifier_123', 'test_client_id')
-            .subscribe((response) => {
-                expect(response).toEqual(mockToken);
-                done();
-            });
+        const tokenPromise = service
+            .fetchAccessToken('auth_code_123', 'verifier_123', 'test_client_id');
 
         const req = httpMock.expectOne('/api/oauth/token');
         expect(req.request.method).toBe('POST');
@@ -76,6 +72,9 @@ describe('AuthService', () => {
         });
 
         req.flush(mockToken);
+
+        const response = await tokenPromise;
+        expect(response).toEqual(mockToken);
     });
 
     it('should fetch permissions', async () => {
@@ -83,7 +82,7 @@ describe('AuthService', () => {
 
         const permissionsPromise = service.fetchPermissions();
 
-        const req = httpMock.expectOne('/api/v1/my/permissions');
+        const req = httpMock.expectOne('/api/v1/my/internal-permissions');
         expect(req.request.method).toBe('GET');
 
         req.flush(mockPermissions);

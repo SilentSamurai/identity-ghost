@@ -1,6 +1,5 @@
 import {Component, EventEmitter, Input, OnInit, Output} from '@angular/core';
 import {NgbActiveModal} from '@ng-bootstrap/ng-bootstrap';
-import {lastValueFrom} from 'rxjs';
 import {MessageService} from 'primeng/api';
 import {NoChangesException, TenantService,} from '../../../_services/tenant.service';
 
@@ -120,15 +119,12 @@ export class UpdateTenantComponent implements OnInit {
 
     async onSubmit() {
         try {
-            let editedTenant = await lastValueFrom(
-                this.tenantService.editTenant(
-                    this.tenant.id,
+            let editedTenant = await this.tenantService.editTenant(
                     this.tenant.name === this.form.name ? null : this.form.name,
                     this.tenant.allowSignUp === this.form.allowSignUp
                         ? null
                         : this.form.allowSignUp,
-                ),
-            );
+                );
             this.messageService.add({
                 severity: 'success',
                 summary: 'Success',

@@ -1,14 +1,25 @@
+/**
+ * Tests the self-service tenant creation and user registration flow.
+ *
+ * A new user registers with a new tenant (org), receives a verification email,
+ * clicks the link to verify, then authenticates against their own tenant. Covers:
+ *   - Registration creates both user and tenant
+ *   - Email verification via SMTP link extraction
+ *   - User cannot log in to a different tenant they don't belong to
+ *   - Authenticated user can read their profile and tenant details (including members)
+ *   - Account deletion prevents further login
+ */
 import {v4 as uuidv4} from 'uuid';
-import {TestAppFixture} from "../test-app.fixture";
+import {SharedTestFixture} from "../shared-test.fixture";
 import {UsersClient} from "../api-client/user-client";
 import {TokenFixture} from "../token.fixture";
-import {EmailSearchCriteria} from "../../src/mail/FakeSmtpServer";
 import {TenantClient} from "../api-client/tenant-client";
 import {SearchClient} from "../api-client/search-client";
+import {HelperFixture} from "../helper.fixture";
 
 
 describe('UsersController (e2e)', () => {
-    let app: TestAppFixture;
+    let app: SharedTestFixture;
     let usersClient: UsersClient;
     let tenantClient: TenantClient;
     let searchClient: SearchClient;
@@ -31,7 +42,7 @@ describe('UsersController (e2e)', () => {
     beforeAll(async () => {
         console.log("Starting Test Stating");
         // Create and set up the test application
-        app = await new TestAppFixture().init();
+        app = new SharedTestFixture();
 
         // Get admin access token for authenticated requests
         tokenFixture = new TokenFixture(app);
@@ -63,11 +74,12 @@ describe('UsersController (e2e)', () => {
 
         it('should verify a new user via email link', async () => {
             // Find the verification email sent to our test user
-            const search: EmailSearchCriteria = {
+            const search = {
                 to: testUserEmail,
                 subject: /signing.*up.*Auth.*Server/i,
-            }
-            const verificationEmail = await app.smtp.waitForEmail(search);
+            };
+            // Increase timeout to 25 seconds to allow for email delivery under load
+            const verificationEmail = await app.smtp.waitForEmail(search, 25000);
             // Verify we found the email
             expect(verificationEmail).toBeDefined();
 
@@ -105,6 +117,19 @@ describe('UsersController (e2e)', () => {
         });
 
         it('should authenticate the user', async () => {
+            // Enable password grant on the self-registered tenant's default client.
+            // Uses a direct search call (not findTenantBy which asserts >= 1 result)
+            // so this is safe when the test runs in isolation without prior registration.
+            const superAdminToken = await tokenFixture.fetchAccessToken(
+                "admin@auth.server.com", "admin9000", "auth.server.com"
+            );
+            const adminSearchClient = new SearchClient(app, superAdminToken.accessToken);
+            const searchResponse = await adminSearchClient.searchTenantByDomain(tenantDomain);
+            if (searchResponse && searchResponse.length > 0) {
+                const helper = new HelperFixture(app, superAdminToken.accessToken);
+                await helper.enablePasswordGrant(searchResponse[0].id, tenantDomain);
+            }
+
             // Test login to get access token
             const authResponse = await tokenFixture.fetchAccessToken(
                 testUserEmail,
@@ -131,12 +156,8 @@ describe('UsersController (e2e)', () => {
         });
 
         it('check tenant is created', async () => {
-
-            const tenant = await searchClient.findTenantBy({domain: tenantDomain});
-
-            let tenantDetails = await tenantClient.getTenantDetails(tenant.id);
+            let tenantDetails = await tenantClient.getTenantDetails(null);
             console.log("Get Tenant Details Response:", tenantDetails);
-            expect(tenantDetails.id).toEqual(tenant.id);
             expect(tenantDetails.name).toEqual(tenantName);
             expect(tenantDetails.domain).toEqual(tenantDomain);
             expect(tenantDetails.clientId).toBeDefined();

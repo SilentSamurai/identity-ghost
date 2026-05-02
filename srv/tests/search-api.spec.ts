@@ -1,10 +1,10 @@
 import {v4 as uuidv4} from 'uuid';
-import {TestAppFixture} from "./test-app.fixture";
+import {SharedTestFixture} from "./shared-test.fixture";
 import {UsersClient} from "./api-client/user-client";
 import {TokenFixture} from "./token.fixture";
 
 describe('GenericSearchController (e2e)', () => {
-    let app: TestAppFixture;
+    let app: SharedTestFixture;
     let usersClient: UsersClient;
     let tokenFixture: TokenFixture;
     let accessToken: string;
@@ -17,7 +17,7 @@ describe('GenericSearchController (e2e)', () => {
 
     beforeAll(async () => {
         // Create and set up the test application
-        app = await new TestAppFixture().init();
+        app = new SharedTestFixture();
 
         // Get admin access token for authenticated requests
         tokenFixture = new TokenFixture(app);

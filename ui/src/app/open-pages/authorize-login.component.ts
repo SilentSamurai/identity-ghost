@@ -1,197 +1,239 @@
 import {Component, OnInit} from '@angular/core';
 import {AuthService} from '../_services/auth.service';
 import {SessionService} from '../_services/session.service';
+import {NonceService} from '../_services/nonce.service';
 import {ActivatedRoute, Router} from '@angular/router';
 import {FormBuilder, FormGroup, Validators} from '@angular/forms';
-import {lastValueFrom} from 'rxjs';
 import {MessageService} from 'primeng/api';
 
 @Component({
     selector: 'app-login',
     template: `
-<app-open-navbar></app-open-navbar>
-<app-centered-card
-    imageUrl="/assets/logo-img.jpg"
->
-    <div *ngIf="loading" class="align-middle text-center" style="padding-top:25%">
-        <div class="spinner-border m-5" role="status">
-            <span class="sr-only">Loading...</span>
-        </div>
-    </div>
-
-    <div *ngIf="!loading && error" class="alert alert-danger mt-3" role="alert">
-        {{ error }}
-    </div>
-
-    <div *ngIf="!loading && !error" class="d-flex justify-content-center mt-2">
-        <div class="py-1 px-2 mb-0">
-            Authorizing
-        </div>
-    </div>
-
-    <!-- Show client info below the image, similar to Sign Up page -->
-    <div *ngIf="!loading && !error" class="d-flex justify-content-center">
-        <div class="h5 py-1 px-2 mb-0">
-            {{ clientId }}
-        </div>
-    </div>
-
-    <!-- Use one FormGroup with conditional fields -->
-    <form
-        (ngSubmit)="loginForm.valid && onSubmit()"
-        *ngIf="!isLoggedIn && !error"
-        [formGroup]="loginForm"
-        class="mt-3"
-        novalidate
-    >
-        <!-- If client_id is frozen, show username/password inputs + Login button -->
-        <div *ngIf="freezeClientId">
-            <div class="form-group">
-                <label for="username">Username</label>
-                <div class="input-group">
-                    <span class="input-group-text">&#64;</span>
-                    <input
-                        class="form-control"
-                        formControlName="username"
-                        id="username"
-                        placeholder="Enter Username / Email"
-                        type="text"
-                    />
-                </div>
-                <div
-                    *ngIf="loginForm.get('username')?.errors && (loginForm.get('username')?.touched || loginForm.get('username')?.dirty)"
-                    class="alert alert-danger mt-2"
-                    role="alert">
-                    Username is required
-                </div>
-            </div>
-
-            <div class="form-group mt-3">
-                <label for="password">Password</label>
-                <div class="input-group">
-                    <input
-                        [type]="isPasswordVisible ? 'text' : 'password'"
-                        class="form-control"
-                        formControlName="password"
-                        id="password"
-                        minlength="6"
-                        placeholder="Password"
-                    />
-                    <button
-                        (click)="isPasswordVisible = !isPasswordVisible"
-                        class="input-group-text"
-                        type="button"
-                    >
-                        <i class="fa fas {{ !isPasswordVisible ? 'fa-eye' : 'fa-eye-slash' }}"></i>
-                    </button>
-                </div>
-                <div
-                    *ngIf="loginForm.get('password')?.errors && (loginForm.get('password')?.touched || loginForm.get('password')?.dirty)"
-                    class="alert alert-danger mt-2"
-                    role="alert">
-                    <div *ngIf="loginForm.get('password')?.errors?.['required']">
-                        Password is required
-                    </div>
-                    <div *ngIf="loginForm.get('password')?.errors?.['minlength']">
-                        Password must be at least 6 characters
-                    </div>
-                </div>
-            </div>
-
-            <div class="form-group d-grid gap-2 py-3">
-                <button [disabled]="loginForm.invalid"
-                        class="btn btn-primary btn-block btn-lg"
-                        id="login-btn">
-                    Login
-                </button>
-            </div>
-
-            <div *ngIf="isLoginFailed" class="alert alert-danger" role="alert">
-                Login failed: {{ errorMessage }}
-            </div>
-        </div>
-    </form>
-
-    <!-- Show confirmation if user is logged in -->
-    <div *ngIf="isLoggedIn" class="alert alert-success">
-        Logged in as {{ loginForm.value?.username }}.
-    </div>
-
-    <div *ngIf="!loading && !error" class="d-flex justify-content-evenly">
-        <a class="mt-1" href="https://silentsamurai.github.io/auth-server">
-            Api Docs
-        </a>
-
-        <a
-            id="signup-link"
-            class="mt-1"
-            [routerLink]="['/signup']"
-            [queryParamsHandling]="'merge'"
+        <app-open-navbar></app-open-navbar>
+        <app-centered-card
+            imageUrl="/assets/logo.svg"
         >
-            Sign Up
-        </a>
-    </div>
-</app-centered-card>
-`,
+            <div *ngIf="loading" class="align-middle text-center" style="padding-top:25%">
+                <div class="spinner-border m-5" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+            </div>
+
+            <div *ngIf="!loading && error" class="alert alert-danger mt-3" role="alert">
+                {{ error }}
+            </div>
+
+            <div *ngIf="!loading && !error" class="d-flex justify-content-center mt-2">
+                <div class="py-1 px-2 mb-0">
+                    Authorizing
+                </div>
+            </div>
+
+            <!-- Show client info below the image, similar to Sign Up page -->
+            <div *ngIf="!loading && !error" class="d-flex justify-content-center">
+                <div class="h5 py-1 px-2 mb-0">
+                    {{ clientId }}
+                </div>
+            </div>
+
+            <!-- Use one FormGroup with conditional fields -->
+            <form
+                (ngSubmit)="loginForm.valid && onSubmit()"
+                *ngIf="!isLoggedIn && !error"
+                [formGroup]="loginForm"
+                class="mt-3"
+                novalidate
+            >
+                <!-- If client_id is frozen, show username/password inputs + Login button -->
+                <div *ngIf="freezeClientId">
+                    <div class="form-group">
+                        <label for="username">Username</label>
+                        <div class="input-group">
+                            <span class="input-group-text">&#64;</span>
+                            <input
+                                class="form-control"
+                                formControlName="username"
+                                id="username"
+                                placeholder="Enter Username / Email"
+                                type="text"
+                                aria-describedby="username-error"
+                            />
+                        </div>
+                        <div
+                            *ngIf="loginForm.get('username')?.errors && (loginForm.get('username')?.touched || loginForm.get('username')?.dirty)"
+                            class="alert alert-danger mt-2"
+                            role="alert"
+                            id="username-error">
+                            Username is required
+                        </div>
+                    </div>
+
+                    <div class="form-group mt-3">
+                        <label for="password">Password</label>
+                        <div class="input-group">
+                            <input
+                                [type]="isPasswordVisible ? 'text' : 'password'"
+                                class="form-control"
+                                formControlName="password"
+                                id="password"
+                                minlength="6"
+                                placeholder="Password"
+                                aria-describedby="password-error"
+                            />
+                            <button
+                                (click)="isPasswordVisible = !isPasswordVisible"
+                                class="input-group-text"
+                                type="button"
+                                aria-label="Toggle password visibility"
+                            >
+                                <i class="fa {{ !isPasswordVisible ? 'fa-eye' : 'fa-eye-slash' }}"></i>
+                            </button>
+                        </div>
+                        <div
+                            *ngIf="loginForm.get('password')?.errors && (loginForm.get('password')?.touched || loginForm.get('password')?.dirty)"
+                            class="alert alert-danger mt-2"
+                            role="alert"
+                            id="password-error">
+                            <div *ngIf="loginForm.get('password')?.errors?.['required']">
+                                Password is required
+                            </div>
+                            <div *ngIf="loginForm.get('password')?.errors?.['minlength']">
+                                Password must be at least 6 characters
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group d-grid gap-2 py-3">
+                        <button [disabled]="loginForm.invalid"
+                                class="btn btn-primary btn-block btn-lg"
+                                id="login-btn">
+                            Login
+                        </button>
+                    </div>
+
+                    <div *ngIf="isLoginFailed" class="alert alert-danger" role="alert">
+                        Login failed: {{ errorMessage }}
+                    </div>
+                </div>
+            </form>
+
+            <!-- Show confirmation if user is logged in -->
+            <div *ngIf="isLoggedIn" class="alert alert-success">
+                Logged in as {{ loginForm.value?.username }}.
+            </div>
+
+            <div *ngIf="!loading && !error" class="d-flex justify-content-evenly">
+                <a class="mt-1" href="https://silentsamurai.github.io/auth-server">
+                    Api Docs
+                </a>
+
+                <a
+                    id="signup-link"
+                    class="mt-1"
+                    [routerLink]="['/signup']"
+                    [queryParamsHandling]="'merge'"
+                >
+                    Sign Up
+                </a>
+            </div>
+        </app-centered-card>
+    `,
     styles: [`
-label { display: block; margin-top: 10px; }
-.card-container.card { max-width: 400px !important; padding: 40px 40px; }
-.card {
-    background-color: var(--bs-card-bg, #f7f7f7);
-    padding: 20px 25px 30px;
-    margin: 0 auto 25px;
-    margin-top: 50px;
-    border-radius: 2px;
-    box-shadow: 0px 2px 2px rgba(0, 0, 0, 0.3);
-    transition: background-color 0.3s ease, box-shadow 0.3s ease;
-}
-[data-bs-theme="dark"] .card {
-    background-color: var(--bs-dark, #212529);
-    border-color: var(--bs-border-color, #495057);
-    box-shadow: 0px 2px 2px rgba(0, 0, 0, 0.5);
-}
-[data-bs-theme="dark"] .form-control {
-    background-color: var(--bs-dark, #212529);
-    border-color: var(--bs-border-color, #495057);
-    color: var(--bs-body-color, #f8f9fa);
-    transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
-}
-[data-bs-theme="dark"] .form-control:focus {
-    background-color: var(--bs-dark, #212529);
-    border-color: var(--bs-primary, #0d6efd);
-    color: var(--bs-body-color, #f8f9fa);
-    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
-}
-[data-bs-theme="dark"] .form-control:hover { border-color: var(--bs-primary, #0d6efd); }
-[data-bs-theme="dark"] .input-group-text {
-    background-color: var(--bs-dark, #212529);
-    border-color: var(--bs-border-color, #495057);
-    color: var(--bs-body-color, #f8f9fa);
-    transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
-}
-[data-bs-theme="dark"] label { color: var(--bs-body-color, #f8f9fa); transition: color 0.3s ease; }
-[data-bs-theme="dark"] .alert-danger {
-    background-color: var(--bs-danger-bg-subtle, rgba(220, 53, 69, 0.15));
-    border-color: var(--bs-danger-border-subtle, rgba(220, 53, 69, 0.3));
-    color: var(--bs-danger-text-emphasis, #ea868f);
-    transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
-}
-[data-bs-theme="dark"] .alert-success {
-    background-color: var(--bs-success-bg-subtle, rgba(25, 135, 84, 0.15));
-    border-color: var(--bs-success-border-subtle, rgba(25, 135, 84, 0.3));
-    color: var(--bs-success-text-emphasis, #75b798);
-    transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
-}
-[data-bs-theme="dark"] a { color: var(--bs-link-color, #0d6efd); transition: color 0.3s ease; }
-[data-bs-theme="dark"] a:hover { color: var(--bs-link-hover-color, #0a58ca); text-decoration: underline; }
-[data-bs-theme="dark"] .btn-primary {
-    background-color: var(--bs-primary, #0d6efd);
-    border-color: var(--bs-primary, #0d6efd);
-    transition: background-color 0.3s ease, border-color 0.3s ease;
-}
-[data-bs-theme="dark"] .btn-primary:hover { background-color: var(--bs-primary-dark, #0b5ed7); border-color: var(--bs-primary-dark, #0b5ed7); }
-[data-bs-theme="dark"] .btn-primary:focus { box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25); }
-`],
+        label {
+            display: block;
+            margin-top: 10px;
+        }
+
+        .card-container.card {
+            max-width: 400px !important;
+            padding: 40px 40px;
+        }
+
+        .card {
+            background-color: var(--bs-card-bg, #f7f7f7);
+            padding: 20px 25px 30px;
+            margin: 0 auto 25px;
+            margin-top: 50px;
+            border-radius: 2px;
+            box-shadow: 0px 2px 2px rgba(0, 0, 0, 0.3);
+            transition: background-color 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        [data-bs-theme="dark"] .card {
+            background-color: var(--bs-dark, #212529);
+            border-color: var(--bs-border-color, #495057);
+            box-shadow: 0px 2px 2px rgba(0, 0, 0, 0.5);
+        }
+
+        [data-bs-theme="dark"] .form-control {
+            background-color: var(--bs-dark, #212529);
+            border-color: var(--bs-border-color, #495057);
+            color: var(--bs-body-color, #f8f9fa);
+            transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+        }
+
+        [data-bs-theme="dark"] .form-control:focus {
+            background-color: var(--bs-dark, #212529);
+            border-color: var(--bs-primary, #0d6efd);
+            color: var(--bs-body-color, #f8f9fa);
+            box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+        }
+
+        [data-bs-theme="dark"] .form-control:hover {
+            border-color: var(--bs-primary, #0d6efd);
+        }
+
+        [data-bs-theme="dark"] .input-group-text {
+            background-color: var(--bs-dark, #212529);
+            border-color: var(--bs-border-color, #495057);
+            color: var(--bs-body-color, #f8f9fa);
+            transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+        }
+
+        [data-bs-theme="dark"] label {
+            color: var(--bs-body-color, #f8f9fa);
+            transition: color 0.3s ease;
+        }
+
+        [data-bs-theme="dark"] .alert-danger {
+            background-color: var(--bs-danger-bg-subtle, rgba(220, 53, 69, 0.15));
+            border-color: var(--bs-danger-border-subtle, rgba(220, 53, 69, 0.3));
+            color: var(--bs-danger-text-emphasis, #ea868f);
+            transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+        }
+
+        [data-bs-theme="dark"] .alert-success {
+            background-color: var(--bs-success-bg-subtle, rgba(25, 135, 84, 0.15));
+            border-color: var(--bs-success-border-subtle, rgba(25, 135, 84, 0.3));
+            color: var(--bs-success-text-emphasis, #75b798);
+            transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+        }
+
+        [data-bs-theme="dark"] a {
+            color: var(--bs-link-color, #0d6efd);
+            transition: color 0.3s ease;
+        }
+
+        [data-bs-theme="dark"] a:hover {
+            color: var(--bs-link-hover-color, #0a58ca);
+            text-decoration: underline;
+        }
+
+        [data-bs-theme="dark"] .btn-primary {
+            background-color: var(--bs-primary, #0d6efd);
+            border-color: var(--bs-primary, #0d6efd);
+            transition: background-color 0.3s ease, border-color 0.3s ease;
+        }
+
+        [data-bs-theme="dark"] .btn-primary:hover {
+            background-color: var(--bs-primary-dark, #0b5ed7);
+            border-color: var(--bs-primary-dark, #0b5ed7);
+        }
+
+        [data-bs-theme="dark"] .btn-primary:focus {
+            box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+        }
+    `],
 })
 export class AuthorizeLoginComponent implements OnInit {
     loginForm: FormGroup;
@@ -204,11 +246,13 @@ export class AuthorizeLoginComponent implements OnInit {
     redirectUri = '';
     code_challenge = '';
     isPasswordVisible = false;
-    code_challenge_method: string = 'plain';
+    code_challenge_method: string = 'S256';
     clientId: string = '';
     state: string = '';
     scope: string = '';
     responseType: string = '';
+    prompt: string = '';
+    maxAge: number | undefined = undefined;
 
     constructor(
         private authService: AuthService,
@@ -216,7 +260,8 @@ export class AuthorizeLoginComponent implements OnInit {
         private route: ActivatedRoute,
         private fb: FormBuilder,
         private tokenStorage: SessionService,
-        private messageService: MessageService
+        private messageService: MessageService,
+        private nonceService: NonceService
     ) {
         this.loginForm = this.fb.group({
             username: ['', Validators.required],
@@ -285,13 +330,24 @@ export class AuthorizeLoginComponent implements OnInit {
         // }
         this.loading = false;
 
-        // Get query parameters
-        this.route.queryParams.subscribe(params => {
-            this.clientId = params['client_id'];
-            this.state = params['state'];
-            this.scope = params['scope'];
-            this.responseType = params['response_type'];
-        });
+        // Read remaining query parameters from snapshot
+        this.clientId = params.get('client_id') || '';
+        this.state = params.get('state') || '';
+        this.scope = params.get('scope') || '';
+        this.responseType = params.get('response_type') || '';
+        this.prompt = params.get('prompt') || '';
+        this.maxAge = params.has('max_age') ? Number(params.get('max_age')) : undefined;
+
+        // Generate and store nonce for OIDC flows
+        if (this.scope && this.scope.split(' ').includes('openid')) {
+            const nonce = this.nonceService.generate();
+            this.nonceService.store(nonce);
+        }
+
+        // Handle prompt=none: skip login form, attempt silent auth
+        if (this.prompt === 'none') {
+            this.handleSilentAuth();
+        }
     }
 
     onContinue() {
@@ -301,9 +357,10 @@ export class AuthorizeLoginComponent implements OnInit {
 
     // redirection to home page might not work sometime,
     // check if internally anything is nav-ing to login page again
-    async onSubmit(): Promise<void> {
+    async onSubmit(subscriberTenantHint?: string): Promise<void> {
         this.loading = true;
         const {username, password, client_id} = this.loginForm.value;
+        const nonce = this.nonceService.retrieve();
         try {
             const data = await this.authService.login(
                 username,
@@ -311,57 +368,128 @@ export class AuthorizeLoginComponent implements OnInit {
                 client_id,
                 this.code_challenge,
                 this.code_challenge_method,
+                subscriberTenantHint,
+                nonce || undefined,
+                this.prompt || undefined,
+                this.maxAge,
             );
+
+            if (data.requires_tenant_selection) {
+                // Ambiguity detected — navigate to tenant selection
+                this.router.navigate(['/tenant-selection'], {
+                    state: {
+                        tenants: data.tenants,
+                        loginParams: {
+                            username, password, client_id,
+                            code_challenge: this.code_challenge,
+                            code_challenge_method: this.code_challenge_method,
+                        },
+                        redirectUri: this.redirectUri,
+                        state: this.state,
+                    }
+                });
+                return;
+            }
+
+            if (data.requires_consent) {
+                // Consent required — navigate to consent screen
+                this.router.navigate(['/consent'], {
+                    state: {
+                        client_name: data.client_name,
+                        scopes: data.requested_scopes,
+                        client_id: data.client_id,
+                        prompt: this.prompt || undefined,
+                        loginParams: {
+                            username, password, client_id,
+                            code_challenge: this.code_challenge,
+                            code_challenge_method: this.code_challenge_method,
+                            redirect_uri: this.redirectUri,
+                            state: this.state,
+                            nonce: nonce || undefined,
+                        },
+                        redirectUri: this.redirectUri,
+                        state: this.state,
+                    }
+                });
+                return;
+            }
+
             let authenticationCode = data.authentication_code;
             this.isLoginFailed = false;
             this.isLoggedIn = true;
             this.tokenStorage.saveAuthCode(authenticationCode);
-            await this.onLoginSuccess(authenticationCode);
+            this.redirectToClient(authenticationCode);
         } catch (err: any) {
             console.error(err);
-            this.errorMessage = err.error.message;
+            this.errorMessage = err.error?.message || 'Login failed';
             this.isLoginFailed = true;
         } finally {
             this.loading = false;
         }
     }
 
-    async onLoginSuccess(authCode: string) {
-        try {
-            // Check for tenant ambiguity
-            const ambiguityCheck = await lastValueFrom(
-                this.authService.checkTenantAmbiguity(authCode, this.clientId)
-            );
-
-            if (ambiguityCheck.hasAmbiguity) {
-                // Navigate to tenant selection with necessary data
-                this.router.navigate(['/tenant-selection'], {
-                    state: {
-                        authCode: authCode,
-                        clientId: this.clientId,
-                        tenants: ambiguityCheck.tenants,
-                        redirectUri: this.redirectUri,
-                        state: this.state
-                    }
-                });
-            } else {
-                // No ambiguity, proceed with normal flow
-                this.redirectToClient(authCode);
-            }
-        } catch (error) {
-            console.error('Error checking tenant ambiguity:', error);
-            this.messageService.add({
-                severity: 'error',
-                summary: 'Error',
-                detail: 'Failed to process authorization. Please try again.',
-                life: 5000
-            });
-        }
-    }
-
     private redirectToClient(authCode: string) {
         const redirectUrl = new URL(this.redirectUri);
         redirectUrl.searchParams.append('code', authCode);
+        if (this.state) {
+            redirectUrl.searchParams.append('state', this.state);
+        }
+        window.location.href = redirectUrl.toString();
+    }
+
+    private async handleSilentAuth(): Promise<void> {
+        this.loading = true;
+        try {
+            // For silent auth, we need user_id and tenant_id from the existing session.
+            // These would typically come from a stored session token.
+            const token = this.tokenStorage.getToken();
+            if (!token) {
+                // No existing session — redirect with login_required error
+                this.redirectWithError('login_required', 'User authentication is required but prompt=none was requested');
+                return;
+            }
+
+            const decoded = this.tokenStorage.getDecodedToken();
+            if (!decoded || !decoded.sub || !decoded.tenant?.id) {
+                this.redirectWithError('login_required', 'User authentication is required but prompt=none was requested');
+                return;
+            }
+
+            const nonce = this.nonceService.retrieve();
+            const data = await this.authService.silentAuth({
+                client_id: this.loginForm.get('client_id')?.value,
+                user_id: decoded.sub,
+                tenant_id: decoded.tenant.id,
+                code_challenge: this.code_challenge,
+                code_challenge_method: this.code_challenge_method,
+                redirect_uri: this.redirectUri,
+                scope: this.scope,
+                nonce: nonce || undefined,
+                max_age: this.maxAge,
+            });
+
+            if (data.error) {
+                this.redirectWithError(data.error, data.error_description || '');
+            } else if (data.authentication_code) {
+                this.tokenStorage.saveAuthCode(data.authentication_code);
+                this.redirectToClient(data.authentication_code);
+            } else {
+                this.redirectWithError('interaction_required', 'Silent authentication failed');
+            }
+        } catch (err: any) {
+            console.error('Silent auth error:', err);
+            const error = err.error?.error || 'login_required';
+            const description = err.error?.error_description || 'User authentication is required but prompt=none was requested';
+            this.redirectWithError(error, description);
+        } finally {
+            this.loading = false;
+        }
+    }
+
+    private redirectWithError(error: string, errorDescription: string): void {
+        const redirectUrl = new URL(this.redirectUri);
+        redirectUrl.searchParams.append('error', error);
+        redirectUrl.searchParams.append('error_description', errorDescription);
         if (this.state) {
             redirectUrl.searchParams.append('state', this.state);
         }

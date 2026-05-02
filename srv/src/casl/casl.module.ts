@@ -1,4 +1,4 @@
-import {Module} from "@nestjs/common";
+import {forwardRef, Module} from "@nestjs/common";
 import {TypeOrmModule} from "@nestjs/typeorm";
 import {Role} from "../entity/role.entity";
 import {UserRole} from "../entity/user.roles.entity";
@@ -16,10 +16,16 @@ import {GroupUser} from "../entity/group.users.entity";
 import {Policy} from "../entity/authorization.entity";
 import {PolicyService} from "./policy.service";
 import {CacheService} from "./cache.service";
+import {ScopeResolverService} from "./scope-resolver.service";
+import {ResolvePermissionPipe} from "../auth/auth.decorator";
+import {CoreModule} from "../core/core.module";
+import {PolicyResolutionService} from "./policy-resolution.service";
+import {App} from "../entity/app.entity";
 
 @Module({
     imports: [
         ConfigModule,
+        forwardRef(() => CoreModule),
         TypeOrmModule.forFeature([
             Tenant,
             User,
@@ -31,6 +37,7 @@ import {CacheService} from "./cache.service";
             GroupRole,
             GroupUser,
             Policy,
+            App,
         ]),
     ],
     controllers: [],
@@ -40,6 +47,9 @@ import {CacheService} from "./cache.service";
         AuthUserService,
         PolicyService,
         CacheService,
+        ScopeResolverService,
+        ResolvePermissionPipe,
+        PolicyResolutionService,
     ],
     exports: [
         SecurityService,
@@ -47,6 +57,9 @@ import {CacheService} from "./cache.service";
         AuthUserService,
         PolicyService,
         CacheService,
+        ScopeResolverService,
+        ResolvePermissionPipe,
+        PolicyResolutionService,
     ],
 })
 export class CaslModule {

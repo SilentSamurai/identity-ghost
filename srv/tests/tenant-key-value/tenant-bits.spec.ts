@@ -1,10 +1,20 @@
-import {TestAppFixture} from '../test-app.fixture';
+/**
+ * Tests the TenantBits key-value store API.
+ *
+ * TenantBits allows technical clients (client_credentials grant) to store per-tenant
+ * key-value pairs scoped by owner. Covers:
+ *   - CRUD lifecycle (add, update, get, exists, delete)
+ *   - Cross-tenant isolation: same key on different tenants stays independent
+ *   - Owner isolation: different owners writing to the same tenant cannot see each other's keys
+ *   - Auth enforcement: user (password grant) tokens are rejected with 403
+ */
+import {SharedTestFixture} from '../shared-test.fixture';
 import {TenantClient} from '../api-client/tenant-client';
 import {TokenFixture} from '../token.fixture';
 import {TenantBitsClient} from "../api-client/tenant-bits-client";
 
 describe('TenantBits API', () => {
-    let app: TestAppFixture;
+    let app: SharedTestFixture;
     let tenantClient: TenantClient;
     let bitsClient: TenantBitsClient;
     let accessToken: string;
@@ -16,7 +26,7 @@ describe('TenantBits API', () => {
     let bitsClient2: TenantBitsClient;
 
     beforeAll(async () => {
-        app = await new TestAppFixture().init();
+        app = new SharedTestFixture();
         const tokenFixture = new TokenFixture(app);
         // Create two tenants
         const adminResponse = await tokenFixture.fetchAccessToken(
@@ -32,7 +42,7 @@ describe('TenantBits API', () => {
         tenantId2 = tenant2.id;
 
         // Use client credentials for bitsClient (tenant 1)
-        const tenant1Creds = await tenantClient.getTenantCredentials(tenantId);
+        const tenant1Creds = await tokenFixture.createConfidentialClient(adminResponse.accessToken, tenantId);
         const response1 = await tokenFixture.fetchClientCredentialsToken(
             tenant1Creds.clientId,
             tenant1Creds.clientSecret
@@ -41,7 +51,7 @@ describe('TenantBits API', () => {
         bitsClient = new TenantBitsClient(app, accessToken);
 
         // Use client credentials for bitsClient2 (tenant 2)
-        const tenant2Creds = await tenantClient.getTenantCredentials(tenantId2);
+        const tenant2Creds = await tokenFixture.createConfidentialClient(adminResponse.accessToken, tenantId2);
         const response2 = await tokenFixture.fetchClientCredentialsToken(
             tenant2Creds.clientId,
             tenant2Creds.clientSecret

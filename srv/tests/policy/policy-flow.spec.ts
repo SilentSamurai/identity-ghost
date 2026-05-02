@@ -1,15 +1,22 @@
-import {TestAppFixture} from "../test-app.fixture";
+/**
+ * Tests the end-to-end policy enforcement flow.
+ *
+ * Creates a role, assigns it to a user, attaches a policy (allow Read on "secure-resource"
+ * with conditions), then fetches a client_credentials token and verifies the policy appears
+ * in the tenant-level permission query for that user.
+ */
+import {SharedTestFixture} from "../shared-test.fixture";
 import {PolicyClient} from "../api-client/policy-client";
 import {TokenFixture} from "../token.fixture";
 import {TenantClient} from "../api-client/tenant-client";
-import {SearchClient} from "../api-client/search-client";
+import {UsersClient} from "../api-client/user-client";
 import {Action, Effect} from "../../src/casl/actions.enum";
 
 describe('Policy Flow (e2e)', () => {
-    let app: TestAppFixture;
+    let app: SharedTestFixture;
 
     beforeAll(async () => {
-        app = await new TestAppFixture().init();
+        app = new SharedTestFixture();
     });
 
     afterAll(async () => {
@@ -27,10 +34,10 @@ describe('Policy Flow (e2e)', () => {
         let accessToken = tokenResponse.accessToken;
         let policyClient = new PolicyClient(app, accessToken);
         const tenantClient = new TenantClient(app, accessToken);
-        const searchClient = new SearchClient(app, accessToken);
+        const usersClient = new UsersClient(app, accessToken);
 
-        const tenant = await searchClient.findTenantBy({domain: "shire.local"});
-        const user = await searchClient.findByUser({email: "admin@shire.local"});
+        const tenant = await tenantClient.getTenantDetails(null);
+        const user = await usersClient.getMe();
 
         let role = await tenantClient.createRole(tenant.id, "TEST_ROLE");
 
@@ -47,7 +54,7 @@ describe('Policy Flow (e2e)', () => {
             {public: false}
         );
 
-        const credential = await tenantClient.getTenantCredentials(tenant.id);
+        const credential = await tokenFixture.createConfidentialClient(accessToken, tenant.id);
 
         const ccTr = await tokenFixture.fetchClientCredentialsToken(
             credential.clientId,

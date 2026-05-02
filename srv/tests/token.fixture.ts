@@ -1,12 +1,36 @@
-import {TestAppFixture} from "./test-app.fixture";
-import {expect2xx} from "./api-client/client";
+import {expect2xx, TestFixture} from "./api-client/client";
+import {ClientEntityClient} from "./api-client/client-entity-client";
 
 export class TokenFixture {
 
-    private readonly app: TestAppFixture;
+    private readonly app: TestFixture;
 
-    constructor(app: TestAppFixture) {
+    constructor(app: TestFixture) {
         this.app = app;
+    }
+
+    /**
+     * Create a confidential (non-public) client for a tenant with client_credentials grant.
+     * Returns the clientId and plaintext clientSecret needed for fetchClientCredentialsToken.
+     *
+     * The default tenant client is public and has no secret, so tests that need
+     * client_credentials tokens must create a confidential client first.
+     */
+    public async createConfidentialClient(
+        accessToken: string,
+        tenantId: string,
+        name: string = 'test-confidential-client',
+    ): Promise<{ clientId: string; clientSecret: string }> {
+        const clientEntityClient = new ClientEntityClient(this.app, accessToken);
+        const result = await clientEntityClient.createClient(tenantId, name, {
+            grantTypes: 'client_credentials',
+            allowedScopes: 'openid profile email',
+            isPublic: false,
+        });
+        return {
+            clientId: result.client.clientId,
+            clientSecret: result.clientSecret,
+        };
     }
 
     public async fetchAccessToken(username: string, password: string, client_id: string): Promise<{
@@ -28,7 +52,7 @@ export class TokenFixture {
 
         expect2xx(response);
 
-        expect(response.status).toEqual(201);
+        expect(response.status).toEqual(200);
         expect(response.body.access_token).toBeDefined();
         expect(response.body.expires_in).toBeDefined();
         expect(response.body.token_type).toEqual('Bearer');
@@ -36,8 +60,6 @@ export class TokenFixture {
 
         let decode = this.app.jwtService().decode(response.body.access_token, {json: true}) as any;
         expect(decode.sub).toBeDefined();
-        expect(decode.email).toBeDefined();
-        expect(decode.name).toBeDefined();
         expect(decode.grant_type).toBeDefined();
         expect(decode.tenant.id).toBeDefined();
         expect(decode.tenant.name).toBeDefined();
@@ -109,31 +131,41 @@ export class TokenFixture {
 
     /**
      * Login using OAuth authorization code flow.
-     * Returns the authentication code that can be used to exchange for a token.
+     * Returns the response which may contain an authentication_code or requires_tenant_selection.
      */
-    public async login(email: string, password: string, clientId: string, codeChallenge: string = 'verifier'): Promise<{
-        authentication_code: string
-    }> {
+    public async login(
+        email: string,
+        password: string,
+        clientId: string,
+        codeChallenge: string = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq',
+        subscriberTenantHint?: string,
+        opts?: { scope?: string; nonce?: string; codeChallengeMethod?: string }
+    ): Promise<any> {
+        const body: any = {
+            email,
+            password,
+            client_id: clientId,
+            code_challenge_method: opts?.codeChallengeMethod || 'plain',
+            code_challenge: codeChallenge
+        };
+        if (subscriberTenantHint) {
+            body.subscriber_tenant_hint = subscriberTenantHint;
+        }
+        if (opts?.scope) body.scope = opts.scope;
+        if (opts?.nonce) body.nonce = opts.nonce;
         const response = await this.app.getHttpServer()
             .post('/api/oauth/login')
-            .send({
-                email,
-                password,
-                client_id: clientId,
-                code_challenge_method: 'plain',
-                code_challenge: codeChallenge
-            })
+            .send(body)
             .set('Accept', 'application/json');
 
         expect2xx(response);
-        expect(response.body.authentication_code).toBeDefined();
         return response.body;
     }
 
     public async exchangeCodeForToken(
         code: string,
         clientId: string,
-        codeVerifier: string = 'verifier'
+        codeVerifier: string = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq'
     ): Promise<{
         access_token?: string,
         refresh_token?: string,
@@ -172,7 +204,7 @@ export class TokenFixture {
         code: string,
         clientId: string,
         subscriptionTenantId?: string,
-        codeVerifier: string = 'verifier'
+        codeVerifier: string = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq'
     ): Promise<{
         access_token?: string,
         refresh_token?: string,
@@ -202,53 +234,6 @@ export class TokenFixture {
         expect(response.body.access_token).toBeDefined();
         expect(response.body.token_type).toEqual('Bearer');
         return response.body;
-    }
-
-    /**
-     * Check for tenant ambiguity in the authentication flow.
-     * Returns the response containing information about ambiguous tenants if any.
-     */
-    public async checkTenantAmbiguity(authCode: string, clientId: string): Promise<{
-        status: number,
-        body: {
-            hasAmbiguity: boolean,
-            tenants?: Array<{
-                id: string,
-                domain: string,
-                name: string
-            }>
-        }
-    }> {
-        const response = await this.app.getHttpServer()
-            .post('/api/oauth/check-tenant-ambiguity')
-            .send({
-                auth_code: authCode,
-                client_id: clientId
-            })
-            .set('Accept', 'application/json');
-
-        expect2xx(response);
-        return response;
-    }
-
-    /**
-     * Update the subscriber tenant hint for an auth code.
-     */
-    public async updateSubscriberTenantHint(authCode: string, clientId: string, subscriberTenantHint: string): Promise<{
-        status: number,
-        body: any
-    }> {
-        const response = await this.app.getHttpServer()
-            .post('/api/oauth/update-subscriber-tenant-hint')
-            .send({
-                auth_code: authCode,
-                client_id: clientId,
-                subscriber_tenant_hint: subscriberTenantHint
-            })
-            .set('Accept', 'application/json');
-
-        expect2xx(response);
-        return response;
     }
 
 }

@@ -1,20 +1,28 @@
-import {Injectable, Logger, NotFoundException, UnauthorizedException} from "@nestjs/common";
+/**
+ * AuthService - Core authentication service handling user and client authentication.
+ *
+ * This service is responsible for:
+ * - Validating user credentials (email/password)
+ * - Validating client credentials (client_id/client_secret)
+ * - Creating access tokens (JWT) for users and technical clients
+ * - Creating security context from tokens
+ *
+ * It implements OAuth 2.0 token validation per RFC 6749 and JWT token handling.
+ */
+import {randomUUID} from "crypto";
+import {HttpException, Inject, Injectable, Logger, NotFoundException, UnauthorizedException} from "@nestjs/common";
+import {OAuthException} from "../exceptions/oauth-exception";
 import {Environment} from "../config/environment.service";
 import {UsersService} from "../services/users.service";
 import {User} from "../entity/user.entity";
 import * as argon2 from "argon2";
 import {Tenant} from "../entity/tenant.entity";
-import {TenantService} from "../services/tenant.service";
-import {CryptUtil} from "../util/crypt.util";
-import {RoleEnum} from "../entity/roleEnum";
 import {ValidationPipe} from "../validation/validation.pipe";
-import {ValidationSchema} from "../validation/validation.schema";
 import {SecurityService} from "../casl/security.service";
 import {
     ChangeEmailToken,
     EmailVerificationToken,
     GRANT_TYPES,
-    RefreshToken,
     ResetPasswordToken,
     TechnicalToken,
     TenantToken,
@@ -22,17 +30,31 @@ import {
 } from "../casl/contexts";
 import {AuthUserService} from "../casl/authUser.service";
 import * as yup from "yup";
-import {JwtServiceHS256, JwtServiceRS256} from "./jwt.service";
+import {TechnicalTokenService} from "../core/technical-token.service";
+import {
+    HS256_TOKEN_GENERATOR,
+    RS256_TOKEN_GENERATOR,
+    SIGNING_KEY_PROVIDER,
+    SigningKeyProvider,
+    TokenService
+} from "../core/token-abstraction";
+import {SubscriptionService} from "../services/subscription.service";
+import {ClientService} from "../services/client.service";
+import {Client} from "../entity/client.entity";
 
 const SecurityContextSchema = yup.object().shape({
     sub: yup.string().required("token is invalid"),
+    aud: yup.array().of(yup.string()).required("token is invalid").min(1, "token is invalid"),
+    jti: yup.string().required("token is invalid"),
+    scope: yup.string().defined(),
+    client_id: yup.string().required("token is invalid"),
+    tenant_id: yup.string().required("token is invalid").uuid("tenant_id must be a valid UUID"),
+    grant_type: yup.string().required("token is invalid"),
     tenant: yup.object().shape({
         id: yup.string().required("token is invalid").uuid("tenant id must be a valid UUID"),
         name: yup.string().required("token is invalid"),
         domain: yup.string().required("token is invalid"),
     }),
-    scopes: yup.array().of(yup.string().max(128)),
-    grant_type: yup.string().required("token is invalid"),
 });
 
 @Injectable()
@@ -44,9 +66,15 @@ export class AuthService {
         private readonly securityService: SecurityService,
         private readonly authUserService: AuthUserService,
         private readonly userService: UsersService,
-        private readonly tenantService: TenantService,
-        private readonly jwtServiceRS256: JwtServiceRS256,
-        private readonly jwtServiceHS256: JwtServiceHS256,
+        private readonly technicalTokenService: TechnicalTokenService,
+        @Inject(RS256_TOKEN_GENERATOR)
+        private readonly tokenGenerator: TokenService,
+        @Inject(HS256_TOKEN_GENERATOR)
+        private readonly hs256TokenGenerator: TokenService,
+        @Inject(SIGNING_KEY_PROVIDER)
+        private readonly signingKeyProvider: SigningKeyProvider,
+        private readonly subscriptionService: SubscriptionService,
+        private readonly clientService: ClientService,
     ) {
         this.LOGGER = new Logger(AuthService.name);
     }
@@ -58,43 +86,44 @@ export class AuthService {
         const user: User = await this.authUserService.findUserByEmail(email);
         const valid: boolean = await argon2.verify(user.password, password);
         if (!valid) {
-            throw new UnauthorizedException('Invalid credentials');
+            throw OAuthException.invalidGrant('Invalid email or password');
+        }
+        if (user.locked) {
+            throw OAuthException.invalidGrant('Account is locked');
         }
         return user;
     }
 
-    async validateRefreshToken(
-        refreshToken: string,
-    ): Promise<{ tenant: Tenant; user: User }> {
-        let validationPipe = new ValidationPipe(
-            ValidationSchema.RefreshTokenSchema,
-        );
-        let payload: RefreshToken = (await validationPipe.transform(
-            this.jwtServiceRS256.decode(refreshToken),
-            null,
-        )) as RefreshToken;
-
-        let tenant = await this.authUserService.findTenantByDomain(
-            payload.domain,
-        );
-        let user = await this.authUserService.findUserByEmail(payload.email);
-        await this.jwtServiceRS256.verify(refreshToken, {
-            publicKey: tenant.publicKey,
-        });
-        return {tenant, user};
-    }
-
     async validateAccessToken(token: string): Promise<Token> {
         try {
+            const rawDecoded = this.tokenGenerator.decode(token);
+
+            // Reject tokens missing any required claim before further processing
+            const requiredClaims = ['iss', 'sub', 'aud', 'exp', 'iat', 'nbf', 'jti'];
+            for (const claim of requiredClaims) {
+                if (rawDecoded[claim] === undefined || rawDecoded[claim] === null) {
+                    throw new Error(`Missing required claim: ${claim}`);
+                }
+            }
+
+            // Enforce aud is an array (reject bare strings)
+            if (!Array.isArray(rawDecoded.aud)) {
+                throw new Error('aud must be a JSON array');
+            }
+
             let decoded = await new ValidationPipe(SecurityContextSchema).transform(
-                this.jwtServiceRS256.decode(token),
+                rawDecoded,
                 null,
             );
-            let tenant = await this.authUserService.findTenantByDomain(
-                decoded.tenant.domain,
-            );
-            const verifiedToken = await this.jwtServiceRS256.verify(token, {
-                publicKey: tenant.publicKey,
+
+            const {header} = this.tokenGenerator.decodeComplete(token);
+            const publicKey = await this.signingKeyProvider.getPublicKeyByKid(header.kid, rawDecoded.tenant_id);
+
+            // Apply clock skew tolerance for time-based claim validation
+            const clockSkew = parseInt(this.configService.get("JWT_CLOCK_SKEW_SECONDS", "30"), 10);
+            const verifiedToken = await this.tokenGenerator.verify(token, {
+                publicKey,
+                clockTolerance: clockSkew,
             })
             const payload: Token = verifiedToken.isTechnical ? TechnicalToken.create(verifiedToken) : TenantToken.create(verifiedToken)
 
@@ -104,63 +133,120 @@ export class AuthService {
                     throw "Invalid Token";
                 }
             } else {
-                let user = await this.authUserService.findUserByEmail(
-                    (payload as TenantToken).email,
-                );
+                // Look up user by sub (UUID) instead of by email
+                const user = await this.authUserService.findUserById(payload.sub);
+                if (user.locked) {
+                    throw new UnauthorizedException('Invalid credentials');
+                }
+                // Populate email, name, and userId on TenantToken from DB lookup
+                const tenantToken = payload as TenantToken;
+                tenantToken.email = user.email;
+                tenantToken.name = user.name;
+                tenantToken.userId = user.id;
+
+                // Membership verification for TenantToken
+                const membershipCheckEnabled = this.configService.get('MEMBERSHIP_CHECK_ENABLED', true);
+                if (membershipCheckEnabled) {
+                    try {
+                        const isMember = await this.authUserService.isMember(tenantToken.tenant_id, tenantToken.sub);
+                        if (!isMember) {
+                            // Check subscription fallback for subscribed users
+                            const isSubscribed = await this.checkSubscriptionAccess(user, tenantToken.tenant_id);
+                            if (!isSubscribed) {
+                                this.LOGGER.warn(
+                                    `Membership verification failed: sub=${tenantToken.sub}, ` +
+                                    `tenant_id=${tenantToken.tenant_id}, jti=${tenantToken.jti}`
+                                );
+                                throw OAuthException.invalidToken('The access token is invalid or has expired');
+                            }
+                        }
+                    } catch (error) {
+                        // Re-throw OAuthException as-is (membership failure)
+                        if (error instanceof OAuthException) {
+                            throw error;
+                        }
+                        // Database failure - fail closed with HTTP 503
+                        this.LOGGER.error(`Database error during membership verification: ${error.message}`);
+                        throw new HttpException('Service temporarily unavailable', 503);
+                    }
+                }
             }
             return payload;
         } catch (e) {
             this.LOGGER.error("Token Validation Failed: ", e.stack);
-            throw new UnauthorizedException(e);
+            throw OAuthException.invalidToken('The access token is invalid or has expired');
         }
     }
 
+    /**
+     * Validate client credentials for confidential clients.
+     * Resolves the Client entity by clientId or alias and validates the secret
+     * using timing-safe comparison via ClientService.validateClientSecret.
+     *
+     * Requirements: 2.1, 2.2, 2.4, 2.5, 2.6
+     */
     async validateClientCredentials(
         clientId: string,
         clientSecret: string,
-    ): Promise<Tenant> {
-        const tenant: Tenant =
-            await this.authUserService.findTenantByClientId(clientId);
-        let valid: boolean = CryptUtil.verifyClientId(
-            tenant.clientSecret,
-            clientId,
-            tenant.secretSalt,
-        );
-        if (!valid) {
-            throw new UnauthorizedException('Invalid credentials');
+    ): Promise<Client> {
+        // Resolve Client entity by clientId (UUID) or alias (domain)
+        let client: Client;
+        try {
+            client = await this.clientService.findByClientIdOrAlias(clientId);
+        } catch {
+            throw OAuthException.invalidClient('Client authentication failed');
         }
-        valid = CryptUtil.verifyClientSecret(tenant.clientSecret, clientSecret);
-        if (!valid) {
-            throw new UnauthorizedException('Invalid credentials');
+
+        // Public clients cannot authenticate with a secret
+        if (client.isPublic) {
+            throw OAuthException.invalidClient('Public clients cannot use client_secret');
         }
-        return tenant;
+
+        // Validate the secret using timing-safe comparison
+        const valid = this.clientService.validateClientSecret(client, clientSecret);
+        if (!valid) {
+            throw OAuthException.invalidClient('Client authentication failed');
+        }
+
+        return client;
     }
 
-    createTechnicalToken(tenant: Tenant, roles: string[]): TechnicalToken {
-        roles = roles instanceof Array ? roles : [];
-        return TechnicalToken.create({
-            sub: "oauth",
-            tenant: {
-                id: tenant.id,
-                name: tenant.name,
-                domain: tenant.domain,
-            },
-            scopes: [RoleEnum.TENANT_VIEWER, ...roles]
-        });
+    /**
+     * Validate that a public client exists by its client_id.
+     *
+     * Per RFC 6749 §6, public clients cannot authenticate with a secret
+     * but must still provide a valid client_id so the server can verify
+     * the refresh token was issued to that client.
+     *
+     * Requirements: 2.3, 2.5
+     */
+    async validatePublicClient(clientId: string): Promise<Client> {
+        // Resolve Client entity by clientId (UUID) or alias (domain)
+        let client: Client;
+        try {
+            client = await this.clientService.findByClientIdOrAlias(clientId);
+        } catch {
+            throw OAuthException.invalidClient('Client authentication failed');
+        }
+
+        // Verify the client is marked as public
+        if (!client.isPublic) {
+            throw OAuthException.invalidClient('Confidential clients must provide client_secret');
+        }
+
+        return client;
+    }
+
+    createTechnicalToken(client: Client, roles: string[]): TechnicalToken {
+        return this.technicalTokenService.createTechnicalToken(client, roles);
     }
 
     async createTechnicalAccessToken(
-        tenant: Tenant,
+        client: Client,
         roles: string[],
+        audience?: string[],
     ): Promise<string> {
-        roles = roles instanceof Array ? roles : [];
-        const payload = this.createTechnicalToken(
-            tenant,
-            roles,
-        );
-        return this.jwtServiceRS256.sign(payload.asPlainObject(), {
-            privateKey: tenant.privateKey
-        });
+        return this.technicalTokenService.createTechnicalAccessToken(client, roles, audience);
     }
 
     /**
@@ -170,55 +256,46 @@ export class AuthService {
         user: User,
         tenant: Tenant,
         scopes: string[] = [],
-    ): Promise<{ accessToken: string; refreshToken: string; scopes: string[] }> {
+        roles: string[] = [],
+        grant_type: GRANT_TYPES = GRANT_TYPES.PASSWORD,
+        audience?: string[],
+        clientId?: string,
+    ): Promise<{ accessToken: string; scopes: string[] }> {
         if (!user.verified) {
             throw new UnauthorizedException('Email not verified');
         }
 
-        let roles = await this.authUserService.getMemberRoles(tenant, user);
-        let scopesFromRoles = roles.map((role) => role.name);
-        scopesFromRoles.push(...scopes);
+        const uniqueScopes = [...new Set(scopes)].sort();
+        // Filter offline_access from JWT scope claim per Requirements 7.1, 7.2
+        const jwtScopes = uniqueScopes.filter(s => s !== 'offline_access');
 
         const accessTokenPayload = TenantToken.create({
-            sub: user.email,
-            email: user.email,
-            name: user.name,
-            userId: user.id,
+            sub: user.id,
             tenant: {
                 id: tenant.id,
                 name: tenant.name,
                 domain: tenant.domain,
             },
-            userTenant: {
-                id: tenant.id,
-                name: tenant.name,
-                domain: tenant.domain,
-            },
-            scopes: scopesFromRoles,
-            grant_type: GRANT_TYPES.PASSWORD,
+            roles: [...new Set(roles)].sort(),
+            grant_type,
+            aud: audience || [this.configService.get("SUPER_TENANT_DOMAIN")],
+            jti: randomUUID(),
+            nbf: Math.floor(Date.now() / 1000),
+            scope: jwtScopes.join(' '),
+            client_id: clientId,
+            tenant_id: tenant.id,
         });
 
-        const refreshTokenPayload: RefreshToken = {
-            email: user.email,
-            domain: tenant.domain,
-        };
-
-        const accessToken = await this.jwtServiceRS256.sign(accessTokenPayload.asPlainObject(), {
-                privateKey: tenant.privateKey,
-                issuer: this.configService.get("SUPER_TENANT_DOMAIN"),
+        const {privateKey, kid} = await this.signingKeyProvider.getSigningKeyWithKid(tenant.id);
+        const accessToken = await this.tokenGenerator.sign(accessTokenPayload.asPlainObject(), {
+                privateKey,
+                keyid: kid,
+                issuer: this.configService.get("ISSUER"),
             },
         );
 
-        const refreshToken = await this.jwtServiceRS256.sign(refreshTokenPayload, {
-                privateKey: tenant.privateKey,
-                expiresIn: this.configService.get(
-                    "REFRESH_TOKEN_EXPIRATION_TIME",
-                ),
-                issuer: this.configService.get("SUPER_TENANT_DOMAIN"),
-            },
-        );
-
-        return {accessToken, refreshToken, scopes: accessTokenPayload.scopes};
+        // Return full scopes (including offline_access) for Token_Response scope field
+        return {accessToken, scopes: uniqueScopes};
     }
 
     /**
@@ -230,55 +307,54 @@ export class AuthService {
         issuingTenant: Tenant,
         userTenant: Tenant,
         scopes: string[] = [],
-    ): Promise<{ accessToken: string; refreshToken: string; scopes: string[] }> {
+        roles: string[] = [],
+        grant_type: GRANT_TYPES = GRANT_TYPES.PASSWORD,
+        audience?: string[],
+        clientId?: string,
+    ): Promise<{ accessToken: string; scopes: string[] }> {
         if (!user.verified) {
             throw new UnauthorizedException('Email not verified');
         }
 
-        let roles = await this.authUserService.getMemberRoles(issuingTenant, user);
-        let scopesFromRoles = roles.map((role) => role.name);
-        scopesFromRoles.push(...scopes);
+        const uniqueScopes = [...new Set(scopes)].sort();
+        // Filter offline_access from JWT scope claim per Requirements 7.1, 7.2
+        const jwtScopes = uniqueScopes.filter(s => s !== 'offline_access');
 
         const accessTokenPayload = TenantToken.create({
-            sub: user.email,
-            email: user.email,
-            name: user.name,
-            userId: user.id,
+            sub: user.id,
             tenant: {
                 id: issuingTenant.id,
                 name: issuingTenant.name,
                 domain: issuingTenant.domain,
             },
-            userTenant: {
-                id: userTenant.id,
-                name: userTenant.name,
-                domain: userTenant.domain,
-            },
-            scopes: scopesFromRoles,
-            grant_type: GRANT_TYPES.PASSWORD,
+            roles: [...new Set(roles)].sort(),
+            grant_type,
+            aud: audience || [this.configService.get("SUPER_TENANT_DOMAIN")],
+            jti: randomUUID(),
+            nbf: Math.floor(Date.now() / 1000),
+            scope: jwtScopes.join(' '),
+            client_id: clientId,
+            tenant_id: issuingTenant.id,
         });
-
-        const refreshTokenPayload: RefreshToken = {
-            email: user.email,
-            domain: issuingTenant.domain,
+        accessTokenPayload.userTenant = {
+            id: userTenant.id,
+            name: userTenant.name,
+            domain: userTenant.domain,
         };
 
-        const accessToken = await this.jwtServiceRS256.sign(accessTokenPayload.asPlainObject(), {
-                privateKey: issuingTenant.privateKey,
-                issuer: this.configService.get("SUPER_TENANT_DOMAIN"),
+        const {
+            privateKey: issuingPrivateKey,
+            kid: issuingKid
+        } = await this.signingKeyProvider.getSigningKeyWithKid(issuingTenant.id);
+        const accessToken = await this.tokenGenerator.sign(accessTokenPayload.asPlainObject(), {
+                privateKey: issuingPrivateKey,
+                keyid: issuingKid,
+                issuer: this.configService.get("ISSUER"),
             },
         );
 
-        const refreshToken = await this.jwtServiceRS256.sign(refreshTokenPayload, {
-                privateKey: issuingTenant.privateKey,
-                expiresIn: this.configService.get(
-                    "REFRESH_TOKEN_EXPIRATION_TIME",
-                ),
-                issuer: this.configService.get("SUPER_TENANT_DOMAIN"),
-            },
-        );
-
-        return {accessToken, refreshToken, scopes: accessTokenPayload.scopes};
+        // Return full scopes (including offline_access) for Token_Response scope field
+        return {accessToken, scopes: uniqueScopes};
     }
 
     /**
@@ -288,7 +364,7 @@ export class AuthService {
         const payload: EmailVerificationToken = {
             sub: user.email,
         };
-        return this.jwtServiceHS256.sign(payload, {
+        return this.hs256TokenGenerator.sign(payload, {
             secret: user.password,
             expiresIn: this.configService.get("TOKEN_VERIFICATION_EXPIRATION_TIME"),
         });
@@ -300,12 +376,12 @@ export class AuthService {
     async verifyEmail(token: string): Promise<boolean> {
         let payload: EmailVerificationToken;
         try {
-            payload = this.jwtServiceHS256.decode(token) as EmailVerificationToken;
+            payload = this.hs256TokenGenerator.decode(token) as EmailVerificationToken;
             const user: User = await this.authUserService.findUserByEmail(payload.sub);
             if (!user) {
                 throw new NotFoundException("User not found");
             }
-            payload = await this.jwtServiceHS256.verify(token, {
+            payload = await this.hs256TokenGenerator.verify(token, {
                 secret: user.password
             }) as EmailVerificationToken;
         } catch (exception: any) {
@@ -315,16 +391,17 @@ export class AuthService {
         const authContext = await this.securityService.getUserAuthContext(
             payload.sub,
         );
+        const permission = this.securityService.createPermission(authContext);
 
         const user: User = await this.userService.findByEmail(
-            authContext,
+            permission,
             payload.sub,
         );
         if (user.verified) {
             return false;
         }
 
-        await this.userService.updateVerified(authContext, user.id, true);
+        await this.userService.updateVerified(permission, user.id, true);
 
         return true;
     }
@@ -339,7 +416,7 @@ export class AuthService {
 
         // Use the user's current password's hash for signing the token.
         // All tokens generated before a successful password change would get invalidated.
-        return this.jwtServiceHS256.sign(payload, {
+        return this.hs256TokenGenerator.sign(payload, {
             secret: user.password,
             expiresIn: this.configService.get('TOKEN_RESET_PASSWORD_EXPIRATION_TIME')
         });
@@ -350,7 +427,7 @@ export class AuthService {
      */
     async resetPassword(token: string, password: string): Promise<boolean> {
         // Get the user.
-        let payload: ResetPasswordToken = this.jwtServiceHS256.decode(
+        let payload: ResetPasswordToken = this.hs256TokenGenerator.decode(
             token,
         ) as ResetPasswordToken;
 
@@ -365,7 +442,7 @@ export class AuthService {
         // A successful password change will invalidate the token.
         payload = null;
         try {
-            payload = this.jwtServiceHS256.verify(token, {
+            payload = await this.hs256TokenGenerator.verify(token, {
                 secret: user.password,
             }) as ResetPasswordToken;
         } catch (exception: any) {
@@ -375,12 +452,13 @@ export class AuthService {
         const authContext = await this.securityService.getUserAuthContext(
             payload.sub,
         );
+        const permission = this.securityService.createPermission(authContext);
 
         if (!user.verified) {
             throw new UnauthorizedException('Email not verified');
         }
 
-        await this.userService.updatePassword(authContext, user.id, password);
+        await this.userService.updatePassword(permission, user.id, password);
 
         return true;
     }
@@ -395,7 +473,7 @@ export class AuthService {
         };
         // Use the user's current email for signing the token.
         // All tokens generated before a successful email change would get invalidated.
-        return this.jwtServiceHS256.sign(payload, {
+        return this.hs256TokenGenerator.sign(payload, {
             secret: user.email,
             expiresIn: this.configService.get("TOKEN_CHANGE_EMAIL_EXPIRATION_TIME")
         });
@@ -406,7 +484,7 @@ export class AuthService {
      */
     async confirmEmailChange(token: string): Promise<boolean> {
         // Get the user.
-        let payload: ChangeEmailToken = this.jwtServiceRS256.decode(
+        let payload: ChangeEmailToken = this.hs256TokenGenerator.decode(
             token,
         ) as ChangeEmailToken;
 
@@ -421,7 +499,7 @@ export class AuthService {
         // A successful email change will invalidate the token.
         payload = null;
         try {
-            payload = await this.jwtServiceRS256.verify(token, {
+            payload = await this.hs256TokenGenerator.verify(token, {
                 secret: user.email,
             }) as ChangeEmailToken;
         } catch (exception: any) {
@@ -431,9 +509,10 @@ export class AuthService {
         const authContext = await this.securityService.getUserAuthContext(
             payload.sub,
         );
+        const permission = this.securityService.createPermission(authContext);
 
         await this.userService.updateEmail(
-            authContext,
+            permission,
             user.id,
             payload.updatedEmail,
         );
@@ -441,8 +520,20 @@ export class AuthService {
         return true;
     }
 
-
     public decodeToken(token: string): any {
-        return this.jwtServiceRS256.decode(token);
+        return this.tokenGenerator.decode(token);
+    }
+
+    /**
+     * Check if a user has subscription-based access to a tenant.
+     * This is used as a fallback when the user is not a direct member of the tenant.
+     * @param user The user entity (already fetched from DB)
+     * @param tenantId The tenant ID to check subscription access for
+     * @returns true if the user has subscription-based access, false otherwise
+     */
+    private async checkSubscriptionAccess(user: User, tenantId: string): Promise<boolean> {
+        const tenant = await this.authUserService.findTenantById(tenantId);
+        const permission = this.securityService.createPermissionForTokenIssuance(tenantId);
+        return this.subscriptionService.isUserSubscribedToTenant(permission, user, tenant);
     }
 }

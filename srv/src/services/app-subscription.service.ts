@@ -1,11 +1,13 @@
 import {Injectable, Logger, NotFoundException} from '@nestjs/common';
 import {InjectRepository} from '@nestjs/typeorm';
-import {Repository} from 'typeorm';
+import {In, Repository} from 'typeorm';
 import {Subscription, SubscriptionStatus} from '../entity/subscription.entity';
 import {Tenant} from '../entity/tenant.entity';
 import {Role} from '../entity/role.entity';
+import {UserRole} from '../entity/user.roles.entity';
 import {App} from '../entity/app.entity';
-import {AuthService} from '../auth/auth.service';
+import {TechnicalTokenService} from '../core/technical-token.service';
+import {ClientService} from './client.service';
 
 const logger = new Logger("AppSubscriptionService");
 
@@ -30,18 +32,23 @@ export class AppSubscriptionService {
         private readonly subscriptionRepo: Repository<Subscription>,
         @InjectRepository(Role)
         private readonly roleRepo: Repository<Role>,
+        @InjectRepository(UserRole)
+        private readonly userRoleRepo: Repository<UserRole>,
         @InjectRepository(App)
         private readonly appRepo: Repository<App>,
-        private readonly authService: AuthService,
+        private readonly technicalTokenService: TechnicalTokenService,
+        private readonly clientService: ClientService,
     ) {
     }
 
     /**
      * This public method handles the app subscription process:
      * 1) Create a subscription in PENDING status.
-     * 2) Copy the owner's roles for the subscriber.
-     * 3) Call the onboard endpoint and parse additional apps to subscribe to.
-     * 4) Update the subscription status to SUCCESS if everything completes properly.
+     * 2) Call the onboard endpoint and parse additional apps to subscribe to.
+     * 3) Update the subscription status to SUCCESS if everything completes properly.
+     *
+     * App-owned roles remain in the owner tenant and are referenced directly
+     * via user_roles — no role copying occurs.
      *
      * If any part of the process throws an error, that error is captured in subscription.message.
      *
@@ -91,9 +98,6 @@ export class AppSubscriptionService {
         try {
             // Create a new subscription with status = PENDING
             subscription = await this.createPendingSubscription(subscriberTenant, app);
-
-            // Copy the app owner's roles
-            await this.copyOwnerRoles(subscriberTenant, app);
 
             // Call the onboard endpoint; potentially subscribe to additional apps
             const onboardSucceeded = await this.callOnboardEndpoint(subscriberTenant, app, visited);
@@ -167,15 +171,20 @@ export class AppSubscriptionService {
             // Call the off board endpoint (if it fails, an error is thrown and caught below)
             await this.callOffboardingEndpoint(tenant, app, visited);
 
-            // Remove roles that were created for this tenant
-            const rolesToRemove = await this.roleRepo.find({
+            // Find app-owned roles (roles that belong to this app in the owner tenant)
+            const appOwnedRoles = await this.roleRepo.find({
                 where: {
-                    tenant: {id: tenant.id},
-                    app: app
+                    app: {id: app.id},
                 },
             });
-            if (rolesToRemove.length > 0) {
-                await this.roleRepo.remove(rolesToRemove);
+
+            // Remove user_roles entries in the subscriber tenant that reference app-owned roles
+            if (appOwnedRoles.length > 0) {
+                const appOwnedRoleIds = appOwnedRoles.map(r => r.id);
+                await this.userRoleRepo.delete({
+                    tenantId: tenant.id,
+                    roleId: In(appOwnedRoleIds),
+                });
             }
 
             // Only delete the subscription if everything succeeded
@@ -212,27 +221,6 @@ export class AppSubscriptionService {
 
 
     /**
-     * Copy all roles owned by the app's owner to the subscriber tenant.
-     */
-    private async copyOwnerRoles(subscriberTenant: Tenant, app: App): Promise<void> {
-        const ownerRoles = await this.roleRepo.find({
-            where: {tenant: {id: app.owner.id}, app: {id: app.id}},
-        });
-
-        const newRoles = ownerRoles.map(role => {
-            const roleCopy = this.roleRepo.create({
-                ...role,
-                id: undefined,      // Let TypeORM generate a new ID
-                tenant: subscriberTenant, // Switch ownership to the subscribing tenant
-                app: null           // Usually you set app = null or keep it the same if you want tenant B to have explicit reference
-            });
-            return roleCopy;
-        });
-
-        await this.roleRepo.save(newRoles);
-    }
-
-    /**
      * Call the app's onboard endpoint. If more apps are returned in the response,
      * recursively subscribe to them. Return whether the onboarding call
      * succeeded or not.
@@ -253,8 +241,9 @@ export class AppSubscriptionService {
         const endpoint = `${app.appUrl.replace(/\/+$/, '')}/api/onboard/tenant`;
         logger.log(`Making request to endpoint: ${endpoint}`);
         logger.log(`Request payload:`, {tenantId: tenant.id});
-        // Get technical token using AuthService (use app owner's tenant)
-        const token = await this.authService.createTechnicalAccessToken(app.owner, []);
+        // Get technical token (use app owner's tenant)
+        const ownerClient = await this.clientService.findByAlias(app.owner.domain);
+        const token = await this.technicalTokenService.createTechnicalAccessToken(ownerClient, []);
         logger.log(`Request headers:`, {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
@@ -270,7 +259,6 @@ export class AppSubscriptionService {
         });
 
         if (!response.ok) {
-            // Something went wrong with the request
             const errorMsg = `Onboarding request failed for app "${app.name}": ${response.status} ${response.statusText}`;
             logger.warn(errorMsg);
             throw new Error(errorMsg);
@@ -317,8 +305,9 @@ export class AppSubscriptionService {
         const endpoint = `${app.appUrl.replace(/\/+$/, '')}/api/offboard/tenant`;
         logger.log(`Making request to endpoint: ${endpoint}`);
         logger.log(`Request payload:`, {tenantId: tenant.id});
-        // Get technical token using AuthService (use app owner's tenant)
-        const token = await this.authService.createTechnicalAccessToken(app.owner, []);
+        // Get technical token (use app owner's tenant)
+        const ownerClient = await this.clientService.findByAlias(app.owner.domain);
+        const token = await this.technicalTokenService.createTechnicalAccessToken(ownerClient, []);
         logger.log(`Request headers:`, {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`

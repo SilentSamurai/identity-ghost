@@ -1,55 +1,28 @@
 import {AbilityBuilder, createMongoAbility} from "@casl/ability";
 import {Action} from "./actions.enum";
 import {Injectable} from "@nestjs/common";
-import {RoleEnum} from "../entity/roleEnum";
 import {AnyAbility} from "@casl/ability/dist/types/PureAbility";
 import {SubjectEnum} from "../entity/subjectEnum";
+import {RoleEnum} from "../entity/roleEnum";
 import {Environment} from "../config/environment.service";
 import {TechnicalToken, TenantToken, Token} from "./contexts";
-import {CacheService} from "./cache.service";
-import {Role} from "../entity/role.entity";
-import {Policy} from "../entity/authorization.entity";
-import {InjectRepository} from "@nestjs/typeorm";
-import {Repository} from "typeorm";
 import {User} from "../entity/user.entity";
 
 @Injectable()
 export class CaslAbilityFactory {
     constructor(
         private readonly configService: Environment,
-        private readonly cacheService: CacheService,
-        @InjectRepository(Role) private roleRepository: Repository<Role>,
-        @InjectRepository(Policy)
-        private authorizationRepository: Repository<Policy>,
     ) {
     }
 
-    public async findRole(name: string, tenantId: string) {
-        let cache_key = `ROLE:${tenantId}:${name}`;
-        if (this.cacheService.has(cache_key)) {
-            let role: Role = this.cacheService.get(cache_key);
-            return role;
-        } else {
-            let role: Role = await this.roleRepository.findOne({
-                where: {
-                    name,
-                    tenant: {id: tenantId},
-                },
-                relations: {
-                    tenant: false,
-                },
-            });
-            this.cacheService.set(cache_key, role);
-            return role;
-        }
+    static isInternalRole(roleName: string): boolean {
+        return Object.values(RoleEnum).includes(roleName as RoleEnum);
     }
 
-    async createForSecurityContext(
+    createForSecurityContext(
         token: Token,
-    ): Promise<AnyAbility> {
+    ): AnyAbility {
         const {can, cannot, build} = new AbilityBuilder(createMongoAbility);
-
-        let roles = token.scopes;
 
         if (token.isTechnicalToken()) {
             const technicalToken = token as TechnicalToken;
@@ -68,6 +41,7 @@ export class CaslAbilityFactory {
             });
         } else if (token.isTenantToken()) {
             const tenantToken = token as TenantToken;
+            const roles = tenantToken.roles;
             // User Permissions
             cannot(Action.Manage, SubjectEnum.USER);
             can(Action.Manage, SubjectEnum.USER, {
@@ -90,6 +64,9 @@ export class CaslAbilityFactory {
                 can(Action.Read, SubjectEnum.POLICY, {
                     tenantId: tenantToken.tenant.id,
                 });
+                can(Action.Read, SubjectEnum.GROUP, {
+                    tenantId: tenantToken.tenant.id,
+                });
 
                 cannot(Action.ReadCredentials, SubjectEnum.TENANT);
             }
@@ -107,10 +84,22 @@ export class CaslAbilityFactory {
                 can(Action.Manage, SubjectEnum.MEMBER, {
                     tenantId: tenantToken.tenant.id,
                 });
+                cannot(Action.Delete, SubjectEnum.MEMBER, {
+                    userId: tenantToken.userId,
+                });
                 can(Action.Manage, SubjectEnum.ROLE, {
                     tenantId: tenantToken.tenant.id,
                 });
                 can(Action.Manage, SubjectEnum.POLICY, {
+                    tenantId: tenantToken.tenant.id,
+                });
+                can(Action.Manage, SubjectEnum.CLIENT, {
+                    tenantId: tenantToken.tenant.id,
+                });
+                can(Action.Manage, SubjectEnum.GROUP, {
+                    tenantId: tenantToken.tenant.id,
+                });
+                can(Action.Manage, SubjectEnum.GROUP_ROLE, {
                     tenantId: tenantToken.tenant.id,
                 });
             }
@@ -124,12 +113,6 @@ export class CaslAbilityFactory {
                 can(Action.ReadCredentials, "all");
             }
 
-            for (let name of roles) {
-                let role = await this.findRole(name, tenantToken.tenant.id);
-                if (!role) continue;
-
-                can(Action.Manage, SubjectEnum.POLICY, {roleId: role.id});
-            }
         }
 
         return build();

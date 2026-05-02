@@ -11,6 +11,11 @@ import {Policy} from "./authorization.entity";
 import {App} from "./app.entity";
 import {Subscription} from "./subscription.entity";
 import {TenantBits} from "./tenant-bits.entity";
+import {Client} from "./client.entity";
+import {RefreshToken} from "./refresh-token.entity";
+import {TenantKey} from "./tenant-key.entity";
+import {LoginSession} from "./login-session.entity";
+import {UserConsent} from "./user-consent.entity";
 
 export const entities = [
     Tenant,
@@ -25,5 +30,10 @@ export const entities = [
     Policy,
     App,
     Subscription,
-    TenantBits
+    TenantBits,
+    Client,
+    RefreshToken,
+    TenantKey,
+    LoginSession,
+    UserConsent
 ];

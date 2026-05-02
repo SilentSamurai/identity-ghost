@@ -1,7 +1,7 @@
-import {HttpClient, HttpHeaders} from '@angular/common/http';
+import {HttpClient} from '@angular/common/http';
 import {lastValueFrom} from 'rxjs';
-import {BaseDataSource, ReturnedData} from "./DataSource";
-import {Query} from "./Query";
+import {BaseDataSource, ReturnedData} from './DataSource';
+import {Query} from './Query';
 
 export interface ApiRequest {
     pageNo: number;
@@ -11,11 +11,14 @@ export interface ApiRequest {
     expand: string[];
 }
 
-export class RestApiModel<T> extends BaseDataSource<T> {
-    private readonly defaultHeaders = new HttpHeaders({
-        'Content-Type': 'application/json',
-    });
+interface SearchResponse<T> {
+    data: T[];
+    pageNo: number;
+    pageSize: number;
+    totalCount: number;
+}
 
+export class RestApiModel<T> extends BaseDataSource<T> {
     constructor(
         private http: HttpClient,
         private path: string,
@@ -34,25 +37,26 @@ export class RestApiModel<T> extends BaseDataSource<T> {
             expand: query.expand,
         };
 
-        return await lastValueFrom(
-            this.http.post<ReturnedData<T>>(this.path, body, {
-                headers: this.defaultHeaders,
-            }),
+        const response = await lastValueFrom(
+            this.http.post<SearchResponse<T>>(this.path, body),
         );
+
+        return {
+            data: response.data,
+            totalCount: response.totalCount,
+        };
     }
 
-    public async queryCount(query: Query): Promise<number> {
+    async queryCount(query: Query): Promise<number> {
         const body = {
             where: query.filters,
             select: 'count',
         };
 
         const response = await lastValueFrom(
-            this.http.post<{ count: number }>(this.path, body, {
-                headers: this.defaultHeaders,
-            }),
+            this.http.post<{ count: number }>(this.path, body),
         );
 
-        return response.count ? response.count : 0;
+        return response.count ?? 0;
     }
 }

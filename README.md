@@ -1,224 +1,188 @@
-# Auth Server (Nest JS)
+# Auth Server
 
 [![Build, Test & Create Docker Image](https://github.com/SilentSamurai/auth-server/actions/workflows/build.yaml/badge.svg)](https://github.com/SilentSamurai/auth-server/actions/workflows/build.yaml)
 [![Build & Release Docker Image](https://github.com/SilentSamurai/auth-server/actions/workflows/release.yaml/badge.svg)](https://github.com/SilentSamurai/auth-server/actions/workflows/release.yaml)
 
-A production‑ready, OAuth Authorization service built with  
-[Nest JS](https://nestjs.com) and [TypeScript](https://www.typescriptlang.org/).
+A production-ready, OIDC-compatible OAuth Authorization service built
+with [NestJS](https://nestjs.com), [Angular](https://angular.io/), and [TypeScript](https://www.typescriptlang.org/).
 
-```
+## 📂 Project Structure
+
+```text
 .
-├── srv                 → Nest‑based back‑end service
-│   ├── src/            → Nest modules, controllers, services, etc.
-│   ├── tests/          → Jest test suites
-│   ├── db/             → Migration & seed files
-│   ├── keys/           → (Local‑only) TLS keys
-│   ├── Dockerfile      → Container image definition
-│   ├── jest.config.js  → Test runner config
-│   ├── nest-cli.json   → Nest CLI config
-│   ├── package.json    → Project metadata & scripts
-│   └── tsconfig*.json  → Build configurations
-└── ui                  → Angular front‑end workspace
-    ├── src/            → Angular app source (components, services, etc.)
-    ├── nginx/          → Minimal Nginx setup for containerised static hosting
-    ├── Dockerfile      → Container image definition
-    ├── angular.json    → Angular CLI config
-    ├── package.json    → Project metadata & scripts
-    └── tsconfig*.json  → TypeScript build configurations
+├── srv                 → NestJS backend service
+│   ├── src/            → Source code (modules, controllers, services)
+│   ├── envs/           → Environment configuration files
+│   ├── Dockerfile      → Backend container definition
+│   └── package.json    → Backend dependencies and scripts
+├── ui                  → Angular frontend application
+│   ├── src/            → Frontend source code
+│   ├── Dockerfile      → Frontend container definition
+│   └── package.json    → Frontend dependencies and scripts
+├── compat-tests        → OIDC compatibility and integration tests
+├── external-user-app   → Mock external application for testing integrations
+├── helm                → Kubernetes Helm charts
+├── Taskfile.yml        → Task runner configuration for orchestration
+└── docker-compose.yml  → Local multi-container setup
 ```
 
 ---
 
 ## ✨ Features
 
-* User registration with e‑mail verification
-* Password‑based login & JWT issuance
-* Token refresh & revocation
-* Password reset workflow
-* Change e‑mail workflow
-* Role & permission system powered by **CASL**
-* Cron jobs via **@nestjs/schedule** (e.g. prune expired tokens)
-* Database migrations via **TypeORM**
-* Fake SMTP server for local development (no external e‑mail required)
-* JSON‑structured production logging, compatible with ELK/EFK stacks
-* Docker & Helm charts provided for easy deployment
+* **OIDC & OAuth2**: Support for standard flows including Authorization Code (with PKCE), Client Credentials, and
+  Refresh Token rotation.
+* **User Management**: Registration with email verification, password reset, and profile management.
+* **Role-Based Access Control**: Permissions powered by **CASL**.
+* **Security**: JWT-based authentication, password hashing with Argon2, and CORS protection.
+* **Developer Friendly**:
+    * Fake SMTP server for local email testing.
+    * Comprehensive test suites (Unit, Integration, E2E, OIDC Compatibility).
+    * Task runner (`task`) for easy orchestration.
+* **Deployment Ready**: Dockerfiles, Helm charts, and CI/CD workflows provided.
 
 ---
 
-## ⚡️ Quick start
+## ⚙️ Requirements
 
-### Using npm
+* [Node.js](https://nodejs.org/) (v18+)
+* [npm](https://www.npmjs.com/)
+* [Task](https://taskfile.dev/) (optional, but recommended for orchestration)
+* [Docker](https://www.docker.com/) & [Docker Compose](https://docs.docker.com/compose/) (for containerized setup)
+* [PostgreSQL](https://www.postgresql.org/) (or use the provided Docker setup)
+
+---
+
+## ⚡️ Quick Start
+
+### Using Task (Recommended)
 
 ```bash
-# 1. Install dependencies
-cd srv
-npm install
+# 1. Install dependencies for both UI and Server
+task build
 
-# 2. Copy or create an environment file
-cp envs/.env.example envs/.env.development   # or point ENV_FILE yourself
+# 2. Setup environment (copy examples if they don't exist)
+# cp srv/envs/.env.example srv/envs/.env.development
 
-# 3. Run the service in watch mode
-npm run start:debug          # http://localhost:9000 by default
-
-# In another terminal you can tail the fake SMTP output:
-npm run smtp-server
+# 3. Start both UI and Server concurrently
+task serve
 ```
 
-### Using just
+### Manual Setup
+
+#### Backend (srv)
 
 ```bash
-# 1. Install just (if not already installed)
-# Windows:
-scoop install just
-# macOS:
-brew install just
-# Linux:
-curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash
+cd srv
+npm install
+# Ensure srv/envs/.env.development exists
+npm run start:debug
+```
 
-# 2. Install dependencies and start the service
-just install
-just dev-external-start    # Starts the service in development mode
+#### Frontend (ui)
 
-# In another terminal you can tail the fake SMTP output:
-npm run smtp-server
+```bash
+cd ui
+npm install
+npm run ui:serve
 ```
 
 ---
 
 ## 🛠️ Configuration
 
-`src/config/environment.service.ts` loads variables from the file referenced by
-`ENV_FILE` (defaults to `./envs/.env.development`).  
-Important keys:
+The backend loads configuration from `.env` files. By default, it looks for `./envs/.env.development`. You can override
+this using the `ENV_FILE` environment variable.
 
-| Variable                 | Purpose                        | Example            |
-|--------------------------|--------------------------------|--------------------|
-| `NODE_ENV`               | `development` \| `production`  | development        |
-| `PORT`                   | HTTP listen port               | 9000               |
-| `ENABLE_HTTPS`           | Enable TLS                     | `false`            |
-| `KEY_PATH` / `CERT_PATH` | TLS key / cert paths           | `keys/key.pem`     |
-| `ENABLE_CORS`            | Allow CORS                     | `true`             |
-| `MAX_REQUEST_SIZE`       | Body‑parser limit (e.g. `1mb`) | `1mb`              |
-| `DATABASE_*`             | TypeORM connection settings    | see `.env.example` |
-| `DATABASE_SSL`           | Enable DB SSL (`true`/`false`) | false              |
+### Key Environment Variables
 
-Add anything else you need—the service simply reads from `process.env`.
+| Variable                  | Purpose                                       | Default       |
+|---------------------------|-----------------------------------------------|---------------|
+| `PORT`                    | Backend HTTP port                             | `9000`        |
+| `NODE_ENV`                | Environment mode (`development`/`production`) | `development` |
+| `DATABASE_HOST`           | PostgreSQL host                               | `localhost`   |
+| `ENABLE_FAKE_SMTP_SERVER` | Enable built-in dev SMTP server               | `true`        |
+| `ENABLE_CORS`             | Enable CORS protection                        | `true`        |
+| `ENABLE_HTTPS`            | Enable TLS/HTTPS                              | `false`       |
 
 ---
 
-## 🏗️ Useful npm scripts
+## 🚀 Useful Scripts
 
-| Script                                | Description                                                     |
-|---------------------------------------|-----------------------------------------------------------------|
-| `npm run build`                       | Clean `dist/` and compile with `tsc`                            |
-| `npm run start:debug`                 | Start Nest in watch/debug mode                                  |
-| `npm run start:prod`                  | Run the already‑built JS from `dist/`                           |
-| `npm run test`                        | Run Jest with coverage (CI friendly)                            |
-| `npm run test:watch`                  | Jest in watch mode (sets `CUSTOM_LOG=1`)                        |
-| `npm run package`                     | Archive a ZIP of the compiled output via `create-zip.js`        |
-| `npm run typeorm`                     | Expose `typeorm` CLI                                            |
-| `npm run generate-migration "<name>"` | Create a skeleton migration in `src/migrations/`                |
-| `npm run smtp-server`                 | Run the dev‑only fake SMTP server (same as `start:mail-server`) |
-| `npm run release`                     | `build` + `test` – CI release helper                            |
+### Backend (`srv`)
 
-> 💡 **Tip**: This project also uses [just](https://github.com/casey/just) for command automation. See the [Just Commands](#-just-commands) section below.
+* `npm run start:debug`: Start with watch mode and debugger.
+* `npm run test`: Run Jest tests.
+* `npm run typeorm`: Execute TypeORM CLI.
+* `npm run generate-migration`: Create a new DB migration.
 
----
+### Frontend (`ui`)
 
-## 🚀 Just Commands
+* `npm run ui:serve`: Start Angular dev server with proxy.
+* `npm run test`: Run Karma unit tests.
+* `npm run e2e:test`: Run Cypress end-to-end tests.
 
-This project uses [just](https://github.com/casey/just) for command automation. Install it with:
+### Orchestration (`root`)
 
-```bash
-# Windows (with scoop)
-scoop install just
-
-# macOS (with homebrew)
-brew install just
-
-# Linux
-curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash
-```
-
-Then run `just --list` to see all available commands. Common commands include:
-
-| Command              | Description                                    |
-|----------------------|------------------------------------------------|
-| `just build`         | Build both UI and server components            |
-| `just test`          | Run tests for both UI and server               |
-| `just release`       | Build, test, and install                       |
-| `just dev-external-start` | Start the external user app in dev mode    |
-| `just run-e2e-tests` | Run end-to-end tests                           |
+* `task build`: Build all components.
+* `task test`: Run all tests (backend & frontend).
+* `task serve`: Run both components in dev mode.
 
 ---
 
 ## 🧪 Testing
 
+### Backend
+
 ```bash
-# unit & integration tests
+cd srv
 npm test
-
-# watch mode
-npm run test:watch
 ```
 
-Jest is configured via `jest.config.js`; e2e Cypress tests live in the project
-root under `e2e/`.
-
----
-
-## 🐳 Docker
-
-Build and run locally:
+### Frontend
 
 ```bash
-docker build -t auth-server:dev ./srv
-docker run -p 9000:9000 --env-file ./envs/.env.development auth-server:dev
+cd ui
+npm test          # Unit tests
+npm run e2e:test  # Cypress E2E
 ```
 
----
-
-## ☸️ Kubernetes / Helm
-
-A reusable chart is provided in `helm/auth-server/`. Basic usage:
+### OIDC Compatibility
 
 ```bash
-helm dependency update ./helm/auth-server
-helm install auth ./helm/auth-server \
-  --set image.tag=1.0.0 \
-  --set env.NODE_ENV=production \
-  --values=my-values.yaml
+cd compat-tests
+npm install
+npm test
 ```
 
 ---
 
-## 📝 Development notes
+## 🐳 Docker & Deployment
 
-### Skipping dev‑only code in prod builds
-
-`src/mail/FakeSmtpServer.ts` is imported **dynamically**, ensuring production
-builds exclude the file entirely (see `prepareApp()` in `src/setup.ts`).
-
-### Migrating the database
+### Docker Compose
 
 ```bash
-npm run typeorm migration:generate -- -n add_user_preferences
-npm run typeorm migration:run
+docker-compose up --build
+```
+
+### Kubernetes (Helm)
+
+```bash
+helm upgrade --install auth-server ./helm/auth-server --namespace auth-server --create-namespace
 ```
 
 ---
 
 ## 🤝 Contributing
 
-1. Fork & clone
-2. Create a branch (`feat/awesome-stuff`)
-3. Commit & push
-4. Open a PR
-
-Please accompany code changes with unit tests where feasible.
+1. Fork the repository.
+2. Create your feature branch (`git checkout -b feat/amazing-feature`).
+3. Commit your changes.
+4. Push to the branch.
+5. Open a Pull Request.
 
 ---
 
 ## © License
 
-[MIT](LICENSE) – © 2024 Silent Samurai
+Distributed under the [MIT](LICENSE) License. © 2024 Silent Samurai

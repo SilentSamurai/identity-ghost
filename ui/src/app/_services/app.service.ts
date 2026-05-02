@@ -51,16 +51,16 @@ export class AppService {
         );
     }
 
-    async getAppCreatedByTenantId(tenantId: string) {
+    async getAppCreatedByTenantId() {
         return lastValueFrom(
-            this.http.get(`${API_URL}/apps/created-by/${tenantId}`)
+            this.http.get(`${API_URL}/apps/my/created`)
         ) as Promise<any[]>;
     }
 
-    async getAvailableApps(tenantId: string): Promise<any[]> {
+    async getAvailableApps(): Promise<any[]> {
         return lastValueFrom(
             this.http.get(
-                `${API_URL}/apps/available-for/${tenantId}`,
+                `${API_URL}/apps/my/available`,
                 this.getHttpOptions()
             )
         ) as Promise<any[]>;

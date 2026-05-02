@@ -36,7 +36,9 @@ export class ModalService {
     }
 
     initialize(initData: any, componentRef: any) {
+        console.log('ModalService.initialize called with:', initData);
         for (let key in initData) {
+            console.log(`Setting ${key} =`, initData[key]);
             componentRef[key] = initData[key];
         }
     }

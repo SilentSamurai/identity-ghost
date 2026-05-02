@@ -4,24 +4,24 @@ import {
     Controller,
     Delete,
     Get,
-    Param,
+    Inject,
     Patch,
     Post,
-    Request,
     UseGuards,
     UseInterceptors,
 } from "@nestjs/common";
 import {Environment} from "../config/environment.service";
-import {UsersService} from "../services/users.service";
 import {TenantService} from "../services/tenant.service";
 import {ValidationPipe} from "../validation/validation.pipe";
 import {ValidationSchema} from "../validation/validation.schema";
 import {Tenant} from "../entity/tenant.entity";
 import {JwtAuthGuard} from "../auth/jwt-auth.guard";
-import {SecurityService} from "../casl/security.service";
 import {SubjectEnum} from "../entity/subjectEnum";
 import {Action} from "../casl/actions.enum";
-import {subject} from "@casl/ability";
+import {CurrentPermission, CurrentTenantId, CurrentUser, Permission} from "../auth/auth.decorator";
+import {SIGNING_KEY_PROVIDER, SigningKeyProvider} from "../core/token-abstraction";
+import {ClientService} from "../services/client.service";
+import {User} from "../entity/user.entity";
 import * as yup from "yup";
 
 @Controller("api/tenant")
@@ -35,117 +35,90 @@ export class TenantController {
     constructor(
         private readonly configService: Environment,
         private readonly tenantService: TenantService,
-        private readonly usersService: UsersService,
-        private readonly securityService: SecurityService,
+        @Inject(SIGNING_KEY_PROVIDER)
+        private readonly signingKeyProvider: SigningKeyProvider,
+        private readonly clientService: ClientService,
     ) {
     }
 
     @Post("/create")
     @UseGuards(JwtAuthGuard)
     async createTenant(
-        @Request() request,
+        @CurrentPermission() permission: Permission,
+        @CurrentUser() user: User,
         @Body(new ValidationPipe(ValidationSchema.CreateTenantSchema))
-            body: any,
+        body: any,
     ): Promise<Tenant> {
-        const user = await this.usersService.findByEmail(
-            request,
-            request.user.email,
-        );
-        const tenant: Tenant = await this.tenantService.create(
-            request,
-            body.name,
-            body.domain,
-            user,
-        );
-        return tenant;
+        return this.tenantService.create(permission, body.name, body.domain, user);
     }
 
-    @Patch("/:tenantId")
+    // ─── New token-derived routes (no :tenantId in URL) ───
+
+    @Patch("/my")
     @UseGuards(JwtAuthGuard)
-    async updateTenant(
-        @Request() request,
-        @Param("tenantId") tenantId: string,
+    async updateMyTenant(
+        @CurrentPermission() permission: Permission,
+        @CurrentTenantId() tenantId: string,
         @Body(new ValidationPipe(TenantController.UpdateTenantSchema))
-            body: { name?: string; allowSignUp?: boolean },
+        body: { name?: string; allowSignUp?: boolean },
     ): Promise<Tenant> {
-        let tenant = await this.tenantService.findById(request, tenantId);
-        this.securityService.check(
-            request,
-            Action.Update,
-            subject(SubjectEnum.TENANT, tenant),
-        );
-        return this.tenantService.updateTenant(request, tenantId, body);
+        return this._updateTenant(permission, tenantId, body);
     }
 
-    @Delete("/:tenantId")
+    @Delete("/my")
     @UseGuards(JwtAuthGuard)
-    async deleteTenant(
-        @Request() request,
-        @Param("tenantId") tenantId: string,
+    async deleteMyTenant(
+        @CurrentPermission() permission: Permission,
+        @CurrentTenantId() tenantId: string,
     ): Promise<Tenant> {
-        return this.tenantService.deleteTenant(request, tenantId);
-    }
-
-    @Get("")
-    @UseGuards(JwtAuthGuard)
-    async getTenants(@Request() request): Promise<Tenant[]> {
-        return await this.tenantService.getAllTenants(request);
+        return this.tenantService.deleteTenant(permission, tenantId);
     }
 
     @Get("/my/credentials")
     @UseGuards(JwtAuthGuard)
-    async getMyCredentials(@Request() request): Promise<any> {
-        let securityContext =
-            this.securityService.getUserOrTechnicalSecurityContext(request);
-        let tenant = await this.tenantService.findById(
-            request,
-            securityContext.tenant.id,
-        );
-        this.securityService.check(
-            request,
-            Action.ReadCredentials,
-            subject(SubjectEnum.TENANT, tenant),
-        );
-        return {
-            id: tenant.id,
-            clientId: tenant.clientId,
-            clientSecret: tenant.clientSecret,
-            publicKey: tenant.publicKey,
-        };
-    }
-
-    @Get("/:tenantId/credentials")
-    @UseGuards(JwtAuthGuard)
-    async getTenantCredentials(
-        @Request() request,
-        @Param("tenantId") tenantId: string,
+    async getMyCredentials(
+        @CurrentPermission() permission: Permission,
+        @CurrentTenantId() tenantId: string,
     ): Promise<any> {
-        let tenant = await this.tenantService.findById(request, tenantId);
-        this.securityService.check(
-            request,
-            Action.ReadCredentials,
-            subject(SubjectEnum.TENANT, tenant),
-        );
+        const tenant = await this.tenantService.findById(permission, tenantId);
+        permission.isAuthorized(Action.ReadCredentials, SubjectEnum.TENANT, tenant);
+        const publicKey = await this.signingKeyProvider.getPublicKey(tenant.id);
+        const defaultClient = await this.clientService.findByAlias(tenant.domain);
         return {
             id: tenant.id,
-            clientId: tenant.clientId,
-            clientSecret: tenant.clientSecret,
-            publicKey: tenant.publicKey,
+            clientId: defaultClient.clientId,
+            publicKey,
         };
     }
 
-    @Get("/:tenantId")
+    @Get("/my/info")
     @UseGuards(JwtAuthGuard)
-    async getTenant(
-        @Request() request,
-        @Param("tenantId") tenantId: string,
-    ): Promise<Tenant> {
-        let tenant = await this.tenantService.findById(request, tenantId);
-        this.securityService.check(
-            request,
-            Action.Read,
-            subject(SubjectEnum.TENANT, tenant),
-        );
+    async getMyTenant(
+        @CurrentPermission() permission: Permission,
+        @CurrentTenantId() tenantId: string,
+    ) {
+        const tenant = await this._getTenant(permission, tenantId);
+        const defaultClient = await this.clientService.findByAlias(tenant.domain);
+        return {
+            ...tenant,
+            clientId: defaultClient.clientId,
+        };
+    }
+
+    // ─── Shared implementation methods ───
+
+    private async _updateTenant(permission: Permission, tenantId: string, body: {
+        name?: string;
+        allowSignUp?: boolean
+    }): Promise<Tenant> {
+        const tenant = await this.tenantService.findById(permission, tenantId);
+        permission.isAuthorized(Action.Update, SubjectEnum.TENANT, tenant);
+        return this.tenantService.updateTenant(permission, tenantId, body);
+    }
+
+    private async _getTenant(permission: Permission, tenantId: string): Promise<Tenant> {
+        const tenant = await this.tenantService.findById(permission, tenantId);
+        permission.isAuthorized(Action.Read, SubjectEnum.TENANT, tenant);
         return tenant;
     }
 }

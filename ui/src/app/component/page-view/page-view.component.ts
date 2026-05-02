@@ -31,7 +31,7 @@ import {firstValueFrom} from 'rxjs';
 
         <div class="text-center" *ngIf="loading">
             <div class="spinner-border" role="status">
-                <span class="sr-only">Loading...</span>
+                <span class="visually-hidden">Loading...</span>
             </div>
         </div>
     `,

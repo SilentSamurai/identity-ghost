@@ -1,11 +1,6 @@
-import {forwardRef, Module} from "@nestjs/common";
+import {Module} from "@nestjs/common";
 import {TypeOrmModule} from "@nestjs/typeorm";
-import {Role} from "../entity/role.entity";
-import {UserRole} from "../entity/user.roles.entity";
-import {RoleService} from "./role.service";
-import {UsersService} from "./users.service";
 import {GroupService} from "./group.service";
-import {TenantService} from "./tenant.service";
 import {Tenant} from "../entity/tenant.entity";
 import {TenantMember} from "../entity/tenant.members.entity";
 import {User} from "../entity/user.entity";
@@ -16,23 +11,30 @@ import {GroupUser} from "../entity/group.users.entity";
 import {CaslModule} from "../casl/casl.module";
 import {App} from "../entity/app.entity";
 import {Subscription} from "../entity/subscription.entity";
-import {SubscriptionService} from "./subscription.service";
 import {AppService} from "./app.service";
 import {TenantBits} from "../entity/tenant-bits.entity";
 import {TenantBitsService} from "./tenant-bits.service";
-import {AuthModule} from "../auth/auth.module";
-import {AppSubscriptionService} from "./app-subscription.service";
+import {Client} from "../entity/client.entity";
+import {ClientService} from "./client.service";
+import {CoreModule} from "../core/core.module";
+import {Role} from "../entity/role.entity";
+import {UserRole} from "../entity/user.roles.entity";
+import {TenantKey} from "../entity/tenant-key.entity";
+import {JwksService} from "./jwks.service";
+import {DiscoveryService} from "./discovery.service";
+import {CorsOriginService} from "./cors-origin.service";
+import {SubscriptionService} from "./subscription.service";
 
 @Module(
     {
         imports: [
-            TypeOrmModule.forFeature([Tenant, User, TenantMember, Role, UserRole, AuthCode, Group, GroupRole, GroupUser, App, Subscription, TenantBits]),
+            TypeOrmModule.forFeature([Tenant, User, TenantMember, Role, UserRole, AuthCode, Group, GroupRole, GroupUser, App, Subscription, TenantBits, Client, TenantKey]),
             CaslModule,
-            forwardRef(() => AuthModule),
+            CoreModule,
         ],
         controllers: [],
-        providers: [UsersService, GroupService, TenantService, RoleService, SubscriptionService, AppService, TenantBitsService, AppSubscriptionService],
-        exports: [UsersService, GroupService, TenantService, RoleService, SubscriptionService, AppService, TenantBitsService, AppSubscriptionService]
+        providers: [GroupService, AppService, TenantBitsService, ClientService, JwksService, DiscoveryService, CorsOriginService, SubscriptionService],
+        exports: [GroupService, AppService, TenantBitsService, ClientService, CoreModule, JwksService, DiscoveryService, CorsOriginService, SubscriptionService],
     })
 export class ServiceModule {
 }

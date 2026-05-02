@@ -10,9 +10,9 @@ import {Component, EventEmitter, Input, Output} from '@angular/core';
         >
             <ng-container *ngTemplateOutlet="content"></ng-container>
         </span>
-        <a *ngIf="!isDisabled" href="javascript:void(0)">
+        <button *ngIf="!isDisabled" class="btn-link">
             <ng-container *ngTemplateOutlet="content"></ng-container>
-        </a>
+        </button>
 
         <ng-template #content>
             <ng-content></ng-content>

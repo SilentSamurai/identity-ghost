@@ -1,10 +1,8 @@
-import {expect2xx, HttpClient} from "./client";
-
-import {TestAppFixture} from "../test-app.fixture";
+import {expect2xx, HttpClient, TestFixture} from "./client";
 
 export class UsersClient extends HttpClient {
 
-    constructor(app: TestAppFixture, accessToken: string) {
+    constructor(app: TestFixture, accessToken: string) {
         super(app, accessToken);
     }
 
@@ -245,5 +243,50 @@ export class UsersClient extends HttpClient {
         return response.body;
     }
 
+    // -----------------------------------------------------------------
+    // Lock a user (PUT /api/users/:userId/lock)
+    // -----------------------------------------------------------------
+    public async lockUser(userId: string) {
+        const response = await this.app.getHttpServer()
+            .put(`/api/users/${userId}/lock`)
+            .set('Authorization', `Bearer ${this.accessToken}`)
+            .set('Accept', 'application/json')
+            .send({});
+
+        console.log("Lock User Response:", response.body);
+        expect2xx(response);
+        return response.body;
+    }
+
+    public async lockUserRaw(userId: string) {
+        return this.app.getHttpServer()
+            .put(`/api/users/${userId}/lock`)
+            .set('Authorization', `Bearer ${this.accessToken}`)
+            .set('Accept', 'application/json')
+            .send({});
+    }
+
+    // -----------------------------------------------------------------
+    // Unlock a user (PUT /api/users/:userId/unlock)
+    // -----------------------------------------------------------------
+    public async unlockUser(userId: string) {
+        const response = await this.app.getHttpServer()
+            .put(`/api/users/${userId}/unlock`)
+            .set('Authorization', `Bearer ${this.accessToken}`)
+            .set('Accept', 'application/json')
+            .send({});
+
+        console.log("Unlock User Response:", response.body);
+        expect2xx(response);
+        return response.body;
+    }
+
+    public async unlockUserRaw(userId: string) {
+        return this.app.getHttpServer()
+            .put(`/api/users/${userId}/unlock`)
+            .set('Authorization', `Bearer ${this.accessToken}`)
+            .set('Accept', 'application/json')
+            .send({});
+    }
 
 }

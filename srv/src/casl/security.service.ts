@@ -1,13 +1,16 @@
 import {ForbiddenException, forwardRef, Inject, Injectable, OnModuleInit, UnauthorizedException} from "@nestjs/common";
 
-import {RoleEnum} from "../entity/roleEnum";
 import {Environment} from "../config/environment.service";
 import {CaslAbilityFactory} from "./casl-ability.factory";
 import {AnyAbility} from "@casl/ability/dist/types/PureAbility";
+import {AbilityBuilder, createMongoAbility, subject} from "@casl/ability";
 import {Action} from "./actions.enum";
-import {subject} from "@casl/ability";
 import {AuthUserService} from "./authUser.service";
-import {AuthContext, GRANT_TYPES, TechnicalToken, TenantToken,} from "./contexts";
+import {AuthContext, GRANT_TYPES, InternalToken, TechnicalToken, TenantToken,} from "./contexts";
+import {SubjectEnum} from "../entity/subjectEnum";
+import {RoleEnum} from "../entity/roleEnum";
+import {Permission} from "../auth/auth.decorator";
+import {ClientService} from "../services/client.service";
 
 @Injectable()
 export class SecurityService implements OnModuleInit {
@@ -16,12 +19,26 @@ export class SecurityService implements OnModuleInit {
         private readonly authUserService: AuthUserService,
         @Inject(forwardRef(() => CaslAbilityFactory))
         private readonly caslAbilityFactory: CaslAbilityFactory,
+        private readonly clientService: ClientService,
     ) {
     }
 
     async onModuleInit() {
     }
 
+    /**
+     * Creates a Permission object from an AuthContext.
+     * Use this for internal (non-HTTP) flows that need to pass Permission objects
+     * to services without an HTTP request (e.g., startup seed, token issuance, registration).
+     */
+    createPermission(authContext: AuthContext): Permission {
+        return new Permission(authContext, this);
+    }
+
+    /**
+     * @deprecated Internal use only — called by Permission.isAuthorized().
+     * Use @CurrentPermission() and permission.isAuthorized() in controllers/services instead.
+     */
     getAbility(authContext: AuthContext): AnyAbility {
         if (authContext.SCOPE_ABILITIES) {
             return authContext.SCOPE_ABILITIES;
@@ -29,6 +46,10 @@ export class SecurityService implements OnModuleInit {
         throw new UnauthorizedException();
     }
 
+    /**
+     * @deprecated Internal use only — called by Permission.isAuthorized().
+     * Use @CurrentPermission() and permission.isAuthorized() in controllers/services instead.
+     */
     isAuthorized(
         authContext: AuthContext,
         action: Action,
@@ -41,6 +62,10 @@ export class SecurityService implements OnModuleInit {
         return this.check(authContext, action, subject(object, obj));
     }
 
+    /**
+     * @deprecated Internal use only — called by Permission.isAuthorized().
+     * Use @CurrentPermission() and permission.isAuthorized() in controllers/services instead.
+     */
     check(authContext: AuthContext, ...args: any): boolean {
         let ability = this.getAbility(authContext);
         if (!ability.can(...args)) {
@@ -49,6 +74,10 @@ export class SecurityService implements OnModuleInit {
         return true;
     }
 
+    /**
+     * @deprecated Internal use only — called by Permission.isAuthorized().
+     * Use @CurrentPermission() and permission.isAuthorized() in controllers/services instead.
+     */
     getToken(authContext: AuthContext): TenantToken {
         let payload = authContext.SECURITY_CONTEXT;
         if (!payload.isTenantToken()) {
@@ -73,6 +102,10 @@ export class SecurityService implements OnModuleInit {
         ) as TechnicalToken;
     }
 
+    /**
+     * @deprecated Internal use only — called by Permission.isAuthorized().
+     * Use @CurrentPermission() and permission.isAuthorized() in controllers/services instead.
+     */
     getUserOrTechnicalSecurityContext(request: any): TenantToken {
         return request["SECURITY_CONTEXT"] as TenantToken;
     }
@@ -83,63 +116,107 @@ export class SecurityService implements OnModuleInit {
 
     isSuperAdmin(securityContext: TenantToken) {
         return (
-            securityContext.scopes.some(
-                (scope) => scope === RoleEnum.SUPER_ADMIN,
-            ) &&
+            securityContext.roles.includes(RoleEnum.SUPER_ADMIN) &&
             securityContext.tenant.domain ===
             this.configService.get("SUPER_TENANT_DOMAIN")
         );
     }
 
-    async getAdminContextForInternalUse(): Promise<AuthContext> {
+    /**
+     * For login/token issuance: can read membership, subscription status, and roles across tenants.
+     * Needs broad Read on TENANT because findByMembership checks Read TENANT without conditions.
+     * Needs broad Read on ROLE because getMemberRoles may operate on the subscribing tenant.
+     */
+    createPermissionForTokenIssuance(tenantId: string): Permission {
+        const {can, build} = new AbilityBuilder(createMongoAbility);
+        can(Action.Read, SubjectEnum.TENANT);
+        can(Action.Read, SubjectEnum.MEMBER);
+        can(Action.Read, SubjectEnum.ROLE);
+        can(Action.Read, SubjectEnum.USER);
         const authContext: AuthContext = {
-            SECURITY_CONTEXT: TenantToken.create({
-                email: "",
-                sub: "",
-                userId: "",
-                name: "",
-                tenant: {
-                    id: "",
-                    name: "",
-                    domain: this.configService.get("SUPER_TENANT_DOMAIN"),
-                },
-                scopes: ["SUPER_ADMIN"],
-                grant_type: GRANT_TYPES.PASSWORD,
-                userTenant: {
-                    id: "",
-                    name: "",
-                    domain: this.configService.get("SUPER_TENANT_DOMAIN"),
-                }
-            }),
-            SCOPE_ABILITIES: null,
+            SECURITY_CONTEXT: InternalToken.create({purpose: "token-issuance", scopedTenantId: tenantId}),
+            SCOPE_ABILITIES: build(),
         };
-        authContext.SCOPE_ABILITIES = await this.caslAbilityFactory.createForSecurityContext(
-            authContext.SECURITY_CONTEXT as TenantToken,
-        );
-        return authContext;
+        return this.createPermission(authContext);
+    }
+
+    /**
+     * For adding members: can read/create users and read tenant membership.
+     */
+    createPermissionForMemberManagement(tenantId: string): Permission {
+        const {can, build} = new AbilityBuilder(createMongoAbility);
+        can(Action.Read, SubjectEnum.TENANT, {id: tenantId});
+        can(Action.Read, SubjectEnum.MEMBER, {tenantId});
+        can(Action.Read, SubjectEnum.USER);
+        can(Action.Create, SubjectEnum.USER);
+        const authContext: AuthContext = {
+            SECURITY_CONTEXT: InternalToken.create({purpose: "member-management", scopedTenantId: tenantId}),
+            SCOPE_ABILITIES: build(),
+        };
+        return this.createPermission(authContext);
+    }
+
+    /**
+     * For registration: can check domain existence, create tenants/users, manage roles,
+     * add members, and update user verification status.
+     */
+    createPermissionForRegistration(): Permission {
+        const {can, build} = new AbilityBuilder(createMongoAbility);
+        can(Action.Read, SubjectEnum.TENANT);
+        can(Action.Create, SubjectEnum.TENANT);
+        can(Action.Update, SubjectEnum.TENANT);
+        can(Action.Read, SubjectEnum.USER);
+        can(Action.Create, SubjectEnum.USER);
+        can(Action.Update, SubjectEnum.USER);
+        can(Action.Read, SubjectEnum.MEMBER);
+        can(Action.Create, SubjectEnum.ROLE);
+        can(Action.Read, SubjectEnum.ROLE);
+        can(Action.Update, SubjectEnum.ROLE);
+        const authContext: AuthContext = {
+            SECURITY_CONTEXT: InternalToken.create({purpose: "registration"}),
+            SCOPE_ABILITIES: build(),
+        };
+        return this.createPermission(authContext);
+    }
+
+    /**
+     * For startup seed data: full access (this is the only legitimate use of broad permissions).
+     */
+    createPermissionForStartupSeed(): Permission {
+        const {can, build} = new AbilityBuilder(createMongoAbility);
+        can(Action.Manage, "all");
+        const authContext: AuthContext = {
+            SECURITY_CONTEXT: InternalToken.create({purpose: "startup-seed"}),
+            SCOPE_ABILITIES: build(),
+        };
+        return this.createPermission(authContext);
     }
 
     async getUserAuthContext(email: string): Promise<AuthContext> {
         const user = await this.authUserService.findUserByEmail(email);
+        const token = TenantToken.create({
+            sub: user.id,
+            roles: [],
+            grant_type: GRANT_TYPES.REFRESH_TOKEN,
+            tenant: {
+                id: "",
+                name: "",
+                domain: this.configService.get("SUPER_TENANT_DOMAIN"),
+            },
+            aud: [this.configService.get("SUPER_TENANT_DOMAIN")],
+            jti: '',
+            nbf: Math.floor(Date.now() / 1000),
+            scope: '',
+            client_id: '',
+            tenant_id: '',
+        });
+        // Populate profile fields from DB (not from JWT)
+        token.email = user.email;
+        token.name = user.name;
+        token.userId = user.id;
+
         const authContext: AuthContext = {
-            SECURITY_CONTEXT: TenantToken.create({
-                email: user.email,
-                sub: user.email,
-                userId: user.id,
-                name: user.name,
-                scopes: [],
-                grant_type: GRANT_TYPES.REFRESH_TOKEN,
-                tenant: {
-                    id: "",
-                    name: "",
-                    domain: this.configService.get("SUPER_TENANT_DOMAIN"),
-                },
-                userTenant: {
-                    id: "",
-                    name: "",
-                    domain: this.configService.get("SUPER_TENANT_DOMAIN"),
-                }
-            }),
+            SECURITY_CONTEXT: token,
             SCOPE_ABILITIES: null,
         };
         authContext.SCOPE_ABILITIES = this.caslAbilityFactory.createContextForUserAuth(user);
@@ -153,28 +230,39 @@ export class SecurityService implements OnModuleInit {
         const user = await this.authUserService.findUserByEmail(email);
         const tenant = await this.authUserService.findTenantByDomain(domain);
         const roles = await this.authUserService.findMemberRoles(tenant, user);
+        const roleNames = roles.map((item) => item.name);
+        const defaultClient = await this.clientService.findByAlias(tenant.domain);
+        const token = TenantToken.create({
+            sub: user.id,
+            tenant: {
+                id: tenant.id,
+                name: tenant.name,
+                domain: tenant.domain,
+            },
+            roles: roleNames,
+            grant_type: GRANT_TYPES.CODE,
+            aud: [this.configService.get("SUPER_TENANT_DOMAIN")],
+            jti: '',
+            nbf: Math.floor(Date.now() / 1000),
+            scope: '',
+            client_id: defaultClient.clientId,
+            tenant_id: tenant.id,
+        });
+        // Populate profile fields from DB (not from JWT)
+        token.email = user.email;
+        token.name = user.name;
+        token.userId = user.id;
+        token.userTenant = {
+            id: tenant.id,
+            name: tenant.name,
+            domain: tenant.domain,
+        };
+
         const authContext: AuthContext = {
-            SECURITY_CONTEXT: TenantToken.create({
-                email: user.email,
-                sub: user.email,
-                userId: user.id,
-                name: user.name,
-                tenant: {
-                    id: tenant.id,
-                    name: tenant.name,
-                    domain: tenant.domain,
-                },
-                scopes: roles.map((item) => item.name),
-                grant_type: GRANT_TYPES.CODE,
-                userTenant: {
-                    id: tenant.id,
-                    name: tenant.name,
-                    domain: tenant.domain,
-                }
-            }),
+            SECURITY_CONTEXT: token,
             SCOPE_ABILITIES: null,
         };
-        authContext.SCOPE_ABILITIES = await this.caslAbilityFactory.createForSecurityContext(
+        authContext.SCOPE_ABILITIES = this.caslAbilityFactory.createForSecurityContext(
             authContext.SECURITY_CONTEXT,
         );
         return authContext;
@@ -187,7 +275,7 @@ export class SecurityService implements OnModuleInit {
             SECURITY_CONTEXT: securityContext,
             SCOPE_ABILITIES: null,
         };
-        authContext.SCOPE_ABILITIES = await this.caslAbilityFactory.createForSecurityContext(
+        authContext.SCOPE_ABILITIES = this.caslAbilityFactory.createForSecurityContext(
             securityContext,
         );
         return authContext;

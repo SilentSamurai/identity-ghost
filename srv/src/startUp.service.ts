@@ -3,6 +3,9 @@ import {Environment} from "./config/environment.service";
 import {UsersService} from "./services/users.service";
 import {RoleService} from "./services/role.service";
 import {TenantService} from "./services/tenant.service";
+import {GroupService} from "./services/group.service";
+import {AppService} from "./services/app.service";
+import {ClientService} from "./services/client.service";
 import {User} from "./entity/user.entity";
 import {readFile} from "fs/promises";
 import {Tenant} from "./entity/tenant.entity";
@@ -19,6 +22,9 @@ export class StartUpService implements OnModuleInit {
         private readonly usersService: UsersService,
         private readonly tenantService: TenantService,
         private readonly roleService: RoleService,
+        private readonly groupService: GroupService,
+        private readonly appService: AppService,
+        private readonly clientService: ClientService,
         private readonly securityService: SecurityService,
         private dataSource: DataSource,
     ) {
@@ -31,6 +37,7 @@ export class StartUpService implements OnModuleInit {
         if (!this.configService.isProduction()) {
             await this.populateDummyUsers();
             await this.createDummyTenantAndUser();
+            await this.createDummyAppsGroupsRoles();
         }
         await this.createAdminUser();
         await this.populateGlobalTenant();
@@ -38,43 +45,42 @@ export class StartUpService implements OnModuleInit {
 
     async createAdminUser() {
         try {
-            let adminContext =
-                await this.securityService.getAdminContextForInternalUse();
+            const permission = this.securityService.createPermissionForStartupSeed();
             if (
                 !(await this.usersService.existByEmail(
-                    adminContext,
+                    permission,
                     this.configService.get("SUPER_ADMIN_EMAIL"),
                 ))
             ) {
                 let user: User = await this.usersService.create(
-                    adminContext,
+                    permission,
                     this.configService.get("SUPER_ADMIN_PASSWORD"),
                     this.configService.get("SUPER_ADMIN_EMAIL"),
                     this.configService.get("SUPER_ADMIN_NAME"),
                 );
 
                 await this.usersService.updateVerified(
-                    adminContext,
+                    permission,
                     user.id,
                     true,
                 );
 
                 const isPresent = await this.usersService.existByEmail(
-                    adminContext,
+                    permission,
                     "admin@mail.com",
                 );
 
                 if (!isPresent) {
 
                     let normalUser: User = await this.usersService.create(
-                        adminContext,
+                        permission,
                         "admin9000",
                         "admin@mail.com",
                         "admin",
                     );
 
                     await this.usersService.updateVerified(
-                        adminContext,
+                        permission,
                         user.id,
                         true,
                     );
@@ -89,8 +95,7 @@ export class StartUpService implements OnModuleInit {
     async createDummyTenantAndUser(): Promise<void> {
         try {
             // 1) Get admin context for creating data
-            const adminContext =
-                await this.securityService.getAdminContextForInternalUse();
+            const permission = this.securityService.createPermissionForStartupSeed();
 
             // 3) Define a list of dummy tenants to create
             const dummyTenants = [
@@ -103,14 +108,45 @@ export class StartUpService implements OnModuleInit {
                 {name: "Lothlorien Tenant", domain: "lothlorien.local", signUp: false},
                 {name: "Mirkwood Tenant", domain: "mirkwood.local", signUp: true},
                 {name: "Erebor Tenant", domain: "erebor.local", signUp: false},
-                {name: "Isengard Tenant", domain: "isengard.local", signUp: false}
+                {name: "Isengard Tenant", domain: "isengard.local", signUp: false},
+                {name: "Perm Test Tenant", domain: "perm-test.local", signUp: false},
+                {name: "Prompt Test Tenant", domain: "prompt-test.local", signUp: false},
+                {name: "Nonce Test Tenant", domain: "nonce-test.local", signUp: false},
+                {name: "Compliance Test Tenant", domain: "compliance-test.local", signUp: false},
+                {name: "IDToken Test Tenant", domain: "idtoken-test.local", signUp: false},
+                {name: "Auth Cleanup Test Tenant", domain: "auth-cleanup-test.local", signUp: false},
+                {name: "ID Token Aud Test Tenant", domain: "idtoken-aud-test.local", signUp: false},
+                {name: "Perms Test Tenant", domain: "perms-test.local", signUp: false},
+                {name: "Session Claims Test Tenant", domain: "session-claims-test.local", signUp: false},
+                {name: "Prompt Prop Test Tenant", domain: "prompt-prop-test.local", signUp: false},
+                {name: "Auth Code Expiry Test Tenant", domain: "auth-code-expiry-test.local", signUp: false},
+                {name: "Offline Access Test Tenant", domain: "offline-access-test.local", signUp: false},
+                {name: "Redirect URI Binding Test Tenant", domain: "redirect-uri-test.local", signUp: false},
+                {name: "Redirect URI Bypass Test Tenant", domain: "redirect-uri-bypass-test.local", signUp: false},
+                {name: "OIDC Compat Test Tenant", domain: "oidc-compat-test.local", signUp: false},
+                {
+                    name: "Client Creds Migration Test Tenant",
+                    domain: "client-creds-migration-test.local",
+                    signUp: false
+                },
+                {name: "Client Binding Test Tenant", domain: "client-binding-test.local", signUp: false},
+                {name: "Auth Code Single Use Test Tenant", domain: "auth-code-single-use-test.local", signUp: false},
+                {name: "UserInfo Test Tenant", domain: "userinfo-test.local", signUp: false},
+                {name: "Session Threading Test Tenant", domain: "session-threading-test.local", signUp: false},
+                {name: "Sub Flow A Tenant", domain: "sub-flow-a.local", signUp: true},
+                {name: "Sub Flow B Tenant", domain: "sub-flow-b.local", signUp: false},
+                {name: "Forgot PW Test Tenant", domain: "forgot-pw-test.local", signUp: true},
+                {name: "Onboard Test Tenant", domain: "onboard-test.local", signUp: false},
+                {name: "Onboard App Owner Tenant", domain: "onboard-app-owner.local", signUp: false},
+                {name: "Onboard Subscriber Tenant", domain: "onboard-subscriber.local", signUp: false},
+                {name: "Login Session Test Tenant", domain: "login-session-test.local", signUp: false},
             ];
 
             // 4) Create each tenant and assign the existing user as owner
             for (const {name, domain, signUp} of dummyTenants) {
                 const adminEmail = `admin@${domain}`;
                 const isPresent = await this.usersService.existByEmail(
-                    adminContext,
+                    permission,
                     adminEmail,
                 );
                 if (isPresent) {
@@ -118,19 +154,19 @@ export class StartUpService implements OnModuleInit {
                 }
 
                 const adminUser: User = await this.usersService.create(
-                    adminContext,
+                    permission,
                     "admin9000",
                     adminEmail,
                     "Admin",
                 );
                 await this.usersService.updateVerified(
-                    adminContext,
+                    permission,
                     adminUser.id,
                     true,
                 );
 
                 const createdTenant: Tenant = await this.tenantService.create(
-                    adminContext,
+                    permission,
                     name,
                     domain,
                     adminUser,
@@ -138,7 +174,7 @@ export class StartUpService implements OnModuleInit {
 
                 if (signUp) {
                     await this.tenantService.updateTenant(
-                        adminContext,
+                        permission,
                         createdTenant.id,
                         {
                             allowSignUp: true,
@@ -152,6 +188,18 @@ export class StartUpService implements OnModuleInit {
                     "Admin user used for ownership:",
                     adminUser.email,
                 );
+
+                // Enable password grant
+                // test fixtures can authenticate via the password grant.
+                try {
+                    const defaultClient = await this.clientService.findByAlias(domain);
+                    await this.clientService.updateClient(permission, defaultClient.clientId, {
+                        allowPasswordGrant: true,
+                    });
+                    this.logger.log(`Enabled allowPasswordGrant on default client for ${domain}`);
+                } catch (e) {
+                    this.logger.warn(`Could not enable allowPasswordGrant on default client for ${domain}: ${e}`);
+                }
             }
         } catch (error) {
             this.logger.error("Error creating multiple dummy tenants:", error);
@@ -161,25 +209,24 @@ export class StartUpService implements OnModuleInit {
     async populateDummyUsers(): Promise<void> {
         try {
             const data: string = await readFile("./users.json", "utf8");
-            const adminContext =
-                await this.securityService.getAdminContextForInternalUse();
+            const permission = this.securityService.createPermissionForStartupSeed();
             const users = JSON.parse(data);
 
             for (const record of users.records) {
                 try {
                     const isPresent = await this.usersService.existByEmail(
-                        adminContext,
+                        permission,
                         record.email,
                     );
                     if (!isPresent) {
                         const user: User = await this.usersService.create(
-                            adminContext,
+                            permission,
                             record.password,
                             record.email,
                             record.name,
                         );
                         await this.usersService.updateVerified(
-                            adminContext,
+                            permission,
                             user.id,
                             true,
                         );
@@ -195,65 +242,248 @@ export class StartUpService implements OnModuleInit {
 
     async populateGlobalTenant() {
         try {
-            let adminContext =
-                await this.securityService.getAdminContextForInternalUse();
+            const permission = this.securityService.createPermissionForStartupSeed();
             let globalTenantExists = await this.tenantService.existByDomain(
-                adminContext,
+                permission,
                 this.configService.get("SUPER_TENANT_DOMAIN"),
             );
             if (!globalTenantExists) {
                 const user = await this.usersService.findByEmail(
-                    adminContext,
+                    permission,
                     this.configService.get("SUPER_ADMIN_EMAIL"),
                 );
                 const tenant: Tenant = await this.tenantService.create(
-                    adminContext,
+                    permission,
                     this.configService.get("SUPER_TENANT_NAME"),
                     this.configService.get("SUPER_TENANT_DOMAIN"),
                     user,
                 );
                 const adminRole = await this.roleService.findByNameAndTenant(
-                    adminContext,
+                    permission,
                     RoleEnum.TENANT_ADMIN,
                     tenant,
                 );
                 const viewerRole = await this.roleService.findByNameAndTenant(
-                    adminContext,
+                    permission,
                     RoleEnum.TENANT_VIEWER,
                     tenant,
                 );
                 const superAdminRole = await this.roleService.create(
-                    adminContext,
+                    permission,
                     RoleEnum.SUPER_ADMIN,
                     tenant,
                     false,
                 );
                 await this.roleService.updateUserRoles(
-                    adminContext,
+                    permission,
                     [adminRole.name, viewerRole.name, superAdminRole.name],
                     tenant,
                     user,
                 );
 
                 const normalUser = await this.usersService.findByEmail(
-                    adminContext,
+                    permission,
                     "admin@mail.com",
                 );
 
-                const isMember = await this.tenantService.isMember(adminContext, tenant.id, normalUser)
+                const isMember = await this.tenantService.isMember(permission, tenant.id, normalUser)
                 if (!isMember) {
-                    await this.tenantService.addMember(adminContext, tenant.id, normalUser);
+                    await this.tenantService.addMember(permission, tenant.id, normalUser);
 
                     await this.roleService.updateUserRoles(
-                        adminContext,
+                        permission,
                         [viewerRole.name],
                         tenant,
                         normalUser,
                     );
                 }
+
+                // Enable password grant on the super tenant's default client so that
+                // admin tooling and test fixtures can authenticate via the password grant.
+                try {
+                    const defaultClient = await this.clientService.findByAlias(
+                        this.configService.get("SUPER_TENANT_DOMAIN"),
+                    );
+                    await this.clientService.updateClient(permission, defaultClient.clientId, {
+                        allowPasswordGrant: true,
+                    });
+                    this.logger.log(`Enabled allowPasswordGrant on default client for ${this.configService.get("SUPER_TENANT_DOMAIN")}`);
+                } catch (e) {
+                    this.logger.warn(`Could not enable allowPasswordGrant on super tenant default client: ${e}`);
+                }
             }
         } catch (e) {
             console.error(e);
+        }
+    }
+
+    async createDummyAppsGroupsRoles(): Promise<void> {
+        try {
+            const permission = this.securityService.createPermissionForStartupSeed();
+
+            const dummyData = [
+                {
+                    domain: "shire.local",
+                    roles: ["Editor", "Reviewer"],
+                    groups: ["Hobbits", "Gardeners"],
+                    apps: [
+                        {
+                            name: "Shire Portal",
+                            appUrl: "https://portal.shire.local",
+                            description: "Main portal for Shire residents"
+                        },
+                        {
+                            name: "Harvest Tracker",
+                            appUrl: "https://harvest.shire.local",
+                            description: "Track crop yields"
+                        },
+                    ],
+                    clients: [
+                        {
+                            name: "Shire Web App",
+                            redirectUris: ["https://portal.shire.local/callback"],
+                            allowedScopes: "openid profile email tenant.read tenant.write"
+                        },
+                        {
+                            name: "Shire Mobile",
+                            redirectUris: ["https://mobile.shire.local/callback"],
+                            allowedScopes: "openid profile",
+                            isPublic: true
+                        },
+                        {
+                            name: "Shire Authorize Test",
+                            redirectUris: ["https://authorize-e2e.example.com/callback"],
+                            allowedScopes: "openid profile email",
+                            isPublic: true
+                        },
+                    ],
+                },
+                {
+                    domain: "gondor.local",
+                    roles: ["Commander", "Scribe", "Diplomat"],
+                    groups: ["Rangers", "Tower Guard", "Council"],
+                    apps: [
+                        {
+                            name: "Gondor Defense",
+                            appUrl: "https://defense.gondor.local",
+                            description: "Military coordination"
+                        },
+                        {
+                            name: "Archive System",
+                            appUrl: "https://archive.gondor.local",
+                            description: "Historical records"
+                        },
+                        {name: "Trade Ledger", appUrl: "https://trade.gondor.local", description: "Commerce tracking"},
+                    ],
+                    clients: [
+                        {
+                            name: "Gondor Defense Client",
+                            redirectUris: ["https://defense.gondor.local/callback"],
+                            allowedScopes: "openid profile"
+                        },
+                    ],
+                },
+                {
+                    domain: "rohan.local",
+                    roles: ["Marshal", "Stable Master"],
+                    groups: ["Riders", "Horse Breeders"],
+                    apps: [
+                        {
+                            name: "Rohan Dispatch",
+                            appUrl: "https://dispatch.rohan.local",
+                            description: "Rider coordination"
+                        },
+                    ],
+                    clients: [],
+                },
+                {
+                    domain: "rivendell.local",
+                    roles: ["Loremaster", "Healer"],
+                    groups: ["Scholars", "Healers Guild"],
+                    apps: [
+                        {
+                            name: "Library of Imladris",
+                            appUrl: "https://library.rivendell.local",
+                            description: "Knowledge repository"
+                        },
+                    ],
+                    clients: [
+                        {
+                            name: "Rivendell Library Client",
+                            redirectUris: ["https://library.rivendell.local/callback"],
+                            allowedScopes: "openid profile"
+                        },
+                    ],
+                },
+                {
+                    domain: "perm-test.local",
+                    roles: ["CustomTestRole"],
+                    groups: [],
+                    apps: [],
+                    clients: [],
+                },
+            ];
+
+            for (const entry of dummyData) {
+                let tenant: Tenant;
+                try {
+                    tenant = await this.tenantService.findByDomain(permission, entry.domain);
+                } catch {
+                    this.logger.warn(`Tenant ${entry.domain} not found, skipping`);
+                    continue;
+                }
+
+                for (const roleName of entry.roles) {
+                    try {
+                        const exists = await this.roleService.findByNameAndTenant(permission, roleName, tenant);
+                        if (exists) continue;
+                    } catch {
+                        await this.roleService.create(permission, roleName, tenant);
+                        this.logger.log(`Created role: ${roleName} in ${entry.domain}`);
+                    }
+                }
+
+                for (const groupName of entry.groups) {
+                    try {
+                        const exists = await this.groupService.existsByNameAndTenantId(permission, groupName, tenant.id);
+                        if (exists) continue;
+                        await this.groupService.create(permission, groupName, tenant);
+                        this.logger.log(`Created group: ${groupName} in ${entry.domain}`);
+                    } catch (e) {
+                        this.logger.warn(`Group ${groupName} in ${entry.domain} may already exist`);
+                    }
+                }
+
+                for (const app of entry.apps) {
+                    try {
+                        await this.appService.createApp(permission, tenant.id, app.name, app.appUrl, app.description);
+                        this.logger.log(`Created app: ${app.name} in ${entry.domain}`);
+                    } catch (e) {
+                        this.logger.warn(`App ${app.name} in ${entry.domain} may already exist`);
+                    }
+                }
+
+                for (const client of entry.clients) {
+                    try {
+                        await this.clientService.createClient(
+                            permission,
+                            tenant.id,
+                            client.name,
+                            client.redirectUris,
+                            client.allowedScopes,
+                            undefined,
+                            undefined,
+                            undefined,
+                            client.isPublic,
+                        );
+                        this.logger.log(`Created client: ${client.name} in ${entry.domain}`);
+                    } catch (e) {
+                        this.logger.warn(`Client ${client.name} in ${entry.domain} may already exist`);
+                    }
+                }
+            }
+        } catch (error) {
+            this.logger.error("Error creating dummy apps/groups/roles:", error);
         }
     }
 }

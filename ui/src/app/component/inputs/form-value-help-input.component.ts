@@ -60,8 +60,9 @@ import {randomId} from "../util/utils";
                         class="input-group-text btn btn-outline-secondary"
                         id="{{ test_id }}_{{ formControlName }}-input-vh-btn"
                         type="button"
+                        aria-label="Open value help"
                     >
-                        <i class="fa fas fa-clone"></i>
+                        <i class="fa fa-clone"></i>
                     </button>
                 </div>
             </div>

@@ -186,6 +186,17 @@ const LoginSchema = yup.object().shape({
         .matches(/^(plain|S256|OWH32)$/, "method is required")
         .default("plain"),
     code_challenge: yup.string().required("code_challenge is required"),
+    subscriber_tenant_hint: yup.string().optional().nullable(),
+    redirect_uri: yup.string().optional(),
+    scope: yup.string().optional(),
+    nonce: yup.string().optional().max(512),
+    prompt: yup.string().optional(),
+    max_age: yup
+        .number()
+        .optional()
+        .integer("max_age must be an integer")
+        .min(0, "max_age must be a non-negative integer"),
+    resource: yup.string().optional(),
 });
 
 const PasswordGrantSchema = yup.object().shape({
@@ -201,7 +212,8 @@ const PasswordGrantSchema = yup.object().shape({
         .max(128),
     client_id: yup.string().required("client_id is required"),
     subscriber_tenant_hint: yup.string().nullable(),
-    scopes: yup.array().of(yup.string().max(20)),
+    scope: yup.string().optional(),
+    resource: yup.string().optional(),
 });
 
 const ClientCredentialGrantSchema = yup.object().shape({
@@ -213,7 +225,8 @@ const ClientCredentialGrantSchema = yup.object().shape({
         }),
     client_id: yup.string().required("client_id is required"),
     client_secret: yup.string().required("client_secret is required"),
-    scopes: yup.array().of(yup.string().max(20)),
+    scope: yup.string().optional(),
+    resource: yup.string().optional(),
 });
 
 const RefreshTokenGrantSchema = yup.object().shape({
@@ -222,8 +235,10 @@ const RefreshTokenGrantSchema = yup.object().shape({
         .required()
         .matches(/^refresh_token$/g, {message: "grant type not recognised"}),
     refresh_token: yup.string().required("refresh_token is required"),
-    subscriber_tenant_hint: yup.string().nullable(),
-    scopes: yup.array().of(yup.string().max(20)),
+    client_id: yup.string().required("client_id is required"),
+    client_secret: yup.string().optional(),
+    scope: yup.string().optional(),
+    resource: yup.string().optional(),
 });
 
 const CodeGrantSchema = yup.object().shape({
@@ -234,10 +249,16 @@ const CodeGrantSchema = yup.object().shape({
             message: "grant type not recognised",
         }),
     code: yup.string().required("code is required"),
-    code_verifier: yup.string().required("code_verifier is required"),
-    client_id: yup.string().optional(),
+    code_verifier: yup.string()
+        .required("code_verifier is required")
+        .min(43, "code_verifier must be at least 43 characters")
+        .max(128, "code_verifier must be at most 128 characters")
+        .matches(/^[A-Za-z0-9\-._~]+$/, "code_verifier contains invalid characters"),
+    client_id: yup.string().required("client_id is required"),
     subscriber_tenant_hint: yup.string().nullable(),
-    scopes: yup.array().of(yup.string().max(20)),
+    scope: yup.string().optional(),
+    redirect_uri: yup.string().optional(),
+    resource: yup.string().optional(),
 });
 
 const VerifyTokenSchema = yup.object().shape({
@@ -279,6 +300,106 @@ const VerifyAuthCodeSchema = yup.object().shape({
     client_id: yup.string().required("client_id is required"),
 });
 
+const ConsentSchema = yup.object().shape({
+    email: yup.string().email().required("Email is required").max(128),
+    password: yup
+        .string()
+        .required("Password is required")
+        .matches(PASSWORD_REGEXP, PASSWORD_MESSAGE)
+        .max(128),
+    client_id: yup.string().required("client_id is required"),
+    code_challenge: yup.string().required("code_challenge is required"),
+    code_challenge_method: yup
+        .string()
+        .required()
+        .matches(/^(plain|S256|OWH32)$/, "method is required"),
+    approved_scopes: yup
+        .array()
+        .of(yup.string())
+        .required("approved_scopes is required"),
+    consent_action: yup
+        .string()
+        .required()
+        .matches(/^(approve|deny)$/, "consent_action must be 'approve' or 'deny'"),
+    redirect_uri: yup.string().optional(),
+    scope: yup.string().optional(),
+    nonce: yup.string().optional().max(512),
+    subscriber_tenant_hint: yup.string().optional().nullable(),
+    prompt: yup.string().optional(),
+    resource: yup.string().optional(),
+});
+
+const SilentAuthSchema = yup.object().shape({
+    client_id: yup.string().required("client_id is required"),
+    user_id: yup.string().required("user_id is required"),
+    tenant_id: yup.string().required("tenant_id is required"),
+    code_challenge: yup.string().required("code_challenge is required"),
+    code_challenge_method: yup
+        .string()
+        .required()
+        .matches(/^(plain|S256|OWH32)$/, "method is required"),
+    redirect_uri: yup.string().optional(),
+    scope: yup.string().optional(),
+    nonce: yup.string().optional().max(512),
+    max_age: yup
+        .number()
+        .optional()
+        .integer("max_age must be an integer")
+        .min(0, "max_age must be a non-negative integer"),
+    resource: yup.string().optional(),
+});
+
+const AuthorizeSchema = yup.object().shape({
+    // RFC 6749 §4.1.2.1: missing or unsupported response_type → unsupported_response_type.
+    // required() catches missing values, oneOf() catches wrong values.
+    // The service maps both (any error on path 'response_type') to unsupported_response_type.
+    response_type: yup
+        .string()
+        .required("response_type is required")
+        .oneOf(["code"], "The response_type parameter must be \"code\""),
+    client_id: yup
+        .string()
+        .required("client_id is required"),
+    redirect_uri: yup
+        .string()
+        .optional(),
+    // RFC 6749 §3.3: scope is optional; when omitted the server defaults to the client's allowedScopes.
+    scope: yup
+        .string()
+        .optional(),
+    // RFC 6749 §4.1.2.1: missing state is a post-redirect error (redirect with error params),
+    // not a pre-redirect JSON error. Validated in the service after redirect_uri is confirmed.
+    state: yup
+        .string()
+        .optional(),
+    code_challenge: yup
+        .string()
+        .optional(),
+    code_challenge_method: yup
+        .string()
+        .optional()
+        .oneOf(["plain", "S256", "OWH32"], "code_challenge_method must be one of: plain, S256, OWH32"),
+    // Nonce length is a post-redirect error per OIDC Core §3.1.2.6, validated in the service.
+    nonce: yup
+        .string()
+        .optional(),
+    // OIDC Core §3.1.2.1: prompt is a space-delimited list of values.
+    // Basic format validation only — the 'none' exclusivity check is enforced
+    // in AuthorizeService.validateAuthorizeRequest() after redirect_uri is validated,
+    // so the error can be delivered as a redirect per RFC 6749 §4.1.2.1.
+    prompt: yup
+        .string()
+        .optional(),
+    max_age: yup
+        .number()
+        .optional()
+        .integer("max_age must be an integer")
+        .min(0, "max_age must be a non-negative integer"),
+    resource: yup
+        .string()
+        .optional(),
+});
+
 export const ValidationSchema = {
     SignUpSchema,
     SignDownSchema,
@@ -315,4 +436,7 @@ export const ValidationSchema = {
     UpdateGroupUser,
     UpdateGroupSchema,
     VerifyAuthCodeSchema,
+    ConsentSchema,
+    SilentAuthSchema,
+    AuthorizeSchema,
 };

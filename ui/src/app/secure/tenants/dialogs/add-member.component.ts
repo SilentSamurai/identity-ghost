@@ -74,7 +74,6 @@ export class AddMemberComponent implements OnInit {
         try {
             const addedMember = await this.tenantService.addMember(
                 this.form.email,
-                this.tenant.id,
             );
             this.messageService.add({
                 severity: 'success',

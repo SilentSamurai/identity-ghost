@@ -1,351 +1,268 @@
 import {Component, OnInit} from '@angular/core';
 import {ActivatedRoute, Router} from '@angular/router';
-import {NgbModal} from '@ng-bootstrap/ng-bootstrap';
+import {MessageService} from 'primeng/api';
+import {GroupService} from '../../_services/group.service';
 import {TenantService} from '../../_services/tenant.service';
 import {SessionService} from '../../_services/session.service';
-import {GroupService} from '../../_services/group.service';
 import {AuthDefaultService} from '../../_services/auth.default.service';
-import {UpdateGroupComponent} from './dialogs/update-group.component';
-import {MessageService} from 'primeng/api';
 import {ConfirmationService} from '../../component/dialogs/confirmation.service';
+import {ModalService} from '../../component/dialogs/modal.service';
+import {UpdateGroupComponent} from './dialogs/update-group.component';
 import {StaticSource} from '../../component/model/StaticSource';
-import {CloseType, ValueHelpResult,} from '../../component/value-help/value-help.component';
+import {CloseType, ValueHelpResult} from '../../component/value-help/value-help.component';
 
 @Component({
-    selector: 'app-group-object',
+    selector: 'app-GP02',
     template: `
-        <nav-bar></nav-bar>
-        <app-object-page *ngIf="!loading">
-            <app-op-title>
-                {{ group.name }}
-            </app-op-title>
-            <app-op-subtitle>
-                {{ group.tenant.name }}
-            </app-op-subtitle>
+        <secure-nav-bar></secure-nav-bar>
+        <app-object-page [loading]="loading">
+            <app-op-title>{{ group.name }}</app-op-title>
+            <app-op-subtitle>Group</app-op-subtitle>
             <app-op-actions>
                 <button
                     (click)="onUpdateGroup()"
+                    [disabled]="!isTenantAdmin"
                     class="btn btn-primary btn-sm me-2"
                 >
                     Update
                 </button>
-
-                <button (click)="onDeleteGroup()" class="btn btn-danger btn-sm">
+                <button
+                    (click)="onDeleteGroup()"
+                    [disabled]="!isTenantAdmin"
+                    class="btn btn-danger btn-sm"
+                >
                     Delete
                 </button>
             </app-op-actions>
             <app-op-header>
                 <div class="row">
                     <div class="col-md">
-                        <app-attribute label="Group Name" valueClass="">
-                            {{ group.name }}
-                        </app-attribute>
-                        <app-attribute label="Description" valueClass="">
-                            {{ group.description }}
-                        </app-attribute>
+                        <app-attribute label="Group Name">{{ group.name }}</app-attribute>
                     </div>
                     <div class="col-md">
-                        <app-attribute label="Tenant Id">
-                            {{ group.tenant.id }}
-                        </app-attribute>
-                        <app-attribute label="Tenant Name">
-                            {{ group.tenant.name }}
-                        </app-attribute>
+                        <app-attribute label="Tenant">{{ group.tenant?.name }}</app-attribute>
                     </div>
                 </div>
             </app-op-header>
 
-            <app-op-tab name="Roles">
-                <app-op-section name="Roles">
+            <app-op-tab name="Users">
+                <app-op-section name="Users">
                     <app-section-content>
-                        <p-table [value]="roles" responsiveLayout="scroll">
-                            <ng-template pTemplate="caption">
-                                <div class="d-flex justify-content-between">
-                                    <h5>Roles</h5>
-                                    <app-value-help-button
-                                        name="Roles"
-                                        classStyle="btn-primary btn-sm"
-                                        [multi]="true"
-                                        [dataSource]="rolesDM"
-                                        [selection]="selectedRoles"
-                                        (onClose)="onAddRoles($event)"
+                        <app-table title="Users" [dataSource]="usersDM">
+                            <app-table-col label="Name" name="name"></app-table-col>
+                            <app-table-col label="Email" name="email"></app-table-col>
+                            <app-table-col label="Actions" name="actions"></app-table-col>
+
+                            <app-table-actions>
+                                <app-value-help-button
+                                    name="Users"
+                                    classStyle="btn-primary btn-sm"
+                                    [multi]="true"
+                                    [dataSource]="membersDM"
+                                    [selection]="selectedUsers"
+                                    (onClose)="onAddUsers($event)"
+                                >
+                                    <app-btn-content>Assign Users</app-btn-content>
+                                    <app-vh-col label="Email" name="email"></app-vh-col>
+                                    <ng-template #vh_body let-row>
+                                        <td>{{ row.email }}</td>
+                                    </ng-template>
+                                </app-value-help-button>
+                            </app-table-actions>
+
+                            <ng-template let-user #table_body>
+                                <td>{{ user.name }}</td>
+                                <td>{{ user.email }}</td>
+                                <td>
+                                    <button
+                                        (click)="onRemoveUser(user)"
+                                        [disabled]="!isTenantAdmin"
+                                        class="btn btn-sm"
+                                        type="button"
+                                        aria-label="Remove user"
                                     >
-                                        <app-btn-content>
-                                            Assign Roles
-                                        </app-btn-content>
-                                        <app-vh-col
-                                            label="Name"
-                                            name="name"
-                                        ></app-vh-col>
-                                        <ng-template #vh_body let-row>
-                                            <td>{{ row.name }}</td>
-                                        </ng-template>
-                                    </app-value-help-button>
-                                </div>
+                                        <i class="fa fa-trash"></i>
+                                    </button>
+                                </td>
                             </ng-template>
-                            <ng-template pTemplate="header">
-                                <tr>
-                                    <th>Name</th>
-                                    <th>Description</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </ng-template>
-                            <ng-template pTemplate="body" let-role>
-                                <tr>
-                                    <td>
-                                        <a
-                                            [routerLink]="[
-                                                '/RL02',
-                                                group.tenant.id,
-                                                role.id,
-                                            ]"
-                                            href="javascript:void(0)"
-                                        >
-                                            {{ role.name }}
-                                        </a>
-                                    </td>
-                                    <td>{{ role.description }}</td>
-                                    <td>
-                                        <button
-                                            (click)="onRemoveRole(role)"
-                                            class="btn btn-sm"
-                                            type="button"
-                                        >
-                                            <i class="fa fa-solid fa-trash"></i>
-                                        </button>
-                                    </td>
-                                </tr>
-                            </ng-template>
-                        </p-table>
+                        </app-table>
                     </app-section-content>
                 </app-op-section>
             </app-op-tab>
 
-            <!-- Convert 'Users' to an app-op-tab -->
-            <app-op-tab name="Users">
-                <app-op-section name="Users">
+            <app-op-tab name="Roles">
+                <app-op-section name="Roles">
                     <app-section-content>
-                        <p-table [value]="users" responsiveLayout="scroll">
-                            <ng-template pTemplate="caption">
-                                <div class="d-flex justify-content-between">
-                                    <h5>Users</h5>
-                                    <app-value-help-button
-                                        name="Users"
-                                        classStyle="btn-primary btn-sm"
-                                        [multi]="true"
-                                        [dataSource]="usersDM"
-                                        [selection]="selectedUsers"
-                                        (onClose)="onAddUsers($event)"
+                        <app-table title="Roles" [dataSource]="rolesDM">
+                            <app-table-col label="Name" name="name"></app-table-col>
+                            <app-table-col label="Description" name="description"></app-table-col>
+                            <app-table-col label="Actions" name="actions"></app-table-col>
+
+                            <app-table-actions>
+                                <app-value-help-button
+                                    name="Roles"
+                                    classStyle="btn-primary btn-sm"
+                                    [multi]="true"
+                                    [dataSource]="tenantRolesDM"
+                                    [selection]="selectedRoles"
+                                    (onClose)="onAddRoles($event)"
+                                >
+                                    <app-btn-content>Assign Roles</app-btn-content>
+                                    <app-vh-col label="Name" name="name"></app-vh-col>
+                                    <ng-template #vh_body let-row>
+                                        <td>{{ row.name }}</td>
+                                    </ng-template>
+                                </app-value-help-button>
+                            </app-table-actions>
+
+                            <ng-template let-role #table_body>
+                                <td>
+                                    <a
+                                        [routerLink]="['/RL02', tenantId, role.id]"
+                                        
+                                    >{{ role.name }}</a>
+                                </td>
+                                <td>{{ role.description }}</td>
+                                <td>
+                                    <button
+                                        (click)="onRemoveRole(role)"
+                                        [disabled]="!isTenantAdmin"
+                                        class="btn btn-sm"
+                                        type="button"
+                                        aria-label="Remove role"
                                     >
-                                        <app-btn-content>
-                                            Assign Users
-                                        </app-btn-content>
-                                        <app-vh-col
-                                            label="Email"
-                                            name="email"
-                                        ></app-vh-col>
-                                        <ng-template #vh_body let-row>
-                                            <td>{{ row.email }}</td>
-                                        </ng-template>
-                                    </app-value-help-button>
-                                </div>
+                                        <i class="fa fa-trash"></i>
+                                    </button>
+                                </td>
                             </ng-template>
-                            <ng-template pTemplate="header">
-                                <tr>
-                                    <th>Name</th>
-                                    <th>Email</th>
-                                    <th>Assignments</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </ng-template>
-                            <ng-template pTemplate="body" let-user>
-                                <tr>
-                                    <td>{{ user.name }}</td>
-                                    <td>
-                                        <a
-                                            [routerLink]="['/UR02', user.email]"
-                                            href="javascript:void(0)"
-                                        >{{ user.email }}</a
-                                        >
-                                    </td>
-                                    <td>
-                                        <a
-                                            [routerLink]="[
-                                                '/TNRL01',
-                                                group.tenant.id,
-                                                user.email,
-                                            ]"
-                                            href="javascript:void(0)"
-                                        >View Assignments</a
-                                        >
-                                    </td>
-                                    <td>
-                                        <button
-                                            (click)="onUserRemove(user)"
-                                            class="btn btn-sm"
-                                            type="button"
-                                        >
-                                            <i class="fa fa-solid fa-trash"></i>
-                                        </button>
-                                    </td>
-                                </tr>
-                            </ng-template>
-                        </p-table>
+                        </app-table>
                     </app-section-content>
                 </app-op-section>
             </app-op-tab>
         </app-object-page>
-        <div class="text-center" *ngIf="loading">
-            <div class="spinner-border" role="status">
-                <span class="sr-only">Loading...</span>
-            </div>
-        </div>
-        <p-confirmDialog></p-confirmDialog>
     `,
     styles: [''],
-    providers: [],
 })
 export class GP02Component implements OnInit {
     loading = true;
-    group: any;
+    group: any = {};
     users: any[] = [];
-    usersDM = new StaticSource(['id']);
     roles: any[] = [];
-    rolesDM = new StaticSource(['id']);
-    selectedRoles: any[] = [];
+    isTenantAdmin = false;
+    tenantId: string = '';
     selectedUsers: any[] = [];
-    private group_id: any;
+    selectedRoles: any[] = [];
+
+    usersDM = new StaticSource(['id']);
+    rolesDM = new StaticSource(['id']);
+    membersDM = new StaticSource(['id']);
+    tenantRolesDM = new StaticSource(['id']);
+
+    private groupId: string = '';
 
     constructor(
-        private tenantService: TenantService,
-        private tokenStorageService: SessionService,
-        private messageService: MessageService,
         private groupService: GroupService,
+        private tenantService: TenantService,
+        private sessionService: SessionService,
+        private messageService: MessageService,
         private actRoute: ActivatedRoute,
         private router: Router,
         private authDefaultService: AuthDefaultService,
         private confirmationService: ConfirmationService,
-        private modalService: NgbModal,
-    ) {
-    }
+        private modalService: ModalService,
+    ) {}
 
     async ngOnInit() {
         this.loading = true;
-        this.authDefaultService.setTitle('Group Details');
-        if (!this.actRoute.snapshot.params.hasOwnProperty('groupId')) {
-            await this.router.navigate(['/GP02']);
+        try {
+            this.groupId = this.actRoute.snapshot.params['groupId'];
+            this.tenantId = this.actRoute.snapshot.params['tenantId'];
+            this.isTenantAdmin = this.sessionService.isTenantAdmin();
+
+            const response = await this.groupService.getGroupDetail(this.groupId);
+            this.group = response.group;
+            this.users = response.users;
+            this.roles = response.roles;
+
+            this.usersDM.setData(this.users);
+            this.rolesDM.setData(this.roles);
+
+            const members = await this.tenantService.getMembers();
+            this.membersDM.setData(members);
+            const tenantRoles = await this.tenantService.getTenantRoles();
+            this.tenantRolesDM.setData(tenantRoles);
+
+            this.authDefaultService.setTitle('Group: ' + this.group.name);
+        } finally {
+            this.loading = false;
         }
-
-        this.group_id = this.actRoute.snapshot.params['groupId'];
-
-        let response = await this.groupService.getGroupDetail(this.group_id);
-
-        this.group = response.group;
-        this.users = response.users;
-        this.roles = response.roles;
-        let members = await this.tenantService.getMembers(this.group.tenantId);
-        this.usersDM.setData(members);
-        let tenantRoles = await this.tenantService.getTenantRoles(
-            this.group.tenantId,
-        );
-        this.rolesDM.setData(tenantRoles);
-
-        this.authDefaultService.setTitle('Group: ' + this.group.name);
-
-        this.loading = false;
     }
 
     async onUpdateGroup() {
-        const modalRef = this.modalService.open(UpdateGroupComponent);
-        modalRef.componentInstance.groupId = this.group_id;
-        modalRef.componentInstance.form.name = this.group.name;
-        const group = await modalRef.result;
-        console.log(group);
-        this.ngOnInit();
-    }
-
-    onDeleteGroup() {
-        this.confirmationService.confirm({
-            message: 'Are you sure you want to proceed?',
-            header: 'Confirmation',
-            icon: 'pi pi-info-circle',
-            accept: async () => {
-                await this.groupService.deleteGroup(this.group_id);
-                this.messageService.add({
-                    severity: 'info',
-                    summary: 'Successful',
-                    detail: 'Group removed',
-                });
-                await this.router.navigate(['/GP01']);
-            },
+        const result = await this.modalService.open(UpdateGroupComponent, {
+            initData: {groupId: this.groupId, form: {name: this.group.name}}
         });
-    }
-
-    onUserRemove(user: any) {
-        this.confirmationService.confirm({
-            message: 'Are you sure you want to proceed?',
-            header: 'Confirmation',
-            icon: 'pi pi-info-circle',
-            accept: async () => {
-                await this.groupService.removeUser(this.group_id, [user.email]);
-                this.messageService.add({
-                    severity: 'info',
-                    summary: 'Successful',
-                    detail: 'User removed',
-                });
-                await this.ngOnInit();
-            },
-        });
-    }
-
-    async onAddUsers(result: ValueHelpResult) {
-        if (result.closeType === CloseType.Confirm) {
-            const selectedUsers = result.selection;
-            if (selectedUsers.length > 0) {
-                await this.groupService.addUser(
-                    this.group_id,
-                    selectedUsers.map((r) => r.email),
-                );
-                await this.ngOnInit();
-            }
+        if (result.is_ok()) {
+            await this.ngOnInit();
         }
     }
 
-    // async provideUsers($event: TableAsyncLoadEvent) {
-    //     let members = await this.tenantService.getMembers(this.group.tenantId);
-    //     $event.update(members, false);
-    // }
-    //
-    // async provideRoles($event: TableAsyncLoadEvent) {
-    //     let roles = await this.tenantService.getTenantRoles(this.group.tenantId);
-    //     $event.update(roles, false);
-    // }
+    async onDeleteGroup() {
+        const deleted = await this.confirmationService.confirm({
+            message: `Are you sure you want to delete group <b>${this.group.name}</b>?`,
+            header: 'Confirmation',
+            icon: 'pi pi-info-circle',
+            accept: async () => {
+                try {
+                    await this.groupService.deleteGroup(this.groupId);
+                    this.messageService.add({severity: 'success', summary: 'Success', detail: 'Group Deleted'});
+                    return true;
+                } catch (e) {
+                    this.messageService.add({severity: 'error', summary: 'Error', detail: 'Group Deletion Failed'});
+                }
+                return null;
+            },
+        });
+        if (deleted) {
+            await this.router.navigate(['/TN02', this.tenantId], {fragment: 'GROUPS'});
+        }
+    }
+
+    async onAddUsers(result: ValueHelpResult) {
+        if (result.closeType === CloseType.Confirm && result.selection.length > 0) {
+            await this.groupService.addUser(this.groupId, result.selection.map((u) => u.email));
+            await this.ngOnInit();
+        }
+    }
+
+    async onRemoveUser(user: any) {
+        await this.confirmationService.confirm({
+            message: `Remove <b>${user.email}</b> from this group?`,
+            header: 'Confirmation',
+            icon: 'pi pi-info-circle',
+            accept: async () => {
+                await this.groupService.removeUser(this.groupId, [user.email]);
+                this.messageService.add({severity: 'info', summary: 'Success', detail: 'User removed'});
+                await this.ngOnInit();
+            },
+        });
+    }
 
     async onAddRoles(result: ValueHelpResult) {
-        if (result.closeType === CloseType.Confirm) {
-            const selectedRoles = result.selection;
-            if (selectedRoles.length > 0) {
-                await this.groupService.addRoles(
-                    this.group_id,
-                    selectedRoles.map((r) => r.name),
-                );
-                await this.ngOnInit();
-            }
+        if (result.closeType === CloseType.Confirm && result.selection.length > 0) {
+            await this.groupService.addRoles(this.groupId, result.selection.map((r) => r.name));
+            await this.ngOnInit();
         }
     }
 
     async onRemoveRole(role: any) {
         await this.confirmationService.confirm({
-            message: 'Are you sure you want to proceed?',
+            message: `Remove role <b>${role.name}</b> from this group?`,
             header: 'Confirmation',
             icon: 'pi pi-info-circle',
             accept: async () => {
-                await this.groupService.removeRoles(this.group_id, [role.name]);
-                this.messageService.add({
-                    severity: 'info',
-                    summary: 'Successful',
-                    detail: 'Role removed',
-                });
+                await this.groupService.removeRoles(this.groupId, [role.name]);
+                this.messageService.add({severity: 'info', summary: 'Success', detail: 'Role removed'});
                 await this.ngOnInit();
             },
         });

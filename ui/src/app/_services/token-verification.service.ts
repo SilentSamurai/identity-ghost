@@ -1,5 +1,5 @@
 import {Injectable} from '@angular/core';
-import jwt_decode from 'jwt-decode';
+import {jwtDecode} from 'jwt-decode';
 import {DecodedToken} from '../model/user.model';
 
 @Injectable({
@@ -8,7 +8,7 @@ import {DecodedToken} from '../model/user.model';
 export class TokenVerificationService {
     verifyToken(token: string): boolean {
         try {
-            const decodedToken = jwt_decode(token) as DecodedToken;
+            const decodedToken = jwtDecode(token) as DecodedToken;
 
             if (!this.verifyRequiredFields(decodedToken)) {
                 console.error('Invalid token structure');
@@ -25,8 +25,13 @@ export class TokenVerificationService {
                 return false;
             }
 
-            if (!this.verifyScopes(decodedToken.scopes)) {
-                console.error('Invalid scopes in token');
+            if (!this.verifyAudience(decodedToken.aud)) {
+                console.error('Invalid audience in token');
+                return false;
+            }
+
+            if (!this.verifyRoles(decodedToken.roles)) {
+                console.error('Invalid roles in token');
                 return false;
             }
 
@@ -42,10 +47,13 @@ export class TokenVerificationService {
             decodedToken.sub &&
             decodedToken.exp &&
             decodedToken.iat &&
-            decodedToken.scopes &&
-            decodedToken.email &&
-            decodedToken.name &&
-            decodedToken.iss
+            decodedToken.iss &&
+            decodedToken.aud &&
+            decodedToken.jti &&
+            decodedToken.client_id &&
+            decodedToken.tenant_id &&
+            decodedToken.scope !== undefined &&
+            decodedToken.grant_type
         );
     }
 
@@ -59,7 +67,11 @@ export class TokenVerificationService {
         return iat <= currentTime + 300;
     }
 
-    private verifyScopes(scopes: string[]): boolean {
-        return Array.isArray(scopes);
+    private verifyAudience(aud: string[]): boolean {
+        return Array.isArray(aud) && aud.length > 0;
+    }
+
+    private verifyRoles(roles: string[]): boolean {
+        return Array.isArray(roles);
     }
 }

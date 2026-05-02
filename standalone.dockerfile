@@ -1,6 +1,5 @@
 FROM node:20.19.0-alpine AS build
 
-
 # Set work directory
 WORKDIR /home/app
 
@@ -31,23 +30,32 @@ WORKDIR /home/app/ui
 RUN npm ci && npm run build
 
 
-
-
 # Production image
 FROM node:20.19.0-alpine
 
 RUN apk add --no-cache nginx
 
-# Copy build artifacts from previous stage
-COPY --from=build /home/app/srv /home/app/srv
+WORKDIR /home/app/srv
+
+# Copy backend package files and install production dependencies only
+COPY ./srv/package.json ./srv/package-lock.json ./
+RUN npm ci --omit=dev
+
+# Copy backend build artifacts
+COPY --from=build /home/app/srv/dist ./dist
+COPY --from=build /home/app/srv/envs ./envs
+COPY --from=build /home/app/srv/users.json ./users.json
 
 # Copy Nginx configs
 COPY ./ui/nginx/mime.types /etc/nginx/mime.types
 COPY ./ui/nginx/templates /etc/nginx/templates
 
-# Nginx static files root (adjust as needed)
+# Nginx static files
 COPY --from=build /home/app/ui/dist /home/static/
+
+# Start script
 COPY start-standalone.sh /home/app/start-standalone.sh
 
-# Start script to run both backend and nginx
-CMD ["sh","/home/app/start-standalone.sh"]
+EXPOSE 80 9001
+
+CMD ["sh", "/home/app/start-standalone.sh"]

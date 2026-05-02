@@ -3,10 +3,6 @@ import {NgbActiveModal} from '@ng-bootstrap/ng-bootstrap';
 import {RoleService} from '../../_services/role.service';
 import {MessageService} from 'primeng/api';
 
-/**
- * Updated version of UpdateRoleModalComponent that uses StandardDialogComponent
- * for consistent layout and styling.
- */
 @Component({
     selector: 'app-update-role-modal',
     template: `
@@ -27,7 +23,7 @@ import {MessageService} from 'primeng/api';
                 </div>
                 <div class="mb-3">
                     <label for="roleDescription" class="form-label"
-                        >Description</label
+                    >Description</label
                     >
                     <textarea
                         id="roleDescription"
@@ -59,7 +55,7 @@ import {MessageService} from 'primeng/api';
     `,
 })
 export class UpdateRoleModalComponent {
-    @Input() role: any; // minimal shape: { id, name, description, tenantId }
+    @Input() role: any;
     @Input() tenantId!: string;
 
     constructor(
@@ -71,7 +67,6 @@ export class UpdateRoleModalComponent {
 
     async onSave() {
         try {
-            // Adjust your service call based on your actual backend endpoint.
             await this.roleService.updateRole(
                 this.role.id,
                 this.role.name,
@@ -82,7 +77,6 @@ export class UpdateRoleModalComponent {
                 summary: 'Role Updated',
                 detail: 'Role name/description updated successfully',
             });
-            // Return updated role object to the caller
             this.activeModal.close(this.role);
         } catch (e: any) {
             this.messageService.add({

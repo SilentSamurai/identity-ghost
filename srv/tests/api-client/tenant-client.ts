@@ -1,9 +1,8 @@
-import {TestAppFixture} from "../test-app.fixture";
-import {expect2xx, HttpClient} from "./client";
+import {expect2xx, HttpClient, TestFixture} from "./client";
 
 export class TenantClient extends HttpClient {
 
-    constructor(app: TestAppFixture, accessToken: string) {
+    constructor(app: TestFixture, accessToken: string) {
         super(app, accessToken);
     }
 
@@ -25,11 +24,11 @@ export class TenantClient extends HttpClient {
     }
 
     // -----------------------------------------------------------------
-    // Existing method for adding members using POST /api/tenant/:tenantId/members/add
+    // Add members using POST /api/tenant/my/members/add
     // -----------------------------------------------------------------
     public async addMembers(tenantId: string, emails: string[]) {
         const response = await this.app.getHttpServer()
-            .post(`/api/tenant/${tenantId}/members/add`)
+            .post(`/api/tenant/my/members/add`)
             .set('Authorization', `Bearer ${this.accessToken}`)
             .set('Accept', 'application/json')
             .send({emails});
@@ -40,11 +39,11 @@ export class TenantClient extends HttpClient {
     }
 
     // -----------------------------------------------------------------
-    // NEW: Remove members (DELETE /api/tenant/:tenantId/members/delete)
+    // Remove members (DELETE /api/tenant/my/members/delete)
     // -----------------------------------------------------------------
     public async removeMembers(tenantId: string, emails: string[]) {
         const response = await this.app.getHttpServer()
-            .delete(`/api/tenant/${tenantId}/members/delete`)
+            .delete(`/api/tenant/my/members/delete`)
             .send({emails})
             .set('Authorization', `Bearer ${this.accessToken}`)
             .set('Accept', 'application/json');
@@ -57,11 +56,11 @@ export class TenantClient extends HttpClient {
     }
 
     // -----------------------------------------------------------------
-    // NEW: Get all members of a tenant (GET /api/tenant/:tenantId/members)
+    // Get all members of a tenant (GET /api/tenant/my/members)
     // -----------------------------------------------------------------
     public async getTenantMembers(tenantId: string) {
         const response = await this.app.getHttpServer()
-            .get(`/api/tenant/${tenantId}/members`)
+            .get(`/api/tenant/my/members`)
             .set('Authorization', `Bearer ${this.accessToken}`)
             .set('Accept', 'application/json');
 
@@ -72,12 +71,12 @@ export class TenantClient extends HttpClient {
     }
 
     // -----------------------------------------------------------------
-    // NEW: Update roles for a specific user in a tenant
-    // (PUT /api/tenant/:tenantId/member/:userId/roles)
+    // Update roles for a specific user in a tenant
+    // (PUT /api/tenant/my/member/:userId/roles)
     // -----------------------------------------------------------------
     public async updateMemberRoles(tenantId: string, userId: string, roles: string[]) {
         const response = await this.app.getHttpServer()
-            .put(`/api/tenant/${tenantId}/member/${userId}/roles`)
+            .put(`/api/tenant/my/member/${userId}/roles`)
             .set('Authorization', `Bearer ${this.accessToken}`)
             .set('Accept', 'application/json')
             .send({roles});
@@ -89,12 +88,12 @@ export class TenantClient extends HttpClient {
     }
 
     // -----------------------------------------------------------------
-    // NEW: Get details for a particular tenant member
-    // (GET /api/tenant/:tenantId/member/:userId)
+    // Get details for a particular tenant member
+    // (GET /api/tenant/my/member/:userId)
     // -----------------------------------------------------------------
     public async getMember(tenantId: string, userId: string) {
         const response = await this.app.getHttpServer()
-            .get(`/api/tenant/${tenantId}/member/${userId}`)
+            .get(`/api/tenant/my/member/${userId}`)
             .set('Authorization', `Bearer ${this.accessToken}`)
             .set('Accept', 'application/json');
 
@@ -105,12 +104,12 @@ export class TenantClient extends HttpClient {
     }
 
     // -----------------------------------------------------------------
-    // NEW: Get roles for a particular tenant member
-    // (GET /api/tenant/:tenantId/member/:userId/roles)
+    // Get roles for a particular tenant member
+    // (GET /api/tenant/my/member/:userId/roles)
     // -----------------------------------------------------------------
     public async getMemberRoles(tenantId: string, userId: string) {
         const response = await this.app.getHttpServer()
-            .get(`/api/tenant/${tenantId}/member/${userId}/roles`)
+            .get(`/api/tenant/my/member/${userId}/roles`)
             .set('Authorization', `Bearer ${this.accessToken}`)
             .set('Accept', 'application/json');
 
@@ -121,11 +120,11 @@ export class TenantClient extends HttpClient {
     }
 
     // -----------------------------------------------------------------
-    // Create a role in a tenant (POST /api/tenant/:tenantId/role/:name)
+    // Create a role in a tenant (POST /api/tenant/my/role/:name)
     // -----------------------------------------------------------------
     public async createRole(tenantId: string, name: string) {
         const response = await this.app.getHttpServer()
-            .post(`/api/tenant/${tenantId}/role/${name}`)
+            .post(`/api/tenant/my/role/${name}`)
             .set('Authorization', `Bearer ${this.accessToken}`)
             .set('Accept', 'application/json');
 
@@ -136,11 +135,11 @@ export class TenantClient extends HttpClient {
     }
 
     // -----------------------------------------------------------------
-    // Delete a role from a tenant (DELETE /api/tenant/:tenantId/role/:name)
+    // Delete a role from a tenant (DELETE /api/tenant/my/role/:name)
     // -----------------------------------------------------------------
     public async deleteRole(tenantId: string, name: string) {
         const response = await this.app.getHttpServer()
-            .delete(`/api/tenant/${tenantId}/role/${name}`)
+            .delete(`/api/tenant/my/role/${name}`)
             .set('Authorization', `Bearer ${this.accessToken}`)
             .set('Accept', 'application/json');
 
@@ -152,11 +151,11 @@ export class TenantClient extends HttpClient {
     }
 
     // -----------------------------------------------------------------
-    // Retrieve all roles for a tenant (GET /api/tenant/:tenantId/roles)
+    // Retrieve all roles for a tenant (GET /api/tenant/my/roles)
     // -----------------------------------------------------------------
     public async getTenantRoles(tenantId: string) {
         const response = await this.app.getHttpServer()
-            .get(`/api/tenant/${tenantId}/roles`)
+            .get(`/api/tenant/my/roles`)
             .set('Authorization', `Bearer ${this.accessToken}`)
             .set('Accept', 'application/json');
 
@@ -167,11 +166,11 @@ export class TenantClient extends HttpClient {
     }
 
     // -----------------------------------------------------------------
-    // Retrieve a single role by name (GET /api/tenant/:tenantId/role/:name)
+    // Retrieve a single role by name (GET /api/tenant/my/role/:name)
     // -----------------------------------------------------------------
     public async getTenantRole(tenantId: string, name: string) {
         const response = await this.app.getHttpServer()
-            .get(`/api/tenant/${tenantId}/role/${name}`)
+            .get(`/api/tenant/my/role/${name}`)
             .set('Authorization', `Bearer ${this.accessToken}`)
             .set('Accept', 'application/json');
 
@@ -182,9 +181,9 @@ export class TenantClient extends HttpClient {
         return response.body;
     }
 
-    public async getTenantDetails(tenantId: string) {
+    public async getTenantDetails(tenantId?: string) {
         const response = await this.app.getHttpServer()
-            .get(`/api/tenant/${tenantId}`)
+            .get(`/api/tenant/my/info`)
             .set('Authorization', `Bearer ${this.accessToken}`)
             .set('Accept', 'application/json');
 
@@ -192,8 +191,10 @@ export class TenantClient extends HttpClient {
 
         expect2xx(response);
 
-
-        expect(response.body.id).toEqual(tenantId);
+        expect(response.body.id).toBeDefined();
+        if (tenantId) {
+            expect(response.body.id).toEqual(tenantId);
+        }
         expect(response.body.name).toBeDefined();
 
         return response.body;
@@ -201,7 +202,7 @@ export class TenantClient extends HttpClient {
 
     public async updateTenant(tenantId: string, name: string) {
         const response = await this.app.getHttpServer()
-            .patch(`/api/tenant/${tenantId}`)
+            .patch(`/api/tenant/my`)
             .send({name})
             .set('Authorization', `Bearer ${this.accessToken}`)
             .set('Accept', 'application/json');
@@ -212,20 +213,9 @@ export class TenantClient extends HttpClient {
         return response.body;
     }
 
-    public async getTenants() {
-        const response = await this.app.getHttpServer()
-            .get('/api/tenant')
-            .set('Authorization', `Bearer ${this.accessToken}`)
-            .set('Accept', 'application/json');
-
-        console.log("Get Tenants Response:", response.body);
-        expect2xx(response);
-        return response.body;
-    }
-
     public async deleteTenant(tenantId: string) {
         const response = await this.app.getHttpServer()
-            .delete(`/api/tenant/${tenantId}`)
+            .delete(`/api/tenant/my`)
             .set('Authorization', `Bearer ${this.accessToken}`)
             .set('Accept', 'application/json');
         console.log("Delete Tenant Response:", response.body);
@@ -247,7 +237,7 @@ export class TenantClient extends HttpClient {
 
     public async getTenantCredentials(tenantId: string) {
         const response = await this.app.getHttpServer()
-            .get(`/api/tenant/${tenantId}/credentials`)
+            .get(`/api/tenant/my/credentials`)
             .set('Authorization', `Bearer ${this.accessToken}`)
             .set('Accept', 'application/json');
 

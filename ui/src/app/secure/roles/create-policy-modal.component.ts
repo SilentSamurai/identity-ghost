@@ -1,4 +1,5 @@
-import {Component, Input, OnInit} from '@angular/core';
+import {Component, DestroyRef, inject, Input, OnInit} from '@angular/core';
+import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {FormBuilder, FormGroup, Validators} from '@angular/forms';
 import {NgbActiveModal} from '@ng-bootstrap/ng-bootstrap';
 import {MessageService} from 'primeng/api';
@@ -24,7 +25,6 @@ import {PolicyService} from '../../_services/policy.service';
             "
         >
             <app-dialog-tab name="Policy Details">
-                <!-- Reactive Form -->
                 <form [formGroup]="policyForm" novalidate>
                     <div class="mb-3">
                         <label class="form-label">Effect</label>
@@ -37,7 +37,6 @@ import {PolicyService} from '../../_services/policy.service';
                     <div class="mb-3">
                         <label class="form-label">Action</label>
                         <select class="form-select" formControlName="action">
-                            <!-- Show default actions plus an 'OTHER' option -->
                             <option *ngFor="let act of possibleActions" [value]="act">
                                 {{ act.toUpperCase() }}
                             </option>
@@ -52,7 +51,6 @@ import {PolicyService} from '../../_services/policy.service';
                         </div>
                     </div>
 
-                    <!-- Conditionally show a text field for custom action -->
                     <div class="mb-3" *ngIf="actionCtrl?.value === 'OTHER'">
                         <label class="form-label">Custom Action</label>
                         <input
@@ -112,7 +110,6 @@ import {PolicyService} from '../../_services/policy.service';
                 >
                     {{ viewOnly ? 'Close' : 'Cancel' }}
                 </button>
-                <!-- The type is 'submit' to trigger onSave via (ngSubmit) -->
                 <button
                     *ngIf="!viewOnly"
                     class="btn btn-primary"
@@ -127,6 +124,7 @@ import {PolicyService} from '../../_services/policy.service';
     `,
 })
 export class CreatePolicyModalComponent implements OnInit {
+    private destroyRef = inject(DestroyRef);
     @Input() role_id: string = '';
     @Input() policyId?: string;
     @Input() viewOnly: boolean = false;
@@ -173,7 +171,7 @@ export class CreatePolicyModalComponent implements OnInit {
             this.loadPolicy(this.policyId);
         }
 
-        this.policyForm.get('action')?.valueChanges.subscribe((value) => {
+        this.policyForm.get('action')?.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((value) => {
             const customActionControl = this.policyForm.get('customAction');
             if (value === 'OTHER') {
                 customActionControl?.setValidators([Validators.required]);
@@ -183,7 +181,6 @@ export class CreatePolicyModalComponent implements OnInit {
             customActionControl?.updateValueAndValidity();
         });
 
-        // If viewOnly mode, disable the entire form
         if (this.viewOnly) {
             this.operation = 'VIEW';
             this.policyForm.disable();

@@ -1,9 +1,8 @@
-import {TestAppFixture} from "../test-app.fixture";
-import {expect2xx, HttpClient} from "./client";
+import {expect2xx, HttpClient, TestFixture} from "./client";
 
 export class GroupClient extends HttpClient {
 
-    constructor(app: TestAppFixture, accessToken: string) {
+    constructor(app: TestFixture, accessToken: string) {
         super(app, accessToken);
     }
 
@@ -26,7 +25,7 @@ export class GroupClient extends HttpClient {
 
     public async getAllTenantGroups(tenantId: string) {
         const response = await this.app.getHttpServer()
-            .get(`/api/tenant/${tenantId}/groups`)
+            .get(`/api/tenant/my/groups`)
             .set('Authorization', `Bearer ${this.accessToken}`)
             .set('Accept', 'application/json');
 

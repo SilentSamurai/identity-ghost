@@ -49,6 +49,20 @@ export class FakeSmtpServer {
         this.setupShutdownHandlers();
     }
 
+    private _boundPort: number = 0;
+
+    /** Actual SMTP port after listen() — useful when configured with port 0. */
+    public get boundPort(): number {
+        return this._boundPort;
+    }
+
+    private _boundControlPort: number = 0;
+
+    /** Actual control-server port after listen() — useful when configured with port 0. */
+    public get boundControlPort(): number {
+        return this._boundControlPort;
+    }
+
     public async listen(): Promise<FakeSmtpServer> {
         return new Promise((resolve, reject) => {
             const onError = (err: Error) => {
@@ -60,9 +74,13 @@ export class FakeSmtpServer {
 
             this.server.listen(this.config.port, this.config.host, () => {
                 this.server.removeListener('error', onError);
+                const addr = this.server.server.address();
+                if (addr && typeof addr === 'object') {
+                    this._boundPort = addr.port;
+                }
                 this.log(
                     "info",
-                    `SMTP Server listening on ${this.config.host}:${this.config.port}`,
+                    `SMTP Server listening on ${this.config.host}:${this._boundPort}`,
                 );
                 // Optionally start control HTTP server
                 if (this.config.controlEnabled) {
@@ -176,14 +194,14 @@ export class FakeSmtpServer {
      */
     private getFullConfig(config: ServerConfig): Required<ServerConfig> {
         return {
-            port: config.port || parseInt(process.env.MAIL_PORT || "587", 10),
+            port: config.port ?? parseInt(process.env.MAIL_PORT || "587", 10),
             host: config.host || process.env.MAIL_HOST || "127.0.0.1",
             logLevel:
                 config.logLevel ||
                 (process.env.SMTP_LOG_LEVEL as any) ||
                 "info",
             controlHost: config.controlHost || process.env.MAIL_CONTROL_HOST || "127.0.0.1",
-            controlPort: config.controlPort || parseInt(process.env.MAIL_CONTROL_PORT || "8899", 10),
+            controlPort: config.controlPort ?? parseInt(process.env.MAIL_CONTROL_PORT || "8899", 10),
             controlEnabled: config.controlEnabled !== undefined
                 ? config.controlEnabled
                 : (process.env.MAIL_CONTROL_ENABLE || "true").toLowerCase() === "true",
@@ -202,10 +220,14 @@ export class FakeSmtpServer {
                 const to = req.query.to as string | undefined;
                 const subject = req.query.subject as string | undefined;
                 const timeoutMs = Number(req.query.timeoutMs ?? 10000);
-                const criteria: any = { sort: 'newest', limit: 1 };
+                const criteria: any = {sort: 'newest', limit: 1};
                 if (to) criteria.to = to;
                 if (subject) {
-                    try { criteria.subject = new RegExp(subject as string, 'i'); } catch { criteria.subject = subject; }
+                    try {
+                        criteria.subject = new RegExp(subject as string, 'i');
+                    } catch {
+                        criteria.subject = subject;
+                    }
                 }
                 const email = await this.waitForEmail(criteria, timeoutMs, 500);
                 const links = this.extractLinks(email);
@@ -221,7 +243,7 @@ export class FakeSmtpServer {
                     date: email.date,
                 });
             } catch (e: any) {
-                return res.status(404).json({ error: e?.message || 'No matching email found' });
+                return res.status(404).json({error: e?.message || 'No matching email found'});
             }
         });
 
@@ -229,10 +251,14 @@ export class FakeSmtpServer {
             const to = req.query.to as string | undefined;
             const subject = req.query.subject as string | undefined;
             const limit = Number(req.query.limit ?? 10);
-            const criteria: any = { sort: 'newest', limit };
+            const criteria: any = {sort: 'newest', limit};
             if (to) criteria.to = to;
             if (subject) {
-                try { criteria.subject = new RegExp(subject as string, 'i'); } catch { criteria.subject = subject; }
+                try {
+                    criteria.subject = new RegExp(subject as string, 'i');
+                } catch {
+                    criteria.subject = subject;
+                }
             }
             const emails = this.searchEmails(criteria).map(e => ({
                 subject: e.subject,
@@ -240,7 +266,7 @@ export class FakeSmtpServer {
                 from: e.from,
                 date: e.date,
             }));
-            return res.json({ emails });
+            return res.json({emails});
         });
 
         app.post('/__test__/emails/clear', (req, res) => {
@@ -250,7 +276,11 @@ export class FakeSmtpServer {
 
         await new Promise<void>((resolve) => {
             this.controlServer = app.listen(this.config.controlPort, this.config.controlHost, () => {
-                this.log('info', `SMTP Control listening on http://${this.config.controlHost}:${this.config.controlPort}`);
+                const addr = this.controlServer.address();
+                if (addr && typeof addr === 'object') {
+                    this._boundControlPort = addr.port;
+                }
+                this.log('info', `SMTP Control listening on http://${this.config.controlHost}:${this._boundControlPort}`);
                 resolve();
             });
         });

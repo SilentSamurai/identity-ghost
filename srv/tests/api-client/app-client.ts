@@ -1,8 +1,7 @@
-import {TestAppFixture} from "../test-app.fixture";
-import {expect2xx, HttpClient} from "./client";
+import {expect2xx, HttpClient, TestFixture} from "./client";
 
 export class AppClient extends HttpClient {
-    constructor(app: TestAppFixture, accessToken: string) {
+    constructor(app: TestFixture, accessToken: string) {
         super(app, accessToken);
     }
 
@@ -69,7 +68,7 @@ export class AppClient extends HttpClient {
      */
     public async subscribeApp(appId: string, tenantId: string) {
         const response = await this.app.getHttpServer()
-            .post(`/api/apps/${appId}/subscribe/${tenantId}`)
+            .post(`/api/apps/${appId}/my/subscribe`)
             .set('Authorization', `Bearer ${this.accessToken}`)
             .set('Accept', 'application/json');
 
@@ -87,7 +86,7 @@ export class AppClient extends HttpClient {
      */
     public async unsubscribeApp(appId: string, tenantId: string) {
         const response = await this.app.getHttpServer()
-            .post(`/api/apps/${appId}/unsubscribe/${tenantId}`)
+            .post(`/api/apps/${appId}/my/unsubscribe`)
             .set('Authorization', `Bearer ${this.accessToken}`)
             .set('Accept', 'application/json');
 
@@ -123,7 +122,7 @@ export class AppClient extends HttpClient {
      */
     public async getAppCreatedByTenant(tenantId: string) {
         const response = await this.app.getHttpServer()
-            .get(`/api/apps/created-by/${tenantId}`)
+            .get(`/api/apps/my/created`)
             .set('Authorization', `Bearer ${this.accessToken}`)
             .set('Accept', 'application/json');
 
@@ -139,7 +138,7 @@ export class AppClient extends HttpClient {
      */
     public async getTenantSubscriptions(tenantId: string) {
         const response = await this.app.getHttpServer()
-            .get(`/api/apps/subscribed-by/${tenantId}`)
+            .get(`/api/apps/my/subscriptions`)
             .set('Authorization', `Bearer ${this.accessToken}`)
             .set('Accept', 'application/json');
 
@@ -165,7 +164,7 @@ export class AppClient extends HttpClient {
 
     public async getAppsAvailableForSubscription(tenantId: string) {
         const response = await this.app.getHttpServer()
-            .post(`/api/apps/available-for/${tenantId}/`)
+            .post(`/api/apps/my/available`)
             .set('Authorization', `Bearer ${this.accessToken}`)
             .set('Accept', 'application/json');
 
@@ -186,7 +185,7 @@ export class AppClient extends HttpClient {
 
     public async getAvailableApps(tenantId: string) {
         const response = await this.app.getHttpServer()
-            .get(`/api/apps/available-for/${tenantId}`)
+            .get(`/api/apps/my/available`)
             .set('Authorization', `Bearer ${this.accessToken}`)
             .set('Accept', 'application/json');
         expect2xx(response);

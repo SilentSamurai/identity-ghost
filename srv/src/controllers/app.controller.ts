@@ -1,14 +1,16 @@
 import {
     Body,
     ClassSerializerInterceptor,
+    ConflictException,
     Controller,
     Delete,
+    ForbiddenException,
     Get,
+    NotFoundException,
     Param,
     ParseUUIDPipe,
     Patch,
     Post,
-    Request,
     UseGuards,
     UseInterceptors
 } from '@nestjs/common';
@@ -16,94 +18,109 @@ import {
 import {SubscriptionService} from '../services/subscription.service';
 import {AppService} from "../services/app.service";
 import {TenantService} from "../services/tenant.service";
-import {AuthContext} from "../casl/contexts";
 import {schemaPipe} from "../validation/validation.pipe";
 import * as yup from "yup";
 import {JwtAuthGuard} from "../auth/jwt-auth.guard";
+import {CurrentPermission, CurrentTenantId, Permission} from "../auth/auth.decorator";
 import {SecurityService} from "../casl/security.service";
+import {OnboardingService} from "../services/onboarding.service";
+import {OnboardCustomerDto, OnboardCustomerSchema} from "../dto/onboard-customer.dto";
 
 @Controller('/api/apps')
 @UseInterceptors(ClassSerializerInterceptor)
 export class AppController {
     constructor(
-        private readonly securityService: SecurityService,
         private readonly tenantService: TenantService,
         private readonly appService: AppService,
-        private readonly subscriptionService: SubscriptionService
+        private readonly subscriptionService: SubscriptionService,
+        private readonly securityService: SecurityService,
+        private readonly onboardingService: OnboardingService
     ) {
     }
 
     @Post("/create")
     @UseGuards(JwtAuthGuard)
     async createApp(
-        @Request() request: AuthContext,
+        @CurrentPermission() permission: Permission,
         @Body('tenantId', ParseUUIDPipe) tenantId: string,
         @Body('name', schemaPipe(yup.string().required('name is required').max(128))) name: string,
         @Body('appUrl', schemaPipe(yup.string().required('app url is required').max(2048))) appUrl: string,
         @Body('description', schemaPipe(yup.string().max(128))) description: string
     ) {
-        // Here you fetch the tenant, then create a new app referencing the tenant
-        const app = await this.appService.createApp(request, tenantId, name, appUrl, description);
+        const app = await this.appService.createApp(permission, tenantId, name, appUrl, description);
         return app;
     }
 
-    /**
-     * Update an app by its ID
-     */
     @Patch('/:appId')
     @UseGuards(JwtAuthGuard)
     async updateApp(
-        @Request() request: AuthContext,
+        @CurrentPermission() permission: Permission,
         @Param('appId', ParseUUIDPipe) appId: string,
         @Body('name', schemaPipe(yup.string().required('name is required').max(128))) name: string,
         @Body('appUrl', schemaPipe(yup.string().required('app url is required').max(2048))) appUrl: string,
         @Body('description', schemaPipe(yup.string().max(128))) description: string
     ) {
-        const app = await this.appService.updateApp(request, appId, name, appUrl, description);
+        const app = await this.appService.updateApp(permission, appId, name, appUrl, description);
         return app;
     }
 
-    /**
-     * Delete an app by its ID
-     */
     @Delete('/:appId')
     @UseGuards(JwtAuthGuard)
     async deleteApp(
-        @Request() request: AuthContext,
+        @CurrentPermission() permission: Permission,
         @Param('appId', ParseUUIDPipe) appId: string
     ) {
-        await this.appService.deleteApp(request, appId);
+        await this.appService.deleteApp(permission, appId);
         return {status: 'success'};
     }
 
-    @Post('/:appId/subscribe/:tenantId')
+    // ─── New token-derived routes (no :tenantId in URL) ───
+
+    @Post('/:appId/my/subscribe')
     @UseGuards(JwtAuthGuard)
-    async subscribeToApp(
-        @Request() request: AuthContext,
+    async subscribeMyTenantToApp(
+        @CurrentPermission() permission: Permission,
         @Param('appId', ParseUUIDPipe) appId: string,
-        @Param('tenantId', ParseUUIDPipe) tenantId: string
+        @CurrentTenantId() tenantId: string,
     ) {
-        // Retrieve the subscriber tenant & the app, then subscribe
-        const promise = await this.subscriptionService.subscribeApp(
-            await this.tenantService.findById(request, tenantId),
-            await this.appService.getAppById(appId)
-        );
-        return {status: "success"}
+        return this._subscribeToApp(permission, appId, tenantId);
     }
 
-    @Post('/:appId/unsubscribe/:tenantId')
+    @Post('/:appId/my/unsubscribe')
     @UseGuards(JwtAuthGuard)
-    async unsubscribeFromApp(
-        @Request() request: AuthContext,
+    async unsubscribeMyTenantFromApp(
+        @CurrentPermission() permission: Permission,
         @Param('appId', ParseUUIDPipe) appId: string,
-        @Param('tenantId', ParseUUIDPipe) tenantId: string
+        @CurrentTenantId() tenantId: string,
     ) {
-        // Retrieve the subscriber tenant & the app, then unsubscribe
-        const promise = await this.subscriptionService.unsubscribe(
-            await this.tenantService.findById(request, tenantId),
-            await this.appService.getAppById(appId)
-        );
-        return {status: "success"}
+        return this._unsubscribeFromApp(permission, appId, tenantId);
+    }
+
+    @Get('/my/subscriptions')
+    @UseGuards(JwtAuthGuard)
+    async getMyTenantSubscriptions(
+        @CurrentPermission() permission: Permission,
+        @CurrentTenantId() tenantId: string,
+    ) {
+        return this.subscriptionService.findByTenantId(tenantId);
+    }
+
+    @Get('/my/created')
+    @UseGuards(JwtAuthGuard)
+    async getMyAppsCreated(
+        @CurrentPermission() permission: Permission,
+        @CurrentTenantId() tenantId: string,
+    ) {
+        return this.appService.findByTenantId(tenantId);
+    }
+
+    @Get('/my/available')
+    @UseGuards(JwtAuthGuard)
+    async getMyAvailableApps(
+        @CurrentPermission() permission: Permission,
+        @CurrentTenantId() tenantId: string,
+    ) {
+        return this.appService.findAllApps(tenantId);
     }
 
     @Get('/subscriptions/:appId')
@@ -114,54 +131,64 @@ export class AppController {
         return this.subscriptionService.findAllByAppId(appId);
     }
 
-    /**
-     * get all app the tenant has subscription to
-     */
-    @Get('/subscribed-by/:tenantId')
-    @UseGuards(JwtAuthGuard)
-    async getTenantSubscriptions(
-        @Request() request: AuthContext,
-        @Param('tenantId', ParseUUIDPipe) tenantId: string
-    ) {
-        return this.subscriptionService.findByTenantId(tenantId);
-    }
-
-    /**
-     * Get all apps created by a tenant
-     */
-    @Get('/created-by/:tenantId')
-    @UseGuards(JwtAuthGuard)
-    async getAppsCreatedByTenant(
-        @Request() request: AuthContext,
-        @Param('tenantId', ParseUUIDPipe) tenantId: string
-    ) {
-        return this.appService.findByTenantId(tenantId);
-    }
-
-    /**
-     * Get all apps available for subscription
-     */
-    @Get('/available-for/:tenantId')
-    @UseGuards(JwtAuthGuard)
-    async getAllSubscribableApps(
-        @Request() request: AuthContext,
-        @Param('tenantId', ParseUUIDPipe) tenantId: string
-    ) {
-        const allApps = await this.appService.findAllApps(tenantId);
-        return allApps;
-    }
-
-    /**
-     * Publish an app (make it visible to other tenants)
-     */
     @Patch('/:appId/publish')
     @UseGuards(JwtAuthGuard)
     async publishApp(
-        @Request() request: AuthContext,
+        @CurrentPermission() permission: Permission,
         @Param('appId', ParseUUIDPipe) appId: string
     ) {
-        const app = await this.appService.publishApp(appId);
+        const app = await this.appService.publishApp(permission, appId);
         return app;
     }
 
+    @Post('/:appId/onboard-customer')
+    @UseGuards(JwtAuthGuard)
+    async onboardCustomer(
+        @CurrentPermission() permission: Permission,
+        @Param('appId', ParseUUIDPipe) appId: string,
+        @Body(schemaPipe(OnboardCustomerSchema)) body: OnboardCustomerDto
+    ) {
+        // Extract token via SecurityService
+        const technicalToken = this.securityService.getTechnicalToken(permission.authContext);
+        
+        // Get the app with owner relation
+        let app;
+        try {
+            app = await this.appService.getAppById(appId);
+        } catch (error) {
+            throw new NotFoundException('App not found');
+        }
+        
+        // Verify token is TechnicalToken (client_credentials grant) and belongs to app owner
+        if (technicalToken.tenant.id !== app.owner.id) {
+            throw new ForbiddenException('Technical token does not belong to app owner');
+        }
+        
+        // Call OnboardingService.onboardCustomer()
+        const response = await this.onboardingService.onboardCustomer(
+            appId,
+            app.owner.id,
+            body
+        );
+        
+        return response;
+    }
+
+    // ─── Shared implementation methods ───
+
+    private async _subscribeToApp(permission: Permission, appId: string, tenantId: string) {
+        await this.subscriptionService.subscribeApp(
+            await this.tenantService.findById(permission, tenantId),
+            await this.appService.getAppById(appId)
+        );
+        return {status: "success"};
+    }
+
+    private async _unsubscribeFromApp(permission: Permission, appId: string, tenantId: string) {
+        await this.subscriptionService.unsubscribe(
+            await this.tenantService.findById(permission, tenantId),
+            await this.appService.getAppById(appId)
+        );
+        return {status: "success"};
+    }
 }

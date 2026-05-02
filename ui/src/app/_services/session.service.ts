@@ -1,5 +1,5 @@
 import {Injectable} from '@angular/core';
-import jwt_decode from 'jwt-decode';
+import {jwtDecode} from 'jwt-decode';
 import {Router} from '@angular/router';
 import {PureAbility} from '@casl/ability';
 import {DecodedToken} from '../model/user.model';
@@ -7,8 +7,17 @@ import {TokenVerificationService} from './token-verification.service';
 import {PKCEService} from './pkce.service';
 
 const TOKEN_KEY = 'auth-token';
+const ID_TOKEN_KEY = 'auth-id-token';
 const AUTH_CODE_KEY = 'auth-code';
 const PERMISSIONS_KEY = 'auth-permissions';
+const REFRESH_TOKEN_KEY = 'auth-refresh-token';
+const USER_PROFILE_KEY = 'auth-user-profile';
+
+export interface UserProfile {
+    email: string;
+    name: string;
+    id: string;
+}
 
 @Injectable({
     providedIn: 'root',
@@ -24,12 +33,23 @@ export class SessionService {
 
     public clearSession(): void {
         window.sessionStorage.removeItem(TOKEN_KEY);
+        window.sessionStorage.removeItem(ID_TOKEN_KEY);
         window.sessionStorage.removeItem(AUTH_CODE_KEY);
         window.sessionStorage.removeItem(PERMISSIONS_KEY);
+        window.sessionStorage.removeItem(REFRESH_TOKEN_KEY);
+        window.sessionStorage.removeItem(USER_PROFILE_KEY);
     }
 
     public getAuthCode(): string | null {
         return window.sessionStorage.getItem(AUTH_CODE_KEY);
+    }
+
+    public saveRefreshToken(token: string): void {
+        window.sessionStorage.setItem(REFRESH_TOKEN_KEY, token);
+    }
+
+    public getRefreshToken(): string | null {
+        return window.sessionStorage.getItem(REFRESH_TOKEN_KEY);
     }
 
     public saveAuthCode(code: string): void {
@@ -53,16 +73,30 @@ export class SessionService {
         return window.sessionStorage.getItem(TOKEN_KEY);
     }
 
+    public saveIdToken(token: string): void {
+        window.sessionStorage.setItem(ID_TOKEN_KEY, token);
+    }
+
+    public getIdToken(): string | null {
+        return window.sessionStorage.getItem(ID_TOKEN_KEY);
+    }
+
     public getDecodedToken(): DecodedToken | null {
         const token = this.getToken();
         if (!token) {
             return null;
         }
         try {
-            const decodedToken = new DecodedToken(jwt_decode(token));
+            const decodedToken = new DecodedToken(jwtDecode(token));
             if (tokenExpired(decodedToken)) {
                 this.clearSession();
                 return null;
+            }
+            // Merge stored user profile (email, name) into decoded token
+            const profile = this.getUserProfile();
+            if (profile) {
+                decodedToken.email = profile.email;
+                decodedToken.name = profile.name;
             }
             return decodedToken;
         } catch (error) {
@@ -70,6 +104,14 @@ export class SessionService {
             this.clearSession();
             return null;
         }
+    }
+
+    /**
+     * Decode an ID token JWT without verification (verification is server-side).
+     * Returns the decoded payload object.
+     */
+    public decodeIdToken(idToken: string): any {
+        return jwtDecode(idToken);
     }
 
     public getUser(): DecodedToken | null {
@@ -82,7 +124,7 @@ export class SessionService {
             return true;
         }
         try {
-            return tokenExpired(new DecodedToken(jwt_decode(token)));
+            return tokenExpired(new DecodedToken(jwtDecode(token)));
         } catch (error) {
             console.error('Error checking token expiration:', error);
             this.clearSession();
@@ -118,6 +160,24 @@ export class SessionService {
         }
     }
 
+    public saveUserProfile(profile: UserProfile): void {
+        window.sessionStorage.setItem(USER_PROFILE_KEY, JSON.stringify(profile));
+    }
+
+    public getUserProfile(): UserProfile | null {
+        const raw = window.sessionStorage.getItem(USER_PROFILE_KEY);
+        if (!raw) {
+            return null;
+        }
+        try {
+            return JSON.parse(raw);
+        } catch (error) {
+            console.error('Error parsing user profile:', error);
+            window.sessionStorage.removeItem(USER_PROFILE_KEY);
+            return null;
+        }
+    }
+
     public getCodeVerifier(): string {
         return this.pkceService.getCodeVerifier();
     }
@@ -133,15 +193,15 @@ export class SessionService {
 
     public isSuperAdmin(): boolean {
         const user = this.getUser();
-        return user !== null && user.scopes.includes('SUPER_ADMIN');
+        return user !== null && user.roles.includes('SUPER_ADMIN');
     }
 
     public isTenantAdmin(): boolean {
         const user = this.getUser();
         return (
             user !== null &&
-            (user.scopes.includes('TENANT_ADMIN') ||
-                user.scopes.includes('SUPER_ADMIN'))
+            (user.roles.includes('TENANT_ADMIN') ||
+                user.roles.includes('SUPER_ADMIN'))
         );
     }
 

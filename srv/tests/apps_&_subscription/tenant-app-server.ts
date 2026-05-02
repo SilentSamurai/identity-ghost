@@ -47,11 +47,11 @@ export class TenantAppServer {
     private server: http.Server;
     private config: Required<ServerConfig>;
     private logger: Console;
-
     // Track onboard and offboard requests
     private onboardRequests: OnboardRequest[] = [];
     private offboardRequests: OffboardRequest[] = [];
     private lastDecodedToken: any = null; // Store last decoded JWT for test assertions
+    private decodedTokensByTenant: Map<string, any> = new Map(); // Keyed by tenantId for parallel-safe lookups
 
     constructor(config: ServerConfig = {}) {
         this.config = this.getFullConfig(config);
@@ -73,13 +73,24 @@ export class TenantAppServer {
         this.setupShutdownHandlers();
     }
 
+    private _boundPort: number = 0;
+
+    /** Actual port after listen() — useful when configured with port 0. */
+    public get boundPort(): number {
+        return this._boundPort;
+    }
+
     /**
      * Start the server
      */
     public async listen(): Promise<TenantAppServer> {
         return new Promise((resolve, reject) => {
             this.server.listen(this.config.port, this.config.host, () => {
-                this.log('info', `Mock Onboard Server listening on ${this.config.host}:${this.config.port}`);
+                const addr = this.server.address();
+                if (addr && typeof addr === 'object') {
+                    this._boundPort = addr.port;
+                }
+                this.log('info', `Mock Onboard Server listening on ${this.config.host}:${this._boundPort}`);
                 resolve(this);
             });
         });
@@ -145,6 +156,13 @@ export class TenantAppServer {
     }
 
     /**
+     * Get the last decoded JWT token (for test assertions)
+     */
+    public getLastDecodedToken(): any {
+        return this.lastDecodedToken;
+    }
+
+    /**
      * Setup middleware
      */
     private setupMiddleware(): void {
@@ -171,6 +189,9 @@ export class TenantAppServer {
                     try {
                         decoded = jwt.decode(token);
                         this.lastDecodedToken = decoded;
+                        if (tenantId) {
+                            this.decodedTokensByTenant.set(tenantId, decoded);
+                        }
                     } catch (e) {
                         this.lastDecodedToken = null;
                     }
@@ -202,6 +223,9 @@ export class TenantAppServer {
                 try {
                     decoded = jwt.decode(token);
                     this.lastDecodedToken = decoded;
+                    if (tenantId) {
+                        this.decodedTokensByTenant.set(tenantId, decoded);
+                    }
                 } catch (e) {
                     this.lastDecodedToken = null;
                 }
@@ -268,6 +292,17 @@ export class TenantAppServer {
             res.json({message: 'Offboard requests cleared'});
         });
 
+        // API to get the last decoded JWT token (for test assertions)
+        this.app.get('/api/last-decoded-token', (req, res) => {
+            res.json(this.lastDecodedToken || null);
+        });
+
+        // API to get a decoded JWT token by the tenantId it was used for (parallel-safe)
+        this.app.get('/api/decoded-token/:tenantId', (req, res) => {
+            const token = this.decodedTokensByTenant.get(req.params.tenantId);
+            res.json(token || null);
+        });
+
         // Catch-all route for unknown endpoints
         this.app.use((req, res) => {
             this.log('warn', `Unknown endpoint: ${req.method} ${req.url}`);
@@ -280,7 +315,7 @@ export class TenantAppServer {
      */
     private getFullConfig(config: ServerConfig): Required<ServerConfig> {
         return {
-            port: config.port || 3000,
+            port: config.port ?? 3000,
             host: config.host || 'localhost',
             logLevel: config.logLevel || 'info'
         };
@@ -312,13 +347,6 @@ export class TenantAppServer {
         if (levels[level] <= levels[this.config.logLevel]) {
             console[level === 'error' ? 'error' : level === 'warn' ? 'warn' : level === 'info' ? 'info' : 'log'](...args);
         }
-    }
-
-    /**
-     * Get the last decoded JWT token (for test assertions)
-     */
-    public getLastDecodedToken(): any {
-        return this.lastDecodedToken;
     }
 }
 

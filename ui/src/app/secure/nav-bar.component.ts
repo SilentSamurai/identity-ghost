@@ -7,7 +7,7 @@ import {NgbModal} from '@ng-bootstrap/ng-bootstrap';
 import {ProfileComponent} from '../open-pages/profile.component';
 
 @Component({
-    selector: 'nav-bar',
+    selector: 'secure-nav-bar',
     template: `
         <nav
             class="navbar navbar-expand-lg navbar-dark"
@@ -22,7 +22,7 @@ import {ProfileComponent} from '../open-pages/profile.component';
                         alt="Logo"
                         class="rounded-circle me-2"
                         height="30"
-                        src="/assets/logo-img.jpg"
+                        src="/assets/logo.svg"
                         width="30"
                     />
                     <span class="text-white">{{ getTitle() }}</span>
@@ -56,11 +56,10 @@ import {ProfileComponent} from '../open-pages/profile.component';
                                 ngbDropdownMenu
                             >
                                 <a class="dropdown-item" href="#">Settings</a>
-                                <a
+                                <button
                                     class="dropdown-item"
-                                    href="javascript:void(0)"
                                     (click)="openProfileModal()"
-                                >Profile</a
+                                >Profile</button
                                 >
                                 <div class="dropdown-divider"></div>
                                 <a
@@ -68,12 +67,17 @@ import {ProfileComponent} from '../open-pages/profile.component';
                                     href="https://silentsamurai.github.io/auth-server"
                                 >API Docs</a
                                 >
-                                <div class="dropdown-divider"></div>
                                 <a
+                                    *ngIf="isSuperAdmin"
                                     class="dropdown-item"
-                                    href="javascript:void(0)"
+                                    routerLink="/admin"
+                                >Admin Panel</a
+                                >
+                                <div class="dropdown-divider"></div>
+                                <button
+                                    class="dropdown-item"
                                     (click)="logout()"
-                                >Sign Out</a
+                                >Sign Out</button
                                 >
                             </div>
                         </li>
@@ -90,9 +94,10 @@ import {ProfileComponent} from '../open-pages/profile.component';
         `,
     ],
 })
-export class AdminNavBarComponent implements OnInit {
+export class SecureNavBarComponent implements OnInit {
     isLoggedIn = false;
     email?: string;
+    isSuperAdmin = false;
     public isCollapsed = true;
 
     constructor(
@@ -110,6 +115,7 @@ export class AdminNavBarComponent implements OnInit {
         if (this.tokenStorageService.isLoggedIn()) {
             const user = this.tokenStorageService.getUser()!;
             this.email = user.email;
+            this.isSuperAdmin = this.tokenStorageService.isSuperAdmin();
         }
     }
 

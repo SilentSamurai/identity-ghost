@@ -1,25 +1,19 @@
-import {TestAppFixture} from "../test-app.fixture";
+import {SharedTestFixture} from "../shared-test.fixture";
 import {expect2xx} from "../api-client/client";
 
 describe('e2e positive auth code flow', () => {
-    let app: TestAppFixture;
+    let app: SharedTestFixture;
     let authentication_code = "";
     let accessToken = "";
     let clientId = "auth.server.com";
-    let clientSecret = "";
-    const verifier = "challenge-ABCD";
-    const challenge = "challenge-ABCD";
+    const verifier = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq";
+    const challenge = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq";
 
     beforeAll(async () => {
-        app = await new TestAppFixture().init();
-    });
+        app = new SharedTestFixture();
 
-    afterAll(async () => {
-        await app.close();
-    });
-
-    it(`/POST login `, async () => {
-        const response = await app.getHttpServer()
+        // Login to get an auth code
+        const loginResponse = await app.getHttpServer()
             .post('/api/oauth/login')
             .send({
                 "code_challenge": challenge,
@@ -29,10 +23,14 @@ describe('e2e positive auth code flow', () => {
                 "code_challenge_method": "plain"
             })
             .set('Accept', 'application/json');
-        // console.log(JSON.stringify(response));
-        expect(response.status).toEqual(201);
-        expect(response.body.authentication_code).toBeDefined();
-        authentication_code = response.body.authentication_code;
+
+        expect(loginResponse.status).toEqual(201);
+        expect(loginResponse.body.authentication_code).toBeDefined();
+        authentication_code = loginResponse.body.authentication_code;
+    });
+
+    afterAll(async () => {
+        await app.close();
     });
 
     it(`/POST Fetch Access Token`, async () => {
@@ -49,7 +47,7 @@ describe('e2e positive auth code flow', () => {
         console.log("Fetch Access Token:", response.body);
         expect2xx(response);
 
-        expect(response.status).toEqual(201);
+        expect(response.status).toEqual(200);
         expect(response.body.access_token).toBeDefined();
         expect(response.body.expires_in).toBeDefined();
         expect(response.body.token_type).toEqual('Bearer');
@@ -75,7 +73,4 @@ describe('e2e positive auth code flow', () => {
         expect(response.body.status).toEqual(true);
         expect(response.body.email).toEqual("admin@auth.server.com");
     });
-
-
 });
-

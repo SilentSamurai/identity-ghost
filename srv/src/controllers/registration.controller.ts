@@ -28,10 +28,12 @@ import {
 import {TenantService} from "../services/tenant.service";
 import {SecurityService} from "../casl/security.service";
 import * as argon2 from "argon2";
+import {ClientService} from "../services/client.service";
 import {InjectRepository} from "@nestjs/typeorm";
 import {Repository} from "typeorm";
 import * as yup from "yup";
 import {Environment} from "../config/environment.service";
+import {CurrentPermission, CurrentUser, Permission} from "../auth/auth.decorator";
 
 @Controller("api")
 @UseInterceptors(ClassSerializerInterceptor)
@@ -73,6 +75,7 @@ export class RegisterController {
         private readonly mailService: MailService,
         private readonly securityService: SecurityService,
         private readonly configService: Environment,
+        private readonly clientService: ClientService,
         @InjectRepository(User) private usersRepository: Repository<User>,
     ) {
     }
@@ -82,7 +85,7 @@ export class RegisterController {
         @Headers() headers,
         @Request() request,
         @Body(new ValidationPipe(RegisterController.RegisterDomainSchema))
-            body: {
+        body: {
             name: string;
             password: string;
             email: string;
@@ -97,11 +100,10 @@ export class RegisterController {
             throw new ConflictException('Email is already being used');
         }
 
-        let adminContext =
-            await this.securityService.getAdminContextForInternalUse();
+        const permission = this.securityService.createPermissionForRegistration();
 
         const isPresent = await this.tenantService.existByDomain(
-            adminContext,
+            permission,
             body.domain,
         );
         if (isPresent) {
@@ -126,7 +128,7 @@ export class RegisterController {
         }
 
         const tenant = await this.tenantService.create(
-            adminContext,
+            permission,
             body.orgName,
             body.domain,
             user,
@@ -140,19 +142,21 @@ export class RegisterController {
         @Headers() headers,
         @Request() request,
         @Body(new ValidationPipe(RegisterController.SignUpSchema))
-            body: {
+        body: {
             name: string;
             password: string;
             email: string;
             client_id: string;
         },
     ): Promise<{ success: boolean }> {
-        let adminContext =
-            await this.securityService.getAdminContextForInternalUse();
-        const tenant = await this.tenantService.findByClientIdOrDomain(
-            adminContext,
-            body.client_id,
-        );
+        const permission = this.securityService.createPermissionForRegistration();
+        let tenant;
+        try {
+            const client = await this.clientService.findByClientIdOrAlias(body.client_id);
+            tenant = client.tenant;
+        } catch {
+            tenant = await this.tenantService.findByDomain(permission, body.client_id);
+        }
         if (!tenant.allowSignUp) {
             throw new BadRequestException("Sign up not allowed by admin");
         }
@@ -183,16 +187,16 @@ export class RegisterController {
             }
         } else {
             user = await this.usersService.findByEmailSecure(
-                adminContext,
+                permission,
                 body.email,
                 body.password,
             );
         }
 
         if (
-            !(await this.tenantService.isMember(adminContext, tenant.id, user))
+            !(await this.tenantService.isMember(permission, tenant.id, user))
         ) {
-            await this.tenantService.addMember(adminContext, tenant.id, user);
+            await this.tenantService.addMember(permission, tenant.id, user);
         }
 
         return {success: true};
@@ -201,16 +205,12 @@ export class RegisterController {
     @Post("/signdown")
     @UseGuards(JwtAuthGuard)
     async signdown(
-        @Request() request,
+        @CurrentPermission() permission: Permission,
+        @CurrentUser() user: User,
         @Body(new ValidationPipe(ValidationSchema.SignDownSchema))
-            body: { password: string },
+        body: { password: string },
     ): Promise<{ status: boolean }> {
-        const securityContext = this.securityService.getToken(request);
-        const user = await this.usersService.findByEmail(
-            request,
-            securityContext.email,
-        );
-        await this.usersService.deleteSecure(request, user.id, body.password);
+        await this.usersService.deleteSecure(permission, user.id, body.password);
 
         return {status: true};
     }

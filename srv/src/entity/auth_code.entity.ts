@@ -20,6 +20,36 @@ export class AuthCode {
     @Column({name: "subscriber_tenant_hint", nullable: true})
     subscriberTenantHint: string;
 
+    @Column({name: "client_id", nullable: false})
+    clientId: string;
+
+    @Column({name: "redirect_uri", nullable: true})
+    redirectUri: string;
+
+    @Column({name: "scope", nullable: true})
+    scope: string;
+
+    @Column({name: "nonce", nullable: true, length: 512})
+    nonce: string;
+
+    @Column({name: "used", default: false})
+    used: boolean;
+
+    @Column({name: "used_at", nullable: true})
+    usedAt: Date;
+
+    @Column({name: "expires_at", nullable: false})
+    expiresAt: Date;
+
+    @Column({name: "sid", type: "varchar", length: 36, nullable: true})
+    sid: string | null;
+
+    @Column({name: "require_auth_time", default: false})
+    requireAuthTime: boolean;
+
+    @Column({name: "resource", nullable: true, length: "2048"})
+    resource: string | null;
+
     @CreateDateColumn({name: "created_at"})
     createdAt: Date;
 }

@@ -1,6 +1,7 @@
 import {Component, ContentChildren, EventEmitter, Input, OnInit, Output, QueryList, ViewChildren,} from '@angular/core';
 import {Operators} from '../model/Operator';
-import {FilterFieldComponent} from './filter-field.component';
+import {Condition, FilterFieldComponent} from './filter-field.component';
+import {FilterSelectFieldComponent, FilterSelectOption} from './filter-select-field.component';
 import {Filter} from '../model/Filters';
 
 @Component({
@@ -10,13 +11,14 @@ import {Filter} from '../model/Filters';
 })
 export class FilterBarColumnComponent implements OnInit {
     @Input() label: string = '';
-    @Input() name: string = ''; // Identifier for the filter field
+    @Input() name: string = '';
+    @Input() type: 'text' | 'select' = 'text';
+    @Input() options: FilterSelectOption[] = [];
 
     constructor() {
     }
 
     ngOnInit(): void {
-        // Initialization logic for a column if needed in the future
     }
 }
 
@@ -24,21 +26,28 @@ export class FilterBarColumnComponent implements OnInit {
     selector: 'app-fb',
     template: `
         <div class="row">
-            <div class="col-md-11 col-sm-12 my-2">
+            <div class="col-md col-sm-12 my-2">
                 <div class="row row-cols-auto">
                     <!-- Render a filter field for each projected column -->
                     <div *ngFor="let column of columns" class="col-auto">
                         <app-filter-field
-                            *ngIf="visibility"
+                            *ngIf="visibility && column.type === 'text'"
                             [name]="column.name"
                             [label]="column.label"
                         >
                         </app-filter-field>
+                        <app-filter-select-field
+                            *ngIf="visibility && column.type === 'select'"
+                            [name]="column.name"
+                            [label]="column.label"
+                            [options]="column.options"
+                        >
+                        </app-filter-select-field>
                     </div>
                 </div>
             </div>
-            <div class="col-md-1 col-sm-12 my-2">
-                <div class="col d-flex justify-content-end align-items-center">
+            <div class="col-md-auto col-sm-12 my-2">
+                <div class="d-flex justify-content-end align-items-center">
                     <!-- Go Button: Triggers filtering -->
                     <button
                         *ngIf="visibility"
@@ -47,6 +56,14 @@ export class FilterBarColumnComponent implements OnInit {
                         class="btn btn-primary btn-block btn-sm me-2"
                     >
                         Go
+                    </button>
+                    <!-- Clear Button: Resets all filters -->
+                    <button
+                        *ngIf="visibility"
+                        (click)="onClear()"
+                        class="btn btn-outline-secondary btn-block btn-sm me-2"
+                    >
+                        Clear
                     </button>
                     <!-- Visibility Toggle Button -->
                     <button
@@ -133,6 +150,10 @@ export class FilterBarComponent implements OnInit {
     @ViewChildren(FilterFieldComponent)
     filterFields!: QueryList<FilterFieldComponent>;
 
+    // Query rendered FilterSelectFieldComponent instances
+    @ViewChildren(FilterSelectFieldComponent)
+    filterSelectFields!: QueryList<FilterSelectFieldComponent>;
+
     goButtonId: string = '';
 
     constructor() {
@@ -143,13 +164,19 @@ export class FilterBarComponent implements OnInit {
     }
 
     getFilters(): Filter[] {
-        if (!this.filterFields) {
-            return [];
-        }
-        return this.filterFields.toArray().flatMap(
-            (ff: FilterFieldComponent) =>
-                ff.getFilters ? ff.getFilters() : [], // Add check for method existence
-        );
+        const textFilters = this.filterFields
+            ? this.filterFields.toArray().flatMap(
+                (ff: FilterFieldComponent) =>
+                    ff.getFilters ? ff.getFilters() : [],
+            )
+            : [];
+        const selectFilters = this.filterSelectFields
+            ? this.filterSelectFields.toArray().flatMap(
+                (ff: FilterSelectFieldComponent) =>
+                    ff.getFilters ? ff.getFilters() : [],
+            )
+            : [];
+        return [...textFilters, ...selectFilters];
     }
 
     toggleVisibility(): void {
@@ -159,5 +186,15 @@ export class FilterBarComponent implements OnInit {
     onGo(): void {
         const activeFilters = this.getFilters();
         this.onFilter.emit(activeFilters);
+    }
+
+    onClear(): void {
+        this.filterFields?.forEach(f => {
+            f.internalFilter.conditions = [new Condition(Operators.MATCHES, '')];
+        });
+        this.filterSelectFields?.forEach(f => {
+            f.selectedValue = f.options.length > 0 ? f.options[0].value : '';
+        });
+        this.onFilter.emit([]);
     }
 }

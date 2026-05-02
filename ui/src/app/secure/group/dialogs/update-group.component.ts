@@ -1,8 +1,7 @@
-import {Component, EventEmitter, OnInit, Output} from '@angular/core';
+import {Component, OnInit} from '@angular/core';
 import {NgbActiveModal} from '@ng-bootstrap/ng-bootstrap';
 import {MessageService} from 'primeng/api';
 import {GroupService} from '../../../_services/group.service';
-import {TenantService} from '../../../_services/tenant.service';
 
 @Component({
     selector: 'app-update-group',
@@ -12,18 +11,16 @@ import {TenantService} from '../../../_services/tenant.service';
                 <form
                     #updateGroupForm="ngForm"
                     (ngSubmit)="updateGroupForm.form.valid && onSubmit()"
-                    name="createGroupForm"
+                    name="updateGroupForm"
                     novalidate
                 >
                     <div class="mb-3 form-group">
-                        <label class="form-label" for="create.group.name"
-                        >Name</label
-                        >
+                        <label class="form-label" for="update.group.name">Name</label>
                         <input
                             #name="ngModel"
                             [(ngModel)]="form.name"
                             class="form-control"
-                            id="create.group.name"
+                            id="update.group.name"
                             name="name"
                             required
                             type="text"
@@ -42,7 +39,7 @@ import {TenantService} from '../../../_services/tenant.service';
                 <button
                     class="btn btn-primary"
                     type="submit"
-                    (click)="updateGroupForm.onSubmit(krishna)"
+                    (click)="updateGroupForm.onSubmit(submitTrigger)"
                 >
                     Update
                 </button>
@@ -52,45 +49,25 @@ import {TenantService} from '../../../_services/tenant.service';
     styles: [''],
 })
 export class UpdateGroupComponent implements OnInit {
-    @Output() passEntry: EventEmitter<any> = new EventEmitter();
-
-    form = {
-        name: '',
-    };
     groupId: string = '';
-    krishna: any;
+    form = {name: ''};
+    submitTrigger: any;
 
     constructor(
         private groupService: GroupService,
-        private tenantService: TenantService,
         private messageService: MessageService,
         public activeModal: NgbActiveModal,
-    ) {
-    }
+    ) {}
 
-    ngOnInit(): void {
-    }
+    ngOnInit(): void {}
 
     async onSubmit() {
         try {
-            const updatedGroup = await this.groupService.updateGroup(
-                this.groupId,
-                this.form.name,
-            );
-            this.messageService.add({
-                severity: 'success',
-                summary: 'Success',
-                detail: 'Group Updated',
-            });
-            this.passEntry.emit(updatedGroup);
+            const updatedGroup = await this.groupService.updateGroup(this.groupId, this.form.name);
+            this.messageService.add({severity: 'success', summary: 'Success', detail: 'Group Updated'});
             this.activeModal.close(updatedGroup);
         } catch (e) {
-            console.error(e);
-            this.messageService.add({
-                severity: 'error',
-                summary: 'Error',
-                detail: 'Group Updation Failed',
-            });
+            this.messageService.add({severity: 'error', summary: 'Error', detail: 'Group Update Failed'});
         }
     }
 }

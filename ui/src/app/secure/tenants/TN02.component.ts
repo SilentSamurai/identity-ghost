@@ -16,11 +16,16 @@ import {UpdateAppComponent} from '../apps/dialogs/update-app.component';
 import {CreateSubscriptionComponent} from "./dialogs/create-subscription.component";
 import {ModalService} from "../../component/dialogs/modal.service";
 import {SubscriptionService} from "../../_services/subscription.service";
+import {ClientService} from "../../_services/client.service";
+import {CreateClientComponent} from "../clients/dialogs/create-client.component";
+import {SecretDisplayComponent} from "../clients/dialogs/secret-display.component";
+import {GroupService} from "../../_services/group.service";
+import {CreateGroupComponent} from "../group/dialogs/create-group.component";
 
 @Component({
     selector: 'view-tenant',
     template: `
-        <nav-bar></nav-bar>
+        <secure-nav-bar></secure-nav-bar>
         <app-object-page [loading]="loading">
             <app-op-title>
                 {{ tenant.name }}
@@ -71,11 +76,7 @@ import {SubscriptionService} from "../../_services/subscription.service";
                             </code>
                         </app-attribute>
                         <app-attribute label="Client Secret">
-                            <code>
-                                <pre class="text-wrap text-break">{{
-                                        credentials.clientSecret
-                                    }}</pre>
-                            </code>
+                            <span class="text-muted">Secret is only shown at client creation time. Use the Clients tab to rotate secrets.</span>
                         </app-attribute>
                         <app-attribute label="Public Key">
                             <code>
@@ -132,7 +133,7 @@ import {SubscriptionService} from "../../_services/subscription.service";
                                             tenant_id,
                                             user.id,
                                         ]"
-                                        href="javascript:void(0)"
+                                        
                                     >View Role Assignments
                                     </a>
                                 </td>
@@ -143,6 +144,7 @@ import {SubscriptionService} from "../../_services/subscription.service";
                                         class="btn"
                                         [attr.data-cy-id]="user.email"
                                         type="button"
+                                        aria-label="Remove member"
                                     >
                                         <i class="fa fa-solid fa-trash"></i>
                                     </button>
@@ -192,7 +194,7 @@ import {SubscriptionService} from "../../_services/subscription.service";
                                             tenant.id,
                                             role.id,
                                         ]"
-                                        href="javascript:void(0)"
+                                        
                                     >{{ role.name }}
                                     </a>
                                 </td>
@@ -205,6 +207,7 @@ import {SubscriptionService} from "../../_services/subscription.service";
                                         class="btn btn-sm"
                                         [attr.data-cy-id]="role.name"
                                         type="button"
+                                        aria-label="Remove role"
                                     >
                                         <i class="fa fa-solid fa-trash"></i>
                                     </button>
@@ -272,6 +275,7 @@ import {SubscriptionService} from "../../_services/subscription.service";
                                         class="btn btn-sm"
                                         data-test-id="edit"
                                         type="button"
+                                        aria-label="Edit app"
                                     >
                                         <i class="fa fa-solid fa-pencil"></i>
                                     </button>
@@ -281,6 +285,7 @@ import {SubscriptionService} from "../../_services/subscription.service";
                                         class="btn btn-sm"
                                         data-test-id="delete"
                                         type="button"
+                                        aria-label="Delete app"
                                     >
                                         <i class="fa fa-solid fa-trash"></i>
                                     </button>
@@ -360,11 +365,110 @@ import {SubscriptionService} from "../../_services/subscription.service";
                                         [disabled]="!isTenantAdmin"
                                         class="btn btn-sm btn-danger me-2"
                                         type="button"
+                                        aria-label="Unsubscribe"
                                     >
                                         <i class="fa fa-solid fa-trash"></i>
                                     </button>
                                 </td>
 
+                            </ng-template>
+                        </app-table>
+                    </app-section-content>
+                </app-op-section>
+            </app-op-tab>
+
+            <app-op-tab name="Clients">
+                <app-op-section name="Clients">
+                    <app-section-content>
+                        <app-table
+                            title="Clients"
+                            [dataSource]="clientsDataModel"
+                        >
+                            <app-table-col label="Name" name="name"></app-table-col>
+                            <app-table-col label="Client ID" name="clientId"></app-table-col>
+                            <app-table-col label="Client Type" name="isPublic"></app-table-col>
+                            <app-table-col label="Grant Types" name="grantTypes"></app-table-col>
+                            <app-table-col label="Actions" name="actions"></app-table-col>
+
+                            <app-table-actions>
+                                <button
+                                    (click)="onCreateClient()"
+                                    [disabled]="!isTenantAdmin"
+                                    id="CREATE_CLIENT_BTN"
+                                    class="btn btn-primary btn-sm"
+                                >
+                                    Create
+                                </button>
+                            </app-table-actions>
+
+                            <ng-template let-client #table_body>
+                                <td>
+                                    <a
+                                        [routerLink]="['/CL02', tenant_id, client.clientId]"
+                                        
+                                    >{{ client.name }}</a>
+                                </td>
+                                <td>{{ client.clientId }}</td>
+                                <td>
+                                    <span *ngIf="client.isPublic" class="badge bg-info">Public</span>
+                                    <span *ngIf="!client.isPublic" class="badge bg-secondary">Confidential</span>
+                                </td>
+                                <td>{{ client.grantTypes }}</td>
+                                <td>
+                                    <button
+                                        (click)="onDeleteClient(client)"
+                                        [disabled]="!isTenantAdmin"
+                                        class="btn btn-sm"
+                                        type="button"
+                                    >
+                                        <i class="fa fa-solid fa-trash"></i>
+                                    </button>
+                                </td>
+                            </ng-template>
+                        </app-table>
+                    </app-section-content>
+                </app-op-section>
+            </app-op-tab>
+
+            <app-op-tab name="Groups">
+                <app-op-section name="Groups">
+                    <app-section-content>
+                        <app-table
+                            title="Group List"
+                            [dataSource]="groupsDataModel"
+                        >
+                            <app-table-col label="Name" name="name"></app-table-col>
+                            <app-table-col label="Actions" name="actions"></app-table-col>
+
+                            <app-table-actions>
+                                <button
+                                    (click)="onCreateGroup()"
+                                    [disabled]="!isTenantAdmin"
+                                    id="CREATE_GROUP_BTN"
+                                    class="btn btn-primary btn-sm"
+                                >
+                                    Create
+                                </button>
+                            </app-table-actions>
+
+                            <ng-template let-group #table_body>
+                                <td>
+                                    <a
+                                        [routerLink]="['/GP02', tenant_id, group.id]"
+                                        
+                                    >{{ group.name }}</a>
+                                </td>
+                                <td>
+                                    <button
+                                        (click)="onDeleteGroup(group)"
+                                        [disabled]="!isTenantAdmin"
+                                        class="btn btn-sm"
+                                        type="button"
+                                        aria-label="Delete group"
+                                    >
+                                        <i class="fa fa-solid fa-trash"></i>
+                                    </button>
+                                </td>
                             </ng-template>
                         </app-table>
                     </app-section-content>
@@ -381,7 +485,6 @@ export class TN02Component implements OnInit {
     tenant: any = {};
     credentials: any = {
         clientId: 'NA',
-        clientSecret: 'NA',
         publicKey: 'NA',
     };
     members: any = [];
@@ -391,6 +494,8 @@ export class TN02Component implements OnInit {
     rolesDataModel: StaticSource<any>;
     createdAppsDataModel: StaticSource<any>;
     subscribedAppsDataModel: StaticSource<any>;
+    clientsDataModel: StaticSource<any>;
+    groupsDataModel: StaticSource<any>;
 
     constructor(
         private tenantService: TenantService,
@@ -404,35 +509,44 @@ export class TN02Component implements OnInit {
         private modalService: ModalService,
         private appService: AppService,
         private subscriptionService: SubscriptionService,
+        private clientService: ClientService,
+        private groupService: GroupService,
     ) {
         this.memberDataModel = new StaticSource(['id']);
         this.rolesDataModel = new StaticSource(['id']);
         this.createdAppsDataModel = new StaticSource(['id']);
         this.subscribedAppsDataModel = new StaticSource(['id']);
+        this.clientsDataModel = new StaticSource(['id']);
+        this.groupsDataModel = new StaticSource(['id']);
     }
 
     async ngOnInit() {
+        this.tenant_id = this.actRoute.snapshot.params['tenantId'];
+        this.isTenantAdmin = this.tokenStorageService.isTenantAdmin();
+        await this.loadData();
+    }
+
+    async loadData() {
         this.loading = true;
         try {
-            this.tenant_id = this.actRoute.snapshot.params['tenantId'];
-            if (this.tokenStorageService.isTenantAdmin()) {
-                this.isTenantAdmin = true;
-                this.credentials = await this.tenantService.getTenantCredentials(
-                    this.tenant_id,
-                );
+            if (this.isTenantAdmin) {
+                this.credentials = await this.tenantService.getTenantCredentials();
             }
-            console.log(this.tenant_id);
-            this.tenant = await this.tenantService.getTenantDetails(this.tenant_id);
-            this.members = await this.tenantService.getMembers(this.tenant_id);
-            this.roles = await this.tenantService.getTenantRoles(this.tenant_id);
+            this.tenant = await this.tenantService.getTenantDetails();
+            this.members = await this.tenantService.getMembers();
+            this.roles = await this.tenantService.getTenantRoles();
 
-            const createdApps = await this.appService.getAppCreatedByTenantId(this.tenant_id);
-            const subscribedApps = await this.subscriptionService.getTenantSubscription(this.tenant_id);
+            const createdApps = await this.appService.getAppCreatedByTenantId();
+            const subscribedApps = await this.subscriptionService.getTenantSubscription();
+            const clients = await this.clientService.getClientsByTenant();
+            const groups = await this.groupService.getGroupsByTenant();
 
             this.memberDataModel.setData(Array.isArray(this.members) ? this.members : []);
             this.rolesDataModel.setData(Array.isArray(this.roles) ? this.roles : []);
             this.createdAppsDataModel.setData(Array.isArray(createdApps) ? createdApps : []);
             this.subscribedAppsDataModel.setData(Array.isArray(subscribedApps) ? subscribedApps : []);
+            this.clientsDataModel.setData(Array.isArray(clients) ? clients : []);
+            this.groupsDataModel.setData(Array.isArray(groups) ? groups : []);
 
             this.authDefaultService.setTitle('TN02: ' + this.tenant.name);
         } finally {
@@ -447,7 +561,7 @@ export class TN02Component implements OnInit {
             }
         });
         if (modalRef.is_ok()) {
-            await this.ngOnInit();
+            await this.loadData();
         }
     }
 
@@ -456,7 +570,7 @@ export class TN02Component implements OnInit {
             initData: {tenant: this.tenant}
         });
         if (modalRef.is_ok()) {
-            await this.ngOnInit();
+            await this.loadData();
         }
     }
 
@@ -467,7 +581,7 @@ export class TN02Component implements OnInit {
             }
         });
         if (modalRef.is_ok()) {
-            await this.ngOnInit();
+            await this.loadData();
         }
     }
 
@@ -480,7 +594,6 @@ export class TN02Component implements OnInit {
                 try {
                     let deletedRole = await this.tenantService.deleteRole(
                         role.name,
-                        this.tenant.id,
                     );
                     this.messageService.add({
                         severity: 'success',
@@ -499,7 +612,7 @@ export class TN02Component implements OnInit {
             },
         });
         if (deletedRole) {
-            await this.ngOnInit();
+            await this.loadData();
         }
     }
 
@@ -512,7 +625,6 @@ export class TN02Component implements OnInit {
                 try {
                     const removedMember = await this.tenantService.removeMember(
                         user.email,
-                        this.tenant.id,
                     );
                     this.messageService.add({
                         severity: 'success',
@@ -531,7 +643,7 @@ export class TN02Component implements OnInit {
             },
         });
         if (removedMember) {
-            await this.ngOnInit();
+            await this.loadData();
         }
     }
 
@@ -542,9 +654,7 @@ export class TN02Component implements OnInit {
             icon: 'pi pi-info-circle',
             accept: async () => {
                 try {
-                    let deletedTenant = await this.tenantService.deleteTenant(
-                        this.tenant.id,
-                    );
+                    let deletedTenant = await this.tenantService.deleteTenant();
                     this.messageService.add({
                         severity: 'success',
                         summary: 'Success',
@@ -567,11 +677,19 @@ export class TN02Component implements OnInit {
     }
 
     async onAddApp() {
+        if (!this.tenant?.id) {
+            this.messageService.add({
+                severity: 'error',
+                summary: 'Error',
+                detail: 'Tenant information is not loaded. Please refresh the page.',
+            });
+            return;
+        }
         const modalRef = await this.modalService.open(CreateAppComponent, {
             initData: {tenantId: this.tenant.id}
         });
         if (modalRef.is_ok()) {
-            await this.ngOnInit();
+            await this.loadData();
         }
     }
 
@@ -580,7 +698,7 @@ export class TN02Component implements OnInit {
             initData: {app}
         });
         if (modalRef.is_ok()) {
-            await this.ngOnInit();
+            await this.loadData();
         }
     }
 
@@ -609,7 +727,7 @@ export class TN02Component implements OnInit {
             },
         });
         if (deletedApp) {
-            await this.ngOnInit();
+            await this.loadData();
         }
     }
 
@@ -617,9 +735,8 @@ export class TN02Component implements OnInit {
         const result = await this.modalService.open(CreateSubscriptionComponent, {
             initData: {tenant: this.tenant}
         });
-        console.log(result, "test");
         if (result.is_ok()) {
-            await this.ngOnInit();
+            await this.loadData();
         }
     }
 
@@ -630,7 +747,7 @@ export class TN02Component implements OnInit {
             icon: 'pi pi-info-circle',
             accept: async () => {
                 try {
-                    await this.subscriptionService.unsubscribeFromApp(subscription.app.id, this.tenant.id);
+                    await this.subscriptionService.unsubscribeFromApp(subscription.app.id);
                     this.messageService.add({
                         severity: 'success',
                         summary: 'Success',
@@ -648,7 +765,7 @@ export class TN02Component implements OnInit {
             },
         });
         if (unsubscribed) {
-            await this.ngOnInit();
+            await this.loadData();
         }
     }
 
@@ -681,7 +798,76 @@ export class TN02Component implements OnInit {
             },
         });
         if (published) {
-            await this.ngOnInit();
+            await this.loadData();
+        }
+    }
+
+    async onCreateClient() {
+        const result = await this.modalService.open<{
+            client: any;
+            clientSecret: string | null
+        }>(CreateClientComponent, {
+            initData: {tenantId: this.tenant_id}
+        });
+        if (result.is_ok()) {
+            const data = result.data;
+            if (data?.clientSecret) {
+                await this.modalService.open(SecretDisplayComponent, {
+                    initData: {clientSecret: data.clientSecret}
+                });
+            }
+            await this.loadData();
+        }
+    }
+
+    async onDeleteClient(client: any) {
+        const deleted = await this.confirmationService.confirm({
+            message: `Are you sure you want to delete <b>${client.name}</b>?`,
+            header: 'Confirmation',
+            icon: 'pi pi-info-circle',
+            accept: async () => {
+                try {
+                    await this.clientService.deleteClient(client.clientId);
+                    this.messageService.add({severity: 'success', summary: 'Success', detail: 'Client Deleted'});
+                    return true;
+                } catch (e) {
+                    this.messageService.add({severity: 'error', summary: 'Error', detail: 'Client Deletion Failed'});
+                }
+                return null;
+            },
+        });
+        if (deleted) {
+            await this.loadData();
+        }
+    }
+
+    async onCreateGroup() {
+        const result = await this.modalService.open(CreateGroupComponent, {
+            initData: {tenantId: this.tenant_id}
+        });
+        if (result.is_ok()) {
+            await this.loadData();
+        }
+    }
+
+    async onDeleteGroup(group: any) {
+        const deleted = await this.confirmationService.confirm({
+            message: `Are you sure you want to delete group <b>${group.name}</b>?`,
+            header: 'Confirmation',
+            icon: 'pi pi-info-circle',
+            accept: async () => {
+                try {
+                    await this.groupService.deleteGroup(group.id);
+                    this.messageService.add({severity: 'success', summary: 'Success', detail: 'Group Deleted'});
+                    return true;
+                } catch (e) {
+                    this.messageService.add({severity: 'error', summary: 'Error', detail: 'Group Deletion Failed'});
+                }
+                return null;
+            },
+        });
+        if (deleted) {
+            await this.loadData();
         }
     }
 }

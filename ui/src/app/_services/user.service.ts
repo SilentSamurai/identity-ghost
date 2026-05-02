@@ -42,14 +42,16 @@ export class UserService {
     }
 
     editUser(id: string, name: string, email: string) {
-        return this.http.put(
-            `${API_URL}/users/update`,
-            {
-                id,
-                name,
-                email
-            },
-            this.getHttpOptions(),
+        return lastValueFrom(
+            this.http.put(
+                `${API_URL}/users/update`,
+                {
+                    id,
+                    name,
+                    email
+                },
+                this.getHttpOptions(),
+            ),
         );
     }
 
@@ -60,16 +62,20 @@ export class UserService {
     }
 
     getUser(userId: string) {
-        return this.http.get(
-            `${API_URL}/users/${userId}`,
-            this.getHttpOptions(),
+        return lastValueFrom(
+            this.http.get(
+                `${API_URL}/users/${userId}`,
+                this.getHttpOptions(),
+            ),
         );
     }
 
     getUserTenants(userId: string) {
-        return this.http.get(
-            `${API_URL}/users/${userId}/tenants`,
-            this.getHttpOptions(),
+        return lastValueFrom(
+            this.http.get(
+                `${API_URL}/users/${userId}/tenants`,
+                this.getHttpOptions(),
+            ),
         );
     }
 
@@ -109,9 +115,21 @@ export class UserService {
         return lastValueFrom(
             this.http.put(
                 `${API_URL}/users/${userId}/password`,
-                { password, confirmPassword },
+                {password, confirmPassword},
                 this.getHttpOptions(),
             ),
+        );
+    }
+
+    lockUser(userId: string) {
+        return lastValueFrom(
+            this.http.put(`${API_URL}/users/${userId}/lock`, {}, this.getHttpOptions()),
+        );
+    }
+
+    unlockUser(userId: string) {
+        return lastValueFrom(
+            this.http.put(`${API_URL}/users/${userId}/unlock`, {}, this.getHttpOptions()),
         );
     }
 }

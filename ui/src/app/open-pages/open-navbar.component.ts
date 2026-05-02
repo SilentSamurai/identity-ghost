@@ -6,7 +6,7 @@ import {Component} from '@angular/core';
         <nav class="navbar navbar-expand-lg navbar-light bg-light border-bottom">
             <div class="container-fluid">
                 <a class="navbar-brand d-flex align-items-center gap-2" routerLink="/welcome">
-                    <img src="/assets/logo-img.jpg" alt="Logo" width="28" height="28" class="rounded-circle"/>
+                    <img src="/assets/logo.svg" alt="Logo" width="28" height="28" class="rounded-circle"/>
                     <span>Auth Server</span>
                 </a>
 

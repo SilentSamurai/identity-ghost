@@ -9,7 +9,7 @@ import {MemberController} from "./members.controller";
 import {CaslModule} from "../casl/casl.module";
 import {RoleController} from "./role.controller";
 import {MainController} from "./main.controller";
-import {GenericSearchController} from "./generic-serach.controller";
+import {GenericSearchController} from "./generic-search.controller";
 import {TypeOrmModule} from "@nestjs/typeorm";
 import {User} from "../entity/user.entity";
 import {Tenant} from "../entity/tenant.entity";
@@ -17,7 +17,10 @@ import {Role} from "../entity/role.entity";
 import {TenantMember} from "../entity/tenant.members.entity";
 import {Group} from "../entity/group.entity";
 import {ServiceModule} from "../services/service.module";
-import {AuthController} from "./auth.controller";
+import {OAuthTokenController} from "./oauth-token.controller";
+import {OAuthVerificationController} from "./oauth-verification.controller";
+import {PasswordResetController} from "./password-reset.controller";
+import {EmailController} from "./email.controller";
 import {PolicyController} from "./policy.controller";
 import {GroupController} from "./group.controller";
 import {RoleControllerV2} from "./roleV2.controller";
@@ -25,6 +28,22 @@ import {RegisterController} from "./registration.controller";
 import {AppController} from "./app.controller";
 import {App} from "../entity/app.entity"
 import {TenantBitsController} from "./tenant-bits.controller";
+import {ClientController} from "./client.controller";
+import {Client} from "../entity/client.entity";
+import {AdminTenantController} from "./admin-tenant.controller";
+import {TenantKey} from "../entity/tenant-key.entity";
+import {IntrospectionController} from "./introspection.controller";
+import {RevocationController} from "./revocation.controller";
+import {JwksController} from "./jwks.controller";
+import {AdminKeysController} from "./admin-keys.controller";
+import {UserInfoController} from "./userinfo.controller";
+import {UserConsent} from "../entity/user-consent.entity";
+import {DiscoveryController} from "./discovery.controller";
+import {SecurityModule} from "../security/security.module";
+import {OAuthExceptionFilter} from "../exceptions/filter/oauth-exception.filter";
+import {OnboardingService} from "../services/onboarding.service";
+import {Subscription} from "../entity/subscription.entity";
+import {UserRole} from "../entity/user.roles.entity";
 
 @Module(
     {
@@ -35,7 +54,8 @@ import {TenantBitsController} from "./tenant-bits.controller";
                 MailModule,
                 CaslModule,
                 ServiceModule,
-                TypeOrmModule.forFeature([User, Tenant, Role, TenantMember, Group, App])
+                SecurityModule,
+                TypeOrmModule.forFeature([User, Tenant, Role, TenantMember, Group, App, Client, TenantKey, UserConsent, Subscription, UserRole])
             ],
         controllers: [
             UsersController,
@@ -45,16 +65,27 @@ import {TenantBitsController} from "./tenant-bits.controller";
             RoleController,
             MainController,
             GenericSearchController,
-            AuthController,
+            OAuthTokenController,
+            OAuthVerificationController,
+            PasswordResetController,
+            EmailController,
             PolicyController,
             GroupController,
             RoleControllerV2,
             RegisterController,
             AppController,
-            TenantBitsController
+            TenantBitsController,
+            ClientController,
+            AdminTenantController,
+            IntrospectionController,
+            RevocationController,
+            JwksController,
+            AdminKeysController,
+            UserInfoController,
+            DiscoveryController
         ],
-        providers: [],
-        exports: []
+        providers: [OAuthExceptionFilter, OnboardingService],
+        exports: [OnboardingService]
     })
 export class ControllersModule {
 }
