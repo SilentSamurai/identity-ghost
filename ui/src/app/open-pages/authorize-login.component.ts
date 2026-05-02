@@ -338,10 +338,13 @@ export class AuthorizeLoginComponent implements OnInit {
         this.prompt = params.get('prompt') || '';
         this.maxAge = params.has('max_age') ? Number(params.get('max_age')) : undefined;
 
-        // Generate and store nonce for OIDC flows
-        if (this.scope && this.scope.split(' ').includes('openid')) {
-            const nonce = this.nonceService.generate();
-            this.nonceService.store(nonce);
+        // Use the RP-provided nonce if present; do not generate one when the RP omitted it.
+        // Per OIDC Core §3.1.2.1, the nonce is the RP's responsibility — if the RP didn't
+        // send one, injecting our own would cause the RP's token validation to fail because
+        // the ID token would contain a nonce the RP never sent and cannot verify.
+        const rpNonce = params.get('nonce');
+        if (rpNonce) {
+            this.nonceService.store(rpNonce);
         }
 
         // Handle prompt=none: skip login form, attempt silent auth

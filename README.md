@@ -6,6 +6,82 @@
 A production-ready, OIDC-compatible OAuth Authorization service built
 with [NestJS](https://nestjs.com), [Angular](https://angular.io/), and [TypeScript](https://www.typescriptlang.org/).
 
+---
+
+## 🐳 Quick Start with Docker
+
+The easiest way to run Auth Server — no source code needed. The standalone image bundles both the UI and backend API.
+
+**Image:** [`sd25/auth-server`](https://hub.docker.com/repository/docker/sd25/auth-server/general)
+
+### SQLite (zero dependencies)
+
+```bash
+docker run -d \
+  --name auth-server \
+  -p 80:80 \
+  -p 9001:9001 \
+  -e SUPER_ADMIN_EMAIL=admin@auth.server.com \
+  -e SUPER_ADMIN_PASSWORD=changeme \
+  -e SUPER_TENANT_DOMAIN=auth.server.com \
+  -e ISSUER=http://localhost:9001 \
+  sd25/auth-server:latest
+```
+
+- UI → [http://localhost](http://localhost)
+- API → [http://localhost:9001](http://localhost:9001)
+
+### With PostgreSQL
+
+```bash
+docker run -d \
+  --name auth-server \
+  -p 80:80 \
+  -p 9001:9001 \
+  -e DATABASE_TYPE=postgres \
+  -e DATABASE_HOST=your-db-host \
+  -e DATABASE_PORT=5432 \
+  -e DATABASE_NAME=auth_db \
+  -e DATABASE_USERNAME=dbuser \
+  -e DATABASE_PASSWORD=dbpassword \
+  -e SUPER_ADMIN_EMAIL=admin@auth.server.com \
+  -e SUPER_ADMIN_PASSWORD=changeme \
+  -e SUPER_TENANT_DOMAIN=auth.server.com \
+  -e ISSUER=https://your-domain.com:9001 \
+  sd25/auth-server:latest
+```
+
+### Environment Variables
+
+| Variable                        | Purpose                                       | Default                 |
+|---------------------------------|-----------------------------------------------|-------------------------|
+| `ISSUER`                        | Token issuer URL (must match your public URL) | `http://localhost:9001` |
+| `BASE_URL`                      | Public URL of the UI                          | `http://localhost:4200` |
+| `BASE_BACKEND_URL`              | Public URL of the backend                     | `http://localhost:9001` |
+| `SUPER_ADMIN_EMAIL`             | Initial super-admin email                     | `admin@auth.server.com` |
+| `SUPER_ADMIN_PASSWORD`          | Initial super-admin password                  | `admin9000`             |
+| `SUPER_TENANT_DOMAIN`           | Domain of the root tenant                     | `auth.server.com`       |
+| `DATABASE_TYPE`                 | `sqlite` or `postgres`                        | `sqlite`                |
+| `DATABASE_HOST`                 | PostgreSQL host                               | `127.0.0.1`             |
+| `DATABASE_PORT`                 | PostgreSQL port                               | `5432`                  |
+| `DATABASE_NAME`                 | Database name (or SQLite file path)           | `db/database.sqlite3`   |
+| `DATABASE_USERNAME`             | Database user                                 | `root`                  |
+| `DATABASE_PASSWORD`             | Database password                             | `root`                  |
+| `DATABASE_SSL`                  | Enable SSL for database connection            | `false`                 |
+| `MAIL_HOST`                     | SMTP host                                     | `localhost`             |
+| `MAIL_PORT`                     | SMTP port                                     | `5870`                  |
+| `MAIL_USER`                     | SMTP username                                 | —                       |
+| `MAIL_PASSWORD`                 | SMTP password                                 | —                       |
+| `TOKEN_EXPIRATION_TIME`         | Access token lifetime                         | `1h`                    |
+| `REFRESH_TOKEN_EXPIRATION_TIME` | Refresh token lifetime                        | `7d`                    |
+| `PORT`                          | Backend HTTP port                             | `9001`                  |
+| `ENABLE_HTTPS`                  | Enable TLS                                    | `false`                 |
+| `ENABLE_CORS`                   | Enable CORS protection                        | `true`                  |
+
+> **Note:** Change `SUPER_ADMIN_PASSWORD` before exposing the server publicly. The defaults are for local development only.
+
+---
+
 ## 📂 Project Structure
 
 ```text
@@ -157,9 +233,9 @@ npm test
 
 ---
 
-## 🐳 Docker & Deployment
+## 🐳 Deployment
 
-### Docker Compose
+### Docker Compose (Build from Source)
 
 ```bash
 docker-compose up --build

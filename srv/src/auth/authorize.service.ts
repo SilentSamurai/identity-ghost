@@ -26,6 +26,7 @@ export interface AuthorizeQueryParams {
 export interface ValidatedAuthorizeRequest {
     clientId: string;
     redirectUri: string;
+    responseType: string;
     scope: string;
     state: string;
     codeChallenge?: string;
@@ -109,6 +110,7 @@ export class AuthorizeService {
             return {
                 clientId: client.clientId,
                 redirectUri,
+                responseType: params.response_type!,
                 scope,
                 state: params.state,
                 codeChallenge,
