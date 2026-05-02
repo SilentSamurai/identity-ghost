@@ -7,6 +7,7 @@ import {Environment} from "../config/environment.service";
 import {AuthCodeService} from "./auth-code.service";
 import {User} from "../entity/user.entity";
 import {Tenant} from "../entity/tenant.entity";
+import {Role} from "../entity/role.entity";
 import {GRANT_TYPES} from "../casl/contexts";
 import {Permission} from "../auth/auth.decorator";
 import {ScopeResolverService} from "../casl/scope-resolver.service";
@@ -20,6 +21,7 @@ import {randomUUID} from "crypto";
 import {LoginSessionService} from "./login-session.service";
 import {SecurityEventLogger} from "../security/security-event-logger.service";
 import {Client} from "../entity/client.entity";
+import {PolicyResolutionService} from "../casl/policy-resolution.service";
 
 /**
  * Decision result for refresh token eligibility.
@@ -120,6 +122,7 @@ export class TokenIssuanceService {
         private readonly usersService: UsersService,
         private readonly loginSessionService: LoginSessionService,
         private readonly securityEventLogger: SecurityEventLogger,
+        private readonly policyResolutionService: PolicyResolutionService,
     ) {
     }
 
@@ -147,8 +150,17 @@ export class TokenIssuanceService {
             return this.issueSubscribedToken(permission, user, tenant, client, options);
         }
 
-        const roles = await this.tenantService.getMemberRoles(permission, tenant.id, user);
-        const roleNames = roles.map(r => r.name);
+        // Fetch tenant-local roles
+        const tenantLocalRoles = await this.tenantService.getMemberRoles(permission, tenant.id, user);
+        
+        // Fetch app-owned roles (cross-tenant roles assigned via subscriptions)
+        // Requirements: 7.1, 7.2, 7.3
+        const appOwnedRoles = await this.policyResolutionService.getAppOwnedRolesForUser(user.id, tenant.id);
+        
+        // Combine both role sets for token inclusion
+        const allRoles = [...tenantLocalRoles, ...appOwnedRoles];
+        const roleNames = this.formatRoleNamesForToken(allRoles);
+        
         const grantedScopes = this.scopeResolverService.resolveScopes(
             options?.requestedScope ?? null,
             client.allowedScopes || 'openid profile email',
@@ -320,8 +332,16 @@ export class TokenIssuanceService {
         // Requirements: 3.2, 3.3, 3.6
         const client = await this.resolveClient(tenant);
 
-        const roles = await this.tenantService.getMemberRoles(permission, tenant.id, user);
-        const roleNames = roles.map(r => r.name);
+        // Fetch tenant-local roles
+        const tenantLocalRoles = await this.tenantService.getMemberRoles(permission, tenant.id, user);
+        
+        // Fetch app-owned roles (cross-tenant roles assigned via subscriptions)
+        // Requirements: 7.1, 7.2, 7.3
+        const appOwnedRoles = await this.policyResolutionService.getAppOwnedRolesForUser(user.id, tenant.id);
+        
+        // Combine both role sets for token inclusion
+        const allRoles = [...tenantLocalRoles, ...appOwnedRoles];
+        const roleNames = this.formatRoleNamesForToken(allRoles);
 
         const grantedScopes = ScopeNormalizer.parse(record.scope);
 
@@ -437,8 +457,17 @@ export class TokenIssuanceService {
         }
 
         const subscribingTenant = ambiguityResult.resolvedTenant!;
-        let additionalRoles = await this.tenantService.getMemberRoles(permission, subscribingTenant.id, user);
-        const allRoleNames = additionalRoles.map(r => r.name);
+        
+        // Fetch tenant-local roles (internal roles like TENANT_ADMIN)
+        const tenantLocalRoles = await this.tenantService.getMemberRoles(permission, subscribingTenant.id, user);
+        
+        // Fetch app-owned roles (cross-tenant roles assigned via subscriptions)
+        // Requirements: 7.1, 7.2, 7.3
+        const appOwnedRoles = await this.policyResolutionService.getAppOwnedRolesForUser(user.id, subscribingTenant.id);
+        
+        // Combine both role sets for token inclusion
+        const allRoles = [...tenantLocalRoles, ...appOwnedRoles];
+        const allRoleNames = this.formatRoleNamesForToken(allRoles);
 
         const grantedScopes = this.scopeResolverService.resolveScopes(
             options?.requestedScope ?? null,
@@ -573,6 +602,25 @@ export class TokenIssuanceService {
      * Falls back to the tenant's default client (by domain alias) when no oauthClientId is given.
      * Requirements: 3.1
      */
+    /**
+     * Formats role names for token inclusion based on role type:
+     * - App-owned roles (role.app is set): format as "{appName}:{roleName}"
+     * - Tenant-local roles (role.app is null): include name as-is
+     * - Internal roles (SUPER_ADMIN, TENANT_ADMIN, TENANT_VIEWER): include name as-is
+     * Requirements: 7.1, 7.2, 7.3, 7.4
+     */
+    private formatRoleNamesForToken(roles: Role[]): string[] {
+        return roles.map(role => {
+            if (role.app) {
+                // App-owned role: format as "{appName}:{roleName}"
+                return `${role.app.name}:${role.name}`;
+            } else {
+                // Tenant-local or internal role: include name as-is
+                return role.name;
+            }
+        });
+    }
+
     private async resolveClient(tenant: Tenant, oauthClientId?: string): Promise<Client> {
         try {
             const client = oauthClientId

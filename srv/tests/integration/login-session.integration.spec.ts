@@ -19,6 +19,11 @@ describe('Login Session Creation', () => {
     let app: SharedTestFixture;
     let tokenFixture: TokenFixture;
 
+    // Use a dedicated tenant to avoid conflicts with other tests (per testing-strategy.md)
+    const clientId = 'login-session-test.local';
+    const email = 'admin@login-session-test.local';
+    const password = 'admin9000';
+
     beforeAll(() => {
         app = new SharedTestFixture();
         tokenFixture = new TokenFixture(app);
@@ -31,16 +36,16 @@ describe('Login Session Creation', () => {
     it('login creates a session — ID token contains auth_time and sid', async () => {
         // Login via auth code flow
         const loginResult = await tokenFixture.login(
-            'admin@auth.server.com',
-            'admin9000',
-            'auth.server.com',
+            email,
+            password,
+            clientId,
         );
         expect(loginResult.authentication_code).toBeDefined();
 
         // Exchange the auth code for tokens
         const tokenResult = await tokenFixture.exchangeCodeForToken(
             loginResult.authentication_code,
-            'auth.server.com',
+            clientId,
         ) as any;
         expect(tokenResult.id_token).toBeDefined();
 
@@ -59,9 +64,9 @@ describe('Login Session Creation', () => {
             .post('/api/oauth/token')
             .send({
                 grant_type: 'password',
-                username: 'admin@auth.server.com',
-                password: 'admin9000',
-                client_id: 'auth.server.com',
+                username: email,
+                password: password,
+                client_id: clientId,
             })
             .set('Accept', 'application/json');
 
@@ -81,9 +86,9 @@ describe('Login Session Creation', () => {
             .post('/api/oauth/token')
             .send({
                 grant_type: 'password',
-                username: 'admin@auth.server.com',
-                password: 'admin9000',
-                client_id: 'auth.server.com',
+                username: email,
+                password: password,
+                client_id: clientId,
             })
             .set('Accept', 'application/json');
 
@@ -108,16 +113,16 @@ describe('Login Session Creation', () => {
         // ID token with valid auth_time and sid, confirming the session record
         // existed at the time of code exchange.
         const loginResult = await tokenFixture.login(
-            'admin@auth.server.com',
-            'admin9000',
-            'auth.server.com',
+            email,
+            password,
+            clientId,
         );
         expect(loginResult.authentication_code).toBeDefined();
 
         // Immediately exchange — if session wasn't persisted, this would fail
         const tokenResult = await tokenFixture.exchangeCodeForToken(
             loginResult.authentication_code,
-            'auth.server.com',
+            clientId,
         ) as any;
         expect(tokenResult.id_token).toBeDefined();
 

@@ -12,4 +12,5 @@ and [Nest.js](https://nestjs.com/).
 - Reset password via email.
 - Change email address via email.
 - API [documentation](https://silentsamurai.github.io/auth-server) available.
-- **Onboarding**: One‑click tenant onboarding for SaaS users (see `docs/multi-tenant-onboarding.md`).
+- **App-Owned Roles**: Define roles in your app's tenant and have them apply across all subscriber tenants. See `docs/app-owned-roles.md`.
+- **Onboarding**: App-initiated tenant provisioning via API (see `docs/multi-tenant-onboarding.md`).

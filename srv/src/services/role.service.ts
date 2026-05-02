@@ -218,6 +218,7 @@ export class RoleService {
                 tenant: {id: tenant.id},
                 users: {id: user.id},
             },
+            relations: ['app'],
         });
     }
 

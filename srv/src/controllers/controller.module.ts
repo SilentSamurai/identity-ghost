@@ -41,6 +41,9 @@ import {UserConsent} from "../entity/user-consent.entity";
 import {DiscoveryController} from "./discovery.controller";
 import {SecurityModule} from "../security/security.module";
 import {OAuthExceptionFilter} from "../exceptions/filter/oauth-exception.filter";
+import {OnboardingService} from "../services/onboarding.service";
+import {Subscription} from "../entity/subscription.entity";
+import {UserRole} from "../entity/user.roles.entity";
 
 @Module(
     {
@@ -52,7 +55,7 @@ import {OAuthExceptionFilter} from "../exceptions/filter/oauth-exception.filter"
                 CaslModule,
                 ServiceModule,
                 SecurityModule,
-                TypeOrmModule.forFeature([User, Tenant, Role, TenantMember, Group, App, Client, TenantKey, UserConsent])
+                TypeOrmModule.forFeature([User, Tenant, Role, TenantMember, Group, App, Client, TenantKey, UserConsent, Subscription, UserRole])
             ],
         controllers: [
             UsersController,
@@ -81,8 +84,8 @@ import {OAuthExceptionFilter} from "../exceptions/filter/oauth-exception.filter"
             UserInfoController,
             DiscoveryController
         ],
-        providers: [OAuthExceptionFilter],
-        exports: []
+        providers: [OAuthExceptionFilter, OnboardingService],
+        exports: [OnboardingService]
     })
 export class ControllersModule {
 }

@@ -7,3 +7,5 @@
 * [Resource Server Verification](resource-server-verification.md)
 * [Audience Model](audience-model.md)
 * [Database Schema](database-schema.md)
+* [App-Owned Roles](app-owned-roles.md)
+* [Multi-Tenant Onboarding](multi-tenant-onboarding.md)

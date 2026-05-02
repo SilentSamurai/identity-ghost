@@ -88,6 +88,7 @@ export class AuthUserService {
                 tenant: {id: tenant.id},
                 users: {id: user.id},
             },
+            relations: ['app'],
         });
     }
 

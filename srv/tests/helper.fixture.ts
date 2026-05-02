@@ -5,6 +5,7 @@ import {GroupClient} from "./api-client/group-client";
 import {UsersClient} from "./api-client/user-client";
 import {AdminTenantClient} from "./api-client/admin-tenant-client";
 import {ClientEntityClient} from "./api-client/client-entity-client";
+import {expect2xx} from "./api-client/client";
 
 export class HelperFixture {
 
@@ -50,6 +51,38 @@ export class HelperFixture {
         if (target) {
             await clientEntityClient.updateClient(target.clientId, {allowPasswordGrant: true});
         }
+    }
+
+    /**
+     * Sets a user's password via the super admin endpoint.
+     * Requires the caller to have super admin privileges.
+     * 
+     * @param userId - The user's ID
+     * @param password - The new password to set
+     */
+    async setUserPassword(userId: string, password: string): Promise<void> {
+        const response = await this.app.getHttpServer()
+            .put(`/api/users/${userId}/password`)
+            .set('Authorization', `Bearer ${this.accessToken}`)
+            .set('Accept', 'application/json')
+            .send({password, confirmPassword: password});
+        expect2xx(response);
+    }
+
+    /**
+     * Verifies a user's email via the super admin endpoint.
+     * Requires the caller to have super admin privileges.
+     * 
+     * @param email - The user's email address
+     * @param verify - Whether to verify (true) or unverify (false) the user
+     */
+    async verifyUser(email: string, verify: boolean = true): Promise<void> {
+        const response = await this.app.getHttpServer()
+            .put('/api/users/verify-user')
+            .set('Authorization', `Bearer ${this.accessToken}`)
+            .set('Accept', 'application/json')
+            .send({email, verify});
+        expect2xx(response);
     }
 
 }

@@ -1,9 +1,12 @@
 import {
     Body,
     ClassSerializerInterceptor,
+    ConflictException,
     Controller,
     Delete,
+    ForbiddenException,
     Get,
+    NotFoundException,
     Param,
     ParseUUIDPipe,
     Patch,
@@ -19,6 +22,9 @@ import {schemaPipe} from "../validation/validation.pipe";
 import * as yup from "yup";
 import {JwtAuthGuard} from "../auth/jwt-auth.guard";
 import {CurrentPermission, CurrentTenantId, Permission} from "../auth/auth.decorator";
+import {SecurityService} from "../casl/security.service";
+import {OnboardingService} from "../services/onboarding.service";
+import {OnboardCustomerDto, OnboardCustomerSchema} from "../dto/onboard-customer.dto";
 
 @Controller('/api/apps')
 @UseInterceptors(ClassSerializerInterceptor)
@@ -26,7 +32,9 @@ export class AppController {
     constructor(
         private readonly tenantService: TenantService,
         private readonly appService: AppService,
-        private readonly subscriptionService: SubscriptionService
+        private readonly subscriptionService: SubscriptionService,
+        private readonly securityService: SecurityService,
+        private readonly onboardingService: OnboardingService
     ) {
     }
 
@@ -131,6 +139,39 @@ export class AppController {
     ) {
         const app = await this.appService.publishApp(permission, appId);
         return app;
+    }
+
+    @Post('/:appId/onboard-customer')
+    @UseGuards(JwtAuthGuard)
+    async onboardCustomer(
+        @CurrentPermission() permission: Permission,
+        @Param('appId', ParseUUIDPipe) appId: string,
+        @Body(schemaPipe(OnboardCustomerSchema)) body: OnboardCustomerDto
+    ) {
+        // Extract token via SecurityService
+        const technicalToken = this.securityService.getTechnicalToken(permission.authContext);
+        
+        // Get the app with owner relation
+        let app;
+        try {
+            app = await this.appService.getAppById(appId);
+        } catch (error) {
+            throw new NotFoundException('App not found');
+        }
+        
+        // Verify token is TechnicalToken (client_credentials grant) and belongs to app owner
+        if (technicalToken.tenant.id !== app.owner.id) {
+            throw new ForbiddenException('Technical token does not belong to app owner');
+        }
+        
+        // Call OnboardingService.onboardCustomer()
+        const response = await this.onboardingService.onboardCustomer(
+            appId,
+            app.owner.id,
+            body
+        );
+        
+        return response;
     }
 
     // ─── Shared implementation methods ───

@@ -19,6 +19,8 @@ import {CacheService} from "./cache.service";
 import {ScopeResolverService} from "./scope-resolver.service";
 import {ResolvePermissionPipe} from "../auth/auth.decorator";
 import {CoreModule} from "../core/core.module";
+import {PolicyResolutionService} from "./policy-resolution.service";
+import {App} from "../entity/app.entity";
 
 @Module({
     imports: [
@@ -35,6 +37,7 @@ import {CoreModule} from "../core/core.module";
             GroupRole,
             GroupUser,
             Policy,
+            App,
         ]),
     ],
     controllers: [],
@@ -46,6 +49,7 @@ import {CoreModule} from "../core/core.module";
         CacheService,
         ScopeResolverService,
         ResolvePermissionPipe,
+        PolicyResolutionService,
     ],
     exports: [
         SecurityService,
@@ -55,6 +59,7 @@ import {CoreModule} from "../core/core.module";
         CacheService,
         ScopeResolverService,
         ResolvePermissionPipe,
+        PolicyResolutionService,
     ],
 })
 export class CaslModule {

@@ -27,7 +27,7 @@ export class RoleControllerV2 {
     static UpdateRoleSchema = yup.object().shape({
         name: yup.string().optional(),
         description: yup.string().optional(),
-        appId: yup.string().optional(),
+        appId: yup.string().optional().nullable(),
     });
 
     constructor(
