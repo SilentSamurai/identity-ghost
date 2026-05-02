@@ -171,3 +171,13 @@ tasks:
             -   cmd: kill -9 $(lsof -t -i:4200) 2>/dev/null || true
                 platforms: [ linux, darwin ]
                 ignore_error: true
+
+    # ─── Docker ───
+
+    docker-publish:
+        desc: Build and publish standalone Docker image to Docker Hub
+        cmds:
+            - echo "🔨 Building standalone Docker image..."
+            - docker build -f standalone.dockerfile -t sd25/auth-server:latest .
+            - echo "🚀 Pushing sd25/auth-server:latest"
+            - docker push sd25/auth-server:latest

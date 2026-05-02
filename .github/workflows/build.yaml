@@ -1,4 +1,4 @@
-name: Build, Test and Create Docker Image
+name: Build and Test
 
 on:
     pull_request:
@@ -9,53 +9,40 @@ jobs:
         name: Run Unit & E2E Tests
         runs-on: ubuntu-latest
 
-        permissions:
-            contents: write  # Needed to upload assets to releases
-
         steps:
             -   name: Check out the repo
                 uses: actions/checkout@v4
 
-            # ---------- Docker buildx ----------
-            -   name: Set up Docker Buildx
-                uses: docker/setup-buildx-action@v3
-
             -   name: Run Srv Test
                 working-directory: srv
                 run: |
-                    npm ci            # Install exact dependencies based on package-lock.json
+                    npm ci
                     npm run release
 
             -   name: Run UI Test
                 working-directory: ui
                 run: |
-                    npm ci            # Install exact dependencies based on package-lock.json
+                    npm ci
                     npm run build
                     npm run test -- --watch=false --browsers=ChromeHeadless
                     npm run e2e:test
 
     build-docker:
-        name: Build Docker Images
+        name: Build Docker Image
         runs-on: ubuntu-latest
-
-        permissions:
-            contents: write  # Needed to upload assets to releases
 
         steps:
             -   name: Check out the repo
                 uses: actions/checkout@v4
 
-            # ---------- Docker buildx ----------
             -   name: Set up Docker Buildx
                 uses: docker/setup-buildx-action@v3
 
-            # ---------- Build docker images ----------
-            -   name: Build srv Docker image
-                run: |
-                    cd srv
-                    docker build -t auth-server-srv:latest .
-
-            -   name: Build ui Docker image
-                run: |
-                    cd ui
-                    docker build -t auth-server-ui:latest .
+            -   name: Build standalone Docker image
+                uses: docker/build-push-action@v5
+                with:
+                    context: .
+                    file: standalone.dockerfile
+                    push: false
+                    cache-from: type=gha
+                    cache-to: type=gha,mode=max
