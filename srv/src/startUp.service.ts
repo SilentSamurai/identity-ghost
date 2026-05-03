@@ -197,6 +197,14 @@ export class StartUpService implements OnModuleInit {
                         allowPasswordGrant: true,
                     });
                     this.logger.log(`Enabled allowPasswordGrant on default client for ${domain}`);
+
+                    // Add redirect URI for shire.local to support external app E2E tests
+                    if (domain === 'shire.local') {
+                        await this.clientService.updateClient(permission, defaultClient.clientId, {
+                            redirectUris: ['http://localhost:3000/', 'http://localhost:3000'],
+                        });
+                        this.logger.log(`Added redirect URIs for external app on ${domain}`);
+                    }
                 } catch (e) {
                     this.logger.warn(`Could not enable allowPasswordGrant on default client for ${domain}: ${e}`);
                 }

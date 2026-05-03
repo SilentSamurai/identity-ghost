@@ -6,7 +6,26 @@
     <meta content="width=device-width, initial-scale=1.0" name="viewport">
     <title>Login Page</title>
     <link crossorigin="anonymous" href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css"
-          integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" rel="stylesheet">
+        integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" rel="stylesheet">
+    <!-- Import map to resolve bare module specifiers for openid-client dependencies -->
+    <script type="importmap">
+    {
+        "imports": {
+            "oauth4webapi": "https://unpkg.com/oauth4webapi@3.5.0/build/index.js",
+            "jose": "https://unpkg.com/jose@5.9.6/dist/browser/index.js",
+            "jose/errors": "https://unpkg.com/jose@5.9.6/dist/browser/util/errors.js",
+            "jose/jwk/thumbprint": "https://unpkg.com/jose@5.9.6/dist/browser/jwk/thumbprint.js",
+            "jose/jwe/compact/decrypt": "https://unpkg.com/jose@5.9.6/dist/browser/jwe/compact/decrypt.js",
+            "jose/jwe/flattened/decrypt": "https://unpkg.com/jose@5.9.6/dist/browser/jwe/flattened/decrypt.js",
+            "jose/jwks/local": "https://unpkg.com/jose@5.9.6/dist/browser/jwks/local.js",
+            "jose/jws/compact/verify": "https://unpkg.com/jose@5.9.6/dist/browser/jws/compact/verify.js",
+            "jose/jws/flattened/verify": "https://unpkg.com/jose@5.9.6/dist/browser/jws/flattened/verify.js",
+            "jose/jwt/decrypt": "https://unpkg.com/jose@5.9.6/dist/browser/jwt/decrypt.js",
+            "jose/jwt/verify": "https://unpkg.com/jose@5.9.6/dist/browser/jwt/verify.js",
+            "jose/key/import": "https://unpkg.com/jose@5.9.6/dist/browser/key/import.js"
+        }
+    }
+    </script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -36,145 +55,181 @@
 </head>
 
 <body>
-<div class="container">
-    <div class="row">
+    <div class="container">
+        <div class="row">
 
-        <div class="card">
-            <pre><code id="decodedToken"></code></pre>
+            <div class="card">
+                <pre><code id="decodedToken"></code></pre>
+            </div>
+
+
         </div>
+        <div class="row justify-content-center">
+            <div class="col-4 ">
+                <button class="login-button w-100" id="login-btn">
+                    Login
+                </button>
+            </div>
 
-
-    </div>
-    <div class="row justify-content-center">
-        <div class="col-4 ">
-            <button class="login-button w-100" id="login-btn" onclick="refer()">
-                Login
-            </button>
         </div>
-
     </div>
-</div>
 
 
 </body>
 <script crossorigin="anonymous" integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM"
-        src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js"></script>
-<script>
+    src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js"></script>
+<script type="module">
+    // Import openid-client
+    import * as client from 'https://unpkg.com/openid-client@6.8.4/build/index.js';
+
+    // OAuth/OIDC Configuration
+    // Point at the NestJS backend directly. The /api/oauth/authorize endpoint
+    // will redirect the browser to the Angular UI (BASE_URL from env config).
+    const BASE_URL = 'http://localhost:9001';
+    const CLIENT_ID = 'shire.local';
+    const REDIRECT_URI = window.location.origin + window.location.pathname;
+
+    // Store config globally after discovery
+    let config = null;
 
     /**
-     * Generate a cryptographically random code_verifier per RFC 7636 §4.1.
-     * 64 characters from the unreserved character set [A-Z, a-z, 0-9, "-", ".", "_", "~"].
+     * Initialize the OIDC client by discovering server metadata
      */
-    function generateCodeVerifier() {
-        const CHARSET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
-        const length = 64;
-        const randomValues = new Uint8Array(length);
-        window.crypto.getRandomValues(randomValues);
-        return Array.from(randomValues, (byte) => CHARSET[byte % CHARSET.length]).join('');
+    async function initOIDC() {
+        const discoveryUrl = new URL(`${BASE_URL}/${CLIENT_ID}/.well-known/openid-configuration`);
+
+        config = await client.discovery(
+            discoveryUrl,
+            CLIENT_ID,
+            undefined, // No client secret for public clients
+            undefined, // No client authentication
+            {
+                execute: [client.allowInsecureRequests]
+            }
+        );
+
+        console.log('OIDC configuration successful', config.serverMetadata());
     }
 
     /**
-     * Generate a cryptographically random state parameter (32 bytes, base64url-encoded).
-     * Per RFC 6749 §10.12, state protects against CSRF attacks on the redirect callback.
+     * Start the OAuth authorization code flow with PKCE
      */
-    function generateState() {
-        const bytes = new Uint8Array(32);
-        window.crypto.getRandomValues(bytes);
-        return base64urlencode(bytes.buffer);
+    async function startLogin() {
+        try {
+            if (!config) {
+                await initOIDC();
+            }
+
+            // Generate PKCE code verifier and challenge
+            const code_verifier = client.randomPKCECodeVerifier();
+            const code_challenge = await client.calculatePKCECodeChallenge(code_verifier);
+
+            // Store code_verifier in session for the callback
+            sessionStorage.setItem('pkce-code-verifier', code_verifier);
+
+            // Generate state for CSRF protection
+            const state = client.randomState();
+            sessionStorage.setItem('oauth-state', state);
+
+            // Build the authorization URL
+            const redirectTo = client.buildAuthorizationUrl(config, {
+                redirect_uri: REDIRECT_URI,
+                code_challenge,
+                code_challenge_method: 'S256',
+                state,
+                scope: 'openid profile email'
+            });
+
+            console.log('Redirecting to:', redirectTo.href);
+            window.location.href = redirectTo.href;
+        } catch (error) {
+            console.error('Login failed:', error);
+            document.getElementById('decodedToken').innerText = 'Login failed: ' + error.message;
+        }
     }
 
-    async function refer() {
-        const redirect_uri = window.location.origin + window.location.pathname;
-        const domain = "shire.local";
-        const code_challenge_method = "S256";
+    /**
+     * Handle the OAuth callback after redirect from authorization server
+     */
+    async function handleCallback() {
+        const urlParams = new URLSearchParams(window.location.search);
 
-        // Generate and store cryptographically random code_verifier
-        const code_verifier = generateCodeVerifier();
-        sessionStorage.setItem('pkce-code-verifier', code_verifier);
+        if (!urlParams.has('code')) {
+            return; // Not a callback
+        }
 
-        const code_challenge = await generateCodeChallengeFromVerifier(code_verifier);
+        const storedState = sessionStorage.getItem('oauth-state');
+        const callbackState = urlParams.get('state');
 
-        // Generate and store state parameter for CSRF protection
-        const state = generateState();
-        sessionStorage.setItem('oauth-state', state);
-
-        window.location.href = `http://localhost:4200/authorize?redirect_uri=${redirect_uri}&response_type=code&code_challenge=${code_challenge}&client_id=${domain}&code_challenge_method=${code_challenge_method}&state=${encodeURIComponent(state)}`;
-    }
-
-    async function getAuthToken(code, subscriber_tenant_hint) {
-        const code_verifier = sessionStorage.getItem('pkce-code-verifier');
-        if (!code_verifier) {
-            document.getElementById('decodedToken').innerText = 'Error: No stored code_verifier found.';
+        // Validate state parameter before proceeding with token exchange (CSRF protection)
+        if (!storedState) {
+            document.getElementById('decodedToken').innerText =
+                'Error: No stored state found — possible CSRF attack. Cannot validate state parameter.';
             return;
         }
-        sessionStorage.removeItem('pkce-code-verifier');
 
-        const response = await fetch('http://localhost:9001/api/oauth/token', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                grant_type: "authorization_code",
-                code,
-                code_verifier: code_verifier,
-                client_id: "shire.local",
-            }),
-        })
-        if (response.ok) {
-            const data = await response.json();
-            console.log(`data => ${data.access_token}`)
-            const username = decodeToken(data.access_token);
-            let element = document.getElementById('login-btn');
-            element.innerText = "Logout " + username;
+        if (!callbackState) {
+            document.getElementById('decodedToken').innerText =
+                'Error: Missing state parameter in callback URL — possible CSRF attack.';
+            return;
         }
-    }
 
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.has('code')) {
-        const returnedState = urlParams.get('state');
-        const storedState = sessionStorage.getItem('oauth-state');
-
-        // Validate state parameter to prevent CSRF attacks (RFC 6749 §10.12)
-        if (!storedState) {
-            document.getElementById('decodedToken').innerText = 'Error: No stored state found. Possible CSRF attack.';
-        } else if (!returnedState || returnedState !== storedState) {
-            document.getElementById('decodedToken').innerText = 'Error: State parameter mismatch. Possible CSRF attack.';
-        } else {
-            // State matches - clear it and proceed with token exchange
+        if (storedState !== callbackState) {
+            document.getElementById('decodedToken').innerText =
+                'Error: state mismatch — expected state does not match callback state. Possible CSRF attack.';
+            // Clear stored values without exchanging the code
+            sessionStorage.removeItem('pkce-code-verifier');
             sessionStorage.removeItem('oauth-state');
-            getAuthToken(urlParams.get('code'), urlParams.get('subscriber_tenant_hint'));
+            return;
+        }
+
+        if (!config) {
+            await initOIDC();
+        }
+
+        const code_verifier = sessionStorage.getItem('pkce-code-verifier');
+
+        try {
+            // Use openid-client to complete the authorization code grant
+            const currentUrl = new URL(window.location.href);
+            const tokens = await client.authorizationCodeGrant(config, currentUrl, {
+                pkceCodeVerifier: code_verifier,
+                expectedState: storedState,
+                idTokenExpected: true
+            });
+
+            // Clear stored values
+            sessionStorage.removeItem('pkce-code-verifier');
+            sessionStorage.removeItem('oauth-state');
+
+            console.log('Token Endpoint Response:', tokens);
+
+            // Display the tokens
+            const access_token = tokens.access_token;
+            const username = decodeToken(access_token);
+
+            // Update button text
+            const loginBtn = document.getElementById('login-btn');
+            loginBtn.innerText = 'Logout ' + username;
+
+            // If there's an ID token, show its claims
+            if (tokens.id_token) {
+                const claims = tokens.claims();
+                console.log('ID Token Claims:', claims);
+            }
+
+        } catch (error) {
+            console.error('Token exchange failed:', error);
+            document.getElementById('decodedToken').innerText = 'Error: Token exchange failed — ' + error.message;
         }
     }
 
-    function sha256(plain) {
-        const encoder = new TextEncoder();
-        const data = encoder.encode(plain);
-        return window.crypto.subtle.digest("SHA-256", data);
-    }
-
-    async function generateCodeChallengeFromVerifier(v) {
-        const hashed = await sha256(v);
-        return base64urlencode(hashed);
-    }
-
-    function base64urlencode(array_buffer) {
-        let str = "";
-        const bytes = new Uint8Array(array_buffer);
-        const len = bytes.byteLength;
-        for (let i = 0; i < len; i++) {
-            str += String.fromCharCode(bytes[i]);
-        }
-        return btoa(str)
-            .replace(/\+/g, "-")
-            .replace(/\//g, "_")
-            .replace(/=+$/, "").toString();
-    }
-
+    /**
+     * Decode and display a JWT token
+     */
     function decodeToken(token) {
         if (!token) {
-            alert('Please enter a bearer token');
-            return;
+            return '';
         }
 
         try {
@@ -185,13 +240,26 @@
                 signature: tokenParts[2]
             };
             document.getElementById('decodedToken').innerText = JSON.stringify(decodedToken, null, 4);
-            return decodedToken.payload.sub;
+            return decodedToken.payload.sub || decodedToken.payload.email || 'User';
         } catch (error) {
             document.getElementById('decodedToken').innerText = 'Error decoding token: ' + error.message;
+            return '';
         }
-        return "";
     }
 
+    // Attach click handler to login button
+    document.getElementById('login-btn').addEventListener('click', startLogin);
+
+    // Handle callback first (state validation doesn't need OIDC config),
+    // then initialize OIDC for future use.
+    handleCallback()
+        .then(() => initOIDC())
+        .catch(error => {
+            console.error('Initialization failed:', error);
+            if (!document.getElementById('decodedToken').innerText) {
+                document.getElementById('decodedToken').innerText = 'OIDC discovery failed: ' + error.message;
+            }
+        });
 </script>
 
 </html>

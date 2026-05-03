@@ -49,6 +49,7 @@ import {ScopeResolverService} from "../casl/scope-resolver.service";
 import {ClientService} from "../services/client.service";
 import {PromptAction, PromptService} from "../auth/prompt.service";
 import {ResourceIndicatorValidator} from "../auth/resource-indicator.validator";
+import {Environment} from "../config/environment.service";
 
 const logger = new Logger("OAuthTokenController");
 
@@ -82,6 +83,7 @@ export class OAuthTokenController {
             params.set('redirect_uri', validated.redirectUri);
             params.set('scope', validated.scope);
             params.set('state', validated.state);
+            params.set('response_type', validated.responseType);
             if (validated.codeChallenge) {
                 params.set('code_challenge', validated.codeChallenge);
                 params.set('code_challenge_method', validated.codeChallengeMethod);
@@ -100,7 +102,7 @@ export class OAuthTokenController {
                 params.set('resource', validated.resource);
             }
 
-            res.redirect(302, `/authorize?${params.toString()}`);
+            res.redirect(302, `${Environment.get('BASE_URL', '')}/authorize?${params.toString()}`);
         } catch (error) {
             if (error instanceof AuthorizeRedirectException) {
                 const params = new URLSearchParams();
