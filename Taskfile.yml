@@ -13,20 +13,20 @@ tasks:
     build:
         desc: Build both UI and server components
         cmds:
-            -   task: build-ui
-            -   task: build-srv
+            -   task: build:ui
+            -   task: build:srv
 
     serve:
         desc: Start UI and server concurrently
         deps:
-            - serve-ui
-            - serve-srv
+            - serve:ui
+            - serve:srv
 
     test:
         desc: Run all tests
         cmds:
-            -   task: test-srv
-            -   task: test-ui
+            -   task: test:srv
+            -   task: test:ui
 
     install:
         desc: Install
@@ -40,7 +40,7 @@ tasks:
             -   task: test
             -   task: install
 
-    dev-external-start:
+    dev:external:start:
         desc: Start the external user application (dev mode)
         dir: ./external-user-app
         cmds:
@@ -48,32 +48,32 @@ tasks:
 
     # ─── Backend (srv) ───
 
-    serve-srv:
+    serve:srv:
         desc: Start backend server in development/debug mode
         dir: ./srv
         cmds:
             - npm run start:debug
 
-    build-srv:
+    build:srv:
         desc: Install dependencies and build the backend server
         dir: ./srv
         cmds:
             - npm i
             - npm run build
 
-    release-srv:
+    release:srv:
         desc: Run backend release routine (build + package + test)
         dir: ./srv
         cmds:
             - npm run release
 
-    test-srv:
+    test:srv:
         desc: Run backend tests
         dir: ./srv
         cmds:
             - npm run test
 
-    prod-start-srv:
+    prod:start:srv:
         desc: Start backend server in production mode
         dir: ./srv
         cmds:
@@ -81,33 +81,33 @@ tasks:
 
     # ─── UI ───
 
-    serve-ui:
+    serve:ui:
         desc: Start frontend dev server with live-reload
         dir: ./ui
         cmds:
             - npm run UI:SERVE:WATCH
 
-    build-ui:
+    build:ui:
         desc: Install dependencies and build the production UI
         dir: ./ui
         cmds:
             - npm i
             - npm run build
 
-    test-ui:
+    test:ui:
         desc: Run UI tests and e2e tests
         dir: ./ui
         cmds:
             - npm test
             - npm run e2e:test
 
-    "cypress:spec":
+    cypress:spec:
         desc: "Run a single Cypress spec file (usage: task cypress:spec -- cypress/e2e/admin-keys.cy.ts)"
         dir: ./ui
         cmds:
             - npm run e2e:spec --spec={{.CLI_ARGS}}
 
-    kill-ports:
+    kill:ports:
         desc: Kill processes listening on ports 9001 and 4200
         cmds:
             -   cmd: powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/kill-ports.ps1
@@ -122,7 +122,7 @@ tasks:
 
     # ─── Docker ───
 
-    docker-publish:
+    docker:publish:
         desc: Build and publish standalone Docker image to Docker Hub
         cmds:
             - echo "🔨 Building standalone Docker image..."

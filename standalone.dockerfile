@@ -33,7 +33,7 @@ RUN npm ci && npm run build
 # Production image
 FROM node:20.19.0-alpine
 
-RUN apk add --no-cache nginx
+RUN apk add --no-cache nginx gettext
 
 WORKDIR /home/app/srv
 
@@ -54,7 +54,7 @@ COPY ./ui/nginx/templates /etc/nginx/templates
 COPY --from=build /home/app/ui/dist /home/static/
 
 # Start script
-COPY start-standalone.sh /home/app/start-standalone.sh
+COPY scripts/start-standalone.sh /home/app/start-standalone.sh
 
 EXPOSE 80 9001
 
