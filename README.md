@@ -167,13 +167,15 @@ npm run ui:serve
 
 ## 🛠️ Configuration
 
-The backend loads configuration from `.env` files. By default, it looks for `./envs/.env.development`. You can override
-this using the `ENV_FILE` environment variable.
+The backend loads configuration from `.env` files located in `srv/envs/`. Set the `ENV` environment variable to select a profile — the app loads `./envs/.env.{ENV}`. Defaults to `development` if not set.
+
+Available profiles: `development`, `testing`, `production`, `cf`, `aws`.
 
 ### Key Environment Variables
 
 | Variable                  | Purpose                                       | Default       |
 |---------------------------|-----------------------------------------------|---------------|
+| `ENV`                     | Config profile name                           | `development` |
 | `PORT`                    | Backend HTTP port                             | `9000`        |
 | `NODE_ENV`                | Environment mode (`development`/`production`) | `development` |
 | `DATABASE_HOST`           | PostgreSQL host                               | `localhost`   |

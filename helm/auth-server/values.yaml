@@ -9,7 +9,7 @@ backend:
     readinessProbe:
         path: /api/v1/health-check
     env:
-        ENV_FILE: "dist/envs/.env.development"
+        ENV: "development"
         PORT: "8080"
         DATABASE_TYPE: "postgres"
         DATABASE_HOST: "postgres-db-postgresql.postgres.svc.cluster.local"

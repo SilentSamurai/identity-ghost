@@ -19,7 +19,7 @@ services:
         build: ./srv
         container_name: auth_srv
         environment:
-            ENV_FILE: dist/envs/.env.development
+            ENV: development
             PORT: 8080
             DATABASE_TYPE: postgres
             DATABASE_HOST: db

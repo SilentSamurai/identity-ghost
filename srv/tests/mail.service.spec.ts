@@ -20,7 +20,7 @@ describe('MailService Rate Limiting', () => {
     setupConsole();
 
     beforeAll(async () => {
-        process.env.ENV_FILE = './envs/.env.testing';
+        process.env.ENV = 'testing';
         process.env.ENABLE_FAKE_SMTP_SERVER = 'false';
         process.env.DISABLE_MAIL_RATE_LIMIT = 'false';
         Environment.setup();

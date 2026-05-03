@@ -12,7 +12,7 @@
         "update": "ng update @angular/core@17 @angular/cli@17",
         "release": "npm run build && npm run test",
         "start:external-service": "cd ../external-user-app && node server.js",
-        "start:backend": "cd ../srv && cross-env ENV_FILE=./envs/.env.testing npm run start",
+        "start:backend": "cd ../srv && cross-env ENV=testing npm run start",
         "e2e:test": "start-server-and-test start:all \"http://localhost:4200|http://localhost:9001\" cypress:run:parallel",
         "e2e": "ng e2e",
         "cypress:open": "cypress open",

@@ -16,7 +16,7 @@ envsubst '${PORT} ${AUTH_SERVER}' < /etc/nginx/templates/default.conf.template >
 
 # Start backend
 cd /home/app/srv
-PORT="$BACKEND_PORT" npm run start:prod &
+ENV="${ENV:-production}" PORT="$BACKEND_PORT" npm run start:prod &
 BACKEND_PID=$!
 
 # Wait for backend
