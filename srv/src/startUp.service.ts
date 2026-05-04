@@ -140,6 +140,9 @@ export class StartUpService implements OnModuleInit {
                 {name: "Onboard App Owner Tenant", domain: "onboard-app-owner.local", signUp: false},
                 {name: "Onboard Subscriber Tenant", domain: "onboard-subscriber.local", signUp: false},
                 {name: "Login Session Test Tenant", domain: "login-session-test.local", signUp: false},
+                {name: "PKCE Bug Condition Test Tenant", domain: "pkce-bug-condition-test.local", signUp: false},
+                {name: "PKCE Preservation Test Tenant", domain: "pkce-preservation-test.local", signUp: false},
+                {name: "PKCE E2E Test Tenant", domain: "pkce-e2e-test.local", signUp: false},
             ];
 
             // 4) Create each tenant and assign the existing user as owner
@@ -201,9 +204,17 @@ export class StartUpService implements OnModuleInit {
                     // Add redirect URI for shire.local to support external app E2E tests
                     if (domain === 'shire.local') {
                         await this.clientService.updateClient(permission, defaultClient.clientId, {
-                            redirectUris: ['http://localhost:3000/', 'http://localhost:3000'],
+                            redirectUris: ['http://localhost:3000/', 'http://localhost:3000', 'http://localhost:3000/no-pkce.html'],
                         });
                         this.logger.log(`Added redirect URIs for external app on ${domain}`);
+                    }
+
+                    // Add redirect URI for pkce-e2e-test.local to support PKCE enforcement E2E tests
+                    if (domain === 'pkce-e2e-test.local') {
+                        await this.clientService.updateClient(permission, defaultClient.clientId, {
+                            redirectUris: ['http://localhost:3000/no-pkce.html'],
+                        });
+                        this.logger.log(`Added redirect URIs for PKCE E2E test on ${domain}`);
                     }
                 } catch (e) {
                     this.logger.warn(`Could not enable allowPasswordGrant on default client for ${domain}: ${e}`);
@@ -364,6 +375,20 @@ export class StartUpService implements OnModuleInit {
                             allowedScopes: "openid profile email",
                             isPublic: true
                         },
+                        {
+                            name: "Shire PKCE Required",
+                            redirectUris: ["https://pkce-required-e2e.example.com/callback"],
+                            allowedScopes: "openid profile email",
+                            isPublic: true,
+                            requirePkce: true
+                        },
+                        {
+                            name: "Shire No PKCE",
+                            redirectUris: ["http://localhost:3000/no-pkce.html"],
+                            allowedScopes: "openid profile email",
+                            isPublic: true,
+                            requirePkce: false
+                        },
                     ],
                 },
                 {
@@ -483,6 +508,7 @@ export class StartUpService implements OnModuleInit {
                             undefined,
                             undefined,
                             client.isPublic,
+                            client.requirePkce,
                         );
                         this.logger.log(`Created client: ${client.name} in ${entry.domain}`);
                     } catch (e) {

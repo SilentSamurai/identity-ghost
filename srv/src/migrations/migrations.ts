@@ -22,6 +22,7 @@ import {AddAliasToClients1758000000000} from "./1758000000000-AddAliasToClients"
 import {AddRequireAuthTimeToAuthCode1759000000000} from "./1759000000000-AddRequireAuthTimeToAuthCode";
 import {AddResourceIndicatorSupport1760000000000} from "./1760000000000-AddResourceIndicatorSupport";
 import {RemoveTenantCredentialColumns1762000000000} from "./1762000000000-RemoveTenantCredentialColumns";
+import {MakeAuthCodePkceColumnsNullable1763000000000} from "./1763000000000-MakeAuthCodePkceColumnsNullable";
 
 export const migrations = [
     CreateInitialTables1681147242561,
@@ -47,5 +48,6 @@ export const migrations = [
     AddAliasToClients1758000000000,
     AddRequireAuthTimeToAuthCode1759000000000,
     AddResourceIndicatorSupport1760000000000,
-    RemoveTenantCredentialColumns1762000000000
+    RemoveTenantCredentialColumns1762000000000,
+    MakeAuthCodePkceColumnsNullable1763000000000
 ];

@@ -273,13 +273,11 @@ export class AuthorizeLoginComponent implements OnInit {
     async ngOnInit(): Promise<void> {
         let params = this.route.snapshot.queryParamMap;
 
-        // code_challenge_method
-        if (!params.has('code_challenge')) {
-            this.error = 'Invalid challenge || challenge not found!';
-            this.loading = false;
-            return;
+        // code_challenge is optional — PKCE enforcement is handled by the backend
+        // based on the client's requirePkce setting
+        if (params.has('code_challenge')) {
+            this.code_challenge = params.get('code_challenge')!;
         }
-        this.code_challenge = params.get('code_challenge')!;
 
         if (!params.has('redirect_uri')) {
             this.error = 'Invalid redirect_uri || redirect_uri not found';

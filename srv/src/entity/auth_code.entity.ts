@@ -5,11 +5,11 @@ export class AuthCode {
     @PrimaryColumn({name: "code", length: 16})
     code: string;
 
-    @Column({name: "code_challenge", unique: true, nullable: false})
-    codeChallenge: string;
+    @Column({name: "code_challenge", nullable: true})
+    codeChallenge: string | null;
 
-    @Column({name: "method", nullable: false})
-    method: string;
+    @Column({name: "method", nullable: true})
+    method: string | null;
 
     @Column({name: "user_id", nullable: false})
     userId: string;

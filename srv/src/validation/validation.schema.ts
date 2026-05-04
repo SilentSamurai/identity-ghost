@@ -182,10 +182,10 @@ const LoginSchema = yup.object().shape({
     client_id: yup.string().required("client_id is required"),
     code_challenge_method: yup
         .string()
-        .required()
-        .matches(/^(plain|S256|OWH32)$/, "method is required")
+        .optional()
+        .matches(/^(plain|S256|OWH32)$/, "method must be plain, S256, or OWH32")
         .default("plain"),
-    code_challenge: yup.string().required("code_challenge is required"),
+    code_challenge: yup.string().optional(),
     subscriber_tenant_hint: yup.string().optional().nullable(),
     redirect_uri: yup.string().optional(),
     scope: yup.string().optional(),
@@ -250,7 +250,7 @@ const CodeGrantSchema = yup.object().shape({
         }),
     code: yup.string().required("code is required"),
     code_verifier: yup.string()
-        .required("code_verifier is required")
+        .optional()
         .min(43, "code_verifier must be at least 43 characters")
         .max(128, "code_verifier must be at most 128 characters")
         .matches(/^[A-Za-z0-9\-._~]+$/, "code_verifier contains invalid characters"),
@@ -308,11 +308,11 @@ const ConsentSchema = yup.object().shape({
         .matches(PASSWORD_REGEXP, PASSWORD_MESSAGE)
         .max(128),
     client_id: yup.string().required("client_id is required"),
-    code_challenge: yup.string().required("code_challenge is required"),
+    code_challenge: yup.string().optional(),
     code_challenge_method: yup
         .string()
-        .required()
-        .matches(/^(plain|S256|OWH32)$/, "method is required"),
+        .optional()
+        .matches(/^(plain|S256|OWH32)$/, "method must be plain, S256, or OWH32"),
     approved_scopes: yup
         .array()
         .of(yup.string())
@@ -333,11 +333,11 @@ const SilentAuthSchema = yup.object().shape({
     client_id: yup.string().required("client_id is required"),
     user_id: yup.string().required("user_id is required"),
     tenant_id: yup.string().required("tenant_id is required"),
-    code_challenge: yup.string().required("code_challenge is required"),
+    code_challenge: yup.string().optional(),
     code_challenge_method: yup
         .string()
-        .required()
-        .matches(/^(plain|S256|OWH32)$/, "method is required"),
+        .optional()
+        .matches(/^(plain|S256|OWH32)$/, "method must be plain, S256, or OWH32"),
     redirect_uri: yup.string().optional(),
     scope: yup.string().optional(),
     nonce: yup.string().optional().max(512),

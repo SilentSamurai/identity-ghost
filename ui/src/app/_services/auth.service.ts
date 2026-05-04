@@ -27,12 +27,14 @@ export class AuthService {
         max_age?: number,
     ): Promise<any> {
         const body: any = {
-            code_challenge: code_challenge,
-            code_challenge_method: method,
             client_id,
             email,
             password,
         };
+        if (code_challenge) {
+            body.code_challenge = code_challenge;
+            body.code_challenge_method = method;
+        }
         if (subscriber_tenant_hint) {
             body.subscriber_tenant_hint = subscriber_tenant_hint;
         }

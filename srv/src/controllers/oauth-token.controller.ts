@@ -155,12 +155,20 @@ export class OAuthTokenController {
         // it is a first-party login and consent should be skipped (Requirements 8.1, 8.2)
         const isFirstParty = client.alias === body.client_id;
 
-        // PKCE S256 enforcement and downgrade prevention
-        if (client.requirePkce && body.code_challenge_method === 'plain') {
-            throw OAuthException.invalidRequest('S256 code_challenge_method is required for this client');
+        // PKCE enforcement based on client configuration
+        // When code_challenge is not provided AND client requires PKCE, reject the request
+        if (!body.code_challenge && client.requirePkce) {
+            throw OAuthException.invalidRequest('code_challenge is required for this client');
         }
-        if (client.pkceMethodUsed === 'S256' && body.code_challenge_method === 'plain') {
-            throw OAuthException.invalidRequest('PKCE downgrade not allowed: this client has previously used S256');
+
+        // When code_challenge IS provided, enforce S256 and downgrade prevention
+        if (body.code_challenge) {
+            if (client.requirePkce && body.code_challenge_method === 'plain') {
+                throw OAuthException.invalidRequest('S256 code_challenge_method is required for this client');
+            }
+            if (client.pkceMethodUsed === 'S256' && body.code_challenge_method === 'plain') {
+                throw OAuthException.invalidRequest('PKCE downgrade not allowed: this client has previously used S256');
+            }
         }
 
         // Validate redirect_uri against registered URIs before proceeding
@@ -249,8 +257,8 @@ export class OAuthTokenController {
             user,
             tenant,
             body.client_id,
-            body.code_challenge,
-            body.code_challenge_method,
+            body.code_challenge || null,
+            body.code_challenge ? (body.code_challenge_method || 'plain') : null,
             result.resolvedHint,
             body.redirect_uri,
             body.scope,
@@ -261,7 +269,7 @@ export class OAuthTokenController {
         );
 
         // Update pkceMethodUsed if client used S256 for the first time
-        if (body.code_challenge_method === 'S256' && client.pkceMethodUsed !== 'S256') {
+        if (body.code_challenge && body.code_challenge_method === 'S256' && client.pkceMethodUsed !== 'S256') {
             client.pkceMethodUsed = 'S256';
             await this.clientRepository.save(client);
         }
@@ -343,8 +351,8 @@ export class OAuthTokenController {
                 user,
                 tenant,
                 body.client_id,
-                body.code_challenge,
-                body.code_challenge_method,
+                body.code_challenge || null,
+                body.code_challenge ? (body.code_challenge_method || 'plain') : null,
                 body.subscriber_tenant_hint,
                 body.redirect_uri,
                 body.scope,
@@ -433,8 +441,8 @@ export class OAuthTokenController {
                 user,
                 tenant,
                 body.client_id,
-                body.code_challenge,
-                body.code_challenge_method,
+                body.code_challenge || null,
+                body.code_challenge ? (body.code_challenge_method || 'plain') : null,
                 undefined, // subscriberTenantHint
                 body.redirect_uri,
                 body.scope,
@@ -546,10 +554,15 @@ export class OAuthTokenController {
             }
         }
 
-        // Validate PKCE
-        const generatedChallenge = CryptUtil.generateCodeChallenge(body.code_verifier, authCode.method);
-        if (generatedChallenge !== authCode.codeChallenge) {
-            throw OAuthException.invalidGrant("The authorization code is invalid or the code verifier does not match");
+        // Validate PKCE: only when the authorization code was issued with a code_challenge
+        if (authCode.codeChallenge) {
+            if (!body.code_verifier) {
+                throw OAuthException.invalidGrant("code_verifier is required when code_challenge was provided in the authorization request");
+            }
+            const generatedChallenge = CryptUtil.generateCodeChallenge(body.code_verifier, authCode.method);
+            if (generatedChallenge !== authCode.codeChallenge) {
+                throw OAuthException.invalidGrant("The authorization code is invalid or the code verifier does not match");
+            }
         }
 
         // Resolve user and tenant from the auth code record

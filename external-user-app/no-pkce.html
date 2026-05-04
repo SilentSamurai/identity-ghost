@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+    <title>No PKCE Login Test</title>
+    <link crossorigin="anonymous" href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css"
+        integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" rel="stylesheet">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #41464b;
+        }
+
+        .login-button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .login-button:hover {
+            background-color: #45a049;
+        }
+
+        .error-card {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="row mb-3">
+            <div class="card">
+                <div class="card-header">No PKCE OAuth Flow Test</div>
+                <div class="card-body">
+                    <pre><code id="decodedToken"></code></pre>
+                </div>
+            </div>
+        </div>
+        <div class="row mb-3" id="error-row" style="display: none;">
+            <div class="card error-card">
+                <div class="card-header">OAuth Error</div>
+                <div class="card-body">
+                    <p><strong>Error:</strong> <span id="error-code"></span></p>
+                    <p><strong>Description:</strong> <span id="error-description"></span></p>
+                </div>
+            </div>
+        </div>
+        <div class="row justify-content-center">
+            <div class="col-4">
+                <button class="login-button w-100" id="login-btn">
+                    Login (No PKCE)
+                </button>
+            </div>
+        </div>
+    </div>
+</body>
+<script crossorigin="anonymous" integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM"
+    src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    // OAuth Configuration - NO PKCE
+    const BASE_URL = 'http://localhost:9001';
+    // Allow client_id to be passed via query param for test isolation
+    const urlParams = new URLSearchParams(window.location.search);
+    const CLIENT_ID = urlParams.get('client_id') || 'pkce-e2e-test.local';
+    const REDIRECT_URI = window.location.origin + '/no-pkce.html';
+
+    /**
+     * Generate a random state for CSRF protection
+     */
+    function randomState() {
+        const array = new Uint8Array(32);
+        crypto.getRandomValues(array);
+        return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+    }
+
+    /**
+     * Start the OAuth authorization code flow WITHOUT PKCE
+     */
+    function startLogin() {
+        // Generate state for CSRF protection
+        const state = randomState();
+        sessionStorage.setItem('oauth-state', state);
+
+        // Build the authorization URL WITHOUT code_challenge
+        const params = new URLSearchParams({
+            response_type: 'code',
+            client_id: CLIENT_ID,
+            redirect_uri: REDIRECT_URI,
+            state: state,
+            scope: 'openid profile email'
+        });
+
+        const authUrl = `${BASE_URL}/api/oauth/authorize?${params.toString()}`;
+        console.log('Redirecting to:', authUrl);
+        window.location.href = authUrl;
+    }
+
+    /**
+     * Handle the OAuth callback after redirect from authorization server
+     */
+    async function handleCallback() {
+        const urlParams = new URLSearchParams(window.location.search);
+
+        // Check for error response (PKCE required but not provided)
+        if (urlParams.has('error')) {
+            const error = urlParams.get('error');
+            const errorDescription = urlParams.get('error_description');
+            
+            document.getElementById('error-row').style.display = 'block';
+            document.getElementById('error-code').innerText = error;
+            document.getElementById('error-description').innerText = errorDescription || 'No description provided';
+            
+            // Update button to show error state
+            const loginBtn = document.getElementById('login-btn');
+            loginBtn.innerText = 'Try Again (No PKCE)';
+            return;
+        }
+
+        if (!urlParams.has('code')) {
+            return; // Not a callback
+        }
+
+        const storedState = sessionStorage.getItem('oauth-state');
+        const callbackState = urlParams.get('state');
+
+        // Validate state parameter
+        if (!storedState || !callbackState || storedState !== callbackState) {
+            document.getElementById('decodedToken').innerText = 'Error: state mismatch — possible CSRF attack.';
+            return;
+        }
+
+        const code = urlParams.get('code');
+
+        try {
+            // Exchange code for tokens WITHOUT code_verifier
+            const tokenResponse = await fetch(`${BASE_URL}/api/oauth/token`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    grant_type: 'authorization_code',
+                    code: code,
+                    client_id: CLIENT_ID,
+                    redirect_uri: REDIRECT_URI
+                    // NO code_verifier - this is the key difference
+                })
+            });
+
+            const tokens = await tokenResponse.json();
+
+            // Clear stored values
+            sessionStorage.removeItem('oauth-state');
+
+            if (tokens.error) {
+                document.getElementById('error-row').style.display = 'block';
+                document.getElementById('error-code').innerText = tokens.error;
+                document.getElementById('error-description').innerText = tokens.error_description || 'Token exchange failed';
+                return;
+            }
+
+            console.log('Token Endpoint Response:', tokens);
+
+            // Display the tokens
+            const access_token = tokens.access_token;
+            decodeToken(access_token);
+
+            // Update button text
+            const loginBtn = document.getElementById('login-btn');
+            loginBtn.innerText = 'Login Successful!';
+            loginBtn.disabled = true;
+
+        } catch (error) {
+            console.error('Token exchange failed:', error);
+            document.getElementById('decodedToken').innerText = 'Error: Token exchange failed — ' + error.message;
+        }
+    }
+
+    /**
+     * Decode and display a JWT token
+     */
+    function decodeToken(token) {
+        if (!token) {
+            return '';
+        }
+
+        try {
+            const tokenParts = token.split('.');
+            const decodedToken = {
+                header: JSON.parse(atob(tokenParts[0])),
+                payload: JSON.parse(atob(tokenParts[1])),
+                signature: tokenParts[2]
+            };
+            document.getElementById('decodedToken').innerText = JSON.stringify(decodedToken, null, 4);
+            return decodedToken.payload.sub || decodedToken.payload.email || 'User';
+        } catch (error) {
+            document.getElementById('decodedToken').innerText = 'Error decoding token: ' + error.message;
+            return '';
+        }
+    }
+
+    // Attach click handler to login button
+    document.getElementById('login-btn').addEventListener('click', startLogin);
+
+    // Handle callback on page load
+    handleCallback();
+</script>
+
+</html>

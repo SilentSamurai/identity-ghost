@@ -123,3 +123,5 @@ nginx/temp
 .kiro/specs/
 
 pve-ct-305-config-backup.json
+
+specs
