@@ -49,7 +49,6 @@ import {DataSource} from "../../component/model/DataSource";
                     <app-table-col label="Domain" name="domain"></app-table-col>
                     <app-table-col label="Name" name="name"></app-table-col>
                     <app-table-col label="Active Keys" name="activeKeyCount"></app-table-col>
-                    <app-table-col label="Discovery URL" name="discoveryUrl"></app-table-col>
                     <app-table-col>
                         <th style="max-width: 100px">Action</th>
                     </app-table-col>
@@ -64,20 +63,6 @@ import {DataSource} from "../../component/model/DataSource";
                         </td>
                         <td>{{ tenant.name }}</td>
                         <td>{{ activeKeyCountMap.get(tenant.id) ?? 0 }}</td>
-                        <td>
-                            <div class="d-flex align-items-center gap-1">
-                                <code class="small text-truncate" style="max-width: 260px"
-                                      title="{{ getDiscoveryUrl(tenant.domain) }}">
-                                    {{ getDiscoveryPath(tenant.domain) }}
-                                </code>
-                                <button class="btn btn-sm btn-outline-secondary p-0 px-1"
-                                        type="button"
-                                        (click)="copyDiscoveryUrl(tenant.domain, $event)"
-                                        aria-label="Copy discovery URL">
-                                    <i class="pi pi-copy"></i>
-                                </button>
-                            </div>
-                        </td>
                         <td class="" style="max-width: 100px">
                             <button
                                 (click)="openUpdateModal(tenant)"
@@ -211,24 +196,5 @@ export class TN01AComponent implements OnInit {
 
     onFilter(event: Filter[]) {
         this.table.filter(event);
-    }
-
-    getDiscoveryPath(domain: string): string {
-        return `/${domain}/.well-known/openid-configuration`;
-    }
-
-    getDiscoveryUrl(domain: string): string {
-        return `${window.location.origin}/${domain}/.well-known/openid-configuration`;
-    }
-
-    async copyDiscoveryUrl(domain: string, event: Event) {
-        event.stopPropagation();
-        const url = this.getDiscoveryUrl(domain);
-        try {
-            await navigator.clipboard.writeText(url);
-            this.messageService.add({severity: 'success', summary: 'Copied', detail: 'Discovery URL copied to clipboard'});
-        } catch (e) {
-            this.messageService.add({severity: 'error', summary: 'Error', detail: 'Copy not supported'});
-        }
     }
 }

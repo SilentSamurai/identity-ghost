@@ -1,4 +1,4 @@
-import {Body, Controller, Header, HttpCode, Post, Res, UseGuards} from '@nestjs/common';
+import {Body, Controller, Get, Header, HttpCode, Post, Res, UseGuards} from '@nestjs/common';
 import {Response} from 'express';
 import {TokenRevocationService} from '../auth/token-revocation.service';
 import {JwtAuthGuard} from '../auth/jwt-auth.guard';
@@ -13,7 +13,6 @@ import {OAuthException} from '../exceptions/oauth-exception';
  * sets up the security context and resolves the tenant, so the controller
  * never touches the Authorization header directly.
  */
-@UseGuards(JwtAuthGuard)
 @Controller('api/oauth')
 export class RevocationController {
     constructor(
@@ -34,6 +33,7 @@ export class RevocationController {
      * Returns HTTP 200 with `{}` for all requests where auth succeeds.
      */
     @Post('revoke')
+    @UseGuards(JwtAuthGuard)
     @HttpCode(200)
     @Header('Cache-Control', 'no-store')
     @Header('Pragma', 'no-cache')
@@ -62,6 +62,7 @@ export class RevocationController {
      * session cookies (`Max-Age=0`).
      */
     @Post('logout')
+    @UseGuards(JwtAuthGuard)
     @HttpCode(200)
     @Header('Cache-Control', 'no-store')
     @Header('Pragma', 'no-cache')
@@ -79,5 +80,36 @@ export class RevocationController {
         ]);
 
         return {};
+    }
+
+    /**
+     * GET /api/oauth/logout
+     *
+     * Returns 405 Method Not Allowed. Logout requires POST.
+     * This prevents 404 noise from health-check probes (e.g. Portainer).
+     */
+    @Get('logout')
+    @HttpCode(405)
+    @Header('Allow', 'POST')
+    getLogout(): { error: string; error_description: string } {
+        return {
+            error: 'method_not_allowed',
+            error_description: 'Use POST to logout.',
+        };
+    }
+
+    /**
+     * GET /api/oauth/revoke
+     *
+     * Returns 405 Method Not Allowed. Revocation requires POST.
+     */
+    @Get('revoke')
+    @HttpCode(405)
+    @Header('Allow', 'POST')
+    getRevoke(): { error: string; error_description: string } {
+        return {
+            error: 'method_not_allowed',
+            error_description: 'Use POST to revoke tokens.',
+        };
     }
 }

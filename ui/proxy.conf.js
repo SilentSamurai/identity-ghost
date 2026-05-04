@@ -7,6 +7,15 @@ const PROXY_CONFIG = [
         logLevel: "debug"
     },
     {
+        context: function (pathname) {
+            return pathname.includes('/.well-known/');
+        },
+        target: "http://localhost:9001/",
+        secure: false,
+        changeOrigin: true,
+        logLevel: "debug"
+    },
+    {
         context: ["/onboard/tenant"],
         target: "http://localhost:9001/",
         secure: false,

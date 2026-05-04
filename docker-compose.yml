@@ -5,11 +5,6 @@ services:
         environment:
             PORT: 80
             AUTH_SERVER: http://auth_srv:8080/api
-        #        volumes:
-        #            - ./nginx/conf/nginx.conf.template:/etc/nginx/nginx.conf
-        #            - ./ui/nginx/mime.types:/etc/nginx/mime.types
-        #            - ./ui/nginx/templates:/etc/nginx/templates
-        #            - ./srv/dist/static:/home/static/
         ports:
             - "9001:80"
         depends_on:

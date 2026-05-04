@@ -6,9 +6,9 @@ BACKEND_PORT="${BACKEND_PORT:-9001}"
 AUTH_SERVER="${AUTH_SERVER:-http://localhost:${BACKEND_PORT}}"
 
 echo "=== Standalone Container Starting ==="
-echo "Nginx port:   ${NGINX_PORT}"
-echo "Backend port: ${BACKEND_PORT}"
-echo "Auth server:  ${AUTH_SERVER}"
+echo "Nginx port:       ${NGINX_PORT}"
+echo "Backend port:     ${BACKEND_PORT}"
+echo "Auth server:      ${AUTH_SERVER}"
 
 # Generate Nginx config from template
 export PORT="$NGINX_PORT" AUTH_SERVER

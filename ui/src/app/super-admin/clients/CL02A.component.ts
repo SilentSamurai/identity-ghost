@@ -70,6 +70,23 @@ import {EditClientAdminComponent} from './dialogs/edit-client-admin.component';
                             <a [routerLink]="['/admin/TN02', client.tenant.id]"
                                >{{ client.tenant.name }}</a>
                         </app-attribute>
+                        <app-attribute label="Discovery URL">
+                            <div class="d-flex align-items-center gap-1">
+                                <code class="small text-wrap text-break">{{ getDiscoveryPath() }}</code>
+                                <button class="btn btn-sm btn-outline-secondary p-0 px-1"
+                                        type="button"
+                                        (click)="copyDiscoveryUrl()"
+                                        aria-label="Copy discovery URL">
+                                    <i class="fa fa-copy"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-secondary p-0 px-1"
+                                        type="button"
+                                        (click)="openDiscoveryUrl()"
+                                        aria-label="Open discovery URL in new tab">
+                                    <i class="fa fa-external-link"></i>
+                                </button>
+                            </div>
+                        </app-attribute>
                         <app-attribute label="Response Types">
                             {{ client.responseTypes }}
                         </app-attribute>
@@ -194,5 +211,29 @@ export class CL02AComponent implements OnInit {
         if (deleted) {
             await this.router.navigate(['/admin/CL01']);
         }
+    }
+
+    getDiscoveryPath(): string {
+        if (!this.client) return '';
+        return `/${this.client.tenant.domain}/.well-known/openid-configuration`;
+    }
+
+    getDiscoveryUrl(): string {
+        if (!this.client) return '';
+        return `${window.location.origin}/${this.client.tenant.domain}/.well-known/openid-configuration`;
+    }
+
+    async copyDiscoveryUrl() {
+        const url = this.getDiscoveryUrl();
+        try {
+            await navigator.clipboard.writeText(url);
+            this.messageService.add({severity: 'success', summary: 'Copied', detail: 'Discovery URL copied to clipboard'});
+        } catch (e) {
+            this.messageService.add({severity: 'error', summary: 'Error', detail: 'Copy not supported'});
+        }
+    }
+
+    openDiscoveryUrl() {
+        window.open(this.getDiscoveryUrl(), '_blank');
     }
 }

@@ -18,7 +18,7 @@ export interface Client {
     allowRefreshToken: boolean;
     name: string;
     createdAt: string;
-    tenant: { id: string; name: string };
+    tenant: { id: string; name: string; domain: string };
 }
 
 export interface CreateClientRequest {
