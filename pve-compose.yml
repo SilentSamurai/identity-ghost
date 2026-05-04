@@ -1,0 +1,24 @@
+# Usage: pve-oci apply pve-compose.yml
+# Purge: pve-oci destroy -f pve-compose.yml --purge
+
+auth:
+  profile: default
+  node: chiki
+
+containers:
+  - vmid: 305
+    image: docker.io/sd25/auth-server:latest
+    hostname: AuthServer
+    memory: 512
+    swap: 128
+    cores: 1
+    net:
+      - name=eth0,bridge=vmbr0,ip=dhcp
+    rootfs_size: "8"
+    storage: cephfs
+    rootfs_storage: pxpool01
+    mp: []
+    privileged: false
+    purge_on_upgrade: false
+    environment:
+      Apple: "PIE"

@@ -27,6 +27,7 @@ done
 echo "Backend is ready!"
 
 # Start Nginx
+mkdir -p /run/nginx
 echo "Starting Nginx on port ${NGINX_PORT}..."
 nginx -g 'daemon off;' &
 NGINX_PID=$!

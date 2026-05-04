@@ -121,3 +121,5 @@ nginx/temp
 /ui/cypress/screenshots
 .vscode/settings.json
 .kiro/specs/
+
+pve-ct-305-config-backup.json
