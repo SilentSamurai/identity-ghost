@@ -304,6 +304,15 @@ export class AuthorizeLoginComponent implements OnInit {
             this.code_challenge_method = params.get('code_challenge_method')!;
         }
 
+        // Read remaining query parameters from snapshot (must happen before auth code check
+        // so that state, scope, etc. are available for any early redirects)
+        this.clientId = params.get('client_id') || '';
+        this.state = params.get('state') || '';
+        this.scope = params.get('scope') || '';
+        this.responseType = params.get('response_type') || '';
+        this.prompt = params.get('prompt') || '';
+        this.maxAge = params.has('max_age') ? Number(params.get('max_age')) : undefined;
+
         // if auth code is present, then redirect
         // verify auth-code
         const authCode = this.tokenStorage.getAuthCode();
@@ -316,6 +325,7 @@ export class AuthorizeLoginComponent implements OnInit {
                             redirect_uri: this.redirectUri,
                             client_id: this.loginForm.get('client_id')?.value,
                             code_challenge: this.code_challenge,
+                            state: this.state,
                         },
                     });
                 }
@@ -327,14 +337,6 @@ export class AuthorizeLoginComponent implements OnInit {
         //     await this.router.navigateByUrl("/home");
         // }
         this.loading = false;
-
-        // Read remaining query parameters from snapshot
-        this.clientId = params.get('client_id') || '';
-        this.state = params.get('state') || '';
-        this.scope = params.get('scope') || '';
-        this.responseType = params.get('response_type') || '';
-        this.prompt = params.get('prompt') || '';
-        this.maxAge = params.has('max_age') ? Number(params.get('max_age')) : undefined;
 
         // Use the RP-provided nonce if present; do not generate one when the RP omitted it.
         // Per OIDC Core §3.1.2.1, the nonce is the RP's responsibility — if the RP didn't

@@ -35,10 +35,12 @@ describe('ScopeNormalizer Properties', () => {
             fc.property(
                 fc.uniqueArray(fc.string(), {minLength: 0, maxLength: 10}),
                 (scopes) => {
-                    // Exclude strings that would be split into multiple scopes or are just whitespace
+                    // Exclude strings that would be split into multiple scopes or are just whitespace.
+                    // Also exclude strings containing commas since parse() treats commas as delimiters
+                    // (to support clients that send comma-separated scopes per the implementation).
                     const validScopes = scopes
                         .map(s => s.trim())
-                        .filter(s => s.length > 0 && !/\s/.test(s));
+                        .filter(s => s.length > 0 && !/[\s,]/.test(s));
 
                     const formatted = ScopeNormalizer.format(validScopes);
                     const parsed = ScopeNormalizer.parse(formatted);

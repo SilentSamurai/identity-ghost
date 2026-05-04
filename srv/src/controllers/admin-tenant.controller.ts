@@ -190,7 +190,7 @@ export class AdminTenantController {
         const user = await this.usersService.findById(permission, userId);
         const tenant = await this.tenantService.findById(permission, tenantId);
         let roles = await this.tenantService.getMemberRoles(permission, tenantId, user);
-        return {tenantId: tenant.id, userId: user.id, roles};
+        return {tenantId: tenant.id, userId: user.id, email: user.email, name: user.name, roles};
     }
 
     @Get("/:tenantId/member/:userId/roles")

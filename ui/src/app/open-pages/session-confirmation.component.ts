@@ -157,6 +157,7 @@ export class SessionConfirmationComponent implements OnInit {
     username = '';
     code_challenge = '';
     client_id = '';
+    state = '';
 
     constructor(
         private userService: UserService,
@@ -173,6 +174,7 @@ export class SessionConfirmationComponent implements OnInit {
         this.redirectUri = params.get('redirect_uri')!;
         this.client_id = params.get('client_id')!;
         this.code_challenge = params.get('code_challenge')!;
+        this.state = params.get('state') || '';
 
         const authCode = this.tokenStorage.getAuthCode();
         if (authCode) {
@@ -201,19 +203,25 @@ export class SessionConfirmationComponent implements OnInit {
                 redirect_uri: this.redirectUri,
                 client_id: this.client_id,
                 code_challenge: this.code_challenge,
+                state: this.state,
             },
         });
     }
 
     async redirect(code: string) {
         if (this.isAbsoluteUrl(this.redirectUri)) {
-            window.location.href = `${this.redirectUri}?code=${code}`;
+            const redirectUrl = new URL(this.redirectUri);
+            redirectUrl.searchParams.append('code', code);
+            if (this.state) {
+                redirectUrl.searchParams.append('state', this.state);
+            }
+            window.location.href = redirectUrl.toString();
         } else {
-            await this.router.navigate([this.redirectUri], {
-                queryParams: {
-                    code: code,
-                },
-            });
+            const queryParams: any = {code};
+            if (this.state) {
+                queryParams.state = this.state;
+            }
+            await this.router.navigate([this.redirectUri], {queryParams});
         }
     }
 
