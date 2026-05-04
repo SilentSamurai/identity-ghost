@@ -23,7 +23,7 @@ describe('RegistrationController', () => {
     setupConsole();
 
     beforeEach(async () => {
-        process.env.ENV_FILE = './envs/.env.testing';
+        process.env.ENV = 'testing';
         process.env.ENABLE_FAKE_SMTP_SERVER = 'false';
         Environment.setup();
 

@@ -10,19 +10,21 @@ export class Environment {
     }
 
     static setup(): any {
-        const envFile = process.env.ENV_FILE || "./envs/.env.development";
+        const profile = process.env.ENV || "development";
+        const envFile = `./envs/.env.${profile}`;
         let envPath = path.resolve(process.cwd(), envFile);
         if (!fs.existsSync(envPath)) {
-            console.log("Environment does not exist", envPath);
-            throw new Error("Missing environment");
+            console.log(`Environment file does not exist for profile '${profile}':`, envPath);
+            throw new Error(`Missing environment file: ${envFile}`);
         }
-        console.log("Environment path :", envPath);
+        console.log(`Environment profile: ${profile}`);
+        console.log(`Environment path:    ${envPath}`);
         config({
             path: envPath,
         });
 
         const DIAGNOSTIC_KEYS = [
-            "NODE_ENV", "PORT", "SERVICE_NAME", "ENV_FILE",
+            "NODE_ENV", "PORT", "SERVICE_NAME", "ENV",
             "DATABASE_HOST", "DATABASE_PORT", "DATABASE_NAME",
             "MAIL_HOST", "MAIL_PORT",
             "LOG_LEVEL",

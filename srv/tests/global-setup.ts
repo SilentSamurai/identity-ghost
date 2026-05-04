@@ -92,7 +92,7 @@ export default async function globalSetup(): Promise<void> {
 
     try {
         // 1. Load environment
-        process.env.ENV_FILE = './envs/.env.testing';
+        process.env.ENV = 'testing';
         process.env.ENABLE_FAKE_SMTP_SERVER = 'false';
         Environment.setup();
 
