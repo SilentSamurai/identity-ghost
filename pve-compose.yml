@@ -21,4 +21,14 @@ containers:
     privileged: false
     purge_on_upgrade: false
     environment:
-      Apple: "PIE"
+      ENV: "production"
+      PORT: "8080"
+      DATABASE_TYPE: "postgres"
+      DATABASE_HOST: "db"
+      DATABASE_PORT: "5432"
+      DATABASE_NAME: "myidentity_db"
+      DATABASE_USERNAME: "root"
+      DATABASE_PASSWORD: "root"
+      DATABASE_SSL: "false"
+      MAIL_HOST: "smtp"
+      MAIL_PORT: "578"
