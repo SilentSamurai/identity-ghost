@@ -30,7 +30,7 @@ import {EditClientComponent} from './dialogs/edit-client.component';
                     Edit
                 </button>
                 <button
-                    *ngIf="client && !client.isPublic"
+                    *ngIf="client"
                     (click)="onRotateSecret()"
                     [disabled]="!isTenantAdmin"
                     id="ROTATE_SECRET_BTN"
@@ -161,6 +161,7 @@ export class CL02Component implements OnInit {
             },
         });
         if (rotated) {
+            this.client = rotated.client;
             await this.modalService.open(SecretDisplayComponent, {
                 initData: {
                     clientSecret: rotated.clientSecret,

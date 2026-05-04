@@ -156,6 +156,12 @@ export class ClientService {
     async rotateSecret(clientId: string): Promise<{ client: Client; plainSecret: string }> {
         const client = await this.findByClientId(clientId);
 
+        // Convert public client to confidential on first secret generation
+        if (client.isPublic) {
+            client.isPublic = false;
+            client.tokenEndpointAuthMethod = 'client_secret_basic';
+        }
+
         const generated = this.generateSecret();
 
         // Set expiry on existing non-expired secrets (24h overlap window)

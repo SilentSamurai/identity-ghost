@@ -27,7 +27,7 @@ import {EditClientAdminComponent} from './dialogs/edit-client-admin.component';
                     Edit
                 </button>
                 <button
-                    *ngIf="client && !client.isPublic"
+                    *ngIf="client"
                     (click)="onRotateSecret()"
                     id="ROTATE_SECRET_BTN"
                     class="btn btn-primary btn-sm ms-2"
