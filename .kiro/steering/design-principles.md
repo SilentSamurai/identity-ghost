@@ -1,3 +1,7 @@
+---
+inclusion: manual
+---
+
 # Design Principles
 
 This is an authorization and authentication server. Every decision must reflect that.

@@ -144,6 +144,7 @@ export class StartUpService implements OnModuleInit {
                 {name: "PKCE Preservation Test Tenant", domain: "pkce-preservation-test.local", signUp: false},
                 {name: "PKCE E2E Test Tenant", domain: "pkce-e2e-test.local", signUp: false},
                 {name: "Client Rotate Test Tenant", domain: "client-rotate-test.local", signUp: false},
+                {name: "Auth Code Reuse Test Tenant", domain: "auth-code-reuse-test.local", signUp: false},
             ];
 
             // 4) Create each tenant and assign the existing user as owner

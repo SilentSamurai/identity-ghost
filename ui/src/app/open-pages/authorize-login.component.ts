@@ -330,7 +330,40 @@ export class AuthorizeLoginComponent implements OnInit {
                     });
                 }
             } catch (e: any) {
-                console.error(e);
+                console.error('Auth code verification failed, attempting silent-auth recovery:', e);
+                // Cached code is used/expired — attempt silent-auth to get a fresh code
+                try {
+                    const decoded = this.tokenStorage.getDecodedToken();
+                    if (decoded && decoded.sub && decoded.tenant?.id) {
+                        const silentData = await this.authService.silentAuth({
+                            client_id: this.loginForm.get('client_id')?.value,
+                            user_id: decoded.sub,
+                            tenant_id: decoded.tenant.id,
+                            code_challenge: this.code_challenge,
+                            code_challenge_method: this.code_challenge_method,
+                        });
+
+                        if (silentData.authentication_code) {
+                            // Save the fresh code and navigate to session-confirm
+                            this.tokenStorage.saveAuthCode(silentData.authentication_code);
+                            await this.router.navigate(['session-confirm'], {
+                                queryParams: {
+                                    redirect_uri: this.redirectUri,
+                                    client_id: this.loginForm.get('client_id')?.value,
+                                    code_challenge: this.code_challenge,
+                                    state: this.state,
+                                },
+                            });
+                            return;
+                        }
+                    }
+                    // silent-auth didn't return a code or no valid session — clear stale code and show login
+                    this.tokenStorage.clearAuthCode();
+                } catch (silentErr: any) {
+                    console.error('Silent-auth recovery also failed:', silentErr);
+                    // Clear stale code from sessionStorage and fall through to show login form
+                    this.tokenStorage.clearAuthCode();
+                }
             }
         }
         // else if (this.tokenStorage.isLoggedIn() && !externalLogin) {

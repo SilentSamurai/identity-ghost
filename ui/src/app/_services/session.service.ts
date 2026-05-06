@@ -44,6 +44,10 @@ export class SessionService {
         return window.sessionStorage.getItem(AUTH_CODE_KEY);
     }
 
+    public clearAuthCode(): void {
+        window.sessionStorage.removeItem(AUTH_CODE_KEY);
+    }
+
     public saveRefreshToken(token: string): void {
         window.sessionStorage.setItem(REFRESH_TOKEN_KEY, token);
     }

@@ -163,4 +163,21 @@ export class TestUtilsController {
 
         return this.authCodeRepo.save(authCode);
     }
+
+    /**
+     * Force-expire an auth code by setting its expiresAt to the past.
+     */
+    @Post("auth-codes/:code/expire")
+    @HttpCode(204)
+    async expireAuthCode(@Param("code") code: string): Promise<void> {
+        await this.authCodeRepo.update({code}, {expiresAt: new Date(Date.now() - 60_000)});
+    }
+
+    /**
+     * Look up an auth code by its code string, returning all fields.
+     */
+    @Get("auth-codes/:code")
+    async getAuthCode(@Param("code") code: string): Promise<AuthCode | null> {
+        return this.authCodeRepo.findOne({where: {code}});
+    }
 }

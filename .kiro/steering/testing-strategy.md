@@ -1,3 +1,8 @@
+---
+inclusion: fileMatch
+fileMatchPattern: "**/*.spec.ts,**/*.test.ts,**/tests/**,**/cypress/**,cypress.config.*"
+---
+
 # Testing Strategy
 
 - For the backend (`srv/`), write **integration tests** only. Do not write unit tests.

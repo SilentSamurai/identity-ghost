@@ -1,3 +1,7 @@
+---
+inclusion: manual
+---
+
 # Token Architecture — Scope/Role Separation
 
 The JWT token model separates OAuth scopes from internal roles. These are independent concerns and must never be mixed.

@@ -193,7 +193,59 @@ export class SessionConfirmationComponent implements OnInit {
     }
 
     async onContinue() {
-        await this.redirect(this.authCode);
+        try {
+            const decoded = this.tokenStorage.getDecodedToken();
+            if (!decoded || !decoded.sub || !decoded.tenant?.id) {
+                // No valid session token — clear and redirect to login
+                this.tokenStorage.clearSession();
+                await this.router.navigate(['authorize'], {
+                    queryParams: {
+                        redirect_uri: this.redirectUri,
+                        client_id: this.client_id,
+                        code_challenge: this.code_challenge,
+                        state: this.state,
+                    },
+                });
+                return;
+            }
+
+            // Always request a fresh authorization code via silent-auth
+            const data = await this.authService.silentAuth({
+                client_id: this.client_id,
+                user_id: decoded.sub,
+                tenant_id: decoded.tenant.id,
+                code_challenge: this.code_challenge,
+                code_challenge_method: 'S256',
+            });
+
+            if (data.authentication_code) {
+                this.tokenStorage.saveAuthCode(data.authentication_code);
+                await this.redirect(data.authentication_code);
+            } else {
+                // silent-auth did not return a code — clear session and redirect to login
+                this.tokenStorage.clearSession();
+                await this.router.navigate(['authorize'], {
+                    queryParams: {
+                        redirect_uri: this.redirectUri,
+                        client_id: this.client_id,
+                        code_challenge: this.code_challenge,
+                        state: this.state,
+                    },
+                });
+            }
+        } catch (e: any) {
+            console.error('silent-auth failed on Continue:', e);
+            // On failure: clear session and navigate to authorize page
+            this.tokenStorage.clearSession();
+            await this.router.navigate(['authorize'], {
+                queryParams: {
+                    redirect_uri: this.redirectUri,
+                    client_id: this.client_id,
+                    code_challenge: this.code_challenge,
+                    state: this.state,
+                },
+            });
+        }
     }
 
     async onLogout() {

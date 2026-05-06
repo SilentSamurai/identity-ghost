@@ -42,6 +42,15 @@ export class OAuthVerificationController {
         }
         const authCodeObj = await this.authCodeService.findByCode(body.auth_code);
 
+        // Reject used or expired authorization codes before any other validation
+        // Requirements: 2.3, 2.4, 3.1, 3.4
+        if (authCodeObj.used === true) {
+            throw OAuthException.invalidGrant("The authorization code has already been used");
+        }
+        if (authCodeObj.expiresAt < new Date()) {
+            throw OAuthException.invalidGrant("The authorization code has expired");
+        }
+
         // Resolve Client entity via ClientService instead of AuthUserService
         // Requirements: 2.4, 5.5
         let client;

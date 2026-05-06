@@ -58,10 +58,25 @@ describe('e2e positive auth code flow', () => {
 
 
     it(`/POST Verify auth gen code`, async () => {
+        // Get a fresh auth code since the previous one was consumed by token exchange
+        const loginResponse = await app.getHttpServer()
+            .post('/api/oauth/login')
+            .send({
+                "code_challenge": challenge,
+                "email": "admin@auth.server.com",
+                "password": "admin9000",
+                "client_id": clientId,
+                "code_challenge_method": "plain"
+            })
+            .set('Accept', 'application/json');
+
+        expect(loginResponse.status).toEqual(201);
+        const freshCode = loginResponse.body.authentication_code;
+
         const response = await app.getHttpServer()
             .post('/api/oauth/verify-auth-code')
             .send({
-                "auth_code": authentication_code,
+                "auth_code": freshCode,
                 "client_id": clientId,
             })
             .set('Accept', 'application/json');
