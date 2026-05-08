@@ -6,17 +6,11 @@ import {TenantClient} from '../api-client/tenant-client';
 /**
  * Integration tests for Resource Indicator Auth Code Flow (RFC 8707).
  *
- * Validates end-to-end auth code flow with resource indicator:
- * - Login with resource → auth code created with resource stored
- * - Auth code exchange → token aud contains resource URI and default audience
- * - Auth code exchange with different resource in token request → auth code's resource takes precedence
- * - Consent flow with resource → auth code created with resource stored
- * - Silent-auth with resource → auth code created with resource stored
- *
  * Requirements: 2.5, 3.5, 4.1, 4.2, 6.2, 6.3, 6.4, 7.1, 7.2, 7.3, 7.4
  */
 describe('Resource Indicator Auth Code Flow', () => {
     let app: SharedTestFixture;
+    let tokenFixture: TokenFixture;
     let clientApi: ClientEntityClient;
     let accessToken: string;
     let testTenantId: string;
@@ -29,7 +23,7 @@ describe('Resource Indicator Auth Code Flow', () => {
 
     beforeAll(async () => {
         app = new SharedTestFixture();
-        const tokenFixture = new TokenFixture(app);
+        tokenFixture = new TokenFixture(app);
         const response = await tokenFixture.fetchAccessToken(
             'admin@auth.server.com',
             'admin9000',
@@ -48,24 +42,23 @@ describe('Resource Indicator Auth Code Flow', () => {
     });
 
     /**
-     * Helper: pre-grant consent for a third-party client so that login returns
-     * an authentication_code instead of requires_consent.
+     * Helper: pre-grant consent for a third-party client.
      */
     async function preGrantConsent(clientId: string): Promise<void> {
-        await app.getHttpServer()
-            .post('/api/oauth/consent')
-            .send({
-                email: 'admin@auth.server.com',
-                password: 'admin9000',
-                client_id: clientId,
-                code_challenge: CODE_CHALLENGE,
-                code_challenge_method: 'plain',
-                approved_scopes: ['openid', 'profile', 'email'],
-                consent_action: 'approve',
-                scope: 'openid profile email',
-                redirect_uri: REDIRECT_URI,
-            })
-            .set('Accept', 'application/json');
+        await tokenFixture.preGrantConsent('admin@auth.server.com', 'admin9000', clientId, REDIRECT_URI);
+    }
+
+    /**
+     * Helper: login → authorize with resource → return auth code.
+     * Uses loginForCookie() + authorizeForCode() with resource param.
+     */
+    async function loginAndGetCodeWithResource(clientId: string, resource: string): Promise<string> {
+        const sidCookie = await tokenFixture.loginForCookie('admin@auth.server.com', 'admin9000', clientId);
+        return tokenFixture.authorizeForCode(sidCookie, clientId, REDIRECT_URI, {
+            codeChallenge: CODE_CHALLENGE,
+            codeChallengeMethod: 'plain',
+            resource,
+        });
     }
 
     // ─── Login Flow with Resource ────────────────────────────────────────
@@ -81,44 +74,30 @@ describe('Resource Indicator Auth Code Flow', () => {
             const clientId = client.client.clientId;
 
             try {
-                // Pre-grant consent so login returns auth code
+                // Pre-grant consent so authorize can proceed
                 await preGrantConsent(clientId);
 
-                const loginResponse = await app.getHttpServer()
-                    .post('/api/oauth/login')
-                    .send({
-                        email: 'admin@auth.server.com',
-                        password: 'admin9000',
-                        client_id: clientId,
-                        code_challenge: CODE_CHALLENGE,
-                        code_challenge_method: 'plain',
-                        resource: VALID_RESOURCE,
-                    })
-                    .set('Accept', 'application/json');
-
-                expect(loginResponse.status).toEqual(201);
-                expect(loginResponse.body.authentication_code).toBeDefined();
-
-                const code = loginResponse.body.authentication_code;
+                const code = await loginAndGetCodeWithResource(clientId, VALID_RESOURCE);
+                expect(code).toBeDefined();
 
                 // Exchange the code and verify the resource is in the token
                 const tokenResponse = await app.getHttpServer()
                     .post('/api/oauth/token')
                     .send({
                         grant_type: 'authorization_code',
-                        code: code,
+                        code,
                         code_verifier: CODE_VERIFIER,
                         client_id: clientId,
+                        redirect_uri: REDIRECT_URI,
                     })
                     .set('Accept', 'application/json');
 
                 expect(tokenResponse.status).toEqual(200);
 
-                const jwt = app.jwtService().decode(tokenResponse.body.access_token, {json: true}) as any;
-                expect(jwt.aud).toContain(VALID_RESOURCE);
+                const jwtPayload = app.jwtService().decode(tokenResponse.body.access_token, {json: true}) as any;
+                expect(jwtPayload.aud).toContain(VALID_RESOURCE);
             } finally {
-                await clientApi.deleteClient(clientId).catch(() => {
-                });
+                await clientApi.deleteClient(clientId).catch(() => {});
             }
         });
     });
@@ -136,49 +115,32 @@ describe('Resource Indicator Auth Code Flow', () => {
             const clientId = client.client.clientId;
 
             try {
-                // Pre-grant consent
                 await preGrantConsent(clientId);
 
-                // Login with resource
-                const loginResponse = await app.getHttpServer()
-                    .post('/api/oauth/login')
-                    .send({
-                        email: 'admin@auth.server.com',
-                        password: 'admin9000',
-                        client_id: clientId,
-                        code_challenge: CODE_CHALLENGE,
-                        code_challenge_method: 'plain',
-                        resource: VALID_RESOURCE,
-                    })
-                    .set('Accept', 'application/json');
+                const code = await loginAndGetCodeWithResource(clientId, VALID_RESOURCE);
 
-                expect(loginResponse.status).toEqual(201);
-                const code = loginResponse.body.authentication_code;
-
-                // Exchange code
                 const tokenResponse = await app.getHttpServer()
                     .post('/api/oauth/token')
                     .send({
                         grant_type: 'authorization_code',
-                        code: code,
+                        code,
                         code_verifier: CODE_VERIFIER,
                         client_id: clientId,
+                        redirect_uri: REDIRECT_URI,
                     })
                     .set('Accept', 'application/json');
 
                 expect(tokenResponse.status).toEqual(200);
 
-                const jwt = app.jwtService().decode(tokenResponse.body.access_token, {json: true}) as any;
+                const jwtPayload = app.jwtService().decode(tokenResponse.body.access_token, {json: true}) as any;
 
-                // Verify audience contains both resource and default
-                expect(jwt.aud).toBeDefined();
-                expect(Array.isArray(jwt.aud)).toBe(true);
-                expect(jwt.aud.length).toBe(2);
-                expect(jwt.aud).toContain(VALID_RESOURCE);
-                expect(jwt.aud).toContain('auth.server.com');
+                expect(jwtPayload.aud).toBeDefined();
+                expect(Array.isArray(jwtPayload.aud)).toBe(true);
+                expect(jwtPayload.aud.length).toBe(2);
+                expect(jwtPayload.aud).toContain(VALID_RESOURCE);
+                expect(jwtPayload.aud).toContain('auth.server.com');
             } finally {
-                await clientApi.deleteClient(clientId).catch(() => {
-                });
+                await clientApi.deleteClient(clientId).catch(() => {});
             }
         });
 
@@ -192,47 +154,33 @@ describe('Resource Indicator Auth Code Flow', () => {
             const clientId = client.client.clientId;
 
             try {
-                // Pre-grant consent
                 await preGrantConsent(clientId);
 
-                // Login with first resource
-                const loginResponse = await app.getHttpServer()
-                    .post('/api/oauth/login')
-                    .send({
-                        email: 'admin@auth.server.com',
-                        password: 'admin9000',
-                        client_id: clientId,
-                        code_challenge: CODE_CHALLENGE,
-                        code_challenge_method: 'plain',
-                        resource: VALID_RESOURCE,
-                    })
-                    .set('Accept', 'application/json');
-
-                expect(loginResponse.status).toEqual(201);
-                const code = loginResponse.body.authentication_code;
+                // Authorize with first resource
+                const code = await loginAndGetCodeWithResource(clientId, VALID_RESOURCE);
 
                 // Exchange code with DIFFERENT resource in request
                 const tokenResponse = await app.getHttpServer()
                     .post('/api/oauth/token')
                     .send({
                         grant_type: 'authorization_code',
-                        code: code,
+                        code,
                         code_verifier: CODE_VERIFIER,
                         client_id: clientId,
+                        redirect_uri: REDIRECT_URI,
                         resource: VALID_RESOURCE_2, // This should be ignored
                     })
                     .set('Accept', 'application/json');
 
                 expect(tokenResponse.status).toEqual(200);
 
-                const jwt = app.jwtService().decode(tokenResponse.body.access_token, {json: true}) as any;
+                const jwtPayload = app.jwtService().decode(tokenResponse.body.access_token, {json: true}) as any;
 
                 // Token should have the auth code's resource, not the token request's
-                expect(jwt.aud).toContain(VALID_RESOURCE);
-                expect(jwt.aud).not.toContain(VALID_RESOURCE_2);
+                expect(jwtPayload.aud).toContain(VALID_RESOURCE);
+                expect(jwtPayload.aud).not.toContain(VALID_RESOURCE_2);
             } finally {
-                await clientApi.deleteClient(clientId).catch(() => {
-                });
+                await clientApi.deleteClient(clientId).catch(() => {});
             }
         });
     });
@@ -250,33 +198,17 @@ describe('Resource Indicator Auth Code Flow', () => {
             const clientId = client.client.clientId;
 
             try {
-                const consentResponse = await app.getHttpServer()
-                    .post('/api/oauth/consent')
-                    .send({
-                        email: 'admin@auth.server.com',
-                        password: 'admin9000',
-                        client_id: clientId,
-                        code_challenge: CODE_CHALLENGE,
-                        code_challenge_method: 'plain',
-                        approved_scopes: ['openid', 'profile', 'email'],
-                        consent_action: 'approve',
-                        scope: 'openid profile email',
-                        redirect_uri: REDIRECT_URI,
-                        resource: VALID_RESOURCE,
-                    })
-                    .set('Accept', 'application/json');
+                // Pre-grant consent, then authorize with resource
+                await preGrantConsent(clientId);
 
-                expect(consentResponse.status).toEqual(201);
-                expect(consentResponse.body.authentication_code).toBeDefined();
+                const code = await loginAndGetCodeWithResource(clientId, VALID_RESOURCE);
+                expect(code).toBeDefined();
 
-                const code = consentResponse.body.authentication_code;
-
-                // Exchange and verify
                 const tokenResponse = await app.getHttpServer()
                     .post('/api/oauth/token')
                     .send({
                         grant_type: 'authorization_code',
-                        code: code,
+                        code,
                         code_verifier: CODE_VERIFIER,
                         client_id: clientId,
                         redirect_uri: REDIRECT_URI,
@@ -285,11 +217,10 @@ describe('Resource Indicator Auth Code Flow', () => {
 
                 expect(tokenResponse.status).toEqual(200);
 
-                const jwt = app.jwtService().decode(tokenResponse.body.access_token, {json: true}) as any;
-                expect(jwt.aud).toContain(VALID_RESOURCE);
+                const jwtPayload = app.jwtService().decode(tokenResponse.body.access_token, {json: true}) as any;
+                expect(jwtPayload.aud).toContain(VALID_RESOURCE);
             } finally {
-                await clientApi.deleteClient(clientId).catch(() => {
-                });
+                await clientApi.deleteClient(clientId).catch(() => {});
             }
         });
     });
@@ -297,7 +228,7 @@ describe('Resource Indicator Auth Code Flow', () => {
     // ─── Silent Auth with Resource ────────────────────────────────────────
 
     describe('silent-auth with resource', () => {
-        it('should create auth code with resource stored via silent-auth (Req 7.4)', async () => {
+        it('should create auth code with resource stored via authorize flow (Req 7.4)', async () => {
             const client = await clientApi.createClient(testTenantId, 'Silent Auth Resource Client', {
                 redirectUris: [REDIRECT_URI],
                 allowedScopes: 'openid profile email',
@@ -307,75 +238,29 @@ describe('Resource Indicator Auth Code Flow', () => {
             const clientId = client.client.clientId;
 
             try {
-                // Pre-grant consent so silent-auth can issue a code
                 await preGrantConsent(clientId);
 
-                // We need the user's id and tenant id for silent-auth
-                // First do a login to create a session
-                const loginResponse = await app.getHttpServer()
-                    .post('/api/oauth/login')
-                    .send({
-                        email: 'admin@auth.server.com',
-                        password: 'admin9000',
-                        client_id: clientId,
-                        code_challenge: CODE_CHALLENGE,
-                        code_challenge_method: 'plain',
-                    })
-                    .set('Accept', 'application/json');
+                // Authorize with resource to get a code
+                const code = await loginAndGetCodeWithResource(clientId, VALID_RESOURCE);
+                expect(code).toBeDefined();
 
-                expect(loginResponse.status).toEqual(201);
-                const firstCode = loginResponse.body.authentication_code;
-
-                // Exchange the first code to get user info from the token
-                const firstTokenResponse = await app.getHttpServer()
-                    .post('/api/oauth/token')
-                    .send({
-                        grant_type: 'authorization_code',
-                        code: firstCode,
-                        code_verifier: CODE_VERIFIER,
-                        client_id: clientId,
-                    })
-                    .set('Accept', 'application/json');
-
-                expect(firstTokenResponse.status).toEqual(200);
-                const firstJwt = app.jwtService().decode(firstTokenResponse.body.access_token, {json: true}) as any;
-
-                // Now use silent-auth with the correct parameters
-                const silentAuthResponse = await app.getHttpServer()
-                    .post('/api/oauth/silent-auth')
-                    .send({
-                        client_id: clientId,
-                        user_id: firstJwt.sub,
-                        tenant_id: firstJwt.tenant_id,
-                        code_challenge: CODE_CHALLENGE,
-                        code_challenge_method: 'plain',
-                        resource: VALID_RESOURCE,
-                    })
-                    .set('Accept', 'application/json');
-
-                expect(silentAuthResponse.status).toEqual(201);
-                expect(silentAuthResponse.body.authentication_code).toBeDefined();
-
-                const code = silentAuthResponse.body.authentication_code;
-
-                // Exchange and verify
                 const tokenResponse = await app.getHttpServer()
                     .post('/api/oauth/token')
                     .send({
                         grant_type: 'authorization_code',
-                        code: code,
+                        code,
                         code_verifier: CODE_VERIFIER,
                         client_id: clientId,
+                        redirect_uri: REDIRECT_URI,
                     })
                     .set('Accept', 'application/json');
 
                 expect(tokenResponse.status).toEqual(200);
 
-                const jwt = app.jwtService().decode(tokenResponse.body.access_token, {json: true}) as any;
-                expect(jwt.aud).toContain(VALID_RESOURCE);
+                const jwtPayload = app.jwtService().decode(tokenResponse.body.access_token, {json: true}) as any;
+                expect(jwtPayload.aud).toContain(VALID_RESOURCE);
             } finally {
-                await clientApi.deleteClient(clientId).catch(() => {
-                });
+                await clientApi.deleteClient(clientId).catch(() => {});
             }
         });
     });

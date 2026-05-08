@@ -23,6 +23,9 @@ export class Tenant {
     @Column({nullable: false, name: "allow_sign_up", default: false})
     allowSignUp: boolean;
 
+    @Column({nullable: false, name: "skip_session_confirm", default: false})
+    skipSessionConfirm: boolean;
+
     @OneToMany((type) => Role, (role) => role.tenant, {
         cascade: true,
         onDelete: "CASCADE",

@@ -23,7 +23,7 @@ export class LoginSessionService {
         const sid = randomUUID();
         const authTime = Math.floor(Date.now() / 1000);
         const durationSeconds = parseInt(
-            this.configService.get("LOGIN_SESSION_DURATION_SECONDS", "86400"),
+            this.configService.get("LOGIN_SESSION_DURATION_SECONDS", "1296000"),
             10,
         );
         const expiresAt = new Date(Date.now() + durationSeconds * 1000);
@@ -88,6 +88,22 @@ export class LoginSessionService {
             return null;
         }
 
+        return session;
+    }
+
+    /**
+     * Find a session by its sid (UUID), validating it is not expired or invalidated.
+     * Returns null if not found, expired, or invalidated.
+     * Used by the authorize endpoint to detect sessions from the signed cookie.
+     */
+    async findSessionBySid(sid: string): Promise<LoginSession | null> {
+        const session = await this.repo.findOne({where: {sid}});
+        if (!session) {
+            return null;
+        }
+        if (session.invalidatedAt !== null || session.expiresAt < new Date()) {
+            return null;
+        }
         return session;
     }
 

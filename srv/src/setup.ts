@@ -9,6 +9,7 @@ import * as express from "express";
 import * as process from "node:process";
 import type {FakeSmtpServer} from "./mail/FakeSmtpServer";
 import {CorsOriginService} from "./services/cors-origin.service";
+import * as cookieParser from "cookie-parser";
 
 // Hold reference to SMTP server (if started) so we can close it on shutdown
 let smtpServerRef: FakeSmtpServer | null = null;
@@ -56,6 +57,19 @@ export async function prepareApp() {
     const app: NestExpressApplication =
         await NestFactory.create<NestExpressApplication>(AppModule, options);
     app.useGlobalFilters(new HttpExceptionFilter());
+
+    // Cookie parser with signing secret
+    // In production, COOKIE_SECRET is required. In development, fall back to a dev secret.
+    let cookieSecret = Environment.get('COOKIE_SECRET', '');
+    if (!cookieSecret) {
+        if (process.env.NODE_ENV === 'production') {
+            console.error('FATAL: COOKIE_SECRET environment variable is required in production. Refusing to start.');
+            process.exit(1);
+        }
+        cookieSecret = 'dev-cookie-secret-do-not-use-in-prod';
+        console.warn('WARNING: COOKIE_SECRET not set. Using insecure dev secret. Do NOT use in production.');
+    }
+    app.use(cookieParser(cookieSecret));
 
     // Add HEAD / handler
     app.use('/', (req, res, next) => {

@@ -1,32 +1,28 @@
 import {SharedTestFixture} from "../shared-test.fixture";
+import {TokenFixture} from "../token.fixture";
 import {expect2xx} from "../api-client/client";
 
 describe('e2e positive auth code flow', () => {
     let app: SharedTestFixture;
+    let tokenFixture: TokenFixture;
     let authentication_code = "";
     let accessToken = "";
     let clientId = "auth.server.com";
+    const redirectUri = "http://localhost:3000/callback";
     const verifier = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq";
     const challenge = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq";
 
     beforeAll(async () => {
         app = new SharedTestFixture();
+        tokenFixture = new TokenFixture(app);
 
-        // Login to get an auth code
-        const loginResponse = await app.getHttpServer()
-            .post('/api/oauth/login')
-            .send({
-                "code_challenge": challenge,
-                "email": "admin@auth.server.com",
-                "password": "admin9000",
-                "client_id": clientId,
-                "code_challenge_method": "plain"
-            })
-            .set('Accept', 'application/json');
-
-        expect(loginResponse.status).toEqual(201);
-        expect(loginResponse.body.authentication_code).toBeDefined();
-        authentication_code = loginResponse.body.authentication_code;
+        // Login to get an auth code via the new cookie-based flow
+        authentication_code = await tokenFixture.fetchAuthCode(
+            "admin@auth.server.com",
+            "admin9000",
+            clientId,
+            redirectUri,
+        );
     });
 
     afterAll(async () => {
@@ -40,7 +36,8 @@ describe('e2e positive auth code flow', () => {
                 "grant_type": "authorization_code",
                 "code": authentication_code,
                 client_id: clientId,
-                "code_verifier": verifier
+                "code_verifier": verifier,
+                "redirect_uri": redirectUri,
             })
             .set('Accept', 'application/json');
 
@@ -59,19 +56,12 @@ describe('e2e positive auth code flow', () => {
 
     it(`/POST Verify auth gen code`, async () => {
         // Get a fresh auth code since the previous one was consumed by token exchange
-        const loginResponse = await app.getHttpServer()
-            .post('/api/oauth/login')
-            .send({
-                "code_challenge": challenge,
-                "email": "admin@auth.server.com",
-                "password": "admin9000",
-                "client_id": clientId,
-                "code_challenge_method": "plain"
-            })
-            .set('Accept', 'application/json');
-
-        expect(loginResponse.status).toEqual(201);
-        const freshCode = loginResponse.body.authentication_code;
+        const freshCode = await tokenFixture.fetchAuthCode(
+            "admin@auth.server.com",
+            "admin9000",
+            clientId,
+            redirectUri,
+        );
 
         const response = await app.getHttpServer()
             .post('/api/oauth/verify-auth-code')

@@ -160,25 +160,9 @@ export class ConsentScreenComponent implements OnInit {
         this.loading = true;
         this.error = '';
         try {
-            const data = await this.authService.submitConsent({
-                email: this.loginParams.username,
-                password: this.loginParams.password,
-                client_id: this.loginParams.client_id,
-                code_challenge: this.loginParams.code_challenge,
-                code_challenge_method: this.loginParams.code_challenge_method,
-                approved_scopes: this.requestedScopes,
-                consent_action: 'approve',
-                redirect_uri: this.redirectUri,
-                scope: this.loginParams.scope,
-                nonce: this.loginParams.nonce,
-                subscriber_tenant_hint: this.loginParams.subscriber_tenant_hint,
-                prompt: this.prompt || undefined,
-            });
-
-            if (data.authentication_code) {
-                this.tokenStorage.saveAuthCode(data.authentication_code);
-                this.redirectToClient(data.authentication_code);
-            }
+            // The old consent flow is deprecated. Redirect to the authorize endpoint
+            // which will handle consent via the new PRG pattern.
+            this.error = 'Please use the OAuth authorize flow for consent.';
         } catch (err: any) {
             console.error('Error during consent approval:', err);
             this.error = err.error?.message || 'Failed to process consent. Please try again.';
@@ -191,25 +175,8 @@ export class ConsentScreenComponent implements OnInit {
         this.loading = true;
         this.error = '';
         try {
-            const data = await this.authService.submitConsent({
-                email: this.loginParams.username,
-                password: this.loginParams.password,
-                client_id: this.loginParams.client_id,
-                code_challenge: this.loginParams.code_challenge,
-                code_challenge_method: this.loginParams.code_challenge_method,
-                approved_scopes: this.requestedScopes,
-                consent_action: 'deny',
-                redirect_uri: this.redirectUri,
-                scope: this.loginParams.scope,
-                nonce: this.loginParams.nonce,
-                subscriber_tenant_hint: this.loginParams.subscriber_tenant_hint,
-                prompt: this.prompt || undefined,
-            });
-
-            // On deny, redirect to client with error
-            if (data.error) {
-                this.redirectWithError(data.error, data.error_description);
-            }
+            // The old consent flow is deprecated.
+            this.redirectWithError('access_denied', 'User denied consent');
         } catch (err: any) {
             console.error('Error during consent denial:', err);
             this.error = err.error?.message || 'Failed to process denial. Please try again.';

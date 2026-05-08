@@ -55,24 +55,17 @@ describe('Refresh Token Issuance', () => {
 
     describe('authorization code grant issuance', () => {
         const clientId = 'auth.server.com';
+        const redirectUri = 'http://localhost:3000/callback';
         const verifier = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq';
-        const challenge = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq';
 
         it('returns an opaque refresh_token via code exchange', async () => {
-            // Login to get auth code
-            const loginResponse = await app.getHttpServer()
-                .post('/api/oauth/login')
-                .send({
-                    email: 'admin@auth.server.com',
-                    password: 'admin9000',
-                    client_id: clientId,
-                    code_challenge_method: 'plain',
-                    code_challenge: challenge,
-                })
-                .set('Accept', 'application/json');
-
-            expect(loginResponse.status).toEqual(201);
-            const code = loginResponse.body.authentication_code;
+            // Get auth code via the new cookie-based flow
+            const code = await tokenFixture.fetchAuthCode(
+                'admin@auth.server.com',
+                'admin9000',
+                clientId,
+                redirectUri,
+            );
 
             // Exchange code for tokens
             const tokenResponse = await app.getHttpServer()
@@ -82,6 +75,7 @@ describe('Refresh Token Issuance', () => {
                     code,
                     code_verifier: verifier,
                     client_id: clientId,
+                    redirect_uri: redirectUri,
                 })
                 .set('Accept', 'application/json');
 

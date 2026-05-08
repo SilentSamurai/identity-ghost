@@ -3,6 +3,13 @@ import {TokenFixture} from '../token.fixture';
 
 const UUID_V4_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+const CLIENT_ID = 'session-claims-test.local';
+const EMAIL = 'admin@session-claims-test.local';
+const PASSWORD = 'admin9000';
+const REDIRECT_URI = 'http://localhost:3000/callback';
+const CODE_VERIFIER = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq';
+const CODE_CHALLENGE = CODE_VERIFIER; // plain method
+
 /**
  * Integration tests for auth_time and sid claims in ID Tokens (Requirements 2, 3).
  *
@@ -26,22 +33,12 @@ describe('Login Session Token Claims', () => {
     });
 
     it('auth code grant — ID token auth_time and sid from session', async () => {
-        // Login via auth code flow
-        const loginResult = await tokenFixture.login(
-            'admin@session-claims-test.local',
-            'admin9000',
-            'session-claims-test.local',
+        // Full cookie-based flow: login → authorize → token exchange
+        const tokenResult = await tokenFixture.fetchTokenWithLoginFlow(
+            EMAIL, PASSWORD, CLIENT_ID, REDIRECT_URI,
         );
-        expect(loginResult.authentication_code).toBeDefined();
-
-        // Exchange the auth code for tokens
-        const tokenResult = await tokenFixture.exchangeCodeForToken(
-            loginResult.authentication_code,
-            'session-claims-test.local',
-        ) as any;
         expect(tokenResult.id_token).toBeDefined();
 
-        // Decode the ID token
         const decoded = app.jwtService().decode(tokenResult.id_token, {json: true}) as any;
 
         // auth_time must be an integer (Unix epoch seconds)
@@ -59,9 +56,9 @@ describe('Login Session Token Claims', () => {
             .post('/api/oauth/token')
             .send({
                 grant_type: 'password',
-                username: 'admin@session-claims-test.local',
-                password: 'admin9000',
-                client_id: 'session-claims-test.local',
+                username: EMAIL,
+                password: PASSWORD,
+                client_id: CLIENT_ID,
             })
             .set('Accept', 'application/json');
 
@@ -70,40 +67,31 @@ describe('Login Session Token Claims', () => {
 
         const decoded = app.jwtService().decode(response.body.id_token, {json: true}) as any;
 
-        // auth_time must be an integer (Unix epoch seconds)
         expect(decoded.auth_time).toBeDefined();
         expect(Number.isInteger(decoded.auth_time)).toBe(true);
-
-        // sid must be a UUID v4 string
         expect(decoded.sid).toBeDefined();
         expect(typeof decoded.sid).toBe('string');
         expect(decoded.sid).toMatch(UUID_V4_REGEX);
     });
 
     it('refresh grant — ID token preserves original auth_time and sid', async () => {
-        // Step 1: Get tokens via password grant (returns refresh_token)
+        // Step 1: Get tokens via password grant
         const passwordResponse = await app.getHttpServer()
             .post('/api/oauth/token')
             .send({
                 grant_type: 'password',
-                username: 'admin@session-claims-test.local',
-                password: 'admin9000',
-                client_id: 'session-claims-test.local',
+                username: EMAIL,
+                password: PASSWORD,
+                client_id: CLIENT_ID,
             })
             .set('Accept', 'application/json');
 
         expect(passwordResponse.status).toEqual(200);
-        expect(passwordResponse.body.id_token).toBeDefined();
-        expect(passwordResponse.body.refresh_token).toBeDefined();
-        expect(passwordResponse.body.access_token).toBeDefined();
-
-        // Decode the original ID token
         const originalDecoded = app.jwtService().decode(passwordResponse.body.id_token, {json: true}) as any;
         expect(originalDecoded.auth_time).toBeDefined();
         expect(originalDecoded.sid).toBeDefined();
 
-        // Step 2: Get tenant credentials for the refresh request.
-        // The default client is public — no client_secret needed (RFC 6749 §6).
+        // Step 2: Get the default client's ID (public — no secret needed)
         const credentialsResponse = await app.getHttpServer()
             .get('/api/tenant/my/credentials')
             .set('Authorization', `Bearer ${passwordResponse.body.access_token}`)
@@ -125,10 +113,9 @@ describe('Login Session Token Claims', () => {
         expect(refreshResponse.status).toEqual(200);
         expect(refreshResponse.body.id_token).toBeDefined();
 
-        // Step 4: Decode the refreshed ID token
         const refreshedDecoded = app.jwtService().decode(refreshResponse.body.id_token, {json: true}) as any;
 
-        // Step 5: Verify auth_time and sid are preserved from the original session
+        // auth_time and sid must be preserved from the original session
         expect(refreshedDecoded.auth_time).toEqual(originalDecoded.auth_time);
         expect(refreshedDecoded.sid).toEqual(originalDecoded.sid);
     });
@@ -138,15 +125,13 @@ describe('Login Session Token Claims', () => {
             .post('/api/oauth/token')
             .send({
                 grant_type: 'password',
-                username: 'admin@session-claims-test.local',
-                password: 'admin9000',
-                client_id: 'session-claims-test.local',
+                username: EMAIL,
+                password: PASSWORD,
+                client_id: CLIENT_ID,
             })
             .set('Accept', 'application/json');
 
         expect(response.status).toEqual(200);
-        expect(response.body.id_token).toBeDefined();
-
         const decoded = app.jwtService().decode(response.body.id_token, {json: true}) as any;
 
         expect(decoded.auth_time).toBeDefined();
@@ -158,15 +143,13 @@ describe('Login Session Token Claims', () => {
             .post('/api/oauth/token')
             .send({
                 grant_type: 'password',
-                username: 'admin@session-claims-test.local',
-                password: 'admin9000',
-                client_id: 'session-claims-test.local',
+                username: EMAIL,
+                password: PASSWORD,
+                client_id: CLIENT_ID,
             })
             .set('Accept', 'application/json');
 
         expect(response.status).toEqual(200);
-        expect(response.body.id_token).toBeDefined();
-
         const decoded = app.jwtService().decode(response.body.id_token, {json: true}) as any;
 
         expect(decoded.sid).toBeDefined();
@@ -174,90 +157,160 @@ describe('Login Session Token Claims', () => {
         expect(decoded.sid).toMatch(UUID_V4_REGEX);
     });
 
-    // prompt=login and max_age tests use an isolated user to avoid invalidating
-    // sessions that belong to other concurrent test files.
     it('prompt=login — new session created — ID token auth_time reflects fresh session', async () => {
-        const codeChallenge = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq';
-        const codeVerifier = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq';
+        const extractSidCookie = (headers: any): string => {
+            const raw: string | string[] = headers['set-cookie'] ?? [];
+            const list = Array.isArray(raw) ? raw : [raw];
+            return list.find((c: string) => c.startsWith('sid='));
+        };
 
-        // Login with prompt=login to force a fresh session
-        const loginResponse = await app.getHttpServer()
+        // Step 1: Login to create a session (sets sid cookie)
+        const loginRes = await app.getHttpServer()
             .post('/api/oauth/login')
-            .send({
-                email: 'admin@session-claims-test.local',
-                password: 'admin9000',
-                client_id: 'session-claims-test.local',
-                code_challenge: codeChallenge,
+            .send({email: EMAIL, password: PASSWORD, client_id: CLIENT_ID})
+            .set('Accept', 'application/json');
+
+        expect(loginRes.status).toBeGreaterThanOrEqual(200);
+        expect(loginRes.status).toBeLessThan(300);
+
+        const sidCookie = extractSidCookie(loginRes.headers);
+        expect(sidCookie).toBeDefined();
+
+        const beforeLogin = Math.floor(Date.now() / 1000);
+
+        // Step 2: GET /authorize with prompt=login — forces a new session
+        const authorizeRes = await app.getHttpServer()
+            .get('/api/oauth/authorize')
+            .query({
+                response_type: 'code',
+                client_id: CLIENT_ID,
+                redirect_uri: REDIRECT_URI,
+                scope: 'openid profile email',
+                state: 'test-state',
+                code_challenge: CODE_CHALLENGE,
                 code_challenge_method: 'plain',
                 prompt: 'login',
             })
+            .set('Cookie', sidCookie)
+            .redirects(0);
+
+        // prompt=login redirects to the login UI (not directly to redirect_uri)
+        expect(authorizeRes.status).toEqual(302);
+        const location: string = authorizeRes.headers['location'];
+        expect(location).toBeDefined();
+        // Should redirect to login page, not to the redirect_uri with a code
+        expect(location).not.toContain('code=');
+
+        // Step 3: Re-login to get a fresh session after prompt=login redirect
+        const reLoginRes = await app.getHttpServer()
+            .post('/api/oauth/login')
+            .send({email: EMAIL, password: PASSWORD, client_id: CLIENT_ID})
             .set('Accept', 'application/json');
 
-        expect(loginResponse.status).toEqual(201);
-        expect(loginResponse.body.authentication_code).toBeDefined();
+        expect(reLoginRes.status).toBeGreaterThanOrEqual(200);
+        const freshSidCookie = extractSidCookie(reLoginRes.headers);
+        expect(freshSidCookie).toBeDefined();
 
-        // Exchange the auth code for tokens
+        // Step 4: GET /authorize again with the fresh session (no prompt=login this time)
+        const authorize2Res = await app.getHttpServer()
+            .get('/api/oauth/authorize')
+            .query({
+                response_type: 'code',
+                client_id: CLIENT_ID,
+                redirect_uri: REDIRECT_URI,
+                scope: 'openid profile email',
+                state: 'test-state-2',
+                code_challenge: CODE_CHALLENGE,
+                code_challenge_method: 'plain',
+                session_confirmed: 'true',
+            })
+            .set('Cookie', freshSidCookie)
+            .redirects(0);
+
+        expect(authorize2Res.status).toEqual(302);
+        const location2: string = authorize2Res.headers['location'];
+        const redirectUrl = new URL(location2, 'http://localhost');
+        const code = redirectUrl.searchParams.get('code');
+        expect(code).toBeDefined();
+
+        // Step 5: Exchange code for tokens
         const tokenResponse = await app.getHttpServer()
             .post('/api/oauth/token')
             .send({
                 grant_type: 'authorization_code',
-                code: loginResponse.body.authentication_code,
-                code_verifier: codeVerifier,
-                client_id: 'session-claims-test.local',
+                code,
+                code_verifier: CODE_VERIFIER,
+                client_id: CLIENT_ID,
+                redirect_uri: REDIRECT_URI,
             })
             .set('Accept', 'application/json');
 
         expect(tokenResponse.status).toEqual(200);
-        expect(tokenResponse.body.id_token).toBeDefined();
-
         const decoded = app.jwtService().decode(tokenResponse.body.id_token, {json: true}) as any;
 
-        // auth_time should be a recent integer (within last 10 seconds)
+        // auth_time should reflect the fresh session (within last 10 seconds)
         expect(decoded.auth_time).toBeDefined();
         expect(Number.isInteger(decoded.auth_time)).toBe(true);
         const now = Math.floor(Date.now() / 1000);
-        expect(decoded.auth_time).toBeGreaterThan(now - 10);
+        expect(decoded.auth_time).toBeGreaterThan(beforeLogin - 2);
         expect(decoded.auth_time).toBeLessThanOrEqual(now + 1);
-
-        // sid should be a UUID
         expect(decoded.sid).toBeDefined();
         expect(decoded.sid).toMatch(UUID_V4_REGEX);
     });
 
     it('max_age — ID token contains auth_time', async () => {
-        const codeChallenge = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq';
-        const codeVerifier = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq';
+        const extractSidCookie = (headers: any): string => {
+            const raw: string | string[] = headers['set-cookie'] ?? [];
+            const list = Array.isArray(raw) ? raw : [raw];
+            return list.find((c: string) => c.startsWith('sid='));
+        };
 
-        // Login with max_age=3600 (isolated user to avoid session poisoning)
-        const loginResponse = await app.getHttpServer()
+        // Login to create a session
+        const loginRes = await app.getHttpServer()
             .post('/api/oauth/login')
-            .send({
-                email: 'admin@session-claims-test.local',
-                password: 'admin9000',
-                client_id: 'session-claims-test.local',
-                code_challenge: codeChallenge,
-                code_challenge_method: 'plain',
-                max_age: 3600,
-            })
+            .send({email: EMAIL, password: PASSWORD, client_id: CLIENT_ID})
             .set('Accept', 'application/json');
 
-        expect(loginResponse.status).toEqual(201);
-        expect(loginResponse.body.authentication_code).toBeDefined();
+        expect(loginRes.status).toBeGreaterThanOrEqual(200);
+        const sidCookie = extractSidCookie(loginRes.headers);
+        expect(sidCookie).toBeDefined();
 
-        // Exchange the auth code for tokens
+        // GET /authorize with max_age=3600
+        const authorizeRes = await app.getHttpServer()
+            .get('/api/oauth/authorize')
+            .query({
+                response_type: 'code',
+                client_id: CLIENT_ID,
+                redirect_uri: REDIRECT_URI,
+                scope: 'openid profile email',
+                state: 'test-state',
+                code_challenge: CODE_CHALLENGE,
+                code_challenge_method: 'plain',
+                max_age: 3600,
+                session_confirmed: 'true',
+            })
+            .set('Cookie', sidCookie)
+            .redirects(0);
+
+        expect(authorizeRes.status).toEqual(302);
+        const location: string = authorizeRes.headers['location'];
+        const redirectUrl = new URL(location, 'http://localhost');
+        const code = redirectUrl.searchParams.get('code');
+        expect(code).toBeDefined();
+
+        // Exchange code for tokens
         const tokenResponse = await app.getHttpServer()
             .post('/api/oauth/token')
             .send({
                 grant_type: 'authorization_code',
-                code: loginResponse.body.authentication_code,
-                code_verifier: codeVerifier,
-                client_id: 'session-claims-test.local',
+                code,
+                code_verifier: CODE_VERIFIER,
+                client_id: CLIENT_ID,
+                redirect_uri: REDIRECT_URI,
             })
             .set('Accept', 'application/json');
 
         expect(tokenResponse.status).toEqual(200);
-        expect(tokenResponse.body.id_token).toBeDefined();
-
         const decoded = app.jwtService().decode(tokenResponse.body.id_token, {json: true}) as any;
 
         // auth_time must be present when max_age was used

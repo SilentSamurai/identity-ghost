@@ -307,18 +307,7 @@ export class LoginComponent implements OnInit {
 
         const code_challenge = await this.tokenStorage.getCodeChallenge(this.code_challenge_method);
 
-        // if auth code is present, then redirect
-        // verify auth-code
-        const authCode = this.tokenStorage.getAuthCode();
-        if (authCode) {
-            const clientId = this.client_id || this.loginForm.get('client_id')?.value;
-            if (clientId) {
-                await this.redirect(authCode, clientId);
-            }
-        }
-        // else if (this.tokenStorage.isLoggedIn() && !externalLogin) {
-        //     await this.router.navigateByUrl("/home");
-        // }
+        // Internal login no longer uses cached auth codes — skip auth code check
         this.loading = false;
     }
 
@@ -335,18 +324,20 @@ export class LoginComponent implements OnInit {
         }
         const code_challenge = await this.tokenStorage.getCodeChallenge(this.code_challenge_method);
         try {
-            const data = await this.authService.login(
-                username,
-                password,
-                clientId,
-                code_challenge,
-                this.code_challenge_method,
-            );
-            let authenticationCode = data.authentication_code;
-            this.isLoginFailed = false;
-            this.isLoggedIn = true;
-            this.tokenStorage.saveAuthCode(authenticationCode);
-            await this.redirect(authenticationCode, clientId);
+            // Login sets the sid cookie and returns {success: true}
+            await this.authService.login(username, password, clientId);
+
+            // After login, redirect to authorize to get an auth code for the admin UI
+            const params = new URLSearchParams();
+            params.set('client_id', clientId);
+            params.set('response_type', 'code');
+            params.set('redirect_uri', window.location.origin + '/home');
+            if (code_challenge) {
+                params.set('code_challenge', code_challenge);
+                params.set('code_challenge_method', this.code_challenge_method);
+            }
+            params.set('session_confirmed', 'true');
+            window.location.href = `/api/oauth/authorize?${params.toString()}`;
         } catch (err: any) {
             console.error(err);
             this.errorMessage = err.error?.message || 'Login failed';

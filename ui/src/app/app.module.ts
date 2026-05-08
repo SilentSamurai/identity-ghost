@@ -35,6 +35,8 @@ import {ConsentScreenComponent} from './open-pages/consent-screen.component';
 import {WelcomeComponent} from './open-pages/welcome.component';
 import {SignUpComponent} from './open-pages/signup.component';
 import {OpenNavbarComponent} from './open-pages/open-navbar.component';
+import {ConsentComponent} from './open-pages/consent.component';
+import {LogoutComponent} from './open-pages/logout.component';
 
 @NgModule({
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
@@ -53,7 +55,9 @@ import {OpenNavbarComponent} from './open-pages/open-navbar.component';
         CenteredCardComponent,
         WelcomeComponent,
         SignUpComponent,
-        OpenNavbarComponent
+        OpenNavbarComponent,
+        ConsentComponent,
+        LogoutComponent,
     ],
     imports: [
         BrowserModule,

@@ -3,12 +3,17 @@ import {TokenFixture} from '../token.fixture';
 
 const UUID_V4_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+const CLIENT_ID = 'session-threading-test.local';
+const EMAIL = 'admin@session-threading-test.local';
+const PASSWORD = 'admin9000';
+const REDIRECT_URI = 'http://localhost:3000/callback';
+
 /**
- * Integration tests for login session threading through auth code and refresh token flows
- * (Requirements 4, 5).
+ * Integration tests for login session threading through the authorization code
+ * and refresh token flows (Requirements 4, 5).
  *
- * Validates that the `sid` created at login is stored on auth codes and refresh tokens,
- * and that it is preserved across token refresh and rotation.
+ * Validates that the `sid` created at login is stored on auth codes and refresh
+ * tokens, and that it is preserved across token refresh and rotation.
  *
  * _Requirements: 4.1, 4.2, 4.3, 5.1, 5.2, 5.3_
  */
@@ -26,23 +31,15 @@ describe('Login Session Threading', () => {
     });
 
     it('auth code flow — sid is threaded from login to ID token', async () => {
-        // Step 1: Login via auth code flow
-        const loginResult = await tokenFixture.login(
-            'admin@session-threading-test.local',
-            'admin9000',
-            'session-threading-test.local',
+        // Full cookie-based flow: login → authorize → token exchange
+        const tokenResponse = await tokenFixture.fetchTokenWithLoginFlow(
+            EMAIL, PASSWORD, CLIENT_ID, REDIRECT_URI,
         );
-        expect(loginResult.authentication_code).toBeDefined();
 
-        // Step 2: Exchange the auth code for tokens
-        const tokenResult = await tokenFixture.exchangeCodeForToken(
-            loginResult.authentication_code,
-            'session-threading-test.local',
-        ) as any;
-        expect(tokenResult.id_token).toBeDefined();
+        expect(tokenResponse.id_token).toBeDefined();
 
-        // Step 3: Decode the ID token and verify sid is a UUID v4
-        const decoded = app.jwtService().decode(tokenResult.id_token, {json: true}) as any;
+        // Decode the ID token and verify sid is a UUID v4
+        const decoded = app.jwtService().decode(tokenResponse.id_token, {json: true}) as any;
         expect(decoded.sid).toBeDefined();
         expect(typeof decoded.sid).toBe('string');
         expect(decoded.sid).toMatch(UUID_V4_REGEX);
@@ -54,9 +51,9 @@ describe('Login Session Threading', () => {
             .post('/api/oauth/token')
             .send({
                 grant_type: 'password',
-                username: 'admin@session-threading-test.local',
-                password: 'admin9000',
-                client_id: 'session-threading-test.local',
+                username: EMAIL,
+                password: PASSWORD,
+                client_id: CLIENT_ID,
             })
             .set('Accept', 'application/json');
 
@@ -70,8 +67,8 @@ describe('Login Session Threading', () => {
         expect(originalDecoded.sid).toBeDefined();
         expect(originalDecoded.sid).toMatch(UUID_V4_REGEX);
 
-        // Step 2: Get tenant credentials for the refresh request.
-        // The default client is public, so no client_secret is needed (RFC 6749 §6).
+        // Step 2: Get the default client's ID for the refresh request.
+        // The default client is public (tokenEndpointAuthMethod=none), so no client_secret is needed.
         const credentialsResponse = await app.getHttpServer()
             .get('/api/tenant/my/credentials')
             .set('Authorization', `Bearer ${passwordResponse.body.access_token}`)
@@ -105,9 +102,9 @@ describe('Login Session Threading', () => {
             .post('/api/oauth/token')
             .send({
                 grant_type: 'password',
-                username: 'admin@session-threading-test.local',
-                password: 'admin9000',
-                client_id: 'session-threading-test.local',
+                username: EMAIL,
+                password: PASSWORD,
+                client_id: CLIENT_ID,
             })
             .set('Accept', 'application/json');
 
@@ -117,7 +114,7 @@ describe('Login Session Threading', () => {
         expect(originalSid).toBeDefined();
         expect(originalSid).toMatch(UUID_V4_REGEX);
 
-        // Step 2: Get tenant credentials (public client — no secret needed)
+        // Step 2: Get the default client's ID (public client — no secret needed)
         const credentialsResponse = await app.getHttpServer()
             .get('/api/tenant/my/credentials')
             .set('Authorization', `Bearer ${passwordResponse.body.access_token}`)

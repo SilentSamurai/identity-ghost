@@ -1,4 +1,5 @@
 import {SharedTestFixture} from "../shared-test.fixture";
+import {TokenFixture} from "../token.fixture";
 import {expect2xx} from "../api-client/client";
 
 /**
@@ -11,42 +12,25 @@ import {expect2xx} from "../api-client/client";
  */
 describe('client_id binding verification at token exchange', () => {
     let app: SharedTestFixture;
+    let tokenFixture: TokenFixture;
     const clientId = "client-binding-test.local";
+    const redirectUri = "http://localhost:3000/callback";
     const email = "admin@client-binding-test.local";
     const password = "admin9000";
     const verifier = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq";
-    const challenge = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq";
 
     beforeAll(async () => {
         app = new SharedTestFixture();
+        tokenFixture = new TokenFixture(app);
     });
 
     afterAll(async () => {
         await app.close();
     });
 
-    /**
-     * Helper: login with client A and return the authorization code.
-     */
-    async function loginAndGetCode(): Promise<string> {
-        const response = await app.getHttpServer()
-            .post('/api/oauth/login')
-            .send({
-                email,
-                password,
-                client_id: clientId,
-                code_challenge: challenge,
-                code_challenge_method: "plain",
-            })
-            .set('Accept', 'application/json');
-        expect(response.status).toEqual(201);
-        expect(response.body.authentication_code).toBeDefined();
-        return response.body.authentication_code;
-    }
-
     // Requirement 3.2: token exchange with a different client_id must be rejected
     it('should return invalid_grant when client_id does not match the stored value', async () => {
-        const code = await loginAndGetCode();
+        const code = await tokenFixture.fetchAuthCode(email, password, clientId, redirectUri);
 
         const response = await app.getHttpServer()
             .post('/api/oauth/token')
@@ -55,6 +39,7 @@ describe('client_id binding verification at token exchange', () => {
                 code,
                 code_verifier: verifier,
                 client_id: "wrong.client.com",
+                redirect_uri: redirectUri,
             })
             .set('Accept', 'application/json');
 
@@ -64,7 +49,7 @@ describe('client_id binding verification at token exchange', () => {
 
     // Requirement 3.1: token exchange with the matching client_id must succeed
     it('should succeed when client_id matches the stored value', async () => {
-        const code = await loginAndGetCode();
+        const code = await tokenFixture.fetchAuthCode(email, password, clientId, redirectUri);
 
         const response = await app.getHttpServer()
             .post('/api/oauth/token')
@@ -73,6 +58,7 @@ describe('client_id binding verification at token exchange', () => {
                 code,
                 code_verifier: verifier,
                 client_id: clientId,
+                redirect_uri: redirectUri,
             })
             .set('Accept', 'application/json');
 

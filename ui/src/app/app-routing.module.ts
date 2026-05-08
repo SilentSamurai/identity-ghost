@@ -21,13 +21,16 @@ import {ResetPasswordComponent} from './open-pages/reset-password.component';
 import {WelcomeComponent} from './open-pages/welcome.component';
 import {SignUpComponent} from './open-pages/signup.component';
 import {AdminGuard} from './super-admin/admin-guard.service';
+import {ConsentComponent} from './open-pages/consent.component';
+import {LogoutComponent} from './open-pages/logout.component';
 
 const routes: Routes = [
     {path: 'welcome', component: WelcomeComponent},
     {path: 'signup', component: SignUpComponent},
     {path: 'session-confirm', component: SessionConfirmationComponent},
     {path: 'authorize', component: AuthorizeLoginComponent},
-    {path: 'consent', component: ConsentScreenComponent},
+    {path: 'consent', component: ConsentComponent},
+    {path: 'logout', component: LogoutComponent},
     {path: 'login', component: LoginComponent},
     {path: 'register', component: RegisterComponent},
     {path: 'forgot-password', component: ForgotPasswordComponent},

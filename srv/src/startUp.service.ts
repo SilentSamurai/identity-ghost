@@ -98,8 +98,13 @@ export class StartUpService implements OnModuleInit {
             const permission = this.securityService.createPermissionForStartupSeed();
 
             // 3) Define a list of dummy tenants to create
-            const dummyTenants = [
-                {name: "Shire Tenant", domain: "shire.local", signUp: true},
+            const dummyTenants: { name: string; domain: string; signUp: boolean; redirectUris?: string[] }[] = [
+                {
+                    name: "Shire Tenant",
+                    domain: "shire.local",
+                    signUp: true,
+                    redirectUris: ['http://localhost:3000/', 'http://localhost:3000', 'http://localhost:3000/no-pkce.html']
+                },
                 {name: "Bree Tenant", domain: "bree.local", signUp: false},
                 {name: "Rivendell Tenant", domain: "rivendell.local", signUp: false},
                 {name: "Mordor Tenant", domain: "mordor.local", signUp: false},
@@ -110,45 +115,65 @@ export class StartUpService implements OnModuleInit {
                 {name: "Erebor Tenant", domain: "erebor.local", signUp: false},
                 {name: "Isengard Tenant", domain: "isengard.local", signUp: false},
                 {name: "Perm Test Tenant", domain: "perm-test.local", signUp: false},
-                {name: "Prompt Test Tenant", domain: "prompt-test.local", signUp: false},
-                {name: "Nonce Test Tenant", domain: "nonce-test.local", signUp: false},
-                {name: "Compliance Test Tenant", domain: "compliance-test.local", signUp: false},
+                {name: "Prompt Test Tenant", domain: "prompt-test.local", signUp: false, redirectUris: ['http://localhost:3000/callback']},
+                {name: "Nonce Test Tenant", domain: "nonce-test.local", signUp: false, redirectUris: ['http://localhost:3000/callback']},
+                {name: "Compliance Test Tenant", domain: "compliance-test.local", signUp: false, redirectUris: ['http://localhost:3000/callback']},
                 {name: "IDToken Test Tenant", domain: "idtoken-test.local", signUp: false},
-                {name: "Auth Cleanup Test Tenant", domain: "auth-cleanup-test.local", signUp: false},
-                {name: "ID Token Aud Test Tenant", domain: "idtoken-aud-test.local", signUp: false},
+                {name: "Auth Cleanup Test Tenant", domain: "auth-cleanup-test.local", signUp: false, redirectUris: ['http://localhost:3000/callback']},
+                {name: "ID Token Aud Test Tenant", domain: "idtoken-aud-test.local", signUp: false, redirectUris: ['http://localhost:3000/callback']},
                 {name: "Perms Test Tenant", domain: "perms-test.local", signUp: false},
-                {name: "Session Claims Test Tenant", domain: "session-claims-test.local", signUp: false},
+                {name: "Session Claims Test Tenant", domain: "session-claims-test.local", signUp: false, redirectUris: ['http://localhost:3000/callback']},
                 {name: "Prompt Prop Test Tenant", domain: "prompt-prop-test.local", signUp: false},
-                {name: "Auth Code Expiry Test Tenant", domain: "auth-code-expiry-test.local", signUp: false},
+                {name: "Auth Code Expiry Test Tenant", domain: "auth-code-expiry-test.local", signUp: false, redirectUris: ['http://localhost:3000/callback']},
                 {name: "Offline Access Test Tenant", domain: "offline-access-test.local", signUp: false},
-                {name: "Redirect URI Binding Test Tenant", domain: "redirect-uri-test.local", signUp: false},
-                {name: "Redirect URI Bypass Test Tenant", domain: "redirect-uri-bypass-test.local", signUp: false},
+                {
+                    name: "Redirect URI Binding Test Tenant",
+                    domain: "redirect-uri-test.local",
+                    signUp: false,
+                    redirectUris: ['https://myapp.example.com/callback']
+                },
+                {
+                    name: "Redirect URI Bypass Test Tenant",
+                    domain: "redirect-uri-bypass-test.local",
+                    signUp: false,
+                    redirectUris: ['https://legit-app.example.com/callback']
+                },
                 {name: "OIDC Compat Test Tenant", domain: "oidc-compat-test.local", signUp: false},
                 {
                     name: "Client Creds Migration Test Tenant",
                     domain: "client-creds-migration-test.local",
                     signUp: false
                 },
-                {name: "Client Binding Test Tenant", domain: "client-binding-test.local", signUp: false},
-                {name: "Auth Code Single Use Test Tenant", domain: "auth-code-single-use-test.local", signUp: false},
+                {name: "Client Binding Test Tenant", domain: "client-binding-test.local", signUp: false, redirectUris: ['http://localhost:3000/callback']},
+                {name: "Auth Code Single Use Test Tenant", domain: "auth-code-single-use-test.local", signUp: false, redirectUris: ['http://localhost:3000/callback']},
                 {name: "UserInfo Test Tenant", domain: "userinfo-test.local", signUp: false},
-                {name: "Session Threading Test Tenant", domain: "session-threading-test.local", signUp: false},
+                {
+                    name: "Session Threading Test Tenant",
+                    domain: "session-threading-test.local",
+                    signUp: false,
+                    redirectUris: ['http://localhost:3000/callback']
+                },
                 {name: "Sub Flow A Tenant", domain: "sub-flow-a.local", signUp: true},
                 {name: "Sub Flow B Tenant", domain: "sub-flow-b.local", signUp: false},
                 {name: "Forgot PW Test Tenant", domain: "forgot-pw-test.local", signUp: true},
                 {name: "Onboard Test Tenant", domain: "onboard-test.local", signUp: false},
                 {name: "Onboard App Owner Tenant", domain: "onboard-app-owner.local", signUp: false},
                 {name: "Onboard Subscriber Tenant", domain: "onboard-subscriber.local", signUp: false},
-                {name: "Login Session Test Tenant", domain: "login-session-test.local", signUp: false},
+                {name: "Login Session Test Tenant", domain: "login-session-test.local", signUp: false, redirectUris: ['http://localhost:3000/callback']},
                 {name: "PKCE Bug Condition Test Tenant", domain: "pkce-bug-condition-test.local", signUp: false},
                 {name: "PKCE Preservation Test Tenant", domain: "pkce-preservation-test.local", signUp: false},
-                {name: "PKCE E2E Test Tenant", domain: "pkce-e2e-test.local", signUp: false},
+                {
+                    name: "PKCE E2E Test Tenant",
+                    domain: "pkce-e2e-test.local",
+                    signUp: false,
+                    redirectUris: ['http://localhost:3000/no-pkce.html']
+                },
                 {name: "Client Rotate Test Tenant", domain: "client-rotate-test.local", signUp: false},
-                {name: "Auth Code Reuse Test Tenant", domain: "auth-code-reuse-test.local", signUp: false},
+                {name: "Auth Code Reuse Test Tenant", domain: "auth-code-reuse-test.local", signUp: false, redirectUris: ['http://localhost:3000/callback']},
             ];
 
             // 4) Create each tenant and assign the existing user as owner
-            for (const {name, domain, signUp} of dummyTenants) {
+            for (const {name, domain, signUp, redirectUris} of dummyTenants) {
                 const adminEmail = `admin@${domain}`;
                 const isPresent = await this.usersService.existByEmail(
                     permission,
@@ -200,26 +225,11 @@ export class StartUpService implements OnModuleInit {
                     const defaultClient = await this.clientService.findByAlias(domain);
                     await this.clientService.updateClient(permission, defaultClient.clientId, {
                         allowPasswordGrant: true,
+                        ...(redirectUris?.length ? {redirectUris} : {}),
                     });
-                    this.logger.log(`Enabled allowPasswordGrant on default client for ${domain}`);
-
-                    // Add redirect URI for shire.local to support external app E2E tests
-                    if (domain === 'shire.local') {
-                        await this.clientService.updateClient(permission, defaultClient.clientId, {
-                            redirectUris: ['http://localhost:3000/', 'http://localhost:3000', 'http://localhost:3000/no-pkce.html'],
-                        });
-                        this.logger.log(`Added redirect URIs for external app on ${domain}`);
-                    }
-
-                    // Add redirect URI for pkce-e2e-test.local to support PKCE enforcement E2E tests
-                    if (domain === 'pkce-e2e-test.local') {
-                        await this.clientService.updateClient(permission, defaultClient.clientId, {
-                            redirectUris: ['http://localhost:3000/no-pkce.html'],
-                        });
-                        this.logger.log(`Added redirect URIs for PKCE E2E test on ${domain}`);
-                    }
+                    this.logger.log(`Configured default client for ${domain}`);
                 } catch (e) {
-                    this.logger.warn(`Could not enable allowPasswordGrant on default client for ${domain}: ${e}`);
+                    this.logger.warn(`Could not configure default client for ${domain}: ${e}`);
                 }
             }
         } catch (error) {
@@ -327,6 +337,7 @@ export class StartUpService implements OnModuleInit {
                     );
                     await this.clientService.updateClient(permission, defaultClient.clientId, {
                         allowPasswordGrant: true,
+                        redirectUris: ['http://localhost:3000/callback'],
                     });
                     this.logger.log(`Enabled allowPasswordGrant on default client for ${this.configService.get("SUPER_TENANT_DOMAIN")}`);
                 } catch (e) {

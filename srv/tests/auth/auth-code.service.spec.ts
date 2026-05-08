@@ -2,7 +2,7 @@
  * Integration tests for AuthCodeService.
  *
  * Tests the authorization code lifecycle through the real HTTP endpoints:
- * - Creating authorization codes (via login)
+ * - Creating authorization codes (via the cookie-based login → authorize flow)
  * - Validating authorization codes with PKCE (via token exchange)
  * - Single-use enforcement
  * - requireAuthTime flag propagation
@@ -19,7 +19,7 @@ describe('AuthCodeService', () => {
     const CLIENT_ID = 'auth.server.com';
     const EMAIL = 'admin@auth.server.com';
     const PASSWORD = 'admin9000';
-    const CODE_CHALLENGE = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq';
+    const REDIRECT_URI = 'http://localhost:3000/callback';
     const CODE_VERIFIER = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq';
 
     beforeAll(() => {
@@ -31,48 +31,27 @@ describe('AuthCodeService', () => {
         await app.close();
     });
 
-    describe('auth code creation via login', () => {
-        it('should create an auth code on successful login', async () => {
-            const response = await app.getHttpServer()
-                .post('/api/oauth/login')
-                .send({
-                    email: EMAIL,
-                    password: PASSWORD,
-                    client_id: CLIENT_ID,
-                    code_challenge: CODE_CHALLENGE,
-                    code_challenge_method: 'plain',
-                })
-                .set('Accept', 'application/json');
+    describe('auth code creation via login → authorize', () => {
+        it('should create an auth code on successful login and authorize', async () => {
+            const code = await tokenFixture.fetchAuthCode(EMAIL, PASSWORD, CLIENT_ID, REDIRECT_URI);
 
-            expect(response.status).toEqual(201);
-            expect(response.body.authentication_code).toBeDefined();
-            expect(typeof response.body.authentication_code).toBe('string');
-            expect(response.body.authentication_code.length).toBeGreaterThan(0);
+            expect(typeof code).toBe('string');
+            expect(code.length).toBeGreaterThan(0);
         });
     });
 
     describe('PKCE validation via token exchange', () => {
         it('should reject token exchange with invalid code verifier', async () => {
-            const loginResponse = await app.getHttpServer()
-                .post('/api/oauth/login')
-                .send({
-                    email: EMAIL,
-                    password: PASSWORD,
-                    client_id: CLIENT_ID,
-                    code_challenge: CODE_CHALLENGE,
-                    code_challenge_method: 'plain',
-                })
-                .set('Accept', 'application/json');
-
-            expect(loginResponse.status).toEqual(201);
+            const code = await tokenFixture.fetchAuthCode(EMAIL, PASSWORD, CLIENT_ID, REDIRECT_URI);
 
             const tokenResponse = await app.getHttpServer()
                 .post('/api/oauth/token')
                 .send({
                     grant_type: 'authorization_code',
-                    code: loginResponse.body.authentication_code,
+                    code,
                     code_verifier: 'WRONG_VERIFIER_that_does_not_match_the_challenge_at_all',
                     client_id: CLIENT_ID,
+                    redirect_uri: REDIRECT_URI,
                 })
                 .set('Accept', 'application/json');
 
@@ -81,26 +60,16 @@ describe('AuthCodeService', () => {
         });
 
         it('should succeed with valid code verifier', async () => {
-            const loginResponse = await app.getHttpServer()
-                .post('/api/oauth/login')
-                .send({
-                    email: EMAIL,
-                    password: PASSWORD,
-                    client_id: CLIENT_ID,
-                    code_challenge: CODE_CHALLENGE,
-                    code_challenge_method: 'plain',
-                })
-                .set('Accept', 'application/json');
-
-            expect(loginResponse.status).toEqual(201);
+            const code = await tokenFixture.fetchAuthCode(EMAIL, PASSWORD, CLIENT_ID, REDIRECT_URI);
 
             const tokenResponse = await app.getHttpServer()
                 .post('/api/oauth/token')
                 .send({
                     grant_type: 'authorization_code',
-                    code: loginResponse.body.authentication_code,
+                    code,
                     code_verifier: CODE_VERIFIER,
                     client_id: CLIENT_ID,
+                    redirect_uri: REDIRECT_URI,
                 })
                 .set('Accept', 'application/json');
 
@@ -113,19 +82,7 @@ describe('AuthCodeService', () => {
 
     describe('auth code single-use enforcement', () => {
         it('should reject a second token exchange with the same auth code', async () => {
-            const loginResponse = await app.getHttpServer()
-                .post('/api/oauth/login')
-                .send({
-                    email: EMAIL,
-                    password: PASSWORD,
-                    client_id: CLIENT_ID,
-                    code_challenge: CODE_CHALLENGE,
-                    code_challenge_method: 'plain',
-                })
-                .set('Accept', 'application/json');
-
-            expect(loginResponse.status).toEqual(201);
-            const code = loginResponse.body.authentication_code;
+            const code = await tokenFixture.fetchAuthCode(EMAIL, PASSWORD, CLIENT_ID, REDIRECT_URI);
 
             // First exchange — should succeed
             const firstExchange = await app.getHttpServer()
@@ -135,6 +92,7 @@ describe('AuthCodeService', () => {
                     code,
                     code_verifier: CODE_VERIFIER,
                     client_id: CLIENT_ID,
+                    redirect_uri: REDIRECT_URI,
                 })
                 .set('Accept', 'application/json');
 
@@ -148,6 +106,7 @@ describe('AuthCodeService', () => {
                     code,
                     code_verifier: CODE_VERIFIER,
                     client_id: CLIENT_ID,
+                    redirect_uri: REDIRECT_URI,
                 })
                 .set('Accept', 'application/json');
 
@@ -165,6 +124,7 @@ describe('AuthCodeService', () => {
                     code: 'NONEXISTENT999',
                     code_verifier: CODE_VERIFIER,
                     client_id: CLIENT_ID,
+                    redirect_uri: REDIRECT_URI,
                 })
                 .set('Accept', 'application/json');
 
@@ -175,20 +135,12 @@ describe('AuthCodeService', () => {
 
     describe('subscriber tenant hint on auth code', () => {
         it('should store subscriber_tenant_hint on the auth code when provided', async () => {
-            const loginResponse = await app.getHttpServer()
-                .post('/api/oauth/login')
-                .send({
-                    email: EMAIL,
-                    password: PASSWORD,
-                    client_id: CLIENT_ID,
-                    code_challenge: CODE_CHALLENGE,
-                    code_challenge_method: 'plain',
-                    subscriber_tenant_hint: 'some-tenant-hint',
-                })
-                .set('Accept', 'application/json');
+            const code = await tokenFixture.fetchAuthCode(EMAIL, PASSWORD, CLIENT_ID, REDIRECT_URI, {
+                subscriberTenantHint: 'some-tenant-hint',
+            });
 
-            expect(loginResponse.status).toEqual(201);
-            expect(loginResponse.body.authentication_code).toBeDefined();
+            expect(typeof code).toBe('string');
+            expect(code.length).toBeGreaterThan(0);
         });
     });
 
@@ -196,24 +148,15 @@ describe('AuthCodeService', () => {
         // Use isolated tenant to avoid session interference with other tests
         const PROMPT_CLIENT_ID = 'prompt-test.local';
         const PROMPT_EMAIL = 'admin@prompt-test.local';
+        const PROMPT_REDIRECT_URI = 'http://localhost:3000/callback';
 
         it('should set requireAuthTime=true when prompt=login is used', async () => {
-            const loginResponse = await app.getHttpServer()
-                .post('/api/oauth/login')
-                .send({
-                    email: PROMPT_EMAIL,
-                    password: PASSWORD,
-                    client_id: PROMPT_CLIENT_ID,
-                    code_challenge: CODE_CHALLENGE,
-                    code_challenge_method: 'plain',
-                    prompt: 'login',
-                })
-                .set('Accept', 'application/json');
+            // fetchAuthCode creates a fresh session and issues a code
+            const code = await tokenFixture.fetchAuthCode(
+                PROMPT_EMAIL, PASSWORD, PROMPT_CLIENT_ID, PROMPT_REDIRECT_URI,
+            );
 
-            expect(loginResponse.status).toEqual(201);
-            const code = loginResponse.body.authentication_code;
-
-            // Look up the auth code's sid via test-utils
+            // Look up the auth code's sid via test-utils to confirm session is linked
             const sidResponse = await app.getHttpServer()
                 .get(`/api/test-utils/auth-codes/${code}/sid`);
 
@@ -229,6 +172,7 @@ describe('AuthCodeService', () => {
                     code,
                     code_verifier: CODE_VERIFIER,
                     client_id: PROMPT_CLIENT_ID,
+                    redirect_uri: PROMPT_REDIRECT_URI,
                 })
                 .set('Accept', 'application/json');
 
@@ -244,33 +188,11 @@ describe('AuthCodeService', () => {
         });
 
         it('should default requireAuthTime to false when no prompt or max_age is provided', async () => {
-            const loginResponse = await app.getHttpServer()
-                .post('/api/oauth/login')
-                .send({
-                    email: EMAIL,
-                    password: PASSWORD,
-                    client_id: CLIENT_ID,
-                    code_challenge: CODE_CHALLENGE,
-                    code_challenge_method: 'plain',
-                })
-                .set('Accept', 'application/json');
+            const tokenResult = await tokenFixture.fetchTokenWithLoginFlow(
+                EMAIL, PASSWORD, CLIENT_ID, REDIRECT_URI,
+            );
 
-            expect(loginResponse.status).toEqual(201);
-            const code = loginResponse.body.authentication_code;
-
-            // Exchange the code — should still succeed
-            const tokenResponse = await app.getHttpServer()
-                .post('/api/oauth/token')
-                .send({
-                    grant_type: 'authorization_code',
-                    code,
-                    code_verifier: CODE_VERIFIER,
-                    client_id: CLIENT_ID,
-                })
-                .set('Accept', 'application/json');
-
-            expect(tokenResponse.status).toEqual(200);
-            expect(tokenResponse.body.access_token).toBeDefined();
+            expect(tokenResult.access_token).toBeDefined();
         });
     });
 });

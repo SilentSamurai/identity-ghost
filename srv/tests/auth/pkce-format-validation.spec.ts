@@ -1,51 +1,39 @@
 import {SharedTestFixture} from '../shared-test.fixture';
+import {TokenFixture} from '../token.fixture';
 
 /**
  * Integration test: PKCE format validation at token endpoint
- *
- * Validates that the CodeGrantSchema rejects code_verifier values that
- * violate RFC 7636 §4.1 format constraints (length and charset) with
- * an invalid_request error, and accepts valid verifiers past format
- * validation.
  *
  * Validates: Requirements 1.1, 1.2, 1.3, 1.4
  */
 describe('PKCE format validation at token endpoint', () => {
     let app: SharedTestFixture;
+    let tokenFixture: TokenFixture;
 
     const clientId = 'auth.server.com';
+    const redirectUri = 'http://localhost:3000/callback';
     const email = 'admin@auth.server.com';
     const password = 'admin9000';
 
     // A valid verifier (exactly 43 chars, unreserved charset) used as the
-    // plain challenge during login. Token exchange will fail with
-    // invalid_grant for non-matching verifiers, but NOT with invalid_request.
+    // plain challenge during login.
     const validChallenge = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq';
 
     beforeAll(async () => {
         app = new SharedTestFixture();
+        tokenFixture = new TokenFixture(app);
     });
 
     afterAll(async () => {
         await app.close();
     });
 
-    /** Helper: obtain a fresh single-use auth code via the login endpoint */
+    /** Helper: obtain a fresh single-use auth code via the new cookie-based flow */
     async function getAuthCode(): Promise<string> {
-        const response = await app.getHttpServer()
-            .post('/api/oauth/login')
-            .send({
-                email,
-                password,
-                client_id: clientId,
-                code_challenge: validChallenge,
-                code_challenge_method: 'plain',
-            })
-            .set('Accept', 'application/json');
-
-        expect(response.status).toEqual(201);
-        expect(response.body.authentication_code).toBeDefined();
-        return response.body.authentication_code;
+        return tokenFixture.fetchAuthCode(email, password, clientId, redirectUri, {
+            codeChallenge: validChallenge,
+            codeChallengeMethod: 'plain',
+        });
     }
 
     /** Helper: attempt token exchange with a given code_verifier */
@@ -57,6 +45,7 @@ describe('PKCE format validation at token endpoint', () => {
                 code,
                 client_id: clientId,
                 code_verifier: codeVerifier,
+                redirect_uri: redirectUri,
             })
             .set('Accept', 'application/json');
     }

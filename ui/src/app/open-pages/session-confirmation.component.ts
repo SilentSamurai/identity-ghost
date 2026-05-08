@@ -1,9 +1,6 @@
 import {Component, OnInit} from '@angular/core';
-import {UserService} from '../_services/user.service';
-import {SessionService} from '../_services/session.service';
 import {ActivatedRoute, Router} from '@angular/router';
 import {AuthService} from '../_services/auth.service';
-import {AuthDefaultService} from '../_services/auth.default.service';
 
 @Component({
     selector: 'session-confirm',
@@ -18,7 +15,7 @@ import {AuthDefaultService} from '../_services/auth.default.service';
                 </div>
             </div>
 
-            <div>
+            <div *ngIf="!loading">
                 <div class="text-center">
                     Logged in as
                 </div>
@@ -27,7 +24,7 @@ import {AuthDefaultService} from '../_services/auth.default.service';
                     <b>{{ username }}</b>
                 </div>
 
-                <div class="form-group d-grid gap-2 py-3 ">
+                <div class="form-group d-grid gap-2 py-3">
                     <button (click)="onContinue()" class="btn btn-primary btn-block btn-lg">
                         Continue
                     </button>
@@ -35,7 +32,7 @@ import {AuthDefaultService} from '../_services/auth.default.service';
 
                 <hr>
 
-                <div class="form-group d-grid gap-2 ">
+                <div class="form-group d-grid gap-2">
                     <button (click)="onLogout()" class="btn btn-danger btn-block btn-lg">
                         Logout
                     </button>
@@ -64,225 +61,108 @@ import {AuthDefaultService} from '../_services/auth.default.service';
             transition: background-color 0.3s ease, box-shadow 0.3s ease;
         }
 
-        .profile-img-card {
-            width: 96px;
-            height: 96px;
-            margin: 0 auto 10px;
-            display: block;
-            border-radius: 50%;
-        }
-
         [data-bs-theme="dark"] .card {
             background-color: var(--bs-dark, #212529);
             border-color: var(--bs-border-color, #495057);
             box-shadow: 0px 2px 2px rgba(0, 0, 0, 0.5);
         }
 
-        [data-bs-theme="dark"] .form-control {
-            background-color: var(--bs-dark, #212529);
-            border-color: var(--bs-border-color, #495057);
-            color: var(--bs-body-color, #f8f9fa);
-            transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
-        }
-
-        [data-bs-theme="dark"] .form-control:focus {
-            background-color: var(--bs-dark, #212529);
-            border-color: var(--bs-primary, #0d6efd);
-            color: var(--bs-body-color, #f8f9fa);
-            box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
-        }
-
-        [data-bs-theme="dark"] .form-control:hover {
-            border-color: var(--bs-primary, #0d6efd);
-        }
-
-        [data-bs-theme="dark"] .input-group-text {
-            background-color: var(--bs-dark, #212529);
-            border-color: var(--bs-border-color, #495057);
-            color: var(--bs-body-color, #f8f9fa);
-            transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
-        }
-
-        [data-bs-theme="dark"] label {
-            color: var(--bs-body-color, #f8f9fa);
-            transition: color 0.3s ease;
-        }
-
-        [data-bs-theme="dark"] .alert-danger {
-            background-color: var(--bs-danger-bg-subtle, rgba(220, 53, 69, 0.15));
-            border-color: var(--bs-danger-border-subtle, rgba(220, 53, 69, 0.3));
-            color: var(--bs-danger-text-emphasis, #ea868f);
-            transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
-        }
-
-        [data-bs-theme="dark"] .alert-success {
-            background-color: var(--bs-success-bg-subtle, rgba(25, 135, 84, 0.15));
-            border-color: var(--bs-success-border-subtle, rgba(25, 135, 84, 0.3));
-            color: var(--bs-success-text-emphasis, #75b798);
-            transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
-        }
-
-        [data-bs-theme="dark"] a {
-            color: var(--bs-link-color, #0d6efd);
-            transition: color 0.3s ease;
-        }
-
-        [data-bs-theme="dark"] a:hover {
-            color: var(--bs-link-hover-color, #0a58ca);
-            text-decoration: underline;
-        }
-
         [data-bs-theme="dark"] .btn-primary {
             background-color: var(--bs-primary, #0d6efd);
             border-color: var(--bs-primary, #0d6efd);
-            transition: background-color 0.3s ease, border-color 0.3s ease;
-        }
-
-        [data-bs-theme="dark"] .btn-primary:hover {
-            background-color: var(--bs-primary-dark, #0b5ed7);
-            border-color: var(--bs-primary-dark, #0b5ed7);
-        }
-
-        [data-bs-theme="dark"] .btn-primary:focus {
-            box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
         }
     `],
 })
 export class SessionConfirmationComponent implements OnInit {
-    content?: string;
-    user: any;
     loading = true;
-    authCode = '';
-    redirectUri = '';
     username = '';
-    code_challenge = '';
-    client_id = '';
-    state = '';
+
+    // OAuth params parsed from query string
+    private clientId = '';
+    private redirectUri = '';
+    private state = '';
+    private scope = '';
+    private responseType = '';
+    private codeChallenge = '';
+    private codeChallengeMethod = '';
+    private nonce = '';
+    private resource = '';
 
     constructor(
-        private userService: UserService,
         private router: Router,
         private route: ActivatedRoute,
         private authService: AuthService,
-        private authDefaultService: AuthDefaultService,
-        private tokenStorage: SessionService,
     ) {
     }
 
     async ngOnInit(): Promise<void> {
-        let params = this.route.snapshot.queryParamMap;
-        this.redirectUri = params.get('redirect_uri')!;
-        this.client_id = params.get('client_id')!;
-        this.code_challenge = params.get('code_challenge')!;
-        this.state = params.get('state') || '';
+        const params = this.route.snapshot.queryParamMap;
 
-        const authCode = this.tokenStorage.getAuthCode();
-        if (authCode) {
-            // if auth code is present, then redirect
-            // verify auth-code
-            try {
-                const data = await this.authService.validateAuthCode(authCode, this.client_id);
-                this.authCode = authCode;
-                this.username = data.email;
-            } catch (e: any) {
-                console.error(e);
-            }
+        // Parse all OAuth params from query string
+        this.clientId = params.get('client_id') || '';
+        this.redirectUri = params.get('redirect_uri') || '';
+        this.state = params.get('state') || '';
+        this.scope = params.get('scope') || '';
+        this.responseType = params.get('response_type') || 'code';
+        this.codeChallenge = params.get('code_challenge') || '';
+        this.codeChallengeMethod = params.get('code_challenge_method') || '';
+        this.nonce = params.get('nonce') || '';
+        this.resource = params.get('resource') || '';
+
+        // Fetch user email from session-info endpoint (cookie-authenticated)
+        // PII never comes from query params
+        try {
+            const info = await this.authService.getSessionInfo();
+            this.username = info.email;
+        } catch (e) {
+            console.error('Failed to fetch session info:', e);
+            // Session is invalid — navigate back to authorize
+            this.navigateToAuthorize();
+            return;
         }
 
         this.loading = false;
     }
 
-    async onContinue() {
+    onContinue(): void {
+        // Navigate to authorize with all OAuth params + session_confirmed=true
+        // The authorize endpoint will issue a fresh code and redirect to the client
+        const authorizeParams = this.buildAuthorizeParams();
+        authorizeParams.set('session_confirmed', 'true');
+        window.location.href = `/api/oauth/authorize?${authorizeParams.toString()}`;
+    }
+
+    async onLogout(): Promise<void> {
         try {
-            const decoded = this.tokenStorage.getDecodedToken();
-            if (!decoded || !decoded.sub || !decoded.tenant?.id) {
-                // No valid session token — clear and redirect to login
-                this.tokenStorage.clearSession();
-                await this.router.navigate(['authorize'], {
-                    queryParams: {
-                        redirect_uri: this.redirectUri,
-                        client_id: this.client_id,
-                        code_challenge: this.code_challenge,
-                        state: this.state,
-                    },
-                });
-                return;
-            }
-
-            // Always request a fresh authorization code via silent-auth
-            const data = await this.authService.silentAuth({
-                client_id: this.client_id,
-                user_id: decoded.sub,
-                tenant_id: decoded.tenant.id,
-                code_challenge: this.code_challenge,
-                code_challenge_method: 'S256',
-            });
-
-            if (data.authentication_code) {
-                this.tokenStorage.saveAuthCode(data.authentication_code);
-                await this.redirect(data.authentication_code);
-            } else {
-                // silent-auth did not return a code — clear session and redirect to login
-                this.tokenStorage.clearSession();
-                await this.router.navigate(['authorize'], {
-                    queryParams: {
-                        redirect_uri: this.redirectUri,
-                        client_id: this.client_id,
-                        code_challenge: this.code_challenge,
-                        state: this.state,
-                    },
-                });
-            }
-        } catch (e: any) {
-            console.error('silent-auth failed on Continue:', e);
-            // On failure: clear session and navigate to authorize page
-            this.tokenStorage.clearSession();
-            await this.router.navigate(['authorize'], {
-                queryParams: {
-                    redirect_uri: this.redirectUri,
-                    client_id: this.client_id,
-                    code_challenge: this.code_challenge,
-                    state: this.state,
-                },
-            });
+            await this.authService.sessionLogout();
+        } catch (e) {
+            console.error('Logout error (continuing anyway):', e);
         }
+
+        // Navigate to authorize with from_logout=true — server will redirect to login form
+        const authorizeParams = this.buildAuthorizeParams();
+        authorizeParams.set('from_logout', 'true');
+        window.location.href = `/api/oauth/authorize?${authorizeParams.toString()}`;
     }
 
-    async onLogout() {
-        this.tokenStorage.clearSession();
-        await this.router.navigate(['authorize'], {
-            queryParams: {
-                redirect_uri: this.redirectUri,
-                client_id: this.client_id,
-                code_challenge: this.code_challenge,
-                state: this.state,
-            },
-        });
+    private buildAuthorizeParams(): URLSearchParams {
+        const params = new URLSearchParams();
+        if (this.clientId) params.set('client_id', this.clientId);
+        if (this.redirectUri) params.set('redirect_uri', this.redirectUri);
+        params.set('response_type', this.responseType || 'code');
+        if (this.scope) params.set('scope', this.scope);
+        if (this.state) params.set('state', this.state);
+        if (this.codeChallenge) {
+            params.set('code_challenge', this.codeChallenge);
+            params.set('code_challenge_method', this.codeChallengeMethod || 'plain');
+        }
+        if (this.nonce) params.set('nonce', this.nonce);
+        if (this.resource) params.set('resource', this.resource);
+        return params;
     }
 
-    async redirect(code: string) {
-        if (this.isAbsoluteUrl(this.redirectUri)) {
-            const redirectUrl = new URL(this.redirectUri);
-            redirectUrl.searchParams.append('code', code);
-            if (this.state) {
-                redirectUrl.searchParams.append('state', this.state);
-            }
-            window.location.href = redirectUrl.toString();
-        } else {
-            const queryParams: any = {code};
-            if (this.state) {
-                queryParams.state = this.state;
-            }
-            await this.router.navigate([this.redirectUri], {queryParams});
-        }
-    }
-
-    protected isAbsoluteUrl(url: string): boolean {
-        try {
-            new URL(url);
-            return true;
-        } catch (error) {
-            return false;
-        }
+    private navigateToAuthorize(): void {
+        const authorizeParams = this.buildAuthorizeParams();
+        window.location.href = `/api/oauth/authorize?${authorizeParams.toString()}`;
     }
 }

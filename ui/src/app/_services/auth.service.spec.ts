@@ -24,23 +24,17 @@ describe('AuthService', () => {
     });
 
     it('should login successfully', async () => {
-        const mockResponse = {
-            auth_code: 'test_auth_code',
-        };
+        const mockResponse = {success: true};
 
         const loginPromise = service.login(
             'test@example.com',
             'password123',
             'client123',
-            'challenge123',
-            'S256',
         );
 
         const req = httpMock.expectOne('/api/oauth/login');
         expect(req.request.method).toBe('POST');
         expect(req.request.body).toEqual({
-            code_challenge: 'challenge123',
-            code_challenge_method: 'S256',
             client_id: 'client123',
             email: 'test@example.com',
             password: 'password123',

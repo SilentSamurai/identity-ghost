@@ -21,6 +21,8 @@ export interface AuthorizeQueryParams {
     max_age?: number;
     resource?: string;
     id_token_hint?: string;
+    from_logout?: string;       // skip session detection after logout
+    session_confirmed?: string; // user confirmed session via session-confirm UI
 }
 
 export interface ValidatedAuthorizeRequest {

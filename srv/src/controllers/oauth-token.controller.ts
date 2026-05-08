@@ -15,16 +15,19 @@ import {
     ClassSerializerInterceptor,
     Controller,
     Get,
+    Header,
     HttpCode,
     Logger,
     Post,
     Query,
     Req,
     Res,
+    UnauthorizedException,
     UseFilters,
     UseInterceptors,
 } from "@nestjs/common";
 import {Request as ExpressRequest, Response} from "express";
+import * as crypto from "crypto";
 
 import {User} from "../entity/user.entity";
 import {AuthService} from "../auth/auth.service";
@@ -40,16 +43,15 @@ import {OAuthExceptionFilter} from "../exceptions/filter/oauth-exception.filter"
 import {AuthorizeQueryParams, AuthorizeService} from "../auth/authorize.service";
 import {CryptUtil} from "../util/crypt.util";
 import {parseBasicAuthHeader} from "../util/http.util";
-import {InjectRepository} from "@nestjs/typeorm";
 import {Client} from "../entity/client.entity";
-import {Repository} from "typeorm";
 import {LoginSessionService} from "../auth/login-session.service";
 import {ConsentService} from "../auth/consent.service";
 import {ScopeResolverService} from "../casl/scope-resolver.service";
 import {ClientService} from "../services/client.service";
-import {PromptAction, PromptService} from "../auth/prompt.service";
 import {ResourceIndicatorValidator} from "../auth/resource-indicator.validator";
 import {Environment} from "../config/environment.service";
+import {RefreshTokenService} from "../auth/refresh-token.service";
+import { deprecate } from "util";
 
 const logger = new Logger("OAuthTokenController");
 
@@ -66,43 +68,87 @@ export class OAuthTokenController {
         private readonly loginSessionService: LoginSessionService,
         private readonly consentService: ConsentService,
         private readonly scopeResolverService: ScopeResolverService,
-        @InjectRepository(Client)
-        private readonly clientRepository: Repository<Client>,
         private readonly clientService: ClientService,
-        private readonly promptService: PromptService,
+        private readonly refreshTokenService: RefreshTokenService,
     ) {
     }
 
     @Get("/authorize")
-    async authorize(@Query() query: AuthorizeQueryParams, @Res() res: Response): Promise<void> {
+    async authorize(
+        @Query() query: AuthorizeQueryParams,
+        @Req() req: ExpressRequest,
+        @Res() res: Response,
+    ): Promise<void> {
         try {
             const validated = await this.authorizeService.validateAuthorizeRequest(query);
 
-            const params = new URLSearchParams();
-            params.set('client_id', query.client_id!); // it needs to be query.client_id as client id can also be a domain or client id
-            params.set('redirect_uri', validated.redirectUri);
-            params.set('scope', validated.scope);
-            params.set('state', validated.state);
-            params.set('response_type', validated.responseType);
-            if (validated.codeChallenge) {
-                params.set('code_challenge', validated.codeChallenge);
-                params.set('code_challenge_method', validated.codeChallengeMethod);
-            }
-            if (validated.nonce) {
-                params.set('nonce', validated.nonce);
-            }
-            // Forward new OIDC parameters
-            if (validated.prompt) {
-                params.set('prompt', validated.prompt);
-            }
-            if (validated.maxAge !== undefined) {
-                params.set('max_age', String(validated.maxAge));
-            }
-            if (validated.resource) {
-                params.set('resource', validated.resource);
+            // 1. Forced login: from_logout or prompt=login
+            if (query.from_logout === 'true' || validated.prompt === 'login') {
+                return this.redirectToLoginUI(res, query, validated);
             }
 
-            res.redirect(302, `${Environment.get('BASE_URL', '')}/authorize?${params.toString()}`);
+            // 2. Unsupported prompt values
+            const supportedPrompts = ['none', 'login', 'consent', undefined];
+            if (validated.prompt && !supportedPrompts.includes(validated.prompt)) {
+                return this.redirectWithError(
+                    res, validated.redirectUri,
+                    'invalid_request',
+                    `Unsupported prompt value: ${validated.prompt}. Supported values: none, login, consent`,
+                    validated.state,
+                );
+            }
+
+            // 3. Resolve session from signed sid cookie
+            const session = await this.resolveSession(req, validated.maxAge);
+
+            // 4. No session
+            if (!session) {
+                if (validated.prompt === 'none') {
+                    return this.redirectWithError(
+                        res, validated.redirectUri, 'login_required', 'No valid session', validated.state,
+                    );
+                }
+                return this.redirectToLoginUI(res, query, validated);
+            }
+
+            // 5. Session valid — resolve client and consent
+            const client = await this.clientService.findByClientIdOrAlias(query.client_id!);
+            const isFirstParty = client.alias === query.client_id;
+
+            const resolvedScopes = this.scopeResolverService.resolveScopes(
+                validated.scope, client.allowedScopes || 'openid profile email',
+            );
+
+            let consentGranted = true;
+            if (!isFirstParty) {
+                const consentCheck = await this.consentService.checkConsent(
+                    session.userId, client.clientId, resolvedScopes,
+                );
+                consentGranted = !consentCheck.consentRequired;
+            }
+
+            const skipConfirm = client.tenant?.skipSessionConfirm === true;
+            const confirmed = query.session_confirmed === 'true';
+
+            // prompt=consent — force re-approval (session-confirm first if configured)
+            if (validated.prompt === 'consent') {
+                if (!skipConfirm && !confirmed) {
+                    return this.redirectToSessionConfirmUI(res, query, validated);
+                }
+                return this.redirectToConsentUI(res, query, validated, session.sid);
+            }
+
+            // No consent → consent UI
+            if (!consentGranted) {
+                return this.redirectToConsentUI(res, query, validated, session.sid);
+            }
+
+            // Consent exists → issue code or session-confirm
+            if (skipConfirm || confirmed) {
+                return this.issueCodeAndRedirect(res, session, client, query, validated);
+            }
+            return this.redirectToSessionConfirmUI(res, query, validated);
+
         } catch (error) {
             if (error instanceof AuthorizeRedirectException) {
                 const params = new URLSearchParams();
@@ -118,31 +164,179 @@ export class OAuthTokenController {
         }
     }
 
+    /**
+     * Resolve session from signed sid cookie.
+     * Returns null if cookie is missing, signature invalid, session not found, expired, or max_age exceeded.
+     */
+    private async resolveSession(req: ExpressRequest, maxAge?: number): Promise<import('../entity/login-session.entity').LoginSession | null> {
+        const sid = (req as any).signedCookies?.sid;
+        if (!sid) return null;
+
+        const session = await this.loginSessionService.findSessionBySid(sid);
+        if (!session) return null;
+
+        // max_age check per OIDC Core §3.1.2.1
+        if (maxAge !== undefined) {
+            const elapsed = Math.floor(Date.now() / 1000) - session.authTime;
+            if (elapsed > maxAge) return null;
+        }
+        return session;
+    }
+
+    /**
+     * Issue an authorization code and redirect to the client's redirect_uri.
+     */
+    private async issueCodeAndRedirect(
+        res: Response,
+        session: import('../entity/login-session.entity').LoginSession,
+        client: Client,
+        query: AuthorizeQueryParams,
+        validated: import('../auth/authorize.service').ValidatedAuthorizeRequest,
+    ): Promise<void> {
+        const user = await this.authUserService.findUserById(session.userId);
+        const authCode = await this.authCodeService.createAuthToken(
+            user,
+            client.tenant,
+            query.client_id!,
+            validated.codeChallenge || null,
+            validated.codeChallenge ? (validated.codeChallengeMethod || 'plain') : null,
+            undefined,
+            validated.redirectUri,
+            validated.scope,
+            validated.nonce,
+            session.sid,
+            false,
+            validated.resource,
+        );
+        const params = new URLSearchParams();
+        params.set('code', authCode);
+        if (validated.state) params.set('state', validated.state);
+        res.redirect(302, `${validated.redirectUri}?${params.toString()}`);
+    }
+
+    /**
+     * Redirect to the login UI, preserving all OAuth params.
+     */
+    private redirectToLoginUI(
+        res: Response,
+        query: AuthorizeQueryParams,
+        validated: import('../auth/authorize.service').ValidatedAuthorizeRequest,
+    ): void {
+        const params = new URLSearchParams();
+        params.set('client_id', query.client_id!);
+        params.set('redirect_uri', validated.redirectUri);
+        params.set('scope', validated.scope);
+        params.set('state', validated.state);
+        params.set('response_type', validated.responseType);
+        if (validated.codeChallenge) {
+            params.set('code_challenge', validated.codeChallenge);
+            params.set('code_challenge_method', validated.codeChallengeMethod);
+        }
+        if (validated.nonce) params.set('nonce', validated.nonce);
+        if (validated.resource) params.set('resource', validated.resource);
+        if (query.from_logout === 'true') params.set('from_logout', 'true');
+        res.redirect(302, `${Environment.get('BASE_URL', '')}/authorize?${params.toString()}`);
+    }
+
+    /**
+     * Redirect to the session-confirm UI, preserving all OAuth params.
+     */
+    private redirectToSessionConfirmUI(
+        res: Response,
+        query: AuthorizeQueryParams,
+        validated: import('../auth/authorize.service').ValidatedAuthorizeRequest,
+    ): void {
+        const params = new URLSearchParams();
+        params.set('client_id', query.client_id!);
+        params.set('redirect_uri', validated.redirectUri);
+        params.set('response_type', validated.responseType);
+        params.set('state', validated.state);
+        params.set('scope', validated.scope);
+        if (validated.codeChallenge) {
+            params.set('code_challenge', validated.codeChallenge);
+            params.set('code_challenge_method', validated.codeChallengeMethod);
+        }
+        if (validated.nonce) params.set('nonce', validated.nonce);
+        if (validated.resource) params.set('resource', validated.resource);
+        res.redirect(302, `${Environment.get('BASE_URL', '')}/session-confirm?${params.toString()}`);
+    }
+
+    /**
+     * Redirect to the consent UI with a stateless CSRF token.
+     */
+    private redirectToConsentUI(
+        res: Response,
+        query: AuthorizeQueryParams,
+        validated: import('../auth/authorize.service').ValidatedAuthorizeRequest,
+        sid: string,
+    ): void {
+        // Stateless CSRF token — deterministic per session, multi-tab safe
+        const csrfToken = crypto
+            .createHmac('sha256', Environment.get('COOKIE_SECRET', 'dev-cookie-secret-do-not-use-in-prod'))
+            .update(sid)
+            .digest('hex');
+
+        const params = new URLSearchParams();
+        params.set('client_id', query.client_id!);
+        params.set('redirect_uri', validated.redirectUri);
+        params.set('response_type', validated.responseType);
+        params.set('state', validated.state);
+        params.set('scope', validated.scope);
+        params.set('csrf_token', csrfToken);
+        if (validated.codeChallenge) {
+            params.set('code_challenge', validated.codeChallenge);
+            params.set('code_challenge_method', validated.codeChallengeMethod);
+        }
+        if (validated.nonce) params.set('nonce', validated.nonce);
+        if (validated.resource) params.set('resource', validated.resource);
+        res.redirect(302, `${Environment.get('BASE_URL', '')}/consent?${params.toString()}`);
+    }
+
+    /**
+     * Redirect to redirect_uri with an OAuth error.
+     */
+    private redirectWithError(
+        res: Response,
+        redirectUri: string,
+        error: string,
+        description: string,
+        state?: string,
+    ): void {
+        const params = new URLSearchParams();
+        params.set('error', error);
+        params.set('error_description', description);
+        if (state) params.set('state', state);
+        res.redirect(302, `${redirectUri}?${params.toString()}`);
+    }
+
+    /**
+     * Helper to get the cookie options for the sid cookie.
+     */
+    private getSidCookieOptions(maxAge: number): Record<string, any> {
+        return {
+            signed: true,
+            httpOnly: true,
+            secure: Environment.get('ENABLE_HTTPS') === 'true' || process.env.NODE_ENV === 'production',
+            sameSite: 'lax' as const,
+            path: '/api/oauth',
+            maxAge: maxAge * 1000, // convert seconds to ms
+        };
+    }
+
     @Post("/login")
     async login(
         @Req() req: ExpressRequest,
+        @Res({passthrough: true}) res: Response,
         @Body(new ValidationPipe(ValidationSchema.LoginSchema))
         body: {
             client_id: string;
             password: string;
             email: string;
-            code_challenge_method: string;
-            code_challenge: string;
-            subscriber_tenant_hint?: string;
-            redirect_uri?: string;
-            scope?: string;
-            nonce?: string;
-            prompt?: string;
-            max_age?: number;
-            resource?: string;
         },
-    ) {
-        const user: User = await this.authService.validate(
-            body.email,
-            body.password,
-        );
+    ): Promise<{ success: true }> {
+        const user: User = await this.authService.validate(body.email, body.password);
 
-        // Resolve Client entity by clientId or alias (Requirements 3.1, 3.2, 3.3)
+        // Resolve Client entity by clientId or alias
         let client: Client;
         try {
             client = await this.clientService.findByClientIdOrAlias(body.client_id);
@@ -151,317 +345,193 @@ export class OAuthTokenController {
         }
         const tenant = client.tenant;
 
-        // Determine first-party status: when the caller used the alias (domain) as client_id,
-        // it is a first-party login and consent should be skipped (Requirements 8.1, 8.2)
-        const isFirstParty = client.alias === body.client_id;
+        // Create a new login session
+        const session = await this.loginSessionService.createSession(user.id, tenant.id);
 
-        // PKCE enforcement based on client configuration
-        // When code_challenge is not provided AND client requires PKCE, reject the request
-        if (!body.code_challenge && client.requirePkce) {
-            throw OAuthException.invalidRequest('code_challenge is required for this client');
-        }
-
-        // When code_challenge IS provided, enforce S256 and downgrade prevention
-        if (body.code_challenge) {
-            if (client.requirePkce && body.code_challenge_method === 'plain') {
-                throw OAuthException.invalidRequest('S256 code_challenge_method is required for this client');
-            }
-            if (client.pkceMethodUsed === 'S256' && body.code_challenge_method === 'plain') {
-                throw OAuthException.invalidRequest('PKCE downgrade not allowed: this client has previously used S256');
-            }
-        }
-
-        // Validate redirect_uri against registered URIs before proceeding
-        await this.authorizeService.validateRedirectUriForClient(body.client_id, body.redirect_uri);
-
-        const result = await this.tokenIssuanceService.resolveLoginAccess(
-            user, tenant, body.subscriber_tenant_hint,
+        // Compute cookie max-age from configured session duration
+        const durationSeconds = parseInt(
+            Environment.get('LOGIN_SESSION_DURATION_SECONDS', '1296000'),
+            10,
         );
 
-        if (!result.granted) {
-            return {
-                requires_tenant_selection: true,
-                tenants: result.ambiguousTenants,
-            };
-        }
+        // Set signed sid cookie
+        res.cookie('sid', session.sid, this.getSidCookieOptions(durationSeconds));
 
-        // Parse prompt parameter and evaluate prompt/max_age requirements
-        const promptValues = this.promptService.parsePrompt(body.prompt);
-        this.promptService.validatePrompt(promptValues);
-
-        // Find existing session for prompt/max_age evaluation
-        const existingSession = await this.loginSessionService.findValidSession(user.id, tenant.id);
-
-        // Resolve scopes for consent check
-        const clientAllowedScopes = client.allowedScopes || 'openid profile email';
-        const resolvedScopes = this.scopeResolverService.resolveScopes(
-            body.scope,
-            clientAllowedScopes,
-        );
-
-        // Check consent state for prompt evaluation
-        let consentGranted = true;
-        if (!isFirstParty) {
-            const consentCheck = await this.consentService.checkConsent(
-                user.id,
-                client.clientId,
-                resolvedScopes,
-            );
-            consentGranted = !consentCheck.consentRequired;
-        }
-
-        // Evaluate prompt/max_age to determine action
-        const evaluation = this.promptService.evaluate({
-            promptValues,
-            maxAge: body.max_age,
-            session: existingSession,
-            consentGranted,
-        });
-
-        // Handle FORCE_LOGIN: invalidate all existing sessions before creating a new one
-        if (evaluation.action === PromptAction.FORCE_LOGIN) {
-            await this.loginSessionService.invalidateAllSessions(user.id, tenant.id);
-        }
-
-        // Handle FORCE_CONSENT: always return requires_consent regardless of existing consent
-        if (evaluation.action === PromptAction.FORCE_CONSENT) {
-            return {
-                requires_consent: true,
-                requested_scopes: resolvedScopes,
-                client_name: client.name || client.clientId,
-            };
-        }
-
-        // Consent check: only for third-party clients (non-first-party)
-        // First-party (alias-resolved) logins skip consent (Requirements 8.1, 8.2)
-        if (!isFirstParty && consentGranted === false) {
-            const consentCheck = await this.consentService.checkConsent(
-                user.id,
-                client.clientId,
-                resolvedScopes,
-            );
-
-            return {
-                requires_consent: true,
-                requested_scopes: consentCheck.requestedScopes,
-                client_name: client.name || client.clientId,
-            };
-        }
-
-        // Create session (new session if FORCE_LOGIN, otherwise may reuse existing)
-        const session = evaluation.action === PromptAction.FORCE_LOGIN
-            ? await this.loginSessionService.createSession(user.id, tenant.id)
-            : existingSession || await this.loginSessionService.createSession(user.id, tenant.id);
-
-        const auth_code = await this.authCodeService.createAuthToken(
-            user,
-            tenant,
-            body.client_id,
-            body.code_challenge || null,
-            body.code_challenge ? (body.code_challenge_method || 'plain') : null,
-            result.resolvedHint,
-            body.redirect_uri,
-            body.scope,
-            body.nonce,
-            session.sid,
-            evaluation.requireAuthTime,
-            body.resource,
-        );
-
-        // Update pkceMethodUsed if client used S256 for the first time
-        if (body.code_challenge && body.code_challenge_method === 'S256' && client.pkceMethodUsed !== 'S256') {
-            client.pkceMethodUsed = 'S256';
-            await this.clientRepository.save(client);
-        }
-
-        return {
-            authentication_code: auth_code,
-        };
+        // Return success — frontend constructs the redirect URL from OAuth params it already has
+        return {success: true};
     }
 
     @Post("/consent")
     async consent(
-        @Body(new ValidationPipe(ValidationSchema.ConsentSchema))
-        body: {
-            email: string;
-            password: string;
-            client_id: string;
-            code_challenge: string;
-            code_challenge_method: string;
-            approved_scopes: string[];
-            consent_action: 'approve' | 'deny';
-            redirect_uri?: string;
-            scope?: string;
-            nonce?: string;
-            subscriber_tenant_hint?: string;
-            prompt?: string;
-            resource?: string;
-        },
-    ): Promise<any> {
-        // Re-authenticate the user
-        const user: User = await this.authService.validate(
-            body.email,
-            body.password,
-        );
-
-        // Handle deny action
-        if (body.consent_action === 'deny') {
-            return {
-                error: 'access_denied',
-                error_description: 'The resource owner denied the request',
-            };
-        }
-
-        // Handle approve action
-        if (body.consent_action === 'approve') {
-            // Resolve Client entity by clientId or alias (Requirements 10.1, 10.2)
-            let client: Client;
-            try {
-                client = await this.clientService.findByClientIdOrAlias(body.client_id);
-            } catch {
-                throw OAuthException.invalidClient('Unknown client_id');
-            }
-
-            // Validate approved_scopes against client.allowedScopes
-            const clientAllowedScopes = client.allowedScopes || 'openid profile email';
-            const resolvedScopes = this.scopeResolverService.resolveScopes(
-                body.approved_scopes.join(' '),
-                clientAllowedScopes,
-            );
-
-            // Grant consent using client.clientId (UUID), not body.client_id (Requirements 10.1, 10.2)
-            await this.consentService.grantConsent(
-                user.id,
-                client.clientId,
-                resolvedScopes,
-            );
-
-            // Resolve tenant from the client entity
-            const tenant = client.tenant;
-
-            // Determine requireAuthTime: true when prompt contains 'login' (Requirement 7.2)
-            const promptValues = this.promptService.parsePrompt(body.prompt);
-            const requireAuthTime = promptValues.includes('login');
-
-            // Create session
-            const session = await this.loginSessionService.createSession(user.id, tenant.id);
-
-            // Create auth code
-            const auth_code = await this.authCodeService.createAuthToken(
-                user,
-                tenant,
-                body.client_id,
-                body.code_challenge || null,
-                body.code_challenge ? (body.code_challenge_method || 'plain') : null,
-                body.subscriber_tenant_hint,
-                body.redirect_uri,
-                body.scope,
-                body.nonce,
-                session.sid,
-                requireAuthTime,
-                body.resource,
-            );
-
-            return {
-                authentication_code: auth_code,
-            };
-        }
-
-        throw OAuthException.invalidRequest('Invalid consent_action');
-    }
-
-    @Post("/silent-auth")
-    async silentAuth(
-        @Body(new ValidationPipe(ValidationSchema.SilentAuthSchema))
+        @Req() req: ExpressRequest,
+        @Res() res: Response,
+        @Body()
         body: {
             client_id: string;
-            user_id: string;
-            tenant_id: string;
-            code_challenge: string;
-            code_challenge_method: string;
-            redirect_uri?: string;
+            redirect_uri: string;
             scope?: string;
+            state?: string;
+            response_type?: string;
+            code_challenge?: string;
+            code_challenge_method?: string;
             nonce?: string;
-            max_age?: number;
             resource?: string;
+            csrf_token: string;
+            decision: 'grant' | 'deny';
         },
-    ): Promise<{ authentication_code: string } | { error: string; error_description: string }> {
-        // Resolve Client entity by clientId or alias
+    ): Promise<void> {
+        // 1. Validate session from signed cookie first
+        const sid = (req as any).signedCookies?.sid;
+        if (!sid) {
+            res.status(401).send('No session');
+            return;
+        }
+        const session = await this.loginSessionService.findSessionBySid(sid);
+        if (!session) {
+            res.status(401).send('Session expired');
+            return;
+        }
+
+        // 2. Validate CSRF token using constant-time comparison
+        const expectedToken = crypto
+            .createHmac('sha256', Environment.get('COOKIE_SECRET', 'dev-cookie-secret-do-not-use-in-prod'))
+            .update(sid)
+            .digest('hex');
+
+        let csrfValid = false;
+        try {
+            csrfValid = body.csrf_token &&
+                body.csrf_token.length === expectedToken.length &&
+                crypto.timingSafeEqual(
+                    Buffer.from(body.csrf_token, 'hex'),
+                    Buffer.from(expectedToken, 'hex'),
+                );
+        } catch {
+            csrfValid = false;
+        }
+
+        if (!csrfValid) {
+            res.status(403).send('Invalid CSRF token');
+            return;
+        }
+
+        // 3. Validate redirect_uri against client's registered URIs
         let client: Client;
         try {
             client = await this.clientService.findByClientIdOrAlias(body.client_id);
         } catch {
-            return {
-                error: 'invalid_client',
-                error_description: 'Unknown client_id',
-            };
+            res.status(400).send('Unknown client_id');
+            return;
         }
-        const tenant = client.tenant;
 
-        // Find valid session for the user+tenant
-        const session = await this.loginSessionService.findValidSession(body.user_id, tenant.id);
+        const registeredUris: string[] = client.redirectUris || [];
+        if (registeredUris.length > 0 && !registeredUris.includes(body.redirect_uri)) {
+            res.status(400).send('Invalid redirect_uri');
+            return;
+        }
 
-        // Resolve scopes for consent check
-        const clientAllowedScopes = client.allowedScopes || 'openid profile email';
+        // Handle denial — redirect to client with error
+        if (body.decision === 'deny') {
+            const params = new URLSearchParams();
+            params.set('error', 'access_denied');
+            params.set('error_description', 'User denied consent');
+            if (body.state) params.set('state', body.state);
+            res.redirect(302, `${body.redirect_uri}?${params.toString()}`);
+            return;
+        }
+
+        // Handle grant — record consent and PRG redirect to authorize
         const resolvedScopes = this.scopeResolverService.resolveScopes(
-            body.scope,
-            clientAllowedScopes,
+            body.scope || '', client.allowedScopes || 'openid profile email',
         );
+        await this.consentService.grantConsent(session.userId, client.clientId, resolvedScopes);
 
-        // Check consent state
-        const consentCheck = await this.consentService.checkConsent(
-            body.user_id,
-            client.clientId,
-            resolvedScopes,
-        );
-        const consentGranted = !consentCheck.consentRequired;
+        // PRG: redirect to authorize — it will see session + consent and issue code
+        const params = new URLSearchParams();
+        params.set('client_id', body.client_id);
+        params.set('redirect_uri', body.redirect_uri);
+        params.set('response_type', body.response_type || 'code');
+        if (body.scope) params.set('scope', body.scope);
+        if (body.state) params.set('state', body.state);
+        if (body.code_challenge) params.set('code_challenge', body.code_challenge);
+        if (body.code_challenge_method) params.set('code_challenge_method', body.code_challenge_method);
+        if (body.nonce) params.set('nonce', body.nonce);
+        if (body.resource) params.set('resource', body.resource);
+        params.set('session_confirmed', 'true');
+        res.redirect(302, `/api/oauth/authorize?${params.toString()}`);
+    }
 
-        // Evaluate prompt=none with gathered context
-        const evaluation = this.promptService.evaluate({
-            promptValues: ['none'],
-            maxAge: body.max_age,
-            session,
-            consentGranted,
-        });
+    /**
+     * POST /session-logout — Cookie-authenticated logout.
+     * Invalidates the server-side session, revokes associated refresh tokens, and clears the sid cookie.
+     */
+    // @Post("/session-logout")
+    // @HttpCode(200)
+    // @Header('Cache-Control', 'no-store')
+    // @Header('Pragma', 'no-cache')
+    // async sessionLogout(
+    //     @Req() req: ExpressRequest,
+    //     @Res({passthrough: true}) res: Response,
+    // ): Promise<Record<string, never>> {
+    //     const sid = (req as any).signedCookies?.sid;
+    //     if (sid) {
+    //         await this.loginSessionService.invalidateSession(sid);
+    //         await this.refreshTokenService.revokeBySid(sid);
+    //     }
 
-        // If evaluation returns an error, return it as JSON
-        if (evaluation.error) {
-            return {
-                error: evaluation.error,
-                error_description: evaluation.errorDescription || '',
-            };
+    //     // Clear the sid cookie
+    //     res.cookie('sid', '', {
+    //         signed: true,
+    //         httpOnly: true,
+    //         secure: Environment.get('ENABLE_HTTPS') === 'true' || process.env.NODE_ENV === 'production',
+    //         sameSite: 'lax' as const,
+    //         path: '/api/oauth',
+    //         maxAge: 0,
+    //     });
+
+    //     return {};
+    // }
+
+    /**
+     * GET /session-info — Cookie-authenticated session info.
+     * Returns the email of the currently authenticated user.
+     */
+    @Get("/session-info")
+    @Header('Cache-Control', 'no-store')
+    async sessionInfo(
+        @Req() req: ExpressRequest,
+    ): Promise<{ email: string }> {
+        const sid = (req as any).signedCookies?.sid;
+        if (!sid) {
+            throw new UnauthorizedException('No session');
         }
 
-        // If evaluation returns ISSUE_CODE, create auth code using existing session's sid
-        if (evaluation.action === PromptAction.ISSUE_CODE && session) {
-            // Get user entity for auth code creation
-            const user = await this.authUserService.findUserById(body.user_id);
-
-            const auth_code = await this.authCodeService.createAuthToken(
-                user,
-                tenant,
-                body.client_id,
-                body.code_challenge || null,
-                body.code_challenge ? (body.code_challenge_method || 'plain') : null,
-                undefined, // subscriberTenantHint
-                body.redirect_uri,
-                body.scope,
-                body.nonce,
-                session.sid,
-                evaluation.requireAuthTime,
-                body.resource,
-            );
-
-            return {
-                authentication_code: auth_code,
-            };
+        const session = await this.loginSessionService.findSessionBySid(sid);
+        if (!session) {
+            throw new UnauthorizedException('Session expired');
         }
 
-        // This should not happen with prompt=none, but handle gracefully
-        return {
-            error: 'interaction_required',
-            error_description: 'An unexpected error occurred during silent authentication',
-        };
+        const user = await this.authUserService.findUserById(session.userId);
+        return {email: user.email};
+    }
+
+    /**
+     * GET /logout — RP-Initiated Logout entry point (per OpenID Connect RP-Initiated Logout §2).
+     * Validates post_logout_redirect_uri if provided and redirects to the UI logout page.
+     */
+    @Get("/logout")
+    async rpInitiatedLogout(
+        @Query() query: { post_logout_redirect_uri?: string; state?: string; id_token_hint?: string },
+        @Res() res: Response,
+    ): Promise<void> {
+        const params = new URLSearchParams();
+        if (query.post_logout_redirect_uri) {
+            params.set('post_logout_redirect_uri', query.post_logout_redirect_uri);
+        }
+        if (query.state) {
+            params.set('state', query.state);
+        }
+        res.redirect(302, `${Environment.get('BASE_URL', '')}/logout?${params.toString()}`);
     }
 
     @HttpCode(200)

@@ -74,30 +74,22 @@ export class TenantSelectionComponent implements OnInit {
     async selectTenant(tenant: any) {
         try {
             // Re-call /login with the selected tenant hint
-            const data = await this.authService.login(
-                this.loginParams.username,
-                this.loginParams.password,
-                this.loginParams.client_id,
-                this.loginParams.code_challenge,
-                this.loginParams.code_challenge_method,
-                tenant.domain,
-            );
-
-            // Now we have the auth code — save and redirect
-            this.tokenStorage.saveAuthCode(data.authentication_code);
-            const redirectUrl = new URL(this.redirectUri);
-            redirectUrl.searchParams.append('code', data.authentication_code);
-            if (this.state) {
-                redirectUrl.searchParams.append('state', this.state);
-            }
-            window.location.href = redirectUrl.toString();
+            // Note: tenant selection is no longer supported with the new cookie-based flow.
+            // The new login endpoint only accepts email, password, client_id.
+            // For multi-tenant scenarios, the user should use the OAuth authorize flow.
+            this.messageService.add({
+                severity: 'info',
+                summary: 'Info',
+                detail: 'Please use the OAuth authorize flow for multi-tenant authentication.',
+                life: 5000,
+            });
         } catch (error) {
             console.error('Error during tenant selection:', error);
             this.messageService.add({
                 severity: 'error',
                 summary: 'Error',
                 detail: 'Failed to complete authentication. Please try again.',
-                life: 5000
+                life: 5000,
             });
         }
     }

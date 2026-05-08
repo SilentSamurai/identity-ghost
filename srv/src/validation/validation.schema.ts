@@ -180,23 +180,6 @@ const LoginSchema = yup.object().shape({
         .matches(PASSWORD_REGEXP, PASSWORD_MESSAGE)
         .max(128),
     client_id: yup.string().required("client_id is required"),
-    code_challenge_method: yup
-        .string()
-        .optional()
-        .matches(/^(plain|S256|OWH32)$/, "method must be plain, S256, or OWH32")
-        .default("plain"),
-    code_challenge: yup.string().optional(),
-    subscriber_tenant_hint: yup.string().optional().nullable(),
-    redirect_uri: yup.string().optional(),
-    scope: yup.string().optional(),
-    nonce: yup.string().optional().max(512),
-    prompt: yup.string().optional(),
-    max_age: yup
-        .number()
-        .optional()
-        .integer("max_age must be an integer")
-        .min(0, "max_age must be a non-negative integer"),
-    resource: yup.string().optional(),
 });
 
 const PasswordGrantSchema = yup.object().shape({
@@ -329,26 +312,6 @@ const ConsentSchema = yup.object().shape({
     resource: yup.string().optional(),
 });
 
-const SilentAuthSchema = yup.object().shape({
-    client_id: yup.string().required("client_id is required"),
-    user_id: yup.string().required("user_id is required"),
-    tenant_id: yup.string().required("tenant_id is required"),
-    code_challenge: yup.string().optional(),
-    code_challenge_method: yup
-        .string()
-        .optional()
-        .matches(/^(plain|S256|OWH32)$/, "method must be plain, S256, or OWH32"),
-    redirect_uri: yup.string().optional(),
-    scope: yup.string().optional(),
-    nonce: yup.string().optional().max(512),
-    max_age: yup
-        .number()
-        .optional()
-        .integer("max_age must be an integer")
-        .min(0, "max_age must be a non-negative integer"),
-    resource: yup.string().optional(),
-});
-
 const AuthorizeSchema = yup.object().shape({
     // RFC 6749 §4.1.2.1: missing or unsupported response_type → unsupported_response_type.
     // required() catches missing values, oneOf() catches wrong values.
@@ -437,6 +400,5 @@ export const ValidationSchema = {
     UpdateGroupSchema,
     VerifyAuthCodeSchema,
     ConsentSchema,
-    SilentAuthSchema,
     AuthorizeSchema,
 };

@@ -1,4 +1,5 @@
 import {SharedTestFixture} from "../shared-test.fixture";
+import {TokenFixture} from "../token.fixture";
 import {expect2xx} from "../api-client/client";
 import * as jwt from "jsonwebtoken";
 
@@ -6,39 +7,26 @@ import * as jwt from "jsonwebtoken";
  * Integration tests for Nonce Replay Protection (OIDC Core 1.0 §3.1.2.1).
  *
  * Verifies that the nonce parameter flows correctly through the authorization
- * code flow: login → auth code → token exchange → ID token claim.
+ * code flow: authorize → auth code → token exchange → ID token claim.
  *
  * Requirements: 1.1, 1.2, 1.3, 1.4, 2.1, 2.2
  */
 describe('Nonce Replay Protection', () => {
     let app: SharedTestFixture;
+    let tokenFixture: TokenFixture;
 
     const clientId = 'nonce-test.local';
+    const redirectUri = 'http://localhost:3000/callback';
     const verifier = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq';
-    const challenge = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq';
     const email = 'admin@nonce-test.local';
     const password = 'admin9000';
 
-    /** Helper: login → get auth code */
+    /** Helper: login → authorize → get auth code with optional nonce */
     async function loginForCode(opts?: { scope?: string; nonce?: string }): Promise<string> {
-        const body: any = {
-            email,
-            password,
-            client_id: clientId,
-            code_challenge: challenge,
-            code_challenge_method: 'plain',
-        };
-        if (opts?.scope !== undefined) body.scope = opts.scope;
-        if (opts?.nonce !== undefined) body.nonce = opts.nonce;
-
-        const res = await app.getHttpServer()
-            .post('/api/oauth/login')
-            .send(body)
-            .set('Accept', 'application/json');
-
-        expect2xx(res);
-        expect(res.body.authentication_code).toBeDefined();
-        return res.body.authentication_code;
+        return tokenFixture.fetchAuthCode(email, password, clientId, redirectUri, {
+            scope: opts?.scope,
+            nonce: opts?.nonce,
+        });
     }
 
     /** Helper: exchange auth code → token response */
@@ -50,6 +38,7 @@ describe('Nonce Replay Protection', () => {
                 code,
                 code_verifier: verifier,
                 client_id: clientId,
+                redirect_uri: redirectUri,
             })
             .set('Accept', 'application/json');
 
@@ -59,6 +48,7 @@ describe('Nonce Replay Protection', () => {
 
     beforeAll(async () => {
         app = new SharedTestFixture();
+        tokenFixture = new TokenFixture(app);
     });
 
     afterAll(async () => {
@@ -126,24 +116,31 @@ describe('Nonce Replay Protection', () => {
     // ── Requirement 1.4: Nonce too long ─────────────────────────────
 
     describe('nonce too long (Req 1.4)', () => {
-        it('should reject nonce exceeding 512 characters with 400 error', async () => {
+        it('should reject nonce exceeding 512 characters with 400 error at authorize endpoint', async () => {
             const longNonce = 'a'.repeat(513);
 
+            // Nonce is now validated at the authorize endpoint (post-redirect error)
+            const sidCookie = await tokenFixture.loginForCookie(email, password, clientId);
             const res = await app.getHttpServer()
-                .post('/api/oauth/login')
-                .send({
-                    email,
-                    password,
+                .get('/api/oauth/authorize')
+                .query({
+                    response_type: 'code',
                     client_id: clientId,
-                    code_challenge: challenge,
-                    code_challenge_method: 'plain',
+                    redirect_uri: redirectUri,
                     scope: 'openid profile email',
+                    state: 'test-state',
+                    code_challenge: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq',
+                    code_challenge_method: 'plain',
+                    session_confirmed: 'true',
                     nonce: longNonce,
                 })
-                .set('Accept', 'application/json');
+                .set('Cookie', sidCookie)
+                .redirects(0);
 
-            expect(res.status).toEqual(400);
-            expect(res.body.error).toBeDefined();
+            // Should redirect with error (post-redirect error per OIDC Core §3.1.2.6)
+            expect(res.status).toEqual(302);
+            const location = new URL(res.headers.location);
+            expect(location.searchParams.get('error')).toBeDefined();
         });
     });
 

@@ -1,10 +1,7 @@
 import {Component, OnInit} from '@angular/core';
 import {AuthService} from '../_services/auth.service';
-import {SessionService} from '../_services/session.service';
-import {NonceService} from '../_services/nonce.service';
-import {ActivatedRoute, Router} from '@angular/router';
+import {ActivatedRoute} from '@angular/router';
 import {FormBuilder, FormGroup, Validators} from '@angular/forms';
-import {MessageService} from 'primeng/api';
 
 @Component({
     selector: 'app-login',
@@ -29,14 +26,12 @@ import {MessageService} from 'primeng/api';
                 </div>
             </div>
 
-            <!-- Show client info below the image, similar to Sign Up page -->
             <div *ngIf="!loading && !error" class="d-flex justify-content-center">
                 <div class="h5 py-1 px-2 mb-0">
                     {{ clientId }}
                 </div>
             </div>
 
-            <!-- Use one FormGroup with conditional fields -->
             <form
                 (ngSubmit)="loginForm.valid && onSubmit()"
                 *ngIf="!isLoggedIn && !error"
@@ -44,7 +39,6 @@ import {MessageService} from 'primeng/api';
                 class="mt-3"
                 novalidate
             >
-                <!-- If client_id is frozen, show username/password inputs + Login button -->
                 <div *ngIf="freezeClientId">
                     <div class="form-group">
                         <label for="username">Username</label>
@@ -117,7 +111,6 @@ import {MessageService} from 'primeng/api';
                 </div>
             </form>
 
-            <!-- Show confirmation if user is logged in -->
             <div *ngIf="isLoggedIn" class="alert alert-success">
                 Logged in as {{ loginForm.value?.username }}.
             </div>
@@ -169,7 +162,6 @@ import {MessageService} from 'primeng/api';
             background-color: var(--bs-dark, #212529);
             border-color: var(--bs-border-color, #495057);
             color: var(--bs-body-color, #f8f9fa);
-            transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
         }
 
         [data-bs-theme="dark"] .form-control:focus {
@@ -179,59 +171,31 @@ import {MessageService} from 'primeng/api';
             box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
         }
 
-        [data-bs-theme="dark"] .form-control:hover {
-            border-color: var(--bs-primary, #0d6efd);
-        }
-
         [data-bs-theme="dark"] .input-group-text {
             background-color: var(--bs-dark, #212529);
             border-color: var(--bs-border-color, #495057);
             color: var(--bs-body-color, #f8f9fa);
-            transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
         }
 
         [data-bs-theme="dark"] label {
             color: var(--bs-body-color, #f8f9fa);
-            transition: color 0.3s ease;
         }
 
         [data-bs-theme="dark"] .alert-danger {
             background-color: var(--bs-danger-bg-subtle, rgba(220, 53, 69, 0.15));
             border-color: var(--bs-danger-border-subtle, rgba(220, 53, 69, 0.3));
             color: var(--bs-danger-text-emphasis, #ea868f);
-            transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
         }
 
         [data-bs-theme="dark"] .alert-success {
             background-color: var(--bs-success-bg-subtle, rgba(25, 135, 84, 0.15));
             border-color: var(--bs-success-border-subtle, rgba(25, 135, 84, 0.3));
             color: var(--bs-success-text-emphasis, #75b798);
-            transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
-        }
-
-        [data-bs-theme="dark"] a {
-            color: var(--bs-link-color, #0d6efd);
-            transition: color 0.3s ease;
-        }
-
-        [data-bs-theme="dark"] a:hover {
-            color: var(--bs-link-hover-color, #0a58ca);
-            text-decoration: underline;
         }
 
         [data-bs-theme="dark"] .btn-primary {
             background-color: var(--bs-primary, #0d6efd);
             border-color: var(--bs-primary, #0d6efd);
-            transition: background-color 0.3s ease, border-color 0.3s ease;
-        }
-
-        [data-bs-theme="dark"] .btn-primary:hover {
-            background-color: var(--bs-primary-dark, #0b5ed7);
-            border-color: var(--bs-primary-dark, #0b5ed7);
-        }
-
-        [data-bs-theme="dark"] .btn-primary:focus {
-            box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
         }
     `],
 })
@@ -243,25 +207,23 @@ export class AuthorizeLoginComponent implements OnInit {
     errorMessage = '';
     error = '';
     freezeClientId = false;
-    redirectUri = '';
-    code_challenge = '';
     isPasswordVisible = false;
-    code_challenge_method: string = 'S256';
     clientId: string = '';
-    state: string = '';
-    scope: string = '';
-    responseType: string = '';
-    prompt: string = '';
-    maxAge: number | undefined = undefined;
+
+    // OAuth params parsed from query string — used to construct the redirect URL after login
+    private redirectUri = '';
+    private state = '';
+    private scope = '';
+    private responseType = '';
+    private codeChallenge = '';
+    private codeChallengeMethod = '';
+    private nonce = '';
+    private resource = '';
 
     constructor(
         private authService: AuthService,
-        private router: Router,
         private route: ActivatedRoute,
         private fb: FormBuilder,
-        private tokenStorage: SessionService,
-        private messageService: MessageService,
-        private nonceService: NonceService
     ) {
         this.loginForm = this.fb.group({
             username: ['', Validators.required],
@@ -271,20 +233,13 @@ export class AuthorizeLoginComponent implements OnInit {
     }
 
     async ngOnInit(): Promise<void> {
-        let params = this.route.snapshot.queryParamMap;
-
-        // code_challenge is optional — PKCE enforcement is handled by the backend
-        // based on the client's requirePkce setting
-        if (params.has('code_challenge')) {
-            this.code_challenge = params.get('code_challenge')!;
-        }
+        const params = this.route.snapshot.queryParamMap;
 
         if (!params.has('redirect_uri')) {
             this.error = 'Invalid redirect_uri || redirect_uri not found';
             this.loading = false;
             return;
         }
-        this.redirectUri = params.get('redirect_uri')!;
 
         if (!params.has('client_id')) {
             this.error = 'Invalid client_id || client_id not found';
@@ -292,261 +247,59 @@ export class AuthorizeLoginComponent implements OnInit {
             return;
         }
 
-        if (params.has('client_id')) {
-            const cid = params.get('client_id');
-            this.loginForm.patchValue({client_id: cid});
-            if (cid && cid.length > 0) {
-                this.freezeClientId = true;
-            }
-        }
-
-        if (params.has('code_challenge_method')) {
-            this.code_challenge_method = params.get('code_challenge_method')!;
-        }
-
-        // Read remaining query parameters from snapshot (must happen before auth code check
-        // so that state, scope, etc. are available for any early redirects)
-        this.clientId = params.get('client_id') || '';
+        // Parse all OAuth params from query string
+        this.redirectUri = params.get('redirect_uri')!;
+        this.clientId = params.get('client_id')!;
         this.state = params.get('state') || '';
         this.scope = params.get('scope') || '';
-        this.responseType = params.get('response_type') || '';
-        this.prompt = params.get('prompt') || '';
-        this.maxAge = params.has('max_age') ? Number(params.get('max_age')) : undefined;
+        this.responseType = params.get('response_type') || 'code';
+        this.codeChallenge = params.get('code_challenge') || '';
+        this.codeChallengeMethod = params.get('code_challenge_method') || '';
+        this.nonce = params.get('nonce') || '';
+        this.resource = params.get('resource') || '';
 
-        // if auth code is present, then redirect
-        // verify auth-code
-        const authCode = this.tokenStorage.getAuthCode();
-        if (authCode) {
-            try {
-                const data = await this.authService.validateAuthCode(authCode, this.loginForm.get('client_id')?.value);
-                if (data.status) {
-                    await this.router.navigate(['session-confirm'], {
-                        queryParams: {
-                            redirect_uri: this.redirectUri,
-                            client_id: this.loginForm.get('client_id')?.value,
-                            code_challenge: this.code_challenge,
-                            state: this.state,
-                        },
-                    });
-                }
-            } catch (e: any) {
-                console.error('Auth code verification failed, attempting silent-auth recovery:', e);
-                // Cached code is used/expired — attempt silent-auth to get a fresh code
-                try {
-                    const decoded = this.tokenStorage.getDecodedToken();
-                    if (decoded && decoded.sub && decoded.tenant?.id) {
-                        const silentData = await this.authService.silentAuth({
-                            client_id: this.loginForm.get('client_id')?.value,
-                            user_id: decoded.sub,
-                            tenant_id: decoded.tenant.id,
-                            code_challenge: this.code_challenge,
-                            code_challenge_method: this.code_challenge_method,
-                        });
-
-                        if (silentData.authentication_code) {
-                            // Save the fresh code and navigate to session-confirm
-                            this.tokenStorage.saveAuthCode(silentData.authentication_code);
-                            await this.router.navigate(['session-confirm'], {
-                                queryParams: {
-                                    redirect_uri: this.redirectUri,
-                                    client_id: this.loginForm.get('client_id')?.value,
-                                    code_challenge: this.code_challenge,
-                                    state: this.state,
-                                },
-                            });
-                            return;
-                        }
-                    }
-                    // silent-auth didn't return a code or no valid session — clear stale code and show login
-                    this.tokenStorage.clearAuthCode();
-                } catch (silentErr: any) {
-                    console.error('Silent-auth recovery also failed:', silentErr);
-                    // Clear stale code from sessionStorage and fall through to show login form
-                    this.tokenStorage.clearAuthCode();
-                }
-            }
+        this.loginForm.patchValue({client_id: this.clientId});
+        if (this.clientId.length > 0) {
+            this.freezeClientId = true;
         }
-        // else if (this.tokenStorage.isLoggedIn() && !externalLogin) {
-        //     await this.router.navigateByUrl("/home");
-        // }
+
         this.loading = false;
-
-        // Use the RP-provided nonce if present; do not generate one when the RP omitted it.
-        // Per OIDC Core §3.1.2.1, the nonce is the RP's responsibility — if the RP didn't
-        // send one, injecting our own would cause the RP's token validation to fail because
-        // the ID token would contain a nonce the RP never sent and cannot verify.
-        const rpNonce = params.get('nonce');
-        if (rpNonce) {
-            this.nonceService.store(rpNonce);
-        }
-
-        // Handle prompt=none: skip login form, attempt silent auth
-        if (this.prompt === 'none') {
-            this.handleSilentAuth();
-        }
     }
 
-    onContinue() {
-        // this.loginForm.get('client_id')?.disable();
-        this.freezeClientId = true;
-    }
-
-    // redirection to home page might not work sometime,
-    // check if internally anything is nav-ing to login page again
-    async onSubmit(subscriberTenantHint?: string): Promise<void> {
+    async onSubmit(): Promise<void> {
         this.loading = true;
+        this.isLoginFailed = false;
         const {username, password, client_id} = this.loginForm.value;
-        const nonce = this.nonceService.retrieve();
+
         try {
-            const data = await this.authService.login(
-                username,
-                password,
-                client_id,
-                this.code_challenge,
-                this.code_challenge_method,
-                subscriberTenantHint,
-                nonce || undefined,
-                this.prompt || undefined,
-                this.maxAge,
-            );
+            // Login sets the sid cookie and returns {success: true}
+            await this.authService.login(username, password, client_id);
 
-            if (data.requires_tenant_selection) {
-                // Ambiguity detected — navigate to tenant selection
-                this.router.navigate(['/tenant-selection'], {
-                    state: {
-                        tenants: data.tenants,
-                        loginParams: {
-                            username, password, client_id,
-                            code_challenge: this.code_challenge,
-                            code_challenge_method: this.code_challenge_method,
-                        },
-                        redirectUri: this.redirectUri,
-                        state: this.state,
-                    }
-                });
-                return;
+            // Construct redirect URL from OAuth params we already have, append session_confirmed=true
+            const authorizeParams = new URLSearchParams();
+            authorizeParams.set('client_id', client_id);
+            authorizeParams.set('redirect_uri', this.redirectUri);
+            authorizeParams.set('response_type', this.responseType || 'code');
+            if (this.scope) authorizeParams.set('scope', this.scope);
+            if (this.state) authorizeParams.set('state', this.state);
+            if (this.codeChallenge) {
+                authorizeParams.set('code_challenge', this.codeChallenge);
+                authorizeParams.set('code_challenge_method', this.codeChallengeMethod || 'plain');
             }
+            if (this.nonce) authorizeParams.set('nonce', this.nonce);
+            if (this.resource) authorizeParams.set('resource', this.resource);
+            authorizeParams.set('session_confirmed', 'true');
 
-            if (data.requires_consent) {
-                // Consent required — navigate to consent screen
-                this.router.navigate(['/consent'], {
-                    state: {
-                        client_name: data.client_name,
-                        scopes: data.requested_scopes,
-                        client_id: data.client_id,
-                        prompt: this.prompt || undefined,
-                        loginParams: {
-                            username, password, client_id,
-                            code_challenge: this.code_challenge,
-                            code_challenge_method: this.code_challenge_method,
-                            redirect_uri: this.redirectUri,
-                            state: this.state,
-                            nonce: nonce || undefined,
-                        },
-                        redirectUri: this.redirectUri,
-                        state: this.state,
-                    }
-                });
-                return;
-            }
-
-            let authenticationCode = data.authentication_code;
-            this.isLoginFailed = false;
-            this.isLoggedIn = true;
-            this.tokenStorage.saveAuthCode(authenticationCode);
-            this.redirectToClient(authenticationCode);
+            // Full-page navigation — browser attaches the newly set sid cookie automatically
+            window.location.href = `/api/oauth/authorize?${authorizeParams.toString()}`;
         } catch (err: any) {
             console.error(err);
             this.errorMessage = err.error?.message || 'Login failed';
             this.isLoginFailed = true;
+            // Clear password field on error
+            this.loginForm.patchValue({password: ''});
         } finally {
             this.loading = false;
         }
     }
-
-    private redirectToClient(authCode: string) {
-        const redirectUrl = new URL(this.redirectUri);
-        redirectUrl.searchParams.append('code', authCode);
-        if (this.state) {
-            redirectUrl.searchParams.append('state', this.state);
-        }
-        window.location.href = redirectUrl.toString();
-    }
-
-    private async handleSilentAuth(): Promise<void> {
-        this.loading = true;
-        try {
-            // For silent auth, we need user_id and tenant_id from the existing session.
-            // These would typically come from a stored session token.
-            const token = this.tokenStorage.getToken();
-            if (!token) {
-                // No existing session — redirect with login_required error
-                this.redirectWithError('login_required', 'User authentication is required but prompt=none was requested');
-                return;
-            }
-
-            const decoded = this.tokenStorage.getDecodedToken();
-            if (!decoded || !decoded.sub || !decoded.tenant?.id) {
-                this.redirectWithError('login_required', 'User authentication is required but prompt=none was requested');
-                return;
-            }
-
-            const nonce = this.nonceService.retrieve();
-            const data = await this.authService.silentAuth({
-                client_id: this.loginForm.get('client_id')?.value,
-                user_id: decoded.sub,
-                tenant_id: decoded.tenant.id,
-                code_challenge: this.code_challenge,
-                code_challenge_method: this.code_challenge_method,
-                redirect_uri: this.redirectUri,
-                scope: this.scope,
-                nonce: nonce || undefined,
-                max_age: this.maxAge,
-            });
-
-            if (data.error) {
-                this.redirectWithError(data.error, data.error_description || '');
-            } else if (data.authentication_code) {
-                this.tokenStorage.saveAuthCode(data.authentication_code);
-                this.redirectToClient(data.authentication_code);
-            } else {
-                this.redirectWithError('interaction_required', 'Silent authentication failed');
-            }
-        } catch (err: any) {
-            console.error('Silent auth error:', err);
-            const error = err.error?.error || 'login_required';
-            const description = err.error?.error_description || 'User authentication is required but prompt=none was requested';
-            this.redirectWithError(error, description);
-        } finally {
-            this.loading = false;
-        }
-    }
-
-    private redirectWithError(error: string, errorDescription: string): void {
-        const redirectUrl = new URL(this.redirectUri);
-        redirectUrl.searchParams.append('error', error);
-        redirectUrl.searchParams.append('error_description', errorDescription);
-        if (this.state) {
-            redirectUrl.searchParams.append('state', this.state);
-        }
-        window.location.href = redirectUrl.toString();
-    }
-
-    // async onSigUpClick() {
-    //     console.log(this.clientId);
-    //     await this.router.navigate(['/signup'], {
-    //         queryParams: {
-    //             client_id: this.clientId,
-    //         },
-    //     });
-    // }
-
-    // protected isAbsoluteUrl(url: string): boolean {
-    //     try {
-    //         new URL(url);
-    //         return true;
-    //     } catch (error) {
-    //         return false;
-    //     }
-    // }
 }
