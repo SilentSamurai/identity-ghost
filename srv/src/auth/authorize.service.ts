@@ -7,6 +7,7 @@ import {Client} from '../entity/client.entity';
 import {ValidationSchema} from '../validation/validation.schema';
 import {ResourceIndicatorValidator} from './resource-indicator.validator';
 import {IdTokenHintValidator} from './id-token-hint.validator';
+import {AmbiguousClientIdException} from '../exceptions/ambiguous-client-id.exception';
 
 export interface AuthorizeQueryParams {
     response_type?: string;
@@ -204,6 +205,11 @@ export class AuthorizeService {
         try {
             return await this.clientService.findByClientIdOrAlias(clientId);
         } catch (error) {
+            // Req 8.7: ambiguous client_id (matches both a UUID and an alias on different rows)
+            // must return invalid_request, not unauthorized_client
+            if (error instanceof AmbiguousClientIdException) {
+                throw OAuthException.invalidRequest('ambiguous client_id');
+            }
             if (error instanceof NotFoundException) {
                 throw OAuthException.invalidRequest('Unknown client_id');
             }

@@ -24,6 +24,7 @@ import {AddResourceIndicatorSupport1760000000000} from "./1760000000000-AddResou
 import {RemoveTenantCredentialColumns1762000000000} from "./1762000000000-RemoveTenantCredentialColumns";
 import {MakeAuthCodePkceColumnsNullable1763000000000} from "./1763000000000-MakeAuthCodePkceColumnsNullable";
 import {AddSkipSessionConfirmToTenants1764000000000} from "./1764000000000-AddSkipSessionConfirmToTenants";
+import {AddAppClientIdentity1770000000000} from "./1770000000000-AddAppClientIdentity";
 
 export const migrations = [
     CreateInitialTables1681147242561,
@@ -51,5 +52,6 @@ export const migrations = [
     AddResourceIndicatorSupport1760000000000,
     RemoveTenantCredentialColumns1762000000000,
     MakeAuthCodePkceColumnsNullable1763000000000,
-    AddSkipSessionConfirmToTenants1764000000000
+    AddSkipSessionConfirmToTenants1764000000000,
+    AddAppClientIdentity1770000000000
 ];

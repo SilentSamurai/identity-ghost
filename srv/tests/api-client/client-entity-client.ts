@@ -48,6 +48,7 @@ export class ClientEntityClient extends HttpClient {
 
     public async updateClient(clientId: string, body: {
         name?: string;
+        alias?: string;
         redirectUris?: string[];
         requirePkce?: boolean;
         allowPasswordGrant?: boolean;

@@ -8,6 +8,14 @@ import {SessionService} from '../../../_services/session.service';
     template: `
         <app-standard-dialog title="Update App" subtitle="Modify application details">
             <app-dialog-tab name="App Details">
+                <div class="mb-3">
+                    <label class="form-label">Client ID</label>
+                    <div><code>{{ app.clientId }}</code></div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Alias</label>
+                    <div><code>{{ app.alias }}</code></div>
+                </div>
                 <form (ngSubmit)="onSubmit()">
                     <div class="mb-3">
                         <label for="name" class="form-label">Name</label>

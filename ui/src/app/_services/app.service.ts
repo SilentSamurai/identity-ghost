@@ -68,7 +68,7 @@ export class AppService {
 
     createDataModel() {
         return new RestApiModel(this.http, `/api/search/Apps`, ['id'], query({
-            expand: ['owner']
+            expand: ['owner', 'client']
         }));
     }
 

@@ -52,7 +52,9 @@ import {ResourceIndicatorValidator} from "../auth/resource-indicator.validator";
 import {Environment} from "../config/environment.service";
 import {RefreshTokenService} from "../auth/refresh-token.service";
 import {TenantAmbiguityService, TenantInfo} from "../auth/tenant-ambiguity.service";
-import { deprecate } from "util";
+import {FirstPartyResolver} from "../auth/first-party-resolver";
+import {AppClientAuditLogger} from "../log/app-client-audit.logger";
+import {AppService} from "../services/app.service";
 
 const logger = new Logger("OAuthTokenController");
 
@@ -72,6 +74,9 @@ export class OAuthTokenController {
         private readonly clientService: ClientService,
         private readonly refreshTokenService: RefreshTokenService,
         private readonly tenantAmbiguityService: TenantAmbiguityService,
+        private readonly firstPartyResolver: FirstPartyResolver,
+        private readonly appClientAuditLogger: AppClientAuditLogger,
+        private readonly appService: AppService,
     ) {
     }
 
@@ -115,7 +120,19 @@ export class OAuthTokenController {
 
             // 5. Session valid — resolve client and consent
             const client = await this.clientService.findByClientIdOrAlias(query.client_id!);
-            const isFirstParty = client.alias === query.client_id;
+            const isFirstParty = await this.firstPartyResolver.isFirstParty(client);
+
+            // Task 15.3: Log when authorize resolves to an App_Client
+            const linkedApp = await this.appService.findByClientId(client.id);
+            if (linkedApp) {
+                this.appClientAuditLogger.logAuthorizeResolved({
+                    appId: linkedApp.id,
+                    clientId: client.clientId,
+                    alias: client.alias || '',
+                    userId: session.userId,
+                    correlationId: '',
+                });
+            }
 
             const resolvedScopes = this.scopeResolverService.resolveScopes(
                 validated.scope, client.allowedScopes || 'openid profile email',
@@ -359,8 +376,8 @@ export class OAuthTokenController {
             throw OAuthException.invalidClient('Unknown client_id');
         }
 
-        // Check if this is a first-party app (alias matches client_id)
-        const isFirstParty = client.alias === body.client_id;
+        // Check if this is a first-party app (stored identity lookup)
+        const isFirstParty = await this.firstPartyResolver.isFirstParty(client);
 
         // For third-party apps without a hint, check for ambiguous tenants
         if (!isFirstParty && !body.subscriber_tenant_hint) {

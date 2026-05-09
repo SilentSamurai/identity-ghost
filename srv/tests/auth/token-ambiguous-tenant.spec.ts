@@ -32,7 +32,6 @@ import {TokenFixture} from '../token.fixture';
 import {UsersClient} from '../api-client/user-client';
 import {AdminTenantClient} from '../api-client/admin-tenant-client';
 import {HelperFixture} from '../helper.fixture';
-import {ClientEntityClient} from '../api-client/client-entity-client';
 
 describe('Ambiguous Subscription Tenant Flow', () => {
     let app: SharedTestFixture;
@@ -41,7 +40,6 @@ describe('Ambiguous Subscription Tenant Flow', () => {
     let tokenFixture: TokenFixture;
     let usersClient: UsersClient;
     let adminTenantClient: AdminTenantClient;
-    let clientEntityClient: ClientEntityClient;
     let superAdminToken: string;
 
     beforeAll(async () => {
@@ -57,7 +55,6 @@ describe('Ambiguous Subscription Tenant Flow', () => {
         appClient = new AppClient(app, superAdminToken);
         usersClient = new UsersClient(app, superAdminToken);
         adminTenantClient = new AdminTenantClient(app, superAdminToken);
-        clientEntityClient = new ClientEntityClient(app, superAdminToken);
 
         // Enable password grant on seeded tenants used by these tests
         const helper = new HelperFixture(app, superAdminToken);
@@ -323,19 +320,32 @@ describe('Ambiguous Subscription Tenant Flow', () => {
             expect(appOwnerTenant).toBeDefined();
             expect(subscriber1).toBeDefined();
 
+            // Create an app and subscribe subscriber1 to it
+            // Per the new per-app OAuth client identity design, hint validation requires
+            // the client to be linked to an App with active subscriptions
+            const createdApp = await appClient.createApp(
+                appOwnerTenant.id,
+                `authcode-hint-app-${uuid()}`,
+                `http://localhost:${app.webhook.boundPort}`,
+                'App for hint validation test'
+            );
+            await appClient.publishApp(createdApp.id);
+            await adminTenantClient.subscribeToApp(subscriber1.id, createdApp.id);
+
             const testUserEmail = `authcode-hint-${uuid()}@test.com`;
             const testUserPassword = 'TestPassword123!';
             await usersClient.createUser('Auth Code Hint User', testUserEmail, testUserPassword);
 
             await adminTenantClient.addMembers(subscriber1.id, [testUserEmail]);
 
-            // POST /login with hint — should create session even if hint is provided
+            // POST /login with hint using the App's clientId (App_Client)
+            // The hint is validated against subscriber tenants for this specific App
             const loginResponse = await app.getHttpServer()
                 .post('/api/oauth/login')
                 .send({
                     email: testUserEmail,
                     password: testUserPassword,
-                    client_id: appOwnerTenant.domain,
+                    client_id: createdApp.clientId,
                     subscriber_tenant_hint: subscriber1.domain,
                 })
                 .set('Accept', 'application/json');
@@ -387,11 +397,8 @@ describe('Ambiguous Subscription Tenant Flow', () => {
             expect(appOwnerTenant).toBeDefined();
             expect(subscriber1).toBeDefined();
 
-            // Webhook URL must be reachable by the subscription onboard callback — keep it on localhost.
+            // Use localhost for the appUrl - this is automatically registered as a redirect URI
             const appUrl = `http://localhost:${app.webhook.boundPort}`;
-            // Redirect URI just needs to pass yup `.url()` validation on client creation
-            // and match itself across authorize + token exchange. It is never fetched.
-            const redirectUri = 'https://authcode-full-flow.example.com/callback';
 
             // Create an app owned by the app owner tenant and subscribe subscriber1 to it
             const createdApp = await appClient.createApp(
@@ -403,18 +410,10 @@ describe('Ambiguous Subscription Tenant Flow', () => {
             await appClient.publishApp(createdApp.id);
             await adminTenantClient.subscribeToApp(subscriber1.id, createdApp.id);
 
-            // Create a third-party client with redirect URI registered
-            // This is needed because the default client (domain alias) has no redirect URIs
-            const clientResult = await clientEntityClient.createClient(
-                appOwnerTenant.id,
-                `test-client-${uuid()}`,
-                {
-                    redirectUris: [redirectUri],
-                    allowedScopes: 'openid profile email',
-                    grantTypes: 'authorization_code',
-                }
-            );
-            const clientId = clientResult.client.clientId;
+            // Use the App's clientId for the OAuth flow
+            // The appUrl is already registered as a redirect URI when the app is created
+            const clientId = createdApp.clientId;
+            const redirectUri = appUrl; // Use the same URL that was registered
 
             const testUserEmail = `authcode-full-flow-${uuid()}@test.com`;
             const testUserPassword = 'TestPassword123!';
@@ -422,7 +421,7 @@ describe('Ambiguous Subscription Tenant Flow', () => {
 
             await adminTenantClient.addMembers(subscriber1.id, [testUserEmail]);
 
-            // Pre-grant consent for this third-party client so /authorize issues a code
+            // Pre-grant consent for this App_Client so /authorize issues a code
             // directly instead of redirecting to the consent UI.
             await tokenFixture.preGrantConsent(
                 testUserEmail,
@@ -432,8 +431,7 @@ describe('Ambiguous Subscription Tenant Flow', () => {
                 'openid profile email',
             );
 
-            // Step 1: Login with hint
-            // Using the actual clientId (not domain alias) makes this a third-party app
+            // Step 1: Login with hint using the App's clientId
             const loginResponse = await app.getHttpServer()
                 .post('/api/oauth/login')
                 .send({
@@ -455,7 +453,13 @@ describe('Ambiguous Subscription Tenant Flow', () => {
             expect(sidCookie).toBeDefined();
 
             // Step 2: Authorize with hint — should issue code
-            const codeVerifier = 'test-verifier-' + uuid();
+            // App_Clients require PKCE with S256 method by default
+            const codeVerifier = 'test-verifier-' + uuid() + '-padding-to-make-it-long-enough';
+            const codeChallenge = require('crypto')
+                .createHash('sha256')
+                .update(codeVerifier)
+                .digest('base64url');
+            
             const authorizeResponse = await app.getHttpServer()
                 .get('/api/oauth/authorize')
                 .query({
@@ -464,8 +468,8 @@ describe('Ambiguous Subscription Tenant Flow', () => {
                     response_type: 'code',
                     scope: 'openid profile email',
                     state: 'test-state',
-                    code_challenge: codeVerifier,
-                    code_challenge_method: 'plain',
+                    code_challenge: codeChallenge,
+                    code_challenge_method: 'S256',
                     subscriber_tenant_hint: subscriber1.domain,
                     session_confirmed: 'true',
                 })

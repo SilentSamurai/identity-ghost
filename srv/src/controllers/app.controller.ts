@@ -38,6 +38,29 @@ export class AppController {
     ) {
     }
 
+    private mapAppResponse(app: any): any {
+        return {
+            id: app.id,
+            name: app.name,
+            appUrl: app.appUrl,
+            description: app.description,
+            isPublic: app.isPublic,
+            ownerTenantId: app.owner?.id,
+            createdAt: app.createdAt,
+            clientId: app.client?.clientId,
+            alias: app.client?.alias,
+        };
+    }
+
+    private mapAppDetailResponse(app: any): any {
+        const base = this.mapAppResponse(app);
+        if (app.client) {
+            const {clientSecrets, ...safeClient} = app.client;
+            base.client = safeClient;
+        }
+        return base;
+    }
+
     @Post("/create")
     @UseGuards(JwtAuthGuard)
     async createApp(
@@ -48,7 +71,7 @@ export class AppController {
         @Body('description', schemaPipe(yup.string().max(128))) description: string
     ) {
         const app = await this.appService.createApp(permission, tenantId, name, appUrl, description);
-        return app;
+        return this.mapAppResponse(app);
     }
 
     @Patch('/:appId')
@@ -61,7 +84,7 @@ export class AppController {
         @Body('description', schemaPipe(yup.string().max(128))) description: string
     ) {
         const app = await this.appService.updateApp(permission, appId, name, appUrl, description);
-        return app;
+        return this.mapAppResponse(app);
     }
 
     @Delete('/:appId')
@@ -105,13 +128,23 @@ export class AppController {
         return this.subscriptionService.findByTenantId(tenantId);
     }
 
+    @Get('/:appId')
+    @UseGuards(JwtAuthGuard)
+    async getAppDetail(
+        @Param('appId', ParseUUIDPipe) appId: string,
+    ) {
+        const app = await this.appService.getAppById(appId);
+        return this.mapAppDetailResponse(app);
+    }
+
     @Get('/my/created')
     @UseGuards(JwtAuthGuard)
     async getMyAppsCreated(
         @CurrentPermission() permission: Permission,
         @CurrentTenantId() tenantId: string,
     ) {
-        return this.appService.findByTenantId(tenantId);
+        const apps = await this.appService.findByTenantId(tenantId);
+        return apps.map(a => this.mapAppResponse(a));
     }
 
     @Get('/my/available')
@@ -120,7 +153,8 @@ export class AppController {
         @CurrentPermission() permission: Permission,
         @CurrentTenantId() tenantId: string,
     ) {
-        return this.appService.findAllApps(tenantId);
+        const apps = await this.appService.findAllApps(tenantId);
+        return apps.map(a => this.mapAppResponse(a));
     }
 
     @Get('/subscriptions/:appId')

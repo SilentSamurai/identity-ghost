@@ -187,6 +187,7 @@ export class StartUpService implements OnModuleInit {
                 },
                 {name: "Client Rotate Test Tenant", domain: "client-rotate-test.local", signUp: false},
                 {name: "Auth Code Reuse Test Tenant", domain: "auth-code-reuse-test.local", signUp: false, redirectUris: ['http://localhost:3000/callback']},
+                {name: "Per-App Client Test Tenant", domain: "per-app-client-test.local", signUp: false, redirectUris: ['http://localhost:3000/callback']},
             ];
 
             // 4) Create each tenant and assign the existing user as owner

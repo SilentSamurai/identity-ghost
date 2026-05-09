@@ -48,6 +48,7 @@ const CreateClientSchema = yup.object().shape({
 
 const UpdateClientSchema = yup.object().shape({
     name: yup.string().max(128),
+    alias: yup.string().max(253),
     redirectUris: yup.array().of(yup.string().url('each redirectUri must be a valid URL')),
     requirePkce: yup.boolean(),
     allowPasswordGrant: yup.boolean(),
@@ -139,6 +140,7 @@ export class ClientController {
         @Param('clientId') clientId: string,
         @Body(schemaPipe(UpdateClientSchema)) body: {
             name?: string;
+            alias?: string;
             redirectUris?: string[];
             requirePkce?: boolean;
             allowPasswordGrant?: boolean;

@@ -323,7 +323,8 @@ const AuthorizeSchema = yup.object().shape({
         .oneOf(["code"], "The response_type parameter must be \"code\""),
     client_id: yup
         .string()
-        .required("client_id is required"),
+        .required("client_id is required")
+        .min(1, "client_id must not be empty"),
     redirect_uri: yup
         .string()
         .optional(),

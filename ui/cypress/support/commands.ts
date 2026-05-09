@@ -136,6 +136,8 @@ Cypress.Commands.add('addAppFromOverview', (appName: string, appUrl: string, des
         expect(interception.response?.statusCode).to.be.oneOf([201, 200]);
     });
 
+    cy.get('.modal-footer').contains('button', 'Done').click();
+
     cy.contains("td", appName).should("exist");
 });
 
