@@ -26,6 +26,11 @@ import {UserConsent} from "../entity/user-consent.entity";
 import {SecurityModule} from "../security/security.module";
 import {PromptService} from "./prompt.service";
 import {IdTokenHintValidator} from "./id-token-hint.validator";
+import {TenantAmbiguityService} from "./tenant-ambiguity.service";
+import {TenantMember} from "../entity/tenant.members.entity";
+import {Subscription} from "../entity/subscription.entity";
+import {Tenant} from "../entity/tenant.entity";
+import {App} from "../entity/app.entity";
 
 @Module({
     imports: [
@@ -34,11 +39,11 @@ import {IdTokenHintValidator} from "./id-token-hint.validator";
         ServiceModule,
         SecurityModule,
         PassportModule,
-        TypeOrmModule.forFeature([AuthCode, User, RefreshToken, LoginSession, UserConsent]),
+        TypeOrmModule.forFeature([AuthCode, User, RefreshToken, LoginSession, UserConsent, TenantMember, Subscription, Tenant, App]),
     ],
     controllers: [],
-    providers: [JwtAuthGuard, AuthService, AuthCodeService, TokenIssuanceService, TenantResolutionGuard, SuperAdminGuard, IdTokenService, TokenIntrospectionService, RefreshTokenService, TokenRevocationService, ClaimsResolverService, AuthorizeService, LoginSessionService, ConsentService, PromptService, IdTokenHintValidator],
-    exports: [JwtAuthGuard, AuthService, AuthCodeService, TokenIssuanceService, TenantResolutionGuard, SuperAdminGuard, IdTokenService, TokenIntrospectionService, RefreshTokenService, TokenRevocationService, ClaimsResolverService, AuthorizeService, LoginSessionService, ConsentService, PromptService, IdTokenHintValidator],
+    providers: [JwtAuthGuard, AuthService, AuthCodeService, TokenIssuanceService, TenantResolutionGuard, SuperAdminGuard, IdTokenService, TokenIntrospectionService, RefreshTokenService, TokenRevocationService, ClaimsResolverService, AuthorizeService, LoginSessionService, ConsentService, PromptService, IdTokenHintValidator, TenantAmbiguityService],
+    exports: [JwtAuthGuard, AuthService, AuthCodeService, TokenIssuanceService, TenantResolutionGuard, SuperAdminGuard, IdTokenService, TokenIntrospectionService, RefreshTokenService, TokenRevocationService, ClaimsResolverService, AuthorizeService, LoginSessionService, ConsentService, PromptService, IdTokenHintValidator, TenantAmbiguityService],
 })
 export class AuthModule {
 }

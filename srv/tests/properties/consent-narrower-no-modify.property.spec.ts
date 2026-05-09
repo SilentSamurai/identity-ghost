@@ -16,20 +16,19 @@ import {ScopeNormalizer} from '../../src/casl/scope-normalizer';
  */
 describe('Feature: user-consent-tracking, Property 5: Narrower requests do not modify the consent record', () => {
     let fixture: SharedTestFixture;
+    let tokenFixture: TokenFixture;
     let clientApi: ClientEntityClient;
     let testTenantId: string;
 
     const REDIRECT_URI = 'https://consent-narrower-prop.example.com/callback';
     const CODE_CHALLENGE = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq';
+    const email = 'admin@auth.server.com';
+    const password = 'admin9000';
 
     beforeAll(async () => {
         fixture = new SharedTestFixture();
-        const tokenFixture = new TokenFixture(fixture);
-        const {accessToken} = await tokenFixture.fetchAccessToken(
-            'admin@auth.server.com',
-            'admin9000',
-            'auth.server.com',
-        );
+        tokenFixture = new TokenFixture(fixture);
+        const {accessToken} = await tokenFixture.fetchAccessToken(email, password, 'auth.server.com');
         clientApi = new ClientEntityClient(fixture, accessToken);
 
         const tenantClient = new TenantClient(fixture, accessToken);
@@ -46,49 +45,43 @@ describe('Feature: user-consent-tracking, Property 5: Narrower requests do not m
     });
 
     /**
-     * Grant consent via the consent endpoint.
+     * Drive /authorize and determine if consent is required.
+     * Returns true if /authorize redirected to the consent UI.
      */
-    async function grantConsent(clientId: string, scopes: string[]) {
-        return fixture.getHttpServer()
-            .post('/api/oauth/consent')
-            .send({
-                email: 'admin@auth.server.com',
-                password: 'admin9000',
-                client_id: clientId,
-                code_challenge: CODE_CHALLENGE,
-                code_challenge_method: 'plain',
-                redirect_uri: REDIRECT_URI,
-                approved_scopes: scopes,
-                consent_action: 'approve',
-                scope: scopes.join(' '),
-            })
-            .set('Accept', 'application/json');
-    }
+    async function isConsentRequired(clientId: string, requestedScopes: string[]): Promise<boolean> {
+        const sidCookie = await tokenFixture.loginForCookie(email, password, clientId);
 
-    /**
-     * Call checkConsent (via the login endpoint) with the given requested scopes.
-     * Returns the login response body.
-     */
-    async function callCheckConsent(clientId: string, requestedScopes: string[]) {
-        return fixture.getHttpServer()
-            .post('/api/oauth/login')
-            .send({
-                email: 'admin@auth.server.com',
-                password: 'admin9000',
+        const res = await fixture.getHttpServer()
+            .get('/api/oauth/authorize')
+            .query({
+                response_type: 'code',
                 client_id: clientId,
-                code_challenge: CODE_CHALLENGE,
-                code_challenge_method: 'plain',
                 redirect_uri: REDIRECT_URI,
                 scope: requestedScopes.join(' '),
+                state: 'narrower-check',
+                code_challenge: CODE_CHALLENGE,
+                code_challenge_method: 'plain',
+                session_confirmed: 'true',
             })
-            .set('Accept', 'application/json');
+            .set('Cookie', sidCookie)
+            .redirects(0);
+
+        expect(res.status).toEqual(302);
+        const location = res.headers['location'] as string;
+        expect(location).toBeDefined();
+
+        if (location.includes('/consent?')) return true;
+
+        const url = new URL(location, 'http://localhost');
+        expect(url.searchParams.has('error')).toBe(false);
+        expect(url.searchParams.get('code')).toBeTruthy();
+        return false;
     }
 
     /**
-     * Verify that the stored consent record still covers exactly the original scopes G
-     * by checking that:
-     * 1. Login with G succeeds (no consent required) — G is still stored
-     * 2. Login with any scope outside G requires consent — no extra scopes were added
+     * Verify that the stored consent record still covers exactly the original scopes G by checking:
+     * 1. /authorize with G → issues code (G is still stored)
+     * 2. /authorize with any scope outside G → consent required (no extra scopes were added)
      */
     async function verifyGrantedScopesUnchanged(
         clientId: string,
@@ -97,43 +90,28 @@ describe('Feature: user-consent-tracking, Property 5: Narrower requests do not m
         const normalizedG = ScopeNormalizer.format(originalGrantedScopes);
         const gScopeArray = ScopeNormalizer.parse(normalizedG);
 
-        // Login with G — must NOT require consent (G is still stored)
-        const loginWithG = await callCheckConsent(clientId, gScopeArray);
-        expect(loginWithG.status).toEqual(201);
-        expect(loginWithG.body.authentication_code).toBeDefined();
-        expect(loginWithG.body.requires_consent).toBeUndefined();
+        // /authorize with G — must NOT require consent (G is still stored)
+        expect(await isConsentRequired(clientId, gScopeArray)).toBe(false);
 
         // Determine scopes NOT in G
         const allScopes = ['openid', 'profile', 'email'];
         const scopesOutsideG = allScopes.filter(s => !gScopeArray.includes(s));
 
-        // If there are scopes outside G, login with G + extra must require consent
-        // (the record was not expanded beyond G)
+        // If there are scopes outside G, requesting G + extra must require consent.
         if (scopesOutsideG.length > 0) {
-            const loginWithExtra = await callCheckConsent(
-                clientId,
-                [...gScopeArray, ...scopesOutsideG],
-            );
-            expect(loginWithExtra.status).toEqual(201);
-            expect(loginWithExtra.body.requires_consent).toBe(true);
+            expect(await isConsentRequired(clientId, [...gScopeArray, ...scopesOutsideG])).toBe(true);
         }
     }
 
-    it('stored granted_scopes remain equal to G after checkConsent with R ⊆ G', async () => {
+    it('stored granted_scopes remain equal to G after a narrower request with R ⊆ G', async () => {
         await fc.assert(
             fc.asyncProperty(
-                // G: granted scopes (at least 1 scope)
                 fc.subarray(['openid', 'profile', 'email'], {minLength: 1}),
                 async (grantedScopes) => {
-                    // Derive R as a subset of G: take a non-empty prefix of G
-                    // We use fc.subarray on the actual grantedScopes to get a subset
+                    // Derive a non-empty R ⊆ G
                     const requestedScopes = grantedScopes.length === 1
-                        ? grantedScopes  // only one option: R = G
+                        ? grantedScopes
                         : grantedScopes.slice(0, Math.max(1, grantedScopes.length - 1));
-
-                    // Ensure R ⊆ G
-                    const rSubsetOfG = requestedScopes.every(s => grantedScopes.includes(s));
-                    fc.pre(rSubsetOfG && requestedScopes.length >= 1);
 
                     const uniqueSuffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
                     const client = await clientApi.createClient(
@@ -149,16 +127,10 @@ describe('Feature: user-consent-tracking, Property 5: Narrower requests do not m
 
                     try {
                         // Step 1: Create consent record with G
-                        const grantResponse = await grantConsent(clientId, grantedScopes);
-                        expect(grantResponse.status).toEqual(201);
-                        expect(grantResponse.body.authentication_code).toBeDefined();
+                        await tokenFixture.preGrantConsent(email, password, clientId, REDIRECT_URI, grantedScopes.join(' '));
 
-                        // Step 2: Call checkConsent with R ⊆ G (via login endpoint)
-                        const checkResponse = await callCheckConsent(clientId, requestedScopes);
-                        expect(checkResponse.status).toEqual(201);
-                        // R ⊆ G → consent not required
-                        expect(checkResponse.body.authentication_code).toBeDefined();
-                        expect(checkResponse.body.requires_consent).toBeUndefined();
+                        // Step 2: Call /authorize with R ⊆ G — must NOT require consent
+                        expect(await isConsentRequired(clientId, requestedScopes)).toBe(false);
 
                         // Step 3: Verify stored scopes are still G (unchanged)
                         await verifyGrantedScopesUnchanged(clientId, grantedScopes);
@@ -172,7 +144,7 @@ describe('Feature: user-consent-tracking, Property 5: Narrower requests do not m
         );
     }, 300_000);
 
-    it('stored granted_scopes remain equal to G after multiple checkConsent calls with R ⊆ G', async () => {
+    it('stored granted_scopes remain equal to G after multiple narrower requests', async () => {
         await fc.assert(
             fc.asyncProperty(
                 // G must have at least 2 scopes so we can derive multiple strict subsets
@@ -192,19 +164,14 @@ describe('Feature: user-consent-tracking, Property 5: Narrower requests do not m
 
                     try {
                         // Create consent record with G
-                        const grantResponse = await grantConsent(clientId, grantedScopes);
-                        expect(grantResponse.status).toEqual(201);
+                        await tokenFixture.preGrantConsent(email, password, clientId, REDIRECT_URI, grantedScopes.join(' '));
 
-                        // Call checkConsent multiple times with different subsets of G
+                        // Call /authorize multiple times with different subsets of G
                         for (let i = 1; i <= grantedScopes.length; i++) {
                             const subset = grantedScopes.slice(0, i);
-                            const checkResponse = await callCheckConsent(clientId, subset);
-                            expect(checkResponse.status).toEqual(201);
-                            expect(checkResponse.body.authentication_code).toBeDefined();
-                            expect(checkResponse.body.requires_consent).toBeUndefined();
+                            expect(await isConsentRequired(clientId, subset)).toBe(false);
                         }
 
-                        // After all checkConsent calls, stored scopes must still equal G
                         await verifyGrantedScopesUnchanged(clientId, grantedScopes);
                     } finally {
                         await clientApi.deleteClient(clientId).catch(() => {
@@ -216,7 +183,7 @@ describe('Feature: user-consent-tracking, Property 5: Narrower requests do not m
         );
     }, 300_000);
 
-    it('checkConsent with R = G does not modify the record (equal set is a subset)', async () => {
+    it('R = G does not modify the record (equal set is a subset)', async () => {
         await fc.assert(
             fc.asyncProperty(
                 fc.subarray(['openid', 'profile', 'email'], {minLength: 1}),
@@ -234,16 +201,10 @@ describe('Feature: user-consent-tracking, Property 5: Narrower requests do not m
                     const clientId = client.client.clientId;
 
                     try {
-                        // Create consent record with G = scopes
-                        await grantConsent(clientId, scopes);
+                        await tokenFixture.preGrantConsent(email, password, clientId, REDIRECT_URI, scopes.join(' '));
 
-                        // Call checkConsent with R = G (equal set)
-                        const checkResponse = await callCheckConsent(clientId, scopes);
-                        expect(checkResponse.status).toEqual(201);
-                        expect(checkResponse.body.authentication_code).toBeDefined();
-                        expect(checkResponse.body.requires_consent).toBeUndefined();
+                        expect(await isConsentRequired(clientId, scopes)).toBe(false);
 
-                        // Stored scopes must still equal G
                         await verifyGrantedScopesUnchanged(clientId, scopes);
                     } finally {
                         await clientApi.deleteClient(clientId).catch(() => {
@@ -255,9 +216,8 @@ describe('Feature: user-consent-tracking, Property 5: Narrower requests do not m
         );
     }, 300_000);
 
-    it('checkConsent with R ⊆ G does not expand the record beyond G', async () => {
+    it('R ⊆ G does not expand the record beyond G (full-to-narrow case)', async () => {
         // Specific case: G = ['openid', 'profile', 'email'], R = ['openid']
-        // After checkConsent, stored scopes must still be exactly ['email', 'openid', 'profile']
         const uniqueSuffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
         const client = await clientApi.createClient(
             testTenantId,
@@ -274,16 +234,10 @@ describe('Feature: user-consent-tracking, Property 5: Narrower requests do not m
             const fullScopes = ['openid', 'profile', 'email'];
             const narrowScopes = ['openid'];
 
-            // Grant full consent
-            await grantConsent(clientId, fullScopes);
+            await tokenFixture.preGrantConsent(email, password, clientId, REDIRECT_URI, fullScopes.join(' '));
 
-            // Check consent with narrow subset
-            const checkResponse = await callCheckConsent(clientId, narrowScopes);
-            expect(checkResponse.status).toEqual(201);
-            expect(checkResponse.body.authentication_code).toBeDefined();
-            expect(checkResponse.body.requires_consent).toBeUndefined();
+            expect(await isConsentRequired(clientId, narrowScopes)).toBe(false);
 
-            // Stored scopes must still be the full set
             await verifyGrantedScopesUnchanged(clientId, fullScopes);
         } finally {
             await clientApi.deleteClient(clientId).catch(() => {

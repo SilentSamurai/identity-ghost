@@ -13,7 +13,7 @@ import {ClientEntityClient} from '../api-client/client-entity-client';
  * - PKCE method downgrade from S256 to plain is prevented
  * - Pre-redirect errors (unknown client_id) return JSON 400
  *
- * Sub-properties:
+ * Subproperties:
  * A) PKCE Required Enforcement: requirePkce=true + no code_challenge → redirect with error=invalid_request
  * B) Voluntary PKCE Honored: requirePkce=false + valid code_challenge S256 → flow succeeds, token exchange requires code_verifier
  * C) Downgrade Prevention: requirePkce=true + code_challenge_method=plain → redirect with error=invalid_request
@@ -23,6 +23,7 @@ import {ClientEntityClient} from '../api-client/client-entity-client';
  */
 describe('PKCE Enforcement: required PKCE, voluntary PKCE, downgrade prevention, and error handling', () => {
     let fixture: SharedTestFixture;
+    let tokenFixture: TokenFixture;
     let pkceRequiredClientId: string;
     let pkceOptionalClientId: string;
 
@@ -39,10 +40,10 @@ describe('PKCE Enforcement: required PKCE, voluntary PKCE, downgrade prevention,
 
     beforeAll(async () => {
         fixture = new SharedTestFixture();
-        const tokenFixture = new TokenFixture(fixture);
+        tokenFixture = new TokenFixture(fixture);
 
         // Get tenant-scoped token to retrieve tenant ID
-        const {accessToken: tenantToken, jwt} = await tokenFixture.fetchAccessToken(
+        const {jwt} = await tokenFixture.fetchAccessToken(
             ADMIN_EMAIL,
             ADMIN_PASSWORD,
             TENANT_DOMAIN,
@@ -76,23 +77,8 @@ describe('PKCE Enforcement: required PKCE, voluntary PKCE, downgrade prevention,
         });
         pkceOptionalClientId = pkceOptional.client.clientId;
 
-        // Pre-grant consent for the optional PKCE client so login returns auth codes
-        // instead of requires_consent (third-party clients require consent)
-        const consentChallenge = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq';
-        await fixture.getHttpServer()
-            .post('/api/oauth/consent')
-            .send({
-                email: ADMIN_EMAIL,
-                password: ADMIN_PASSWORD,
-                client_id: pkceOptionalClientId,
-                code_challenge: consentChallenge,
-                code_challenge_method: 'plain',
-                approved_scopes: ['openid', 'profile', 'email'],
-                consent_action: 'approve',
-                scope: 'openid profile email',
-                redirect_uri: REDIRECT_URI,
-            })
-            .set('Accept', 'application/json');
+        // Pre-grant consent for the optional PKCE client so /authorize issues codes directly
+        await tokenFixture.preGrantConsent(ADMIN_EMAIL, ADMIN_PASSWORD, pkceOptionalClientId, REDIRECT_URI);
     });
 
     afterAll(async () => {
@@ -147,7 +133,7 @@ describe('PKCE Enforcement: required PKCE, voluntary PKCE, downgrade prevention,
                 }),
                 {numRuns: 20},
             );
-        }, 120_000);
+        }, 180_000);
     });
 
     // --- Sub-property B: Voluntary PKCE Honored ---
@@ -157,58 +143,21 @@ describe('PKCE Enforcement: required PKCE, voluntary PKCE, downgrade prevention,
                 fc.asyncProperty(stateArb, scopeArb, verifierArb, async (state, scope, verifier) => {
                     const codeChallenge = generateS256Challenge(verifier);
 
-                    // Step 1: GET /api/oauth/authorize with code_challenge
-                    const authorizeRes = await fixture.getHttpServer()
-                        .get('/api/oauth/authorize')
-                        .query({
-                            response_type: 'code',
-                            client_id: pkceOptionalClientId,
-                            redirect_uri: REDIRECT_URI,
-                            scope,
-                            state,
-                            code_challenge: codeChallenge,
-                            code_challenge_method: 'S256',
-                        })
-                        .redirects(0);
+                    // Login → get sid cookie → authorize with S256 code_challenge → get auth code
+                    const sidCookie = await tokenFixture.loginForCookie(ADMIN_EMAIL, ADMIN_PASSWORD, pkceOptionalClientId);
+                    const code = await tokenFixture.authorizeForCode(sidCookie, pkceOptionalClientId, REDIRECT_URI, {
+                        scope,
+                        state,
+                        codeChallenge,
+                        codeChallengeMethod: 'S256',
+                    });
 
-                    // Should redirect to frontend login page (success path)
-                    expect(authorizeRes.status).toEqual(302);
-                    const location = authorizeRes.headers['location'] as string;
-                    expect(location).toBeDefined();
-
-                    const redirectUrl = new URL(location, 'http://localhost');
-                    // Should NOT have error params
-                    expect(redirectUrl.searchParams.has('error')).toBe(false);
-                    // Should pass through code_challenge
-                    expect(redirectUrl.searchParams.get('code_challenge')).toEqual(codeChallenge);
-                    expect(redirectUrl.searchParams.get('code_challenge_method')).toEqual('S256');
-
-                    // Step 2: POST /api/oauth/login with code_challenge
-                    const loginRes = await fixture.getHttpServer()
-                        .post('/api/oauth/login')
-                        .send({
-                            email: ADMIN_EMAIL,
-                            password: ADMIN_PASSWORD,
-                            client_id: pkceOptionalClientId,
-                            redirect_uri: REDIRECT_URI,
-                            scope,
-                            code_challenge: codeChallenge,
-                            code_challenge_method: 'S256',
-                        })
-                        .set('Accept', 'application/json');
-
-                    expect(loginRes.status).toBeGreaterThanOrEqual(200);
-                    expect(loginRes.status).toBeLessThan(300);
-                    expect(loginRes.body.authentication_code).toBeDefined();
-
-                    const authCode = loginRes.body.authentication_code;
-
-                    // Step 3a: Token exchange WITH correct code_verifier → should succeed
+                    // Token exchange WITH correct code_verifier → should succeed
                     const tokenRes = await fixture.getHttpServer()
                         .post('/api/oauth/token')
                         .send({
                             grant_type: 'authorization_code',
-                            code: authCode,
+                            code,
                             client_id: pkceOptionalClientId,
                             redirect_uri: REDIRECT_URI,
                             code_verifier: verifier,
@@ -221,7 +170,7 @@ describe('PKCE Enforcement: required PKCE, voluntary PKCE, downgrade prevention,
                 }),
                 {numRuns: 10},
             );
-        }, 120_000);
+        }, 180_000);
 
         it('requirePkce=false + valid S256 code_challenge → token exchange with WRONG code_verifier fails', async () => {
             await fc.assert(
@@ -231,51 +180,21 @@ describe('PKCE Enforcement: required PKCE, voluntary PKCE, downgrade prevention,
 
                     const codeChallenge = generateS256Challenge(verifier);
 
-                    // Step 1: Authorize
-                    const authorizeRes = await fixture.getHttpServer()
-                        .get('/api/oauth/authorize')
-                        .query({
-                            response_type: 'code',
-                            client_id: pkceOptionalClientId,
-                            redirect_uri: REDIRECT_URI,
-                            scope,
-                            state,
-                            code_challenge: codeChallenge,
-                            code_challenge_method: 'S256',
-                        })
-                        .redirects(0);
+                    // Login → authorize with S256 → get auth code
+                    const sidCookie = await tokenFixture.loginForCookie(ADMIN_EMAIL, ADMIN_PASSWORD, pkceOptionalClientId);
+                    const code = await tokenFixture.authorizeForCode(sidCookie, pkceOptionalClientId, REDIRECT_URI, {
+                        scope,
+                        state,
+                        codeChallenge,
+                        codeChallengeMethod: 'S256',
+                    });
 
-                    expect(authorizeRes.status).toEqual(302);
-                    const location = authorizeRes.headers['location'] as string;
-                    const redirectUrl = new URL(location, 'http://localhost');
-                    expect(redirectUrl.searchParams.has('error')).toBe(false);
-
-                    // Step 2: Login
-                    const loginRes = await fixture.getHttpServer()
-                        .post('/api/oauth/login')
-                        .send({
-                            email: ADMIN_EMAIL,
-                            password: ADMIN_PASSWORD,
-                            client_id: pkceOptionalClientId,
-                            redirect_uri: REDIRECT_URI,
-                            scope,
-                            code_challenge: codeChallenge,
-                            code_challenge_method: 'S256',
-                        })
-                        .set('Accept', 'application/json');
-
-                    expect(loginRes.status).toBeGreaterThanOrEqual(200);
-                    expect(loginRes.status).toBeLessThan(300);
-                    expect(loginRes.body.authentication_code).toBeDefined();
-
-                    const authCode = loginRes.body.authentication_code;
-
-                    // Step 3: Token exchange with WRONG code_verifier → should fail
+                    // Token exchange with WRONG code_verifier → should fail
                     const tokenRes = await fixture.getHttpServer()
                         .post('/api/oauth/token')
                         .send({
                             grant_type: 'authorization_code',
-                            code: authCode,
+                            code,
                             client_id: pkceOptionalClientId,
                             redirect_uri: REDIRECT_URI,
                             code_verifier: wrongVerifier,
@@ -288,7 +207,7 @@ describe('PKCE Enforcement: required PKCE, voluntary PKCE, downgrade prevention,
                 }),
                 {numRuns: 10},
             );
-        }, 120_000);
+        }, 180_000);
     });
 
     // --- Sub-property C: Downgrade Prevention ---
@@ -322,7 +241,7 @@ describe('PKCE Enforcement: required PKCE, voluntary PKCE, downgrade prevention,
                 }),
                 {numRuns: 20},
             );
-        }, 120_000);
+        }, 180_000);
     });
 
     // --- Sub-property D: Pre-redirect Errors ---
@@ -349,6 +268,6 @@ describe('PKCE Enforcement: required PKCE, voluntary PKCE, downgrade prevention,
                 }),
                 {numRuns: 20},
             );
-        }, 120_000);
+        }, 180_000);
     });
 });

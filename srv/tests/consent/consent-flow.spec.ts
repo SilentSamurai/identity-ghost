@@ -1,19 +1,27 @@
 /**
- * Integration tests for the consent flow.
+ * Integration tests for the consent flow (cookie + CSRF + PRG redirect contract).
  *
- * Tests the full consent lifecycle through the HTTP stack:
- * - POST /api/oauth/login returns requires_consent for third-party clients with no prior consent
- * - POST /api/oauth/login proceeds to auth code when consent already covers requested scopes
- * - POST /api/oauth/login skips consent for first-party (tenant-domain) client_id
- * - POST /api/oauth/login skips consent for first-party (tenant-clientId) client_id
- * - Consent check uses resolved scopes (intersection with client.allowedScopes), not raw scopes
- * - POST /api/oauth/consent (approve) creates consent record and returns auth code
- * - POST /api/oauth/consent (deny) returns access_denied error
- * - POST /api/oauth/consent re-authenticates the user (rejects bad credentials)
- * - POST /api/oauth/consent validates approved_scopes against client.allowedScopes
+ * Covers behaviors unique to the consent flow that are NOT already covered by the
+ * consent property tests (`consent-required-iff-scopes-exceed`, `consent-missing-always-required`,
+ * `consent-grant-produces-union`, `consent-narrower-no-modify`):
  *
- * Requirements: 2.1, 2.2, 3.1, 3.2, 3.3, 5.1, 6.1, 6.2, 6.3, 6.4
+ *   - GET  /api/oauth/authorize → 302 to /consent UI for a third-party client with no prior consent
+ *   - GET  /api/oauth/authorize → 302 directly to redirect_uri?code=... for a first-party (tenant-domain) client_id
+ *   - Consent UI redirect carries the resolved scope set (intersection with client.allowedScopes)
+ *   - POST /api/oauth/consent (grant)  → 302 → /authorize → redirect_uri?code=... (code is exchangeable for tokens)
+ *   - POST /api/oauth/consent (deny)   → 302 → redirect_uri?error=access_denied
+ *   - Deny does not create a consent record (subsequent /authorize still redirects to consent UI)
+ *   - POST /api/oauth/consent requires a valid sid cookie (401 without it)
+ *   - POST /api/oauth/consent requires a valid CSRF token (403 with wrong token)
+ *   - POST /api/oauth/consent rejects unknown client_id (400)
+ *   - POST /api/oauth/consent rejects unregistered redirect_uri (400)
+ *   - POST /api/oauth/consent with scope outside client.allowedScopes → those scopes are silently dropped
+ *     from the granted set (issued token does not carry them)
+ *   - prompt=consent forces re-consent even when consent already covers the requested scopes
+ *
+ * Requirements: 2.2, 3.1 (resolved), 3.2, 3.3, 6.1, 6.3, 6.4 (CSRF / session re-check)
  */
+import * as crypto from 'crypto';
 import {SharedTestFixture} from '../shared-test.fixture';
 import {TokenFixture} from '../token.fixture';
 import {ClientEntityClient} from '../api-client/client-entity-client';
@@ -22,34 +30,67 @@ import {TenantClient} from '../api-client/tenant-client';
 const CODE_CHALLENGE = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq';
 const CODE_VERIFIER = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq';
 const REDIRECT_URI = 'https://consent-flow-test.example.com/callback';
+const COOKIE_SECRET = 'dev-cookie-secret-do-not-use-in-prod';
+
+const ADMIN_EMAIL = 'admin@auth.server.com';
+const ADMIN_PASSWORD = 'admin9000';
+
+/**
+ * Look up a Client by alias via the generic search endpoint.
+ * The search endpoint is available to super admins regardless of tenant scoping,
+ * so we use it to find the default clients for both the super tenant and the test tenant.
+ */
+async function findClientByAlias(
+    app: SharedTestFixture,
+    accessToken: string,
+    alias: string,
+): Promise<any | null> {
+    const response = await app.getHttpServer()
+        .post('/api/search/Clients')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({
+            pageNo: 0,
+            pageSize: 10,
+            where: [{field: 'alias', label: 'alias', value: alias, operator: 'equals'}],
+        });
+    if (response.status >= 200 && response.status < 300) {
+        const rows = response.body?.data ?? [];
+        return rows.find((c: any) => c.alias === alias) ?? null;
+    }
+    return null;
+}
 
 describe('Consent Flow Integration Tests', () => {
     let app: SharedTestFixture;
+    let tokenFixture: TokenFixture;
     let clientApi: ClientEntityClient;
     let tenantApi: TenantClient;
-    let accessToken: string;
     let testTenantId: string;
     let testTenantDomain: string;
 
-    // Third-party registered Client entities used across tests
-    let thirdPartyClientId: string;           // allowedScopes: openid profile email
-    let narrowScopesClientId: string;         // allowedScopes: openid profile (no email)
+    // Third-party clients used across tests
+    let thirdPartyClientId: string;      // allowedScopes: openid profile email
+    let narrowScopesClientId: string;    // allowedScopes: openid profile  (no email)
+
+    // First-party default client — we register REDIRECT_URI on the test tenant's
+    // default client so it can participate in the authorize-code flow against our test URI.
+    let testTenantDefaultClientId: string;
 
     beforeAll(async () => {
         app = new SharedTestFixture();
-        const tokenFixture = new TokenFixture(app);
+        tokenFixture = new TokenFixture(app);
+
         const tokenResponse = await tokenFixture.fetchAccessToken(
-            'admin@auth.server.com',
-            'admin9000',
+            ADMIN_EMAIL,
+            ADMIN_PASSWORD,
             'auth.server.com',
         );
-        accessToken = tokenResponse.accessToken;
+        const accessToken = tokenResponse.accessToken;
 
         clientApi = new ClientEntityClient(app, accessToken);
         tenantApi = new TenantClient(app, accessToken);
 
-        // Create a tenant to own the third-party clients
-        // Tenant name max is 20 chars; use a short prefix + last 8 digits of timestamp
+        // Dedicated test tenant (name is limited to 20 chars)
         const uniqueSuffix = String(Date.now()).slice(-8);
         testTenantDomain = `cf-test-${uniqueSuffix}.com`;
         const tenant = await tenantApi.createTenant(
@@ -58,8 +99,6 @@ describe('Consent Flow Integration Tests', () => {
         );
         testTenantId = tenant.id;
 
-
-        // Create a third-party client with full OIDC scopes
         const fullScopesClient = await clientApi.createClient(testTenantId, 'Full Scopes App', {
             redirectUris: [REDIRECT_URI],
             allowedScopes: 'openid profile email',
@@ -67,686 +106,503 @@ describe('Consent Flow Integration Tests', () => {
         });
         thirdPartyClientId = fullScopesClient.client.clientId;
 
-        // Create a third-party client with only openid + profile (no email)
         const narrowClient = await clientApi.createClient(testTenantId, 'Narrow Scopes App', {
             redirectUris: [REDIRECT_URI],
             allowedScopes: 'openid profile',
             isPublic: true,
         });
         narrowScopesClientId = narrowClient.client.clientId;
+
+        // Register REDIRECT_URI on the test tenant's default client so the Req 6.3 test
+        // (first-party tenant-domain client_id skips consent) can issue codes against
+        // our test URI. We intentionally avoid mutating the super-tenant default client —
+        // other tests depend on its pre-existing redirect URI and the PATCH schema would
+        // reject URIs like `http://localhost:3000/callback` as "not a valid URL" via yup.
+        const testDefault = await findClientByAlias(app, accessToken, testTenantDomain);
+        expect(testDefault).toBeDefined();
+        testTenantDefaultClientId = testDefault.clientId;
+        await clientApi.updateClient(testTenantDefaultClientId, {redirectUris: [REDIRECT_URI]});
     });
 
     afterAll(async () => {
-        await clientApi.deleteClient(thirdPartyClientId).catch(() => {
-        });
-        await clientApi.deleteClient(narrowScopesClientId).catch(() => {
-        });
+        await clientApi.deleteClient(thirdPartyClientId).catch(() => {});
+        await clientApi.deleteClient(narrowScopesClientId).catch(() => {});
         await app.close();
     });
 
-    // ─── Helper ──────────────────────────────────────────────────────
+    // ── Helpers ────────────────────────────────────────────────────
 
-    function loginRequest(body: {
-        client_id: string;
-        scope?: string;
-        email?: string;
-        password?: string;
-    }) {
-        return app.getHttpServer()
-            .post('/api/oauth/login')
-            .send({
-                email: 'admin@auth.server.com',
-                password: 'admin9000',
-                code_challenge: CODE_CHALLENGE,
-                code_challenge_method: 'plain',
-                redirect_uri: REDIRECT_URI,
-                ...body,
-            })
-            .set('Accept', 'application/json');
+    /** Extract the raw (unsigned) sid value from a signed cookie string. */
+    function extractSidValue(signedCookie: string): string {
+        // Cookie format: "sid=s%3A<value>.<signature>; Path=..."
+        const cookieValue = signedCookie.split(';')[0].split('=').slice(1).join('=');
+        const decoded = decodeURIComponent(cookieValue).replace(/^s:/, '');
+        return decoded.split('.')[0];
     }
 
-    function consentRequest(body: {
-        client_id: string;
-        approved_scopes: string[];
-        consent_action: 'approve' | 'deny';
-        email?: string;
-        password?: string;
-        scope?: string;
-    }) {
-        return app.getHttpServer()
+    /** Compute the CSRF token for a given sid using the dev cookie secret. */
+    function csrfTokenFor(sid: string): string {
+        return crypto.createHmac('sha256', COOKIE_SECRET).update(sid).digest('hex');
+    }
+
+    /** Issue POST /login, returning the signed sid cookie string. */
+    async function loginForSid(clientId: string): Promise<string> {
+        return tokenFixture.loginForCookie(ADMIN_EMAIL, ADMIN_PASSWORD, clientId);
+    }
+
+    /**
+     * Hit /authorize with the given session cookie and return the 302 redirect location.
+     */
+    async function authorize(
+        sidCookie: string,
+        clientId: string,
+        scope: string,
+        opts: { state?: string; prompt?: string } = {},
+    ): Promise<string> {
+        const query: Record<string, string> = {
+            response_type: 'code',
+            client_id: clientId,
+            redirect_uri: REDIRECT_URI,
+            scope,
+            state: opts.state ?? 'consent-flow-test',
+            code_challenge: CODE_CHALLENGE,
+            code_challenge_method: 'plain',
+            session_confirmed: 'true',
+        };
+        if (opts.prompt) query.prompt = opts.prompt;
+
+        const res = await app.getHttpServer()
+            .get('/api/oauth/authorize')
+            .query(query)
+            .set('Cookie', sidCookie)
+            .redirects(0);
+
+        expect(res.status).toEqual(302);
+        return res.headers['location'] as string;
+    }
+
+    /** True when the given authorize response location is the consent UI redirect. */
+    function isConsentRedirect(location: string): boolean {
+        return location.includes('/consent?');
+    }
+
+    /** Build POST body for /consent. */
+    function consentBody(partial: Record<string, any>): Record<string, any> {
+        return {
+            redirect_uri: REDIRECT_URI,
+            response_type: 'code',
+            code_challenge: CODE_CHALLENGE,
+            code_challenge_method: 'plain',
+            ...partial,
+        };
+    }
+
+    /**
+     * Full happy-path: login → authorize → follow 302 to consent UI → POST /consent (grant) →
+     * follow 302 back to /authorize → return the authorization code carried on the final
+     * redirect_uri redirect.
+     */
+    async function grantConsentAndGetCode(
+        sidCookie: string,
+        clientId: string,
+        scope: string,
+        state = 'consent-grant',
+    ): Promise<string> {
+        const authLoc = await authorize(sidCookie, clientId, scope, {state});
+        expect(isConsentRedirect(authLoc)).toBe(true);
+
+        const consentUrl = new URL(authLoc, 'http://localhost');
+        const csrfToken = consentUrl.searchParams.get('csrf_token');
+        expect(csrfToken).toBeTruthy();
+
+        const res = await app.getHttpServer()
             .post('/api/oauth/consent')
-            .send({
-                email: 'admin@auth.server.com',
-                password: 'admin9000',
-                code_challenge: CODE_CHALLENGE,
-                code_challenge_method: 'plain',
-                redirect_uri: REDIRECT_URI,
-                ...body,
-            })
-            .set('Accept', 'application/json');
+            .set('Cookie', sidCookie)
+            .send(consentBody({
+                client_id: clientId,
+                scope,
+                state,
+                csrf_token: csrfToken,
+                decision: 'grant',
+            }))
+            .redirects(0);
+
+        // Consent grant PRG → redirects to /api/oauth/authorize
+        expect(res.status).toEqual(302);
+        const authorizePrg = res.headers['location'] as string;
+        expect(authorizePrg.startsWith('/api/oauth/authorize?')).toBe(true);
+
+        // Follow PRG to authorize, which should now issue a code
+        const authorizeRes = await app.getHttpServer()
+            .get(authorizePrg)
+            .set('Cookie', sidCookie)
+            .redirects(0);
+        expect(authorizeRes.status).toEqual(302);
+
+        const finalLoc = authorizeRes.headers['location'] as string;
+        const finalUrl = new URL(finalLoc, 'http://localhost');
+        expect(finalUrl.searchParams.has('error')).toBe(false);
+        const code = finalUrl.searchParams.get('code');
+        expect(code).toBeTruthy();
+        return code!;
     }
 
-    // ─── Req 2.2: No consent record → requires_consent ───────────────
+    // ── Req 2.2, 6.1: No consent → authorize redirects to consent UI ──────────
 
-    describe('login endpoint — requires_consent for new third-party client (Req 2.2, 6.1, 6.2)', () => {
-        it('should return requires_consent when no consent record exists for a registered Client', async () => {
-            const response = await loginRequest({
-                client_id: thirdPartyClientId,
-                scope: 'openid profile',
-            });
-
-            expect(response.status).toEqual(201);
-            expect(response.body.requires_consent).toBe(true);
-            expect(response.body.requested_scopes).toBeDefined();
-            expect(Array.isArray(response.body.requested_scopes)).toBe(true);
-            expect(response.body.requested_scopes).toContain('openid');
-            expect(response.body.requested_scopes).toContain('profile');
-            expect(response.body.client_name).toBeDefined();
-            // Must NOT return an auth code when consent is required
-            expect(response.body.authentication_code).toBeUndefined();
-        });
-
-        it('should include client_name in the requires_consent response (Req 6.2)', async () => {
-            // Use a fresh client so there is definitely no prior consent
-            const freshClient = await clientApi.createClient(testTenantId, 'Named App For Consent', {
+    describe('authorize redirects to consent UI for a third-party client with no prior consent (Req 2.2, 6.1)', () => {
+        it('redirects to /consent with client_id, redirect_uri, scope, state, and csrf_token', async () => {
+            // Fresh client with no prior consent
+            const fresh = await clientApi.createClient(testTenantId, 'Consent UI App', {
                 redirectUris: [REDIRECT_URI],
                 allowedScopes: 'openid profile email',
                 isPublic: true,
             });
+            const clientId = fresh.client.clientId;
 
             try {
-                const response = await loginRequest({
-                    client_id: freshClient.client.clientId,
-                    scope: 'openid',
-                });
+                const sidCookie = await loginForSid(clientId);
+                const location = await authorize(sidCookie, clientId, 'openid profile', {state: 'abc123'});
 
-                expect(response.status).toEqual(201);
-                expect(response.body.requires_consent).toBe(true);
-                expect(response.body.client_name).toBe('Named App For Consent');
+                expect(isConsentRedirect(location)).toBe(true);
+                const url = new URL(location, 'http://localhost');
+                expect(url.searchParams.get('client_id')).toEqual(clientId);
+                expect(url.searchParams.get('redirect_uri')).toEqual(REDIRECT_URI);
+                expect(url.searchParams.get('scope')).toContain('openid');
+                expect(url.searchParams.get('scope')).toContain('profile');
+                expect(url.searchParams.get('state')).toEqual('abc123');
+                expect(url.searchParams.get('csrf_token')).toBeTruthy();
             } finally {
-                await clientApi.deleteClient(freshClient.client.clientId).catch(() => {
-                });
-            }
-        });
-    });
-
-    // ─── Req 2.1: Existing consent covers scopes → auth code ─────────
-
-    describe('login endpoint — skips consent when already consented (Req 2.1, 5.1)', () => {
-        it('should return auth code directly when consent already covers requested scopes', async () => {
-            // Step 1: Create a fresh client
-            const freshClient = await clientApi.createClient(testTenantId, 'Pre-Consented App', {
-                redirectUris: [REDIRECT_URI],
-                allowedScopes: 'openid profile email',
-                isPublic: true,
-            });
-            const clientId = freshClient.client.clientId;
-
-            try {
-                // Step 2: Grant consent via the consent endpoint
-                const approveResponse = await consentRequest({
-                    client_id: clientId,
-                    approved_scopes: ['openid', 'profile', 'email'],
-                    consent_action: 'approve',
-                    scope: 'openid profile email',
-                });
-                expect(approveResponse.status).toEqual(201);
-                expect(approveResponse.body.authentication_code).toBeDefined();
-
-                // Step 3: Login again — consent already covers the scopes
-                const loginResponse = await loginRequest({
-                    client_id: clientId,
-                    scope: 'openid profile',
-                });
-
-                expect(loginResponse.status).toEqual(201);
-                expect(loginResponse.body.authentication_code).toBeDefined();
-                expect(loginResponse.body.requires_consent).toBeUndefined();
-            } finally {
-                await clientApi.deleteClient(clientId).catch(() => {
-                });
+                await clientApi.deleteClient(clientId).catch(() => {});
             }
         });
 
-        it('should return auth code when requesting a strict subset of previously granted scopes (Req 5.1)', async () => {
-            // Create a fresh client and grant full consent
-            const freshClient = await clientApi.createClient(testTenantId, 'Subset Scopes App', {
-                redirectUris: [REDIRECT_URI],
-                allowedScopes: 'openid profile email',
-                isPublic: true,
-            });
-            const clientId = freshClient.client.clientId;
+        it('csrf_token in the consent UI URL matches HMAC-SHA256(sid, COOKIE_SECRET)', async () => {
+            const sidCookie = await loginForSid(thirdPartyClientId);
+            const location = await authorize(sidCookie, thirdPartyClientId, 'openid profile');
 
-            try {
-                // Grant consent for all scopes
-                const approveResponse = await consentRequest({
-                    client_id: clientId,
-                    approved_scopes: ['openid', 'profile', 'email'],
-                    consent_action: 'approve',
-                    scope: 'openid profile email',
-                });
-                expect(approveResponse.body.authentication_code).toBeDefined();
+            expect(isConsentRedirect(location)).toBe(true);
+            const url = new URL(location, 'http://localhost');
+            const csrfFromUrl = url.searchParams.get('csrf_token');
 
-                // Login requesting only a subset — should skip consent
-                const loginResponse = await loginRequest({
-                    client_id: clientId,
-                    scope: 'openid',
-                });
-
-                expect(loginResponse.status).toEqual(201);
-                expect(loginResponse.body.authentication_code).toBeDefined();
-                expect(loginResponse.body.requires_consent).toBeUndefined();
-            } finally {
-                await clientApi.deleteClient(clientId).catch(() => {
-                });
-            }
+            const sid = extractSidValue(sidCookie);
+            expect(csrfFromUrl).toEqual(csrfTokenFor(sid));
         });
     });
 
-    // ─── Req 6.3: First-party logins skip consent entirely ───────────
+    // ── Req 6.3: First-party (tenant domain) client_id skips consent entirely ─
 
-    describe('login endpoint — skips consent for first-party client_id (Req 6.3)', () => {
-        it('should skip consent entirely for tenant-domain client_id', async () => {
-            // auth.server.com is the default first-party tenant domain
-            const response = await loginRequest({
-                client_id: 'auth.server.com',
-                scope: 'openid profile email',
-            });
+    describe('first-party client_id (tenant domain) skips consent (Req 6.3)', () => {
+        it('authorize issues a code directly when client_id is the tenant domain alias', async () => {
+            const sidCookie = await loginForSid(testTenantDomain);
+            const location = await authorize(sidCookie, testTenantDomain, 'openid profile');
 
-            expect(response.status).toEqual(201);
-            // Should return an auth code directly — no consent required
-            expect(response.body.authentication_code).toBeDefined();
-            expect(response.body.requires_consent).toBeUndefined();
-        });
-
-        it('should skip consent entirely for tenant-domain alias client_id', async () => {
-            // testTenantDomain is the alias of the default Client for the test tenant.
-            // Using the domain as client_id resolves to the first-party default client,
-            // so consent is skipped (Req 8.1). Client.clientId (UUID) is the
-            // valid client_id for the login endpoint — only Client.clientId (UUID) or
-            // Client.alias (domain) are accepted.
-            const response = await loginRequest({
-                client_id: testTenantDomain,
-                scope: 'openid profile',
-            });
-
-            expect(response.status).toEqual(201);
-            // Should return an auth code directly — no consent required
-            expect(response.body.authentication_code).toBeDefined();
-            expect(response.body.requires_consent).toBeUndefined();
+            expect(isConsentRedirect(location)).toBe(false);
+            const url = new URL(location, 'http://localhost');
+            expect(url.searchParams.get('code')).toBeTruthy();
+            expect(url.searchParams.has('error')).toBe(false);
         });
     });
 
-    // ─── Req 3.1: Consent check uses resolved scopes ─────────────────
+    // ── Req 3.1 (resolved): consent check uses resolved scope set ────────────
 
-    describe('login endpoint — consent check uses resolved scopes (Req 3.1)', () => {
-        it('should use intersection of requested and client.allowedScopes for consent check', async () => {
-            // narrowScopesClientId only allows openid + profile (no email)
-            // Requesting openid + profile + email → resolved to openid + profile
-            const response = await loginRequest({
-                client_id: narrowScopesClientId,
-                scope: 'openid profile email',
-            });
-
-            expect(response.status).toEqual(201);
-            expect(response.body.requires_consent).toBe(true);
-            // requested_scopes should be the resolved set (openid + profile), not the raw request
-            expect(response.body.requested_scopes).toBeDefined();
-            expect(response.body.requested_scopes).toContain('openid');
-            expect(response.body.requested_scopes).toContain('profile');
-            // email is outside client.allowedScopes — should not appear in requested_scopes
-            expect(response.body.requested_scopes).not.toContain('email');
-        });
-
-        it('should grant consent for resolved scopes and skip on subsequent login with raw broader request', async () => {
-            // Create a fresh narrow-scopes client
-            const freshClient = await clientApi.createClient(testTenantId, 'Resolved Scopes App', {
+    describe('consent check uses resolved scopes, not the raw request (Req 3.1)', () => {
+        it('skips consent on subsequent authorize with broader raw scope when stored consent covers the resolved intersection', async () => {
+            // Fresh narrow-scope client: allowedScopes = 'openid profile'
+            const fresh = await clientApi.createClient(testTenantId, 'Resolved Scopes App', {
                 redirectUris: [REDIRECT_URI],
                 allowedScopes: 'openid profile',
                 isPublic: true,
             });
-            const clientId = freshClient.client.clientId;
+            const clientId = fresh.client.clientId;
 
             try {
                 // Grant consent for the resolved scopes (openid + profile)
-                const approveResponse = await consentRequest({
-                    client_id: clientId,
-                    approved_scopes: ['openid', 'profile'],
-                    consent_action: 'approve',
-                    scope: 'openid profile',
-                });
-                expect(approveResponse.body.authentication_code).toBeDefined();
+                await tokenFixture.preGrantConsent(
+                    ADMIN_EMAIL,
+                    ADMIN_PASSWORD,
+                    clientId,
+                    REDIRECT_URI,
+                    'openid profile',
+                );
 
-                // Login requesting openid + profile + email (email is outside allowedScopes)
-                // Resolved scopes = openid + profile → already consented → skip consent
-                const loginResponse = await loginRequest({
-                    client_id: clientId,
-                    scope: 'openid profile email',
-                });
+                // Subsequent authorize with raw scope openid+profile+email —
+                // email is outside allowedScopes, resolves to openid+profile,
+                // which is already in the stored consent → should skip consent.
+                const sidCookie = await loginForSid(clientId);
+                const location = await authorize(sidCookie, clientId, 'openid profile email');
 
-                expect(loginResponse.status).toEqual(201);
-                expect(loginResponse.body.authentication_code).toBeDefined();
-                expect(loginResponse.body.requires_consent).toBeUndefined();
+                expect(isConsentRedirect(location)).toBe(false);
+                const url = new URL(location, 'http://localhost');
+                expect(url.searchParams.get('code')).toBeTruthy();
+                expect(url.searchParams.has('error')).toBe(false);
             } finally {
-                await clientApi.deleteClient(clientId).catch(() => {
-                });
+                await clientApi.deleteClient(clientId).catch(() => {});
             }
         });
     });
 
-    // ─── Req 3.2: Consent approval creates record and returns auth code
+    // ── Req 3.2: grant issues an exchangeable code ──────────────────────────
 
-    describe('consent endpoint — approve action (Req 3.2, 6.4)', () => {
-        it('should create consent record and return authentication_code on approve', async () => {
-            const freshClient = await clientApi.createClient(testTenantId, 'Approve Test App', {
+    describe('consent grant issues an exchangeable authorization code (Req 3.2)', () => {
+        it('code from consent-grant flow can be exchanged for an access token', async () => {
+            const fresh = await clientApi.createClient(testTenantId, 'Token Exchange App', {
                 redirectUris: [REDIRECT_URI],
                 allowedScopes: 'openid profile email',
                 isPublic: true,
             });
-            const clientId = freshClient.client.clientId;
+            const clientId = fresh.client.clientId;
 
             try {
-                const response = await consentRequest({
-                    client_id: clientId,
-                    approved_scopes: ['openid', 'profile'],
-                    consent_action: 'approve',
-                    scope: 'openid profile',
-                });
+                const sidCookie = await loginForSid(clientId);
+                const code = await grantConsentAndGetCode(sidCookie, clientId, 'openid profile');
 
-                expect(response.status).toEqual(201);
-                expect(response.body.authentication_code).toBeDefined();
-                expect(typeof response.body.authentication_code).toBe('string');
-                expect(response.body.authentication_code.length).toBeGreaterThan(0);
-                // Must not return an error
-                expect(response.body.error).toBeUndefined();
-            } finally {
-                await clientApi.deleteClient(clientId).catch(() => {
-                });
-            }
-        });
-
-        it('should persist consent so subsequent login skips consent screen (Req 2.1)', async () => {
-            const freshClient = await clientApi.createClient(testTenantId, 'Persist Consent App', {
-                redirectUris: [REDIRECT_URI],
-                allowedScopes: 'openid profile email',
-                isPublic: true,
-            });
-            const clientId = freshClient.client.clientId;
-
-            try {
-                // Approve consent
-                const approveResponse = await consentRequest({
-                    client_id: clientId,
-                    approved_scopes: ['openid', 'profile', 'email'],
-                    consent_action: 'approve',
-                    scope: 'openid profile email',
-                });
-                expect(approveResponse.body.authentication_code).toBeDefined();
-
-                // Login again — consent is now stored, should skip consent
-                const loginResponse = await loginRequest({
-                    client_id: clientId,
-                    scope: 'openid profile email',
-                });
-
-                expect(loginResponse.status).toEqual(201);
-                expect(loginResponse.body.authentication_code).toBeDefined();
-                expect(loginResponse.body.requires_consent).toBeUndefined();
-            } finally {
-                await clientApi.deleteClient(clientId).catch(() => {
-                });
-            }
-        });
-
-        it('should return auth code that can be exchanged for an access token', async () => {
-            const freshClient = await clientApi.createClient(testTenantId, 'Token Exchange App', {
-                redirectUris: [REDIRECT_URI],
-                allowedScopes: 'openid profile email',
-                isPublic: true,
-            });
-            const clientId = freshClient.client.clientId;
-
-            try {
-                const approveResponse = await consentRequest({
-                    client_id: clientId,
-                    approved_scopes: ['openid', 'profile'],
-                    consent_action: 'approve',
-                    scope: 'openid profile',
-                });
-                expect(approveResponse.body.authentication_code).toBeDefined();
-                const authCode = approveResponse.body.authentication_code;
-
-                // Exchange the auth code for an access token
-                const tokenResponse = await app.getHttpServer()
+                const tokenRes = await app.getHttpServer()
                     .post('/api/oauth/token')
                     .send({
                         grant_type: 'authorization_code',
-                        code: authCode,
+                        code,
                         client_id: clientId,
                         code_verifier: CODE_VERIFIER,
                         redirect_uri: REDIRECT_URI,
                     })
                     .set('Accept', 'application/json');
 
-                expect(tokenResponse.status).toEqual(200);
-                expect(tokenResponse.body.access_token).toBeDefined();
-                expect(tokenResponse.body.token_type).toEqual('Bearer');
+                expect(tokenRes.status).toEqual(200);
+                expect(tokenRes.body.access_token).toBeTruthy();
+                expect(tokenRes.body.token_type).toEqual('Bearer');
             } finally {
-                await clientApi.deleteClient(clientId).catch(() => {
-                });
+                await clientApi.deleteClient(clientId).catch(() => {});
             }
         });
     });
 
-    // ─── Req 3.3: Consent denial returns access_denied ───────────────
+    // ── Req 3.3: deny redirects to redirect_uri?error=access_denied ──────────
 
-    describe('consent endpoint — deny action (Req 3.3)', () => {
-        it('should return access_denied error when user denies consent', async () => {
-            const freshClient = await clientApi.createClient(testTenantId, 'Deny Test App', {
+    describe('consent deny action (Req 3.3)', () => {
+        it('redirects to redirect_uri with error=access_denied and no code', async () => {
+            const fresh = await clientApi.createClient(testTenantId, 'Deny Test App', {
                 redirectUris: [REDIRECT_URI],
                 allowedScopes: 'openid profile email',
                 isPublic: true,
             });
-            const clientId = freshClient.client.clientId;
+            const clientId = fresh.client.clientId;
 
             try {
-                const response = await consentRequest({
-                    client_id: clientId,
-                    approved_scopes: [],
-                    consent_action: 'deny',
-                });
+                const sidCookie = await loginForSid(clientId);
+                // First hit authorize to make sure we land on consent UI (and get a csrf_token)
+                const authLoc = await authorize(sidCookie, clientId, 'openid profile', {state: 'deny-state'});
+                expect(isConsentRedirect(authLoc)).toBe(true);
+                const csrfToken = new URL(authLoc, 'http://localhost').searchParams.get('csrf_token');
+                expect(csrfToken).toBeTruthy();
 
-                expect(response.status).toEqual(201);
-                expect(response.body.error).toEqual('access_denied');
-                expect(response.body.error_description).toBeDefined();
-                expect(response.body.error_description).toContain('denied');
-                // Must not return an auth code
-                expect(response.body.authentication_code).toBeUndefined();
-            } finally {
-                await clientApi.deleteClient(clientId).catch(() => {
-                });
-            }
-        });
-
-        it('should not create a consent record when user denies (Req 3.3)', async () => {
-            const freshClient = await clientApi.createClient(testTenantId, 'Deny No Record App', {
-                redirectUris: [REDIRECT_URI],
-                allowedScopes: 'openid profile email',
-                isPublic: true,
-            });
-            const clientId = freshClient.client.clientId;
-
-            try {
-                // Deny consent
-                const denyResponse = await consentRequest({
-                    client_id: clientId,
-                    approved_scopes: [],
-                    consent_action: 'deny',
-                });
-                expect(denyResponse.body.error).toEqual('access_denied');
-
-                // Login again — should still require consent (no record was created)
-                const loginResponse = await loginRequest({
-                    client_id: clientId,
-                    scope: 'openid profile',
-                });
-
-                expect(loginResponse.status).toEqual(201);
-                expect(loginResponse.body.requires_consent).toBe(true);
-                expect(loginResponse.body.authentication_code).toBeUndefined();
-            } finally {
-                await clientApi.deleteClient(clientId).catch(() => {
-                });
-            }
-        });
-    });
-
-    // ─── Req 6.4: Consent endpoint re-authenticates the user ─────────
-
-    describe('consent endpoint — re-authentication (Req 6.4)', () => {
-        it('should reject consent submission with wrong password', async () => {
-            const freshClient = await clientApi.createClient(testTenantId, 'Reauth Test App', {
-                redirectUris: [REDIRECT_URI],
-                allowedScopes: 'openid profile email',
-                isPublic: true,
-            });
-            const clientId = freshClient.client.clientId;
-
-            try {
-                const response = await consentRequest({
-                    client_id: clientId,
-                    approved_scopes: ['openid', 'profile'],
-                    consent_action: 'approve',
-                    email: 'admin@auth.server.com',
-                    password: 'wrong-password-xyz',
-                });
-
-                // Should fail authentication — 4xx error
-                expect(response.status).toBeGreaterThanOrEqual(400);
-                expect(response.status).toBeLessThan(500);
-                expect(response.body.authentication_code).toBeUndefined();
-            } finally {
-                await clientApi.deleteClient(clientId).catch(() => {
-                });
-            }
-        });
-
-        it('should reject consent submission with unknown email', async () => {
-            const freshClient = await clientApi.createClient(testTenantId, 'Reauth Unknown Email App', {
-                redirectUris: [REDIRECT_URI],
-                allowedScopes: 'openid profile email',
-                isPublic: true,
-            });
-            const clientId = freshClient.client.clientId;
-
-            try {
-                const response = await consentRequest({
-                    client_id: clientId,
-                    approved_scopes: ['openid'],
-                    consent_action: 'approve',
-                    email: 'nonexistent@example.com',
-                    password: 'admin9000',
-                });
-
-                expect(response.status).toBeGreaterThanOrEqual(400);
-                expect(response.status).toBeLessThan(500);
-                expect(response.body.authentication_code).toBeUndefined();
-            } finally {
-                await clientApi.deleteClient(clientId).catch(() => {
-                });
-            }
-        });
-    });
-
-    // ─── Req 6.4: Consent endpoint validates approved_scopes ─────────
-
-    describe('consent endpoint — scope validation against client.allowedScopes (Req 6.4)', () => {
-        it('should reject approved_scopes that exceed client.allowedScopes', async () => {
-            // narrowScopesClientId only allows openid + profile
-            // Attempting to approve email (not in allowedScopes) should fail or be silently dropped
-            const response = await consentRequest({
-                client_id: narrowScopesClientId,
-                approved_scopes: ['openid', 'profile', 'email'],
-                consent_action: 'approve',
-                scope: 'openid profile email',
-            });
-
-            // Either the request is rejected (4xx) or email is silently dropped
-            // and the auth code is issued for the valid intersection only.
-            // The key invariant: if a code is returned, email must NOT be in the granted scopes.
-            if (response.status >= 400) {
-                expect(response.body.error).toBeDefined();
-                expect(response.body.authentication_code).toBeUndefined();
-            } else {
-                // Code was issued — verify it can be exchanged and email is not in the token scopes
-                expect(response.body.authentication_code).toBeDefined();
-                const authCode = response.body.authentication_code;
-
-                const tokenResponse = await app.getHttpServer()
-                    .post('/api/oauth/token')
-                    .send({
-                        grant_type: 'authorization_code',
-                        code: authCode,
-                        client_id: narrowScopesClientId,
-                        code_verifier: CODE_VERIFIER,
-                        redirect_uri: REDIRECT_URI,
-                    })
-                    .set('Accept', 'application/json');
-
-                expect(tokenResponse.status).toEqual(200);
-                const decoded = app.jwtService().decode(tokenResponse.body.access_token, {json: true}) as any;
-                // email scope must not be present — it was outside client.allowedScopes
-                if (decoded?.scopes) {
-                    expect(decoded.scopes).not.toContain('email');
-                }
-            }
-        });
-
-        it('should accept approved_scopes that are a subset of client.allowedScopes', async () => {
-            const freshClient = await clientApi.createClient(testTenantId, 'Valid Scopes App', {
-                redirectUris: [REDIRECT_URI],
-                allowedScopes: 'openid profile email',
-                isPublic: true,
-            });
-            const clientId = freshClient.client.clientId;
-
-            try {
-                // Approve only openid — a valid subset of allowedScopes
-                const response = await consentRequest({
-                    client_id: clientId,
-                    approved_scopes: ['openid'],
-                    consent_action: 'approve',
-                    scope: 'openid',
-                });
-
-                expect(response.status).toEqual(201);
-                expect(response.body.authentication_code).toBeDefined();
-                expect(response.body.error).toBeUndefined();
-            } finally {
-                await clientApi.deleteClient(clientId).catch(() => {
-                });
-            }
-        });
-
-        it('should reject consent for an unknown client_id', async () => {
-            const response = await consentRequest({
-                client_id: 'totally-unknown-client-id-xyz',
-                approved_scopes: ['openid'],
-                consent_action: 'approve',
-            });
-
-            expect(response.status).toBeGreaterThanOrEqual(400);
-            expect(response.status).toBeLessThan(500);
-            expect(response.body.error).toBeDefined();
-            expect(response.body.authentication_code).toBeUndefined();
-        });
-    });
-
-    // ─── Req 3.1: New scopes trigger re-consent ───────────────────────
-
-    describe('login endpoint — new scopes trigger re-consent (Req 3.1)', () => {
-        it('should require consent again when client requests scopes beyond what was previously granted', async () => {
-            const freshClient = await clientApi.createClient(testTenantId, 'Incremental Scopes App', {
-                redirectUris: [REDIRECT_URI],
-                allowedScopes: 'openid profile email',
-                isPublic: true,
-            });
-            const clientId = freshClient.client.clientId;
-
-            try {
-                // Step 1: Grant consent for openid only
-                const firstApprove = await consentRequest({
-                    client_id: clientId,
-                    approved_scopes: ['openid'],
-                    consent_action: 'approve',
-                    scope: 'openid',
-                });
-                expect(firstApprove.body.authentication_code).toBeDefined();
-
-                // Step 2: Login requesting openid + profile — profile is new, consent required
-                const loginResponse = await loginRequest({
-                    client_id: clientId,
-                    scope: 'openid profile',
-                });
-
-                expect(loginResponse.status).toEqual(201);
-                expect(loginResponse.body.requires_consent).toBe(true);
-                expect(loginResponse.body.requested_scopes).toContain('profile');
-                expect(loginResponse.body.authentication_code).toBeUndefined();
-            } finally {
-                await clientApi.deleteClient(clientId).catch(() => {
-                });
-            }
-        });
-    });
-
-    // ─── prompt=consent forces consent even when already granted ─────
-
-    describe('login endpoint — prompt=consent forces consent (OIDC prompt)', () => {
-        it('should return requires_consent when prompt=consent even when consent already granted', async () => {
-            const freshClient = await clientApi.createClient(testTenantId, 'Prompt Consent App', {
-                redirectUris: [REDIRECT_URI],
-                allowedScopes: 'openid profile email',
-                isPublic: true,
-            });
-            const clientId = freshClient.client.clientId;
-
-            try {
-                // Step 1: Grant consent for all scopes
-                const approveResponse = await consentRequest({
-                    client_id: clientId,
-                    approved_scopes: ['openid', 'profile', 'email'],
-                    consent_action: 'approve',
-                    scope: 'openid profile email',
-                });
-                expect(approveResponse.body.authentication_code).toBeDefined();
-
-                // Step 2: Login again with prompt=consent — should force consent even though already granted
-                const loginResponse = await app.getHttpServer()
-                    .post('/api/oauth/login')
-                    .send({
-                        email: 'admin@auth.server.com',
-                        password: 'admin9000',
-                        code_challenge: CODE_CHALLENGE,
-                        code_challenge_method: 'plain',
-                        redirect_uri: REDIRECT_URI,
+                const res = await app.getHttpServer()
+                    .post('/api/oauth/consent')
+                    .set('Cookie', sidCookie)
+                    .send(consentBody({
                         client_id: clientId,
-                        scope: 'openid profile email',
-                        prompt: 'consent',
-                    })
-                    .set('Accept', 'application/json');
+                        scope: 'openid profile',
+                        state: 'deny-state',
+                        csrf_token: csrfToken,
+                        decision: 'deny',
+                    }))
+                    .redirects(0);
 
-                expect(loginResponse.status).toEqual(201);
-                expect(loginResponse.body.requires_consent).toBe(true);
-                expect(loginResponse.body.requested_scopes).toBeDefined();
-                expect(loginResponse.body.authentication_code).toBeUndefined();
+                expect(res.status).toEqual(302);
+                const location = res.headers['location'] as string;
+                expect(location.startsWith(REDIRECT_URI)).toBe(true);
+                const url = new URL(location, 'http://localhost');
+                expect(url.searchParams.get('error')).toEqual('access_denied');
+                expect(url.searchParams.get('error_description')).toBeTruthy();
+                expect(url.searchParams.get('state')).toEqual('deny-state');
+                expect(url.searchParams.has('code')).toBe(false);
             } finally {
-                await clientApi.deleteClient(clientId).catch(() => {
-                });
+                await clientApi.deleteClient(clientId).catch(() => {});
+            }
+        });
+
+        it('deny does not create a consent record — subsequent authorize still redirects to consent UI', async () => {
+            const fresh = await clientApi.createClient(testTenantId, 'Deny No Record App', {
+                redirectUris: [REDIRECT_URI],
+                allowedScopes: 'openid profile email',
+                isPublic: true,
+            });
+            const clientId = fresh.client.clientId;
+
+            try {
+                const sidCookie = await loginForSid(clientId);
+                const authLoc = await authorize(sidCookie, clientId, 'openid profile');
+                const csrfToken = new URL(authLoc, 'http://localhost').searchParams.get('csrf_token');
+
+                await app.getHttpServer()
+                    .post('/api/oauth/consent')
+                    .set('Cookie', sidCookie)
+                    .send(consentBody({
+                        client_id: clientId,
+                        scope: 'openid profile',
+                        csrf_token: csrfToken,
+                        decision: 'deny',
+                    }))
+                    .redirects(0);
+
+                // Authorize again — should still require consent
+                const sidCookie2 = await loginForSid(clientId);
+                const location2 = await authorize(sidCookie2, clientId, 'openid profile');
+                expect(isConsentRedirect(location2)).toBe(true);
+            } finally {
+                await clientApi.deleteClient(clientId).catch(() => {});
             }
         });
     });
 
-    // ─── prompt=login invalidates existing sessions ──────────────────
-    // Uses an isolated user (prompt-test.local) to avoid poisoning sessions for other concurrent tests.
+    // ── Req 6.4 (replacement): consent endpoint security & validation ────────
 
-    describe('login endpoint — prompt=login invalidates sessions (OIDC prompt)', () => {
-        it('should create a new session when prompt=login is specified', async () => {
-            // Use an isolated tenant to avoid invalidating sessions used by other test files
-            const response = await app.getHttpServer()
-                .post('/api/oauth/login')
+    describe('consent endpoint security checks (Req 6.4)', () => {
+        it('returns 401 when no sid cookie is present', async () => {
+            const res = await app.getHttpServer()
+                .post('/api/oauth/consent')
+                .send(consentBody({
+                    client_id: thirdPartyClientId,
+                    scope: 'openid profile',
+                    csrf_token: 'anything',
+                    decision: 'grant',
+                }))
+                .redirects(0);
+
+            expect(res.status).toEqual(401);
+        });
+
+        it('returns 403 when csrf_token does not match HMAC(sid, secret)', async () => {
+            const sidCookie = await loginForSid(thirdPartyClientId);
+
+            const res = await app.getHttpServer()
+                .post('/api/oauth/consent')
+                .set('Cookie', sidCookie)
+                .send(consentBody({
+                    client_id: thirdPartyClientId,
+                    scope: 'openid profile',
+                    csrf_token: crypto.randomBytes(32).toString('hex'),
+                    decision: 'grant',
+                }))
+                .redirects(0);
+
+            expect(res.status).toEqual(403);
+        });
+
+        it('returns 400 for an unknown client_id', async () => {
+            const sidCookie = await loginForSid(thirdPartyClientId);
+            const sid = extractSidValue(sidCookie);
+            const csrfToken = csrfTokenFor(sid);
+
+            const res = await app.getHttpServer()
+                .post('/api/oauth/consent')
+                .set('Cookie', sidCookie)
+                .send(consentBody({
+                    client_id: 'totally-unknown-client-id-xyz',
+                    scope: 'openid',
+                    csrf_token: csrfToken,
+                    decision: 'grant',
+                }))
+                .redirects(0);
+
+            expect(res.status).toEqual(400);
+        });
+
+        it('returns 400 when redirect_uri is not registered on the client', async () => {
+            const sidCookie = await loginForSid(thirdPartyClientId);
+            const sid = extractSidValue(sidCookie);
+            const csrfToken = csrfTokenFor(sid);
+
+            const res = await app.getHttpServer()
+                .post('/api/oauth/consent')
+                .set('Cookie', sidCookie)
                 .send({
-                    email: 'admin@prompt-test.local',
-                    password: 'admin9000',
+                    client_id: thirdPartyClientId,
+                    redirect_uri: 'https://evil.example.com/unregistered',
+                    scope: 'openid',
+                    response_type: 'code',
                     code_challenge: CODE_CHALLENGE,
                     code_challenge_method: 'plain',
-                    client_id: 'prompt-test.local',
-                    prompt: 'login',
+                    csrf_token: csrfToken,
+                    decision: 'grant',
+                })
+                .redirects(0);
+
+            expect(res.status).toEqual(400);
+        });
+
+        it('silently drops scopes outside client.allowedScopes from the granted set', async () => {
+            // narrowScopesClientId allows only openid + profile. If the consent body asks
+            // for `email`, it must not appear in the resulting token's scopes.
+            const sidCookie = await loginForSid(narrowScopesClientId);
+            const code = await grantConsentAndGetCode(
+                sidCookie,
+                narrowScopesClientId,
+                'openid profile email',
+            );
+
+            const tokenRes = await app.getHttpServer()
+                .post('/api/oauth/token')
+                .send({
+                    grant_type: 'authorization_code',
+                    code,
+                    client_id: narrowScopesClientId,
+                    code_verifier: CODE_VERIFIER,
+                    redirect_uri: REDIRECT_URI,
                 })
                 .set('Accept', 'application/json');
 
-            expect(response.status).toEqual(201);
-            expect(response.body.authentication_code).toBeDefined();
+            expect(tokenRes.status).toEqual(200);
+
+            // Token scopes must not contain email — it was outside allowedScopes.
+            const decoded = app.jwtService().decode(tokenRes.body.access_token, {json: true}) as any;
+            const rawScopes: string | string[] | undefined = decoded?.scope ?? decoded?.scopes;
+            const scopeArray = Array.isArray(rawScopes)
+                ? rawScopes
+                : typeof rawScopes === 'string'
+                    ? rawScopes.split(/\s+/).filter(Boolean)
+                    : [];
+            if (scopeArray.length > 0) {
+                expect(scopeArray).not.toContain('email');
+            }
+        });
+    });
+
+    // ── prompt=consent forces re-consent even when already granted ──────────
+
+    describe('prompt=consent forces re-consent (OIDC prompt)', () => {
+        it('redirects to consent UI even when existing consent already covers requested scopes', async () => {
+            const fresh = await clientApi.createClient(testTenantId, 'Prompt Consent App', {
+                redirectUris: [REDIRECT_URI],
+                allowedScopes: 'openid profile email',
+                isPublic: true,
+            });
+            const clientId = fresh.client.clientId;
+
+            try {
+                // Step 1: grant consent for all scopes using the helper
+                await tokenFixture.preGrantConsent(
+                    ADMIN_EMAIL,
+                    ADMIN_PASSWORD,
+                    clientId,
+                    REDIRECT_URI,
+                    'openid profile email',
+                );
+
+                // Step 2: authorize with prompt=consent — must redirect to consent UI anyway
+                const sidCookie = await loginForSid(clientId);
+                const location = await authorize(
+                    sidCookie,
+                    clientId,
+                    'openid profile email',
+                    {prompt: 'consent'},
+                );
+
+                expect(isConsentRedirect(location)).toBe(true);
+                const url = new URL(location, 'http://localhost');
+                expect(url.searchParams.get('csrf_token')).toBeTruthy();
+            } finally {
+                await clientApi.deleteClient(clientId).catch(() => {});
+            }
         });
     });
 });

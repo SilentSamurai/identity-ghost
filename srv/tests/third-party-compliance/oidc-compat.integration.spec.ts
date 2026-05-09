@@ -35,9 +35,36 @@ describe('OIDC Compatibility (openid-client v5)', () => {
     let publicClient: Client;
 
     /**
-     * Full OAuth authorize → login → get auth code flow.
-     * Hits GET /api/oauth/authorize, follows the 302, parses forwarded params,
-     * then POSTs credentials to /api/oauth/login — exactly what the Angular UI does.
+     * Extract the `sid=...` cookie pair (just the name=value part, no attributes)
+     * from a fetch Response's Set-Cookie header(s).
+     */
+    function extractSidCookie(res: Response): string {
+        const headers = res.headers as any;
+        const cookies: string[] = typeof headers.getSetCookie === 'function'
+            ? headers.getSetCookie()
+            : (headers.get('set-cookie') ? [headers.get('set-cookie') as string] : []);
+
+        for (const c of cookies) {
+            const trimmed = c.trim();
+            if (trimmed.startsWith('sid=')) {
+                return trimmed.split(';')[0];
+            }
+        }
+        throw new Error(`sid cookie not found in Set-Cookie: ${JSON.stringify(cookies)}`);
+    }
+
+    /**
+     * Simulates the browser-driven OAuth flow end-to-end, mirroring what the Angular UI does:
+     *   1. GET  /api/oauth/authorize            → 302 to the login UI (no session yet)
+     *   2. POST /api/oauth/login                → 2xx, Set-Cookie: sid=... (session created)
+     *   3. GET  /api/oauth/authorize (with sid) → 302 to redirect_uri?code=...&state=...
+     *
+     * openid-client is a Relying Party library: it builds the authorize URL and
+     * exchanges the code at /token. Everything in between is user-agent work, which
+     * we perform here with fetch + a manually carried sid cookie.
+     *
+     * `session_confirmed=true` is added to the authorize URL to bypass the session-confirm UI,
+     * which the tenant has enabled (skipSessionConfirm: false).
      */
     async function authorizeAndLogin(
         oidcClient: Client,
@@ -50,7 +77,8 @@ describe('OIDC Compatibility (openid-client v5)', () => {
     ): Promise<{ code: string; state: string }> {
         const state = generators.state();
 
-        // 1. Build authorize URL via openid-client
+        // Build the authorize URL via openid-client. session_confirmed=true is passed
+        // through verbatim as a custom param.
         const authUrl = oidcClient.authorizationUrl({
             scope: opts.scope,
             code_challenge: opts.code_challenge,
@@ -58,45 +86,45 @@ describe('OIDC Compatibility (openid-client v5)', () => {
             state,
             nonce: opts.nonce,
             redirect_uri: redirectUri,
+            session_confirmed: 'true',
         });
 
-        // 2. Hit /api/oauth/authorize — expect 302 to login page
-        const authorizeRes = await fetch(authUrl, {redirect: 'manual'});
-        expect(authorizeRes.status).toBe(302);
+        // 1. First /authorize (no session) — expect redirect to the login UI.
+        const preLoginAuthorizeRes = await fetch(authUrl, {redirect: 'manual'});
+        expect(preLoginAuthorizeRes.status).toBe(302);
 
-        const location = authorizeRes.headers.get('location');
-        expect(location).toBeDefined();
-
-        // 3. Parse forwarded params from the redirect
-        const redirectUrl = new URL(location!, baseUrl);
-        const fwdParams = {
-            client_id: redirectUrl.searchParams.get('client_id')!,
-            scope: redirectUrl.searchParams.get('scope')!,
-            code_challenge: redirectUrl.searchParams.get('code_challenge')!,
-            code_challenge_method: redirectUrl.searchParams.get('code_challenge_method')!,
-            nonce: redirectUrl.searchParams.get('nonce') || undefined,
-        };
-
-        // 4. POST credentials to /api/oauth/login (simulating the login form)
+        // 2. POST credentials to /api/oauth/login — creates session, sets signed sid cookie.
         const loginRes = await fetch(`${baseUrl}/api/oauth/login`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({
                 email: adminEmail,
                 password: adminPassword,
-                client_id: fwdParams.client_id,
-                code_challenge: fwdParams.code_challenge,
-                code_challenge_method: fwdParams.code_challenge_method,
-                scope: fwdParams.scope,
-                nonce: fwdParams.nonce,
+                client_id: oidcClient.metadata.client_id,
             }),
         });
         expect2xx(loginRes);
 
-        const loginBody = await loginRes.json();
-        expect(loginBody.authentication_code).toBeDefined();
+        const sidCookie = extractSidCookie(loginRes);
 
-        return {code: loginBody.authentication_code, state};
+        // 3. Hit /authorize again with the sid cookie — server issues a code and
+        //    redirects to redirect_uri?code=...&state=...
+        const authorizeRes = await fetch(authUrl, {
+            redirect: 'manual',
+            headers: {cookie: sidCookie},
+        });
+        expect(authorizeRes.status).toBe(302);
+
+        const location = authorizeRes.headers.get('location');
+        expect(location).toBeTruthy();
+
+        const redirectUrl = new URL(location!, baseUrl);
+        expect(redirectUrl.searchParams.has('error')).toBe(false);
+
+        const code = redirectUrl.searchParams.get('code');
+        expect(code).toBeTruthy();
+
+        return {code: code!, state};
     }
 
     beforeAll(async () => {

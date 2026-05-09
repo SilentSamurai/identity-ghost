@@ -13,6 +13,16 @@ const httpOptionsWithCredentials = {
     withCredentials: true,
 };
 
+export interface TenantInfo {
+    id: string;
+    name: string;
+    domain: string;
+}
+
+export type LoginResponse =
+    | { success: true }
+    | { requires_tenant_selection: true; tenants: TenantInfo[] };
+
 @Injectable({
     providedIn: 'root',
 })
@@ -21,18 +31,24 @@ export class AuthService {
     }
 
     /**
-     * Authenticate with credentials. Returns {success: true} and sets the sid cookie.
-     * The frontend constructs the redirect URL from OAuth params it already has.
+     * Authenticate with credentials.
+     * Returns either {success: true} with sid cookie set,
+     * or {requires_tenant_selection: true, tenants: [...]} if user belongs to multiple subscriber tenants.
      */
     async login(
         email: string,
         password: string,
         client_id: string,
-    ): Promise<{ success: true }> {
+        subscriber_tenant_hint?: string,
+    ): Promise<LoginResponse> {
+        const body: any = {client_id, email, password};
+        if (subscriber_tenant_hint) {
+            body.subscriber_tenant_hint = subscriber_tenant_hint;
+        }
         return await lastValueFrom(
-            this.http.post<{ success: true }>(
+            this.http.post<LoginResponse>(
                 `${AUTH_API}/login`,
-                {client_id, email, password},
+                body,
                 httpOptionsWithCredentials,
             ),
         );

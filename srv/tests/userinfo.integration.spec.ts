@@ -22,27 +22,16 @@ describe('UserInfo Endpoint Integration', () => {
     const password = 'admin9000';
     const verifier = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq';
     const challenge = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq';
+    const redirectUri = 'http://localhost:3000/callback';
 
-    /** Helper: login → get auth code with specific scope (matches id-token-integration.spec.ts pattern) */
+    /** Helper: login → authorize → auth code (cookie-based flow) with specific scope */
     async function loginForCode(opts?: { scope?: string; nonce?: string }): Promise<string> {
-        const body: any = {
-            email,
-            password,
-            client_id: clientId,
-            code_challenge: challenge,
-            code_challenge_method: 'plain',
-        };
-        if (opts?.scope !== undefined) body.scope = opts.scope;
-        if (opts?.nonce !== undefined) body.nonce = opts.nonce;
-
-        const res = await app.getHttpServer()
-            .post('/api/oauth/login')
-            .send(body)
-            .set('Accept', 'application/json');
-
-        expect2xx(res);
-        expect(res.body.authentication_code).toBeDefined();
-        return res.body.authentication_code;
+        return tokenFixture.fetchAuthCode(email, password, clientId, redirectUri, {
+            scope: opts?.scope,
+            nonce: opts?.nonce,
+            codeChallenge: challenge,
+            codeChallengeMethod: 'plain',
+        });
     }
 
     /** Helper: exchange auth code → full token response */
@@ -54,6 +43,7 @@ describe('UserInfo Endpoint Integration', () => {
                 code,
                 code_verifier: verifier,
                 client_id: clientId,
+                redirect_uri: redirectUri,
             })
             .set('Accept', 'application/json');
 

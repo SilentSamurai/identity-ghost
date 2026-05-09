@@ -51,6 +51,7 @@ import {ClientService} from "../services/client.service";
 import {ResourceIndicatorValidator} from "../auth/resource-indicator.validator";
 import {Environment} from "../config/environment.service";
 import {RefreshTokenService} from "../auth/refresh-token.service";
+import {TenantAmbiguityService, TenantInfo} from "../auth/tenant-ambiguity.service";
 import { deprecate } from "util";
 
 const logger = new Logger("OAuthTokenController");
@@ -70,6 +71,7 @@ export class OAuthTokenController {
         private readonly scopeResolverService: ScopeResolverService,
         private readonly clientService: ClientService,
         private readonly refreshTokenService: RefreshTokenService,
+        private readonly tenantAmbiguityService: TenantAmbiguityService,
     ) {
     }
 
@@ -200,7 +202,7 @@ export class OAuthTokenController {
             query.client_id!,
             validated.codeChallenge || null,
             validated.codeChallenge ? (validated.codeChallengeMethod || 'plain') : null,
-            undefined,
+            validated.subscriberTenantHint,
             validated.redirectUri,
             validated.scope,
             validated.nonce,
@@ -234,6 +236,10 @@ export class OAuthTokenController {
         }
         if (validated.nonce) params.set('nonce', validated.nonce);
         if (validated.resource) params.set('resource', validated.resource);
+        if (validated.prompt) params.set('prompt', validated.prompt);
+        if (validated.maxAge !== undefined) params.set('max_age', String(validated.maxAge));
+        if (query.id_token_hint) params.set('id_token_hint', query.id_token_hint);
+        if (validated.subscriberTenantHint) params.set('subscriber_tenant_hint', validated.subscriberTenantHint);
         if (query.from_logout === 'true') params.set('from_logout', 'true');
         res.redirect(302, `${Environment.get('BASE_URL', '')}/authorize?${params.toString()}`);
     }
@@ -258,6 +264,10 @@ export class OAuthTokenController {
         }
         if (validated.nonce) params.set('nonce', validated.nonce);
         if (validated.resource) params.set('resource', validated.resource);
+        if (validated.prompt) params.set('prompt', validated.prompt);
+        if (validated.maxAge !== undefined) params.set('max_age', String(validated.maxAge));
+        if (query.id_token_hint) params.set('id_token_hint', query.id_token_hint);
+        if (validated.subscriberTenantHint) params.set('subscriber_tenant_hint', validated.subscriberTenantHint);
         res.redirect(302, `${Environment.get('BASE_URL', '')}/session-confirm?${params.toString()}`);
     }
 
@@ -289,6 +299,10 @@ export class OAuthTokenController {
         }
         if (validated.nonce) params.set('nonce', validated.nonce);
         if (validated.resource) params.set('resource', validated.resource);
+        if (validated.prompt) params.set('prompt', validated.prompt);
+        if (validated.maxAge !== undefined) params.set('max_age', String(validated.maxAge));
+        if (query.id_token_hint) params.set('id_token_hint', query.id_token_hint);
+        if (validated.subscriberTenantHint) params.set('subscriber_tenant_hint', validated.subscriberTenantHint);
         res.redirect(302, `${Environment.get('BASE_URL', '')}/consent?${params.toString()}`);
     }
 
@@ -332,8 +346,9 @@ export class OAuthTokenController {
             client_id: string;
             password: string;
             email: string;
+            subscriber_tenant_hint?: string;
         },
-    ): Promise<{ success: true }> {
+    ): Promise<{ success: true } | { requires_tenant_selection: true; tenants: TenantInfo[] }> {
         const user: User = await this.authService.validate(body.email, body.password);
 
         // Resolve Client entity by clientId or alias
@@ -343,6 +358,40 @@ export class OAuthTokenController {
         } catch {
             throw OAuthException.invalidClient('Unknown client_id');
         }
+
+        // Check if this is a first-party app (alias matches client_id)
+        const isFirstParty = client.alias === body.client_id;
+
+        // For third-party apps without a hint, check for ambiguous tenants
+        if (!isFirstParty && !body.subscriber_tenant_hint) {
+            const subscriberTenants = await this.tenantAmbiguityService.findSubscriberTenants(
+                user.id,
+                client.clientId,
+            );
+
+            if (subscriberTenants.length > 1) {
+                // Multiple tenants — user must select one
+                // Don't create session yet
+                logger.log(`User ${user.email} has ${subscriberTenants.length} subscriber tenants for client ${body.client_id} — requiring selection`);
+                return {
+                    requires_tenant_selection: true,
+                    tenants: subscriberTenants,
+                };
+            }
+        }
+
+        // If hint provided, validate it
+        if (body.subscriber_tenant_hint) {
+            const isValidHint = await this.tenantAmbiguityService.validateHint(
+                user.id,
+                client.clientId,
+                body.subscriber_tenant_hint,
+            );
+            if (!isValidHint) {
+                throw OAuthException.invalidRequest('Invalid subscriber_tenant_hint');
+            }
+        }
+
         const tenant = client.tenant;
 
         // Create a new login session
@@ -376,6 +425,7 @@ export class OAuthTokenController {
             code_challenge_method?: string;
             nonce?: string;
             resource?: string;
+            subscriber_tenant_hint?: string;
             csrf_token: string;
             decision: 'grant' | 'deny';
         },
@@ -457,6 +507,7 @@ export class OAuthTokenController {
         if (body.code_challenge_method) params.set('code_challenge_method', body.code_challenge_method);
         if (body.nonce) params.set('nonce', body.nonce);
         if (body.resource) params.set('resource', body.resource);
+        if (body.subscriber_tenant_hint) params.set('subscriber_tenant_hint', body.subscriber_tenant_hint);
         params.set('session_confirmed', 'true');
         res.redirect(302, `/api/oauth/authorize?${params.toString()}`);
     }
@@ -465,32 +516,32 @@ export class OAuthTokenController {
      * POST /session-logout — Cookie-authenticated logout.
      * Invalidates the server-side session, revokes associated refresh tokens, and clears the sid cookie.
      */
-    // @Post("/session-logout")
-    // @HttpCode(200)
-    // @Header('Cache-Control', 'no-store')
-    // @Header('Pragma', 'no-cache')
-    // async sessionLogout(
-    //     @Req() req: ExpressRequest,
-    //     @Res({passthrough: true}) res: Response,
-    // ): Promise<Record<string, never>> {
-    //     const sid = (req as any).signedCookies?.sid;
-    //     if (sid) {
-    //         await this.loginSessionService.invalidateSession(sid);
-    //         await this.refreshTokenService.revokeBySid(sid);
-    //     }
+    @Post("/session-logout")
+    @HttpCode(200)
+    @Header('Cache-Control', 'no-store')
+    @Header('Pragma', 'no-cache')
+    async sessionLogout(
+        @Req() req: ExpressRequest,
+        @Res({passthrough: true}) res: Response,
+    ): Promise<Record<string, never>> {
+        const sid = (req as any).signedCookies?.sid;
+        if (sid) {
+            await this.loginSessionService.invalidateSession(sid);
+            await this.refreshTokenService.revokeBySid(sid);
+        }
 
-    //     // Clear the sid cookie
-    //     res.cookie('sid', '', {
-    //         signed: true,
-    //         httpOnly: true,
-    //         secure: Environment.get('ENABLE_HTTPS') === 'true' || process.env.NODE_ENV === 'production',
-    //         sameSite: 'lax' as const,
-    //         path: '/api/oauth',
-    //         maxAge: 0,
-    //     });
+        // Clear the sid cookie
+        res.cookie('sid', '', {
+            signed: true,
+            httpOnly: true,
+            secure: Environment.get('ENABLE_HTTPS') === 'true' || process.env.NODE_ENV === 'production',
+            sameSite: 'lax' as const,
+            path: '/api/oauth',
+            maxAge: 0,
+        });
 
-    //     return {};
-    // }
+        return {};
+    }
 
     /**
      * GET /session-info — Cookie-authenticated session info.

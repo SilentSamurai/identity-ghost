@@ -21,8 +21,9 @@ export interface AuthorizeQueryParams {
     max_age?: number;
     resource?: string;
     id_token_hint?: string;
-    from_logout?: string;       // skip session detection after logout
-    session_confirmed?: string; // user confirmed session via session-confirm UI
+    from_logout?: string;            // skip session detection after logout
+    session_confirmed?: string;      // user confirmed session via session-confirm UI
+    subscriber_tenant_hint?: string; // selected tenant for ambiguous multi-tenant users
 }
 
 export interface ValidatedAuthorizeRequest {
@@ -38,6 +39,7 @@ export interface ValidatedAuthorizeRequest {
     maxAge?: number;
     resource?: string;
     idTokenHintSub?: string;
+    subscriberTenantHint?: string;
 }
 
 @Injectable()
@@ -122,6 +124,7 @@ export class AuthorizeService {
                 maxAge: params.max_age,
                 resource: params.resource,
                 idTokenHintSub,
+                subscriberTenantHint: params.subscriber_tenant_hint,
             };
         } catch (error) {
             if (error instanceof OAuthException || error instanceof AuthorizeRedirectException) {

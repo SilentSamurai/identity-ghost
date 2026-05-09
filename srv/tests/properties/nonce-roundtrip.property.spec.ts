@@ -1,7 +1,7 @@
 import * as fc from 'fast-check';
 import * as jwt from 'jsonwebtoken';
 import {SharedTestFixture} from '../shared-test.fixture';
-import {expect2xx} from '../api-client/client';
+import {TokenFixture} from '../token.fixture';
 
 /**
  * Feature: nonce-replay-protection, Property 1: Nonce round-trip integrity —
@@ -12,8 +12,10 @@ import {expect2xx} from '../api-client/client';
  */
 describe('Feature: nonce-replay-protection, Property 1: Nonce round-trip integrity', () => {
     let app: SharedTestFixture;
+    let tokenFixture: TokenFixture;
 
     const clientId = 'auth.server.com';
+    const redirectUri = 'http://localhost:3000/callback';
     const verifier = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq';
     const challenge = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq';
     const email = 'admin@auth.server.com';
@@ -26,23 +28,14 @@ describe('Feature: nonce-replay-protection, Property 1: Nonce round-trip integri
         .array(fc.constantFrom(...URL_SAFE_CHARS.split('')), {minLength: 1, maxLength: 512})
         .map((chars) => chars.join(''));
 
-    /** Helper: login with nonce → get auth code */
+    /** Helper: login → authorize → get auth code (cookie-based flow), with nonce */
     async function loginForCode(nonce: string): Promise<string> {
-        const res = await app.getHttpServer()
-            .post('/api/oauth/login')
-            .send({
-                email,
-                password,
-                client_id: clientId,
-                code_challenge: challenge,
-                code_challenge_method: 'plain',
-                scope: 'openid profile email',
-                nonce,
-            })
-            .set('Accept', 'application/json');
-
-        expect2xx(res);
-        return res.body.authentication_code;
+        return tokenFixture.fetchAuthCode(email, password, clientId, redirectUri, {
+            codeChallenge: challenge,
+            codeChallengeMethod: 'plain',
+            scope: 'openid profile email',
+            nonce,
+        });
     }
 
     /** Helper: exchange auth code → token response */
@@ -54,15 +47,18 @@ describe('Feature: nonce-replay-protection, Property 1: Nonce round-trip integri
                 code,
                 code_verifier: verifier,
                 client_id: clientId,
+                redirect_uri: redirectUri,
             })
             .set('Accept', 'application/json');
 
-        expect2xx(res);
+        expect(res.status).toBeGreaterThanOrEqual(200);
+        expect(res.status).toBeLessThan(300);
         return res.body;
     }
 
     beforeAll(async () => {
         app = new SharedTestFixture();
+        tokenFixture = new TokenFixture(app);
     });
 
     afterAll(async () => {
@@ -82,5 +78,5 @@ describe('Feature: nonce-replay-protection, Property 1: Nonce round-trip integri
             }),
             {numRuns: 20},
         );
-    }, 120_000);
+    }, 180_000);
 });

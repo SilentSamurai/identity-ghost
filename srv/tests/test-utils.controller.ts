@@ -144,6 +144,10 @@ export class TestUtilsController {
         method: string;
         sid?: string;
         requireAuthTime?: boolean;
+        redirectUri?: string | null;
+        scope?: string | null;
+        nonce?: string | null;
+        resource?: string | null;
     }): Promise<AuthCode> {
         const code = Math.random().toString(36).substring(2, 8).toUpperCase();
         const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes from now
@@ -159,6 +163,10 @@ export class TestUtilsController {
             requireAuthTime: body.requireAuthTime || false,
             used: false,
             expiresAt,
+            redirectUri: (body.redirectUri ?? null) as any,
+            scope: (body.scope ?? null) as any,
+            nonce: (body.nonce ?? null) as any,
+            resource: body.resource ?? null,
         });
 
         return this.authCodeRepo.save(authCode);

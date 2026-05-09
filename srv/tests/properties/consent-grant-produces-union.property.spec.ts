@@ -16,20 +16,19 @@ import {ScopeNormalizer} from '../../src/casl/scope-normalizer';
  */
 describe('Feature: user-consent-tracking, Property 4: Granting consent produces the union of scopes', () => {
     let fixture: SharedTestFixture;
+    let tokenFixture: TokenFixture;
     let clientApi: ClientEntityClient;
     let testTenantId: string;
 
     const REDIRECT_URI = 'https://consent-union-prop.example.com/callback';
     const CODE_CHALLENGE = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq';
+    const email = 'admin@auth.server.com';
+    const password = 'admin9000';
 
     beforeAll(async () => {
         fixture = new SharedTestFixture();
-        const tokenFixture = new TokenFixture(fixture);
-        const {accessToken} = await tokenFixture.fetchAccessToken(
-            'admin@auth.server.com',
-            'admin9000',
-            'auth.server.com',
-        );
+        tokenFixture = new TokenFixture(fixture);
+        const {accessToken} = await tokenFixture.fetchAccessToken(email, password, 'auth.server.com');
         clientApi = new ClientEntityClient(fixture, accessToken);
 
         const tenantClient = new TenantClient(fixture, accessToken);
@@ -45,30 +44,48 @@ describe('Feature: user-consent-tracking, Property 4: Granting consent produces 
         await fixture.close();
     });
 
-    /**
-     * Grant consent via the consent endpoint.
-     */
-    async function grantConsent(clientId: string, scopes: string[]) {
-        return fixture.getHttpServer()
-            .post('/api/oauth/consent')
-            .send({
-                email: 'admin@auth.server.com',
-                password: 'admin9000',
-                client_id: clientId,
-                code_challenge: CODE_CHALLENGE,
-                code_challenge_method: 'plain',
-                redirect_uri: REDIRECT_URI,
-                approved_scopes: scopes,
-                consent_action: 'approve',
-                scope: scopes.join(' '),
-            })
-            .set('Accept', 'application/json');
+    /** Grant consent via tokenFixture.preGrantConsent (cookie + CSRF). */
+    async function grantConsent(clientId: string, scopes: string[]): Promise<void> {
+        await tokenFixture.preGrantConsent(email, password, clientId, REDIRECT_URI, scopes.join(' '));
     }
 
     /**
-     * Verify that the stored consent covers exactly the expected scopes by checking
-     * that login succeeds (no consent required) for the expected union, and that
-     * login requires consent for any scope outside the union.
+     * Drive /authorize and determine if consent is required.
+     * Returns true if /authorize redirected to the consent UI.
+     */
+    async function isConsentRequired(clientId: string, requestedScopes: string[]): Promise<boolean> {
+        const sidCookie = await tokenFixture.loginForCookie(email, password, clientId);
+
+        const res = await fixture.getHttpServer()
+            .get('/api/oauth/authorize')
+            .query({
+                response_type: 'code',
+                client_id: clientId,
+                redirect_uri: REDIRECT_URI,
+                scope: requestedScopes.join(' '),
+                state: 'union-check',
+                code_challenge: CODE_CHALLENGE,
+                code_challenge_method: 'plain',
+                session_confirmed: 'true',
+            })
+            .set('Cookie', sidCookie)
+            .redirects(0);
+
+        expect(res.status).toEqual(302);
+        const location = res.headers['location'] as string;
+        expect(location).toBeDefined();
+
+        if (location.includes('/consent?')) return true;
+
+        const url = new URL(location, 'http://localhost');
+        expect(url.searchParams.has('error')).toBe(false);
+        expect(url.searchParams.get('code')).toBeTruthy();
+        return false;
+    }
+
+    /**
+     * Verify the stored consent covers exactly `expectedUnion` — /authorize succeeds for the
+     * union, and any scope outside the union makes /authorize redirect to consent UI.
      */
     async function verifyStoredScopes(
         clientId: string,
@@ -77,57 +94,25 @@ describe('Feature: user-consent-tracking, Property 4: Granting consent produces 
         const normalizedExpected = ScopeNormalizer.format(expectedUnion);
         const expectedScopeArray = ScopeNormalizer.parse(normalizedExpected);
 
-        // Login with the full expected union — must NOT require consent
-        const loginWithUnion = await fixture.getHttpServer()
-            .post('/api/oauth/login')
-            .send({
-                email: 'admin@auth.server.com',
-                password: 'admin9000',
-                client_id: clientId,
-                code_challenge: CODE_CHALLENGE,
-                code_challenge_method: 'plain',
-                redirect_uri: REDIRECT_URI,
-                scope: expectedScopeArray.join(' '),
-            })
-            .set('Accept', 'application/json');
-
-        expect(loginWithUnion.status).toEqual(201);
-        expect(loginWithUnion.body.authentication_code).toBeDefined();
-        expect(loginWithUnion.body.requires_consent).toBeUndefined();
+        // /authorize with the full expected union — must NOT require consent
+        expect(await isConsentRequired(clientId, expectedScopeArray)).toBe(false);
 
         // Determine scopes NOT in the expected union
         const allScopes = ['openid', 'profile', 'email'];
         const scopesOutsideUnion = allScopes.filter(s => !expectedScopeArray.includes(s));
 
-        // If there are scopes outside the union, login with them must require consent
+        // If there are scopes outside the union, /authorize must require consent for them.
         if (scopesOutsideUnion.length > 0) {
-            const loginWithExtra = await fixture.getHttpServer()
-                .post('/api/oauth/login')
-                .send({
-                    email: 'admin@auth.server.com',
-                    password: 'admin9000',
-                    client_id: clientId,
-                    code_challenge: CODE_CHALLENGE,
-                    code_challenge_method: 'plain',
-                    redirect_uri: REDIRECT_URI,
-                    scope: [...expectedScopeArray, ...scopesOutsideUnion].join(' '),
-                })
-                .set('Accept', 'application/json');
-
-            expect(loginWithExtra.status).toEqual(201);
-            expect(loginWithExtra.body.requires_consent).toBe(true);
+            expect(await isConsentRequired(clientId, [...expectedScopeArray, ...scopesOutsideUnion])).toBe(true);
         }
     }
 
     it('stored scopes after grantConsent equal G ∪ A (normalized)', async () => {
         await fc.assert(
             fc.asyncProperty(
-                // G: initial granted scopes
                 fc.subarray(['openid', 'profile', 'email'], {minLength: 1}),
-                // A: newly approved scopes
                 fc.subarray(['openid', 'profile', 'email'], {minLength: 1}),
                 async (grantedScopes, approvedScopes) => {
-                    // Create a fresh client for this iteration
                     const uniqueSuffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
                     const client = await clientApi.createClient(
                         testTenantId,
@@ -142,14 +127,10 @@ describe('Feature: user-consent-tracking, Property 4: Granting consent produces 
 
                     try {
                         // Step 1: Create initial consent with G
-                        const firstGrant = await grantConsent(clientId, grantedScopes);
-                        expect(firstGrant.status).toEqual(201);
-                        expect(firstGrant.body.authentication_code).toBeDefined();
+                        await grantConsent(clientId, grantedScopes);
 
                         // Step 2: Grant consent with A (update existing record)
-                        const secondGrant = await grantConsent(clientId, approvedScopes);
-                        expect(secondGrant.status).toEqual(201);
-                        expect(secondGrant.body.authentication_code).toBeDefined();
+                        await grantConsent(clientId, approvedScopes);
 
                         // Step 3: Compute expected union G ∪ A
                         const expectedUnion = ScopeNormalizer.union(grantedScopes, approvedScopes);
@@ -174,7 +155,6 @@ describe('Feature: user-consent-tracking, Property 4: Granting consent produces 
                 async (scopesFirst, scopesSecond) => {
                     const uniqueSuffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-                    // Client A: grant G first, then A
                     const clientA = await clientApi.createClient(
                         testTenantId,
                         `CU CommA ${uniqueSuffix}`,
@@ -185,7 +165,6 @@ describe('Feature: user-consent-tracking, Property 4: Granting consent produces 
                         },
                     );
 
-                    // Client B: grant A first, then G
                     const clientB = await clientApi.createClient(
                         testTenantId,
                         `CU CommB ${uniqueSuffix}`,
@@ -205,7 +184,6 @@ describe('Feature: user-consent-tracking, Property 4: Granting consent produces 
                         await grantConsent(clientB.client.clientId, scopesSecond);
                         await grantConsent(clientB.client.clientId, scopesFirst);
 
-                        // Both should have the same union
                         const expectedUnion = ScopeNormalizer.union(scopesFirst, scopesSecond);
 
                         await verifyStoredScopes(clientA.client.clientId, expectedUnion);
@@ -240,11 +218,10 @@ describe('Feature: user-consent-tracking, Property 4: Granting consent produces 
                     const clientId = client.client.clientId;
 
                     try {
-                        // Grant the same scopes twice
                         await grantConsent(clientId, scopes);
                         await grantConsent(clientId, scopes);
 
-                        // G ∪ G = G — stored scopes must equal the original scopes
+                        // G ∪ G = G
                         await verifyStoredScopes(clientId, scopes);
                     } finally {
                         await clientApi.deleteClient(clientId).catch(() => {

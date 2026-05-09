@@ -87,6 +87,7 @@ export class SessionConfirmationComponent implements OnInit {
     private codeChallengeMethod = '';
     private nonce = '';
     private resource = '';
+    private subscriberTenantHint = '';
 
     constructor(
         private router: Router,
@@ -108,6 +109,7 @@ export class SessionConfirmationComponent implements OnInit {
         this.codeChallengeMethod = params.get('code_challenge_method') || '';
         this.nonce = params.get('nonce') || '';
         this.resource = params.get('resource') || '';
+        this.subscriberTenantHint = params.get('subscriber_tenant_hint') || '';
 
         // Fetch user email from session-info endpoint (cookie-authenticated)
         // PII never comes from query params
@@ -158,6 +160,7 @@ export class SessionConfirmationComponent implements OnInit {
         }
         if (this.nonce) params.set('nonce', this.nonce);
         if (this.resource) params.set('resource', this.resource);
+        if (this.subscriberTenantHint) params.set('subscriber_tenant_hint', this.subscriberTenantHint);
         return params;
     }
 

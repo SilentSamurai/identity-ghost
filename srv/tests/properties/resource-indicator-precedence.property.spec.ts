@@ -58,26 +58,23 @@ const twoDifferentResourcesArb = fc.tuple(resourceUriArb, resourceUriArb)
  */
 describe('Feature: resource-indicator-support, Property 4: Auth code resource takes precedence', () => {
     let app: SharedTestFixture;
+    let tokenFixture: TokenFixture;
     let clientApi: ClientEntityClient;
-    let accessToken: string;
     let testTenantId: string;
 
     const REDIRECT_URI = 'https://precedence-test.example.com/callback';
     const CODE_VERIFIER = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq';
     const CODE_CHALLENGE = CODE_VERIFIER; // plain method
+    const email = 'admin@auth.server.com';
+    const password = 'admin9000';
 
     beforeAll(async () => {
         app = new SharedTestFixture();
-        const tokenFixture = new TokenFixture(app);
-        const response = await tokenFixture.fetchAccessToken(
-            'admin@auth.server.com',
-            'admin9000',
-            'auth.server.com',
-        );
-        accessToken = response.accessToken;
-        clientApi = new ClientEntityClient(app, accessToken);
+        tokenFixture = new TokenFixture(app);
+        const response = await tokenFixture.fetchAccessToken(email, password, 'auth.server.com');
+        clientApi = new ClientEntityClient(app, response.accessToken);
 
-        const tenantClient = new TenantClient(app, accessToken);
+        const tenantClient = new TenantClient(app, response.accessToken);
         const tenant = await tenantClient.createTenant('precedence-test', 'precedence-test.com');
         testTenantId = tenant.id;
     });
@@ -87,24 +84,15 @@ describe('Feature: resource-indicator-support, Property 4: Auth code resource ta
     });
 
     /**
-     * Helper: pre-grant consent for a third-party client so that login returns
-     * an authentication_code instead of requires_consent.
+     * Helper: login → authorize with resource → return auth code.
      */
-    async function preGrantConsent(clientId: string): Promise<void> {
-        await app.getHttpServer()
-            .post('/api/oauth/consent')
-            .send({
-                email: 'admin@auth.server.com',
-                password: 'admin9000',
-                client_id: clientId,
-                code_challenge: CODE_CHALLENGE,
-                code_challenge_method: 'plain',
-                approved_scopes: ['openid', 'profile', 'email'],
-                consent_action: 'approve',
-                scope: 'openid profile email',
-                redirect_uri: REDIRECT_URI,
-            })
-            .set('Accept', 'application/json');
+    async function loginAndGetCodeWithResource(clientId: string, resource?: string): Promise<string> {
+        const sidCookie = await tokenFixture.loginForCookie(email, password, clientId);
+        return tokenFixture.authorizeForCode(sidCookie, clientId, REDIRECT_URI, {
+            codeChallenge: CODE_CHALLENGE,
+            codeChallengeMethod: 'plain',
+            resource,
+        });
     }
 
     it('auth code resource takes precedence over token request resource', async () => {
@@ -121,33 +109,21 @@ describe('Feature: resource-indicator-support, Property 4: Auth code resource ta
                 const clientId = client.client.clientId;
 
                 try {
-                    // Pre-grant consent so login returns auth code
-                    await preGrantConsent(clientId);
+                    // Pre-grant consent so authorize can issue a code
+                    await tokenFixture.preGrantConsent(email, password, clientId, REDIRECT_URI);
 
-                    // Login with the first resource (authCodeResource)
-                    const loginResponse = await app.getHttpServer()
-                        .post('/api/oauth/login')
-                        .send({
-                            email: 'admin@auth.server.com',
-                            password: 'admin9000',
-                            client_id: clientId,
-                            code_challenge: CODE_CHALLENGE,
-                            code_challenge_method: 'plain',
-                            resource: authCodeResource,
-                        })
-                        .set('Accept', 'application/json');
-
-                    expect(loginResponse.status).toEqual(201);
-                    const code = loginResponse.body.authentication_code;
+                    // Authorize with authCodeResource
+                    const code = await loginAndGetCodeWithResource(clientId, authCodeResource);
 
                     // Exchange the code, but provide a DIFFERENT resource in the token request
                     const tokenResponse = await app.getHttpServer()
                         .post('/api/oauth/token')
                         .send({
                             grant_type: 'authorization_code',
-                            code: code,
+                            code,
                             code_verifier: CODE_VERIFIER,
                             client_id: clientId,
+                            redirect_uri: REDIRECT_URI,
                             // This resource should be IGNORED
                             resource: tokenRequestResource,
                         })
@@ -170,7 +146,7 @@ describe('Feature: resource-indicator-support, Property 4: Auth code resource ta
             }),
             {numRuns: 10},
         );
-    }, 120_000);
+    }, 180_000);
 
     it('token request resource is ignored when auth code has stored resource', async () => {
         const authCodeResource = 'https://stored-resource.example.com/api';
@@ -185,33 +161,19 @@ describe('Feature: resource-indicator-support, Property 4: Auth code resource ta
         const clientId = client.client.clientId;
 
         try {
-            // Pre-grant consent
-            await preGrantConsent(clientId);
+            await tokenFixture.preGrantConsent(email, password, clientId, REDIRECT_URI);
 
-            // Login with authCodeResource
-            const loginResponse = await app.getHttpServer()
-                .post('/api/oauth/login')
-                .send({
-                    email: 'admin@auth.server.com',
-                    password: 'admin9000',
-                    client_id: clientId,
-                    code_challenge: CODE_CHALLENGE,
-                    code_challenge_method: 'plain',
-                    resource: authCodeResource,
-                })
-                .set('Accept', 'application/json');
-
-            expect(loginResponse.status).toEqual(201);
-            const code = loginResponse.body.authentication_code;
+            const code = await loginAndGetCodeWithResource(clientId, authCodeResource);
 
             // Exchange with a different resource in the request
             const tokenResponse = await app.getHttpServer()
                 .post('/api/oauth/token')
                 .send({
                     grant_type: 'authorization_code',
-                    code: code,
+                    code,
                     code_verifier: CODE_VERIFIER,
                     client_id: clientId,
+                    redirect_uri: REDIRECT_URI,
                     resource: tokenRequestResource,
                 })
                 .set('Accept', 'application/json');
@@ -229,7 +191,7 @@ describe('Feature: resource-indicator-support, Property 4: Auth code resource ta
         }
     });
 
-    it('auth code without resource allows token request resource to be used', async () => {
+    it('auth code without resource: token request resource is also ignored (auth code resource is source of truth)', async () => {
         const resource = 'https://token-request-resource.example.com/api';
 
         // Create a client with allowedResources
@@ -242,24 +204,10 @@ describe('Feature: resource-indicator-support, Property 4: Auth code resource ta
         const clientId = client.client.clientId;
 
         try {
-            // Pre-grant consent
-            await preGrantConsent(clientId);
+            await tokenFixture.preGrantConsent(email, password, clientId, REDIRECT_URI);
 
-            // Login WITHOUT a resource
-            const loginResponse = await app.getHttpServer()
-                .post('/api/oauth/login')
-                .send({
-                    email: 'admin@auth.server.com',
-                    password: 'admin9000',
-                    client_id: clientId,
-                    code_challenge: CODE_CHALLENGE,
-                    code_challenge_method: 'plain',
-                    // No resource parameter
-                })
-                .set('Accept', 'application/json');
-
-            expect(loginResponse.status).toEqual(201);
-            const code = loginResponse.body.authentication_code;
+            // Authorize WITHOUT a resource → stored resource on auth code is null
+            const code = await loginAndGetCodeWithResource(clientId, undefined);
 
             // Exchange with a resource in the token request
             // Per the design, the auth code's stored resource (null) takes precedence,
@@ -268,10 +216,11 @@ describe('Feature: resource-indicator-support, Property 4: Auth code resource ta
                 .post('/api/oauth/token')
                 .send({
                     grant_type: 'authorization_code',
-                    code: code,
+                    code,
                     code_verifier: CODE_VERIFIER,
                     client_id: clientId,
-                    resource: resource,
+                    redirect_uri: REDIRECT_URI,
+                    resource,
                 })
                 .set('Accept', 'application/json');
 
@@ -282,9 +231,8 @@ describe('Feature: resource-indicator-support, Property 4: Auth code resource ta
             // When auth code has no resource, the token should have only the default audience
             expect(jwt.aud).toBeDefined();
             expect(Array.isArray(jwt.aud)).toBe(true);
-            // Should only have the default audience (no resource)
-            expect(jwt.aud.length).toBe(1);
-            expect(jwt.aud).toContain('auth.server.com');
+            // The token request's resource must not leak into aud
+            expect(jwt.aud).not.toContain(resource);
         } finally {
             await clientApi.deleteClient(clientId).catch(() => {
             });

@@ -52,6 +52,7 @@ import {AuthService} from '../_services/auth.service';
                     <input type="hidden" name="code_challenge_method" [value]="codeChallengeMethod">
                     <input type="hidden" name="nonce" [value]="nonce">
                     <input type="hidden" name="resource" [value]="resource">
+                    <input type="hidden" name="subscriber_tenant_hint" [value]="subscriberTenantHint">
                     <input type="hidden" name="csrf_token" [value]="csrfToken">
                     <input type="hidden" name="decision" [value]="decision" id="decision-input">
 
@@ -143,6 +144,7 @@ export class ConsentComponent implements OnInit {
     nonce = '';
     resource = '';
     csrfToken = '';
+    subscriberTenantHint = '';
 
     constructor(
         private route: ActivatedRoute,
@@ -165,6 +167,7 @@ export class ConsentComponent implements OnInit {
         this.nonce = params.get('nonce') || '';
         this.resource = params.get('resource') || '';
         this.csrfToken = params.get('csrf_token') || '';
+        this.subscriberTenantHint = params.get('subscriber_tenant_hint') || '';
 
         // Parse requested scopes for display
         this.requestedScopes = this.scope ? this.scope.split(' ').filter(s => s.length > 0) : [];
@@ -228,6 +231,7 @@ export class ConsentComponent implements OnInit {
         }
         if (this.nonce) params.set('nonce', this.nonce);
         if (this.resource) params.set('resource', this.resource);
+        if (this.subscriberTenantHint) params.set('subscriber_tenant_hint', this.subscriberTenantHint);
         window.location.href = `/api/oauth/authorize?${params.toString()}`;
     }
 }

@@ -96,16 +96,17 @@ describe('Ambiguous Tenant Flow', () => {
         // 4. Select tenant and complete flow
         cy.get('button').contains(TENANTS.gondor.domain).click();
 
-        // 5. Verify the login-with-hint call returns an auth code
+        // 5. Verify the login-with-hint call returns success (session created)
         cy.wait('@loginWithHint').should(({request, response}) => {
             expect(response, 'response').to.exist;
             expect(response!.statusCode).to.be.oneOf([201, 200]);
-            expect(response!.body).to.have.property('authentication_code');
+            expect(response!.body).to.have.property('success', true);
             expect(request.body).to.have.property('subscriber_tenant_hint', TENANTS.gondor.domain);
         });
 
-        // 6. Verify successful completion
+        // 6. Verify successful completion — redirected to client with auth code
         cy.url().should('include', 'https://example.com/');
+        cy.url().should('include', 'code=');
     });
 
     // Cleanup: unsubscribe Gondor from the test app

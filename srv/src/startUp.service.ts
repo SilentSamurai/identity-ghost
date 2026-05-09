@@ -118,12 +118,12 @@ export class StartUpService implements OnModuleInit {
                 {name: "Prompt Test Tenant", domain: "prompt-test.local", signUp: false, redirectUris: ['http://localhost:3000/callback']},
                 {name: "Nonce Test Tenant", domain: "nonce-test.local", signUp: false, redirectUris: ['http://localhost:3000/callback']},
                 {name: "Compliance Test Tenant", domain: "compliance-test.local", signUp: false, redirectUris: ['http://localhost:3000/callback']},
-                {name: "IDToken Test Tenant", domain: "idtoken-test.local", signUp: false},
+                {name: "IDToken Test Tenant", domain: "idtoken-test.local", signUp: false, redirectUris: ['http://localhost:3000/callback']},
                 {name: "Auth Cleanup Test Tenant", domain: "auth-cleanup-test.local", signUp: false, redirectUris: ['http://localhost:3000/callback']},
                 {name: "ID Token Aud Test Tenant", domain: "idtoken-aud-test.local", signUp: false, redirectUris: ['http://localhost:3000/callback']},
                 {name: "Perms Test Tenant", domain: "perms-test.local", signUp: false},
                 {name: "Session Claims Test Tenant", domain: "session-claims-test.local", signUp: false, redirectUris: ['http://localhost:3000/callback']},
-                {name: "Prompt Prop Test Tenant", domain: "prompt-prop-test.local", signUp: false},
+                {name: "Prompt Prop Test Tenant", domain: "prompt-prop-test.local", signUp: false, redirectUris: ['http://localhost:3000/callback']},
                 {name: "Auth Code Expiry Test Tenant", domain: "auth-code-expiry-test.local", signUp: false, redirectUris: ['http://localhost:3000/callback']},
                 {name: "Offline Access Test Tenant", domain: "offline-access-test.local", signUp: false},
                 {
@@ -146,7 +146,7 @@ export class StartUpService implements OnModuleInit {
                 },
                 {name: "Client Binding Test Tenant", domain: "client-binding-test.local", signUp: false, redirectUris: ['http://localhost:3000/callback']},
                 {name: "Auth Code Single Use Test Tenant", domain: "auth-code-single-use-test.local", signUp: false, redirectUris: ['http://localhost:3000/callback']},
-                {name: "UserInfo Test Tenant", domain: "userinfo-test.local", signUp: false},
+                {name: "UserInfo Test Tenant", domain: "userinfo-test.local", signUp: false, redirectUris: ['http://localhost:3000/callback']},
                 {
                     name: "Session Threading Test Tenant",
                     domain: "session-threading-test.local",

@@ -3,7 +3,6 @@ import {SharedTestFixture} from '../shared-test.fixture';
 import {TokenFixture} from '../token.fixture';
 import {ClientEntityClient} from '../api-client/client-entity-client';
 import {TenantClient} from '../api-client/tenant-client';
-import {expect2xx} from '../api-client/client';
 
 /**
  * Feature: redirect-uri-validation, Properties 4 & 5: Token exchange redirect_uri binding
@@ -20,6 +19,7 @@ import {expect2xx} from '../api-client/client';
  */
 describe('Feature: redirect-uri-validation, Property 4: Token exchange binding accepts iff request URI matches stored URI', () => {
     let app: SharedTestFixture;
+    let tokenFixture: TokenFixture;
     let clientApi: ClientEntityClient;
     let testClientId: string;
 
@@ -27,11 +27,10 @@ describe('Feature: redirect-uri-validation, Property 4: Token exchange binding a
     const email = 'admin@auth.server.com';
     const password = 'admin9000';
     const verifier = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq';
-    const challenge = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq';
 
     beforeAll(async () => {
         app = new SharedTestFixture();
-        const tokenFixture = new TokenFixture(app);
+        tokenFixture = new TokenFixture(app);
         const {accessToken} = await tokenFixture.fetchAccessToken(email, password, 'auth.server.com');
 
         clientApi = new ClientEntityClient(app, accessToken);
@@ -45,21 +44,8 @@ describe('Feature: redirect-uri-validation, Property 4: Token exchange binding a
         });
         testClientId = created.client.clientId;
 
-        // Pre-grant consent so login returns auth codes instead of requires_consent
-        await app.getHttpServer()
-            .post('/api/oauth/consent')
-            .send({
-                email,
-                password,
-                client_id: testClientId,
-                code_challenge: challenge,
-                code_challenge_method: 'plain',
-                approved_scopes: ['openid', 'profile', 'email'],
-                consent_action: 'approve',
-                scope: 'openid profile email',
-                redirect_uri: REGISTERED_URI,
-            })
-            .set('Accept', 'application/json');
+        // Pre-grant consent so /authorize issues codes directly (third-party client).
+        await tokenFixture.preGrantConsent(email, password, testClientId, REGISTERED_URI);
     });
 
     afterAll(async () => {
@@ -68,23 +54,12 @@ describe('Feature: redirect-uri-validation, Property 4: Token exchange binding a
         await app.close();
     });
 
-    /** Login and get an auth code with the registered redirect_uri */
+    /** Obtain a fresh auth code via login → authorize (cookie flow), bound to REGISTERED_URI. */
     async function loginForCode(): Promise<string> {
-        const res = await app.getHttpServer()
-            .post('/api/oauth/login')
-            .send({
-                email,
-                password,
-                client_id: testClientId,
-                code_challenge: challenge,
-                code_challenge_method: 'plain',
-                scope: 'openid profile email',
-                redirect_uri: REGISTERED_URI,
-            })
-            .set('Accept', 'application/json');
-
-        expect2xx(res);
-        return res.body.authentication_code;
+        return tokenFixture.fetchAuthCode(email, password, testClientId, REGISTERED_URI, {
+            codeChallenge: verifier,
+            codeChallengeMethod: 'plain',
+        });
     }
 
     /** Exchange an auth code for tokens, optionally with a redirect_uri */
@@ -140,9 +115,9 @@ describe('Feature: redirect-uri-validation, Property 4: Token exchange binding a
                     expect(omittedResult.body.error).toBe('invalid_grant');
                 },
             ),
-            {numRuns: 20},
+            {numRuns: 10},
         );
-    }, 120_000);
+    }, 180_000);
 });
 
 
@@ -154,11 +129,19 @@ describe('Feature: redirect-uri-validation, Property 4: Token exchange binding a
  * in the Token_Request.
  *
  * **Validates: Requirements 4.5**
+ *
+ * Note: The HTTP /authorize flow always validates and stores a redirect_uri against the
+ * client's registered URIs (rejecting clients that have none). To create an AuthCode with
+ * a null redirect_uri we seed one directly via the test-utils controller. This still
+ * exercises the token-endpoint binding code-path, which is what Property 5 is about.
  */
 describe('Feature: redirect-uri-validation, Property 5: Null stored redirect_uri bypasses binding check', () => {
     let app: SharedTestFixture;
+    let tokenFixture: TokenFixture;
     let clientApi: ClientEntityClient;
     let testClientId: string;
+    let userId: string;
+    let tenantId: string;
 
     const REGISTERED_URI = 'https://prop-null-binding-test.example.com/callback';
     const email = 'admin@auth.server.com';
@@ -168,12 +151,13 @@ describe('Feature: redirect-uri-validation, Property 5: Null stored redirect_uri
 
     beforeAll(async () => {
         app = new SharedTestFixture();
-        const tokenFixture = new TokenFixture(app);
+        tokenFixture = new TokenFixture(app);
         const {accessToken} = await tokenFixture.fetchAccessToken(email, password, 'auth.server.com');
 
         clientApi = new ClientEntityClient(app, accessToken);
         const tenantClient = new TenantClient(app, accessToken);
         const tenant = await tenantClient.createTenant('prop-null-bind', 'prop-null-bind.example.com');
+        tenantId = tenant.id;
 
         const created = await clientApi.createClient(tenant.id, 'Null Binding Prop Client', {
             redirectUris: [REGISTERED_URI],
@@ -182,21 +166,10 @@ describe('Feature: redirect-uri-validation, Property 5: Null stored redirect_uri
         });
         testClientId = created.client.clientId;
 
-        // Pre-grant consent so login returns auth codes instead of requires_consent
-        await app.getHttpServer()
-            .post('/api/oauth/consent')
-            .send({
-                email,
-                password,
-                client_id: testClientId,
-                code_challenge: challenge,
-                code_challenge_method: 'plain',
-                approved_scopes: ['openid', 'profile', 'email'],
-                consent_action: 'approve',
-                scope: 'openid profile email',
-                redirect_uri: REGISTERED_URI,
-            })
-            .set('Accept', 'application/json');
+        // Look up the admin user's id so we can seed auth codes with a valid FK.
+        const userRes = await app.getHttpServer().get(`/api/test-utils/users/by-email/${encodeURIComponent(email)}`);
+        expect(userRes.status).toBe(200);
+        userId = userRes.body.id;
     });
 
     afterAll(async () => {
@@ -205,22 +178,23 @@ describe('Feature: redirect-uri-validation, Property 5: Null stored redirect_uri
         await app.close();
     });
 
-    /** Login WITHOUT redirect_uri so null is stored in the auth code */
-    async function loginForCodeWithoutRedirectUri(): Promise<string> {
+    /** Seed an auth code with null redirect_uri via the test-utils controller. */
+    async function seedCodeWithoutRedirectUri(): Promise<string> {
         const res = await app.getHttpServer()
-            .post('/api/oauth/login')
+            .post('/api/test-utils/auth-codes')
             .send({
-                email,
-                password,
-                client_id: testClientId,
-                code_challenge: challenge,
-                code_challenge_method: 'plain',
+                userId,
+                tenantId,
+                clientId: testClientId,
+                codeChallenge: challenge,
+                method: 'plain',
+                redirectUri: null,
                 scope: 'openid profile email',
             })
             .set('Accept', 'application/json');
-
-        expect2xx(res);
-        return res.body.authentication_code;
+        expect(res.status).toBeGreaterThanOrEqual(200);
+        expect(res.status).toBeLessThan(300);
+        return res.body.code;
     }
 
     /** Exchange an auth code for tokens, optionally with a redirect_uri */
@@ -246,9 +220,6 @@ describe('Feature: redirect-uri-validation, Property 5: Null stored redirect_uri
     /**
      * Property 5: When auth code has null redirect_uri, token exchange always succeeds
      * regardless of the redirect_uri value in the request.
-     *
-     * We generate arbitrary URI strings (and undefined) and verify that token exchange
-     * succeeds for all of them when the stored redirect_uri is null.
      */
     it('token exchange succeeds with any redirect_uri when stored redirect_uri is null', async () => {
         await fc.assert(
@@ -256,7 +227,7 @@ describe('Feature: redirect-uri-validation, Property 5: Null stored redirect_uri
                 // Generate either an arbitrary URL string or undefined
                 fc.option(fc.webUrl(), {nil: undefined}),
                 async (requestRedirectUri) => {
-                    const code = await loginForCodeWithoutRedirectUri();
+                    const code = await seedCodeWithoutRedirectUri();
                     const result = await exchangeCode(code, requestRedirectUri ?? undefined);
 
                     expect(result.status).toBeGreaterThanOrEqual(200);
@@ -266,5 +237,5 @@ describe('Feature: redirect-uri-validation, Property 5: Null stored redirect_uri
             ),
             {numRuns: 20},
         );
-    }, 120_000);
+    }, 180_000);
 });

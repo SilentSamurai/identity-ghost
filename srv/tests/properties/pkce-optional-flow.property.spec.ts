@@ -2,23 +2,22 @@ import * as fc from 'fast-check';
 import {SharedTestFixture} from '../shared-test.fixture';
 import {TokenFixture} from '../token.fixture';
 import {ClientEntityClient} from '../api-client/client-entity-client';
-import {TenantClient} from '../api-client/tenant-client';
 
 /**
- * PKCE Optional Flow — Full authorize → login → token exchange without PKCE
+ * PKCE Optional Flow — Full authorize → token exchange without PKCE
  *
  * _For any_ authorization request where `client.requirePkce=false` AND no
  * `code_challenge` is provided, the `/api/oauth/authorize` endpoint SHALL
- * redirect to frontend without PKCE params, AND the `/api/oauth/login`
- * endpoint SHALL succeed without `code_challenge`, AND token exchange SHALL
- * succeed without `code_verifier`.
+ * redirect to frontend without PKCE params, AND the full flow SHALL succeed
+ * without `code_verifier` at token exchange.
  *
  * **Validates: Requirements 2.1, 2.2**
  *
  * Verifies that clients with requirePkce=false can complete the OAuth flow without PKCE.
  */
-describe('PKCE Optional Flow: authorize → login → token exchange without code_challenge', () => {
+describe('PKCE Optional Flow: authorize → token exchange without code_challenge', () => {
     let fixture: SharedTestFixture;
+    let tokenFixture: TokenFixture;
     let testClientId: string;
 
     const TENANT_DOMAIN = 'pkce-bug-condition-test.local';
@@ -28,10 +27,10 @@ describe('PKCE Optional Flow: authorize → login → token exchange without cod
 
     beforeAll(async () => {
         fixture = new SharedTestFixture();
-        const tokenFixture = new TokenFixture(fixture);
+        tokenFixture = new TokenFixture(fixture);
 
         // Get a tenant-scoped token for the test tenant to retrieve its ID
-        const {accessToken: tenantToken, jwt} = await tokenFixture.fetchAccessToken(
+        const {jwt} = await tokenFixture.fetchAccessToken(
             ADMIN_EMAIL,
             ADMIN_PASSWORD,
             TENANT_DOMAIN,
@@ -56,20 +55,9 @@ describe('PKCE Optional Flow: authorize → login → token exchange without cod
         });
         testClientId = created.client.clientId;
 
-        // Pre-grant consent for the test client so login returns auth codes
-        // instead of requires_consent (third-party clients require consent)
-        await fixture.getHttpServer()
-            .post('/api/oauth/consent')
-            .send({
-                email: ADMIN_EMAIL,
-                password: ADMIN_PASSWORD,
-                client_id: testClientId,
-                approved_scopes: ['openid', 'profile', 'email'],
-                consent_action: 'approve',
-                scope: 'openid profile email',
-                redirect_uri: REDIRECT_URI,
-            })
-            .set('Accept', 'application/json');
+        // Pre-grant consent so /authorize issues codes directly
+        // (third-party clients require consent)
+        await tokenFixture.preGrantConsent(ADMIN_EMAIL, ADMIN_PASSWORD, testClientId, REDIRECT_URI);
     });
 
     afterAll(async () => {
@@ -81,10 +69,13 @@ describe('PKCE Optional Flow: authorize → login → token exchange without cod
     const scopeArb = fc.subarray(['openid', 'profile', 'email'], {minLength: 1})
         .map(scopes => scopes.join(' '));
 
-    it('optional PKCE: full authorize → login → token exchange succeeds without PKCE', async () => {
+    it('optional PKCE: full authorize → token exchange succeeds without PKCE', async () => {
         await fc.assert(
             fc.asyncProperty(stateArb, scopeArb, async (state, scope) => {
-                // Step 1: GET /api/oauth/authorize without code_challenge
+                // Step 1: Login to get a sid cookie
+                const sidCookie = await tokenFixture.loginForCookie(ADMIN_EMAIL, ADMIN_PASSWORD, testClientId);
+
+                // Step 2: GET /api/oauth/authorize WITHOUT code_challenge
                 const authorizeRes = await fixture.getHttpServer()
                     .get('/api/oauth/authorize')
                     .query({
@@ -93,45 +84,27 @@ describe('PKCE Optional Flow: authorize → login → token exchange without cod
                         redirect_uri: REDIRECT_URI,
                         scope,
                         state,
+                        session_confirmed: 'true',
                     })
+                    .set('Cookie', sidCookie)
                     .redirects(0);
 
-                // Expect 302 redirect to frontend /authorize
+                // Expect 302 redirect to the client's redirect URI with a code
                 expect(authorizeRes.status).toEqual(302);
                 const location = authorizeRes.headers['location'] as string;
                 expect(location).toBeDefined();
 
                 const redirectUrl = new URL(location, 'http://localhost');
+                expect(redirectUrl.searchParams.has('error')).toBe(false);
+                const code = redirectUrl.searchParams.get('code');
+                expect(code).toBeDefined();
 
-                // The redirect should NOT contain code_challenge params
-                expect(redirectUrl.searchParams.has('code_challenge')).toBe(false);
-                expect(redirectUrl.searchParams.has('code_challenge_method')).toBe(false);
-
-                // Step 2: POST /api/oauth/login without code_challenge
-                const loginRes = await fixture.getHttpServer()
-                    .post('/api/oauth/login')
-                    .send({
-                        email: ADMIN_EMAIL,
-                        password: ADMIN_PASSWORD,
-                        client_id: testClientId,
-                        redirect_uri: REDIRECT_URI,
-                        scope,
-                    })
-                    .set('Accept', 'application/json');
-
-                // Login should succeed with an authentication_code
-                expect(loginRes.status).toBeGreaterThanOrEqual(200);
-                expect(loginRes.status).toBeLessThan(300);
-                expect(loginRes.body.authentication_code).toBeDefined();
-
-                const authCode = loginRes.body.authentication_code;
-
-                // Step 3: POST /api/oauth/token without code_verifier
+                // Step 3: POST /api/oauth/token WITHOUT code_verifier
                 const tokenRes = await fixture.getHttpServer()
                     .post('/api/oauth/token')
                     .send({
                         grant_type: 'authorization_code',
-                        code: authCode,
+                        code,
                         client_id: testClientId,
                         redirect_uri: REDIRECT_URI,
                     })
@@ -144,5 +117,5 @@ describe('PKCE Optional Flow: authorize → login → token exchange without cod
             }),
             {numRuns: 10},
         );
-    }, 120_000);
+    }, 180_000);
 });

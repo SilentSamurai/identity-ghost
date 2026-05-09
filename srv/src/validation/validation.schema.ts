@@ -180,6 +180,7 @@ const LoginSchema = yup.object().shape({
         .matches(PASSWORD_REGEXP, PASSWORD_MESSAGE)
         .max(128),
     client_id: yup.string().required("client_id is required"),
+    subscriber_tenant_hint: yup.string().optional().max(256),
 });
 
 const PasswordGrantSchema = yup.object().shape({

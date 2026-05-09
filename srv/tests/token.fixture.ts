@@ -328,6 +328,7 @@ export class TokenFixture {
             subscriberTenantHint?: string;
             resource?: string;
             nonce?: string;
+            maxAge?: number;
         },
     ): Promise<string> {
         const codeChallenge = opts?.codeChallenge ?? 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq';
@@ -345,6 +346,7 @@ export class TokenFixture {
         if (opts?.subscriberTenantHint) query.subscriber_tenant_hint = opts.subscriberTenantHint;
         if (opts?.resource) query.resource = opts.resource;
         if (opts?.nonce) query.nonce = opts.nonce;
+        if (opts?.maxAge !== undefined) query.max_age = String(opts.maxAge);
 
         const res = await this.app.getHttpServer()
             .get('/api/oauth/authorize')
@@ -381,6 +383,7 @@ export class TokenFixture {
             subscriberTenantHint?: string;
             resource?: string;
             nonce?: string;
+            maxAge?: number;
         },
     ): Promise<string> {
         const sidCookie = await this.loginForCookie(email, password, clientId);

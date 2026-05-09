@@ -15,7 +15,6 @@ import {CL02Component} from './secure/clients/CL02.component';
 import {GP02Component} from './secure/group/GP02.component';
 import {AuthorizeLoginComponent} from "./open-pages/authorize-login.component";
 import {TenantSelectionComponent} from './open-pages/tenant-selection.component';
-import {ConsentScreenComponent} from './open-pages/consent-screen.component';
 import {ForgotPasswordComponent} from './open-pages/forgot-password.component';
 import {ResetPasswordComponent} from './open-pages/reset-password.component';
 import {WelcomeComponent} from './open-pages/welcome.component';

@@ -1,6 +1,6 @@
 import {Component, OnInit} from '@angular/core';
-import {AuthService} from '../_services/auth.service';
-import {ActivatedRoute} from '@angular/router';
+import {AuthService, LoginResponse} from '../_services/auth.service';
+import {ActivatedRoute, Router} from '@angular/router';
 import {FormBuilder, FormGroup, Validators} from '@angular/forms';
 
 @Component({
@@ -219,10 +219,12 @@ export class AuthorizeLoginComponent implements OnInit {
     private codeChallengeMethod = '';
     private nonce = '';
     private resource = '';
+    private subscriberTenantHint = '';
 
     constructor(
         private authService: AuthService,
         private route: ActivatedRoute,
+        private router: Router,
         private fb: FormBuilder,
     ) {
         this.loginForm = this.fb.group({
@@ -257,6 +259,7 @@ export class AuthorizeLoginComponent implements OnInit {
         this.codeChallengeMethod = params.get('code_challenge_method') || '';
         this.nonce = params.get('nonce') || '';
         this.resource = params.get('resource') || '';
+        this.subscriberTenantHint = params.get('subscriber_tenant_hint') || '';
 
         this.loginForm.patchValue({client_id: this.clientId});
         if (this.clientId.length > 0) {
@@ -272,10 +275,41 @@ export class AuthorizeLoginComponent implements OnInit {
         const {username, password, client_id} = this.loginForm.value;
 
         try {
-            // Login sets the sid cookie and returns {success: true}
-            await this.authService.login(username, password, client_id);
+            // Login — may return success or require tenant selection
+            const response: LoginResponse = await this.authService.login(
+                username,
+                password,
+                client_id,
+                this.subscriberTenantHint || undefined,
+            );
 
-            // Construct redirect URL from OAuth params we already have, append session_confirmed=true
+            // Check if tenant selection is required
+            if ('requires_tenant_selection' in response && response.requires_tenant_selection) {
+                // Navigate to tenant selection page with state
+                this.router.navigate(['/tenant-selection'], {
+                    state: {
+                        tenants: response.tenants,
+                        loginParams: {
+                            email: username,
+                            password: password,
+                            client_id: client_id,
+                        },
+                        oauthParams: {
+                            redirectUri: this.redirectUri,
+                            state: this.state,
+                            scope: this.scope,
+                            responseType: this.responseType,
+                            codeChallenge: this.codeChallenge,
+                            codeChallengeMethod: this.codeChallengeMethod,
+                            nonce: this.nonce,
+                            resource: this.resource,
+                        },
+                    },
+                });
+                return;
+            }
+
+            // Success — construct redirect URL from OAuth params we already have
             const authorizeParams = new URLSearchParams();
             authorizeParams.set('client_id', client_id);
             authorizeParams.set('redirect_uri', this.redirectUri);
@@ -288,6 +322,7 @@ export class AuthorizeLoginComponent implements OnInit {
             }
             if (this.nonce) authorizeParams.set('nonce', this.nonce);
             if (this.resource) authorizeParams.set('resource', this.resource);
+            if (this.subscriberTenantHint) authorizeParams.set('subscriber_tenant_hint', this.subscriberTenantHint);
             authorizeParams.set('session_confirmed', 'true');
 
             // Full-page navigation — browser attaches the newly set sid cookie automatically
