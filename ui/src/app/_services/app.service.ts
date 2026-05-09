@@ -24,23 +24,27 @@ export class AppService {
         };
     }
 
-    async createApp(tenantId: string, name: string, appUrl: string, description: string) {
+    async createApp(tenantId: string, name: string, appUrl: string, description: string, onboardingEnabled?: boolean, onboardingCallbackUrl?: string) {
         return lastValueFrom(
             this.http.post(`${API_URL}/apps/create`, {
                 tenantId,
                 name,
                 appUrl,
-                description
+                description,
+                onboardingEnabled,
+                onboardingCallbackUrl
             })
         );
     }
 
-    async updateApp(id: string, name: string, appUrl: string, description: string) {
+    async updateApp(id: string, name: string, appUrl: string, description: string, onboardingEnabled?: boolean, onboardingCallbackUrl?: string | null) {
         return lastValueFrom(
             this.http.patch(`${API_URL}/apps/${id}`, {
                 name,
                 appUrl,
-                description
+                description,
+                onboardingEnabled,
+                onboardingCallbackUrl
             })
         );
     }

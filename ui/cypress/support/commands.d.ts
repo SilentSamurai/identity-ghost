@@ -35,7 +35,7 @@ declare namespace Cypress {
         userOpenClientList(): Chainable<any>;
 
         // Context-neutral commands (work on whatever page you're already on)
-        addAppFromOverview(appName: string, appUrl: string, description: string): Chainable<any>;
+        addAppFromOverview(appName: string, appUrl: string, description: string, options?: { onboardingEnabled?: boolean }): Chainable<any>;
 
         subscribeAppFromOverview(appName: string): Chainable<any>;
 

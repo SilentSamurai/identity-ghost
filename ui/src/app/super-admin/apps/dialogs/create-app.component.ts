@@ -22,6 +22,21 @@ import {AppService} from '../../../_services/app.service';
                         <textarea class="form-control" id="description" [(ngModel)]="app.description" name="description"
                                   rows="3"></textarea>
                     </div>
+                    <hr>
+                    <h6>Onboarding Settings</h6>
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="onboardingEnabled" 
+                               [(ngModel)]="app.onboardingEnabled" name="onboardingEnabled">
+                        <label class="form-check-label" for="onboardingEnabled">Enable tenant onboarding callbacks</label>
+                        <small class="form-text text-muted d-block">When enabled, the auth server will call your app's onboard/offboard endpoints when tenants subscribe or unsubscribe.</small>
+                    </div>
+                    <div class="mb-3" *ngIf="app.onboardingEnabled">
+                        <label for="onboardingCallbackUrl" class="form-label">Onboarding Callback URL (optional)</label>
+                        <input type="text" class="form-control" id="onboardingCallbackUrl" 
+                               [(ngModel)]="app.onboardingCallbackUrl" name="onboardingCallbackUrl"
+                               placeholder="Leave empty to use App URL">
+                        <small class="form-text text-muted">Base URL for onboarding callbacks. If empty, App URL will be used.</small>
+                    </div>
                 </form>
             </app-dialog-tab>
 
@@ -33,7 +48,9 @@ import {AppService} from '../../../_services/app.service';
     `
 })
 export class CreateAppComponent implements OnInit {
-    app: any = {};
+    app: any = {
+        onboardingEnabled: true
+    };
     tenantId?: string = undefined;
 
     constructor(
@@ -55,7 +72,9 @@ export class CreateAppComponent implements OnInit {
                 this.tenantId,
                 this.app.name,
                 this.app.appUrl,
-                this.app.description
+                this.app.description,
+                this.app.onboardingEnabled,
+                this.app.onboardingCallbackUrl || undefined
             );
             this.activeModal.close(this.app);
         } catch (error) {

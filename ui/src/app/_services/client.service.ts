@@ -17,6 +17,7 @@ export interface Client {
     allowPasswordGrant: boolean;
     allowRefreshToken: boolean;
     name: string;
+    alias: string | null;
     createdAt: string;
     tenant: { id: string; name: string; domain: string };
 }

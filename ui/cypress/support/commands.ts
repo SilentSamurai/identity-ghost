@@ -120,13 +120,19 @@ Cypress.Commands.add('adminAddAppToTenant', (domain: string, appName: string, ap
     cy.addAppFromOverview(appName, appUrl, description);
 });
 
-Cypress.Commands.add('addAppFromOverview', (appName: string, appUrl: string, description: string) => {
+Cypress.Commands.add('addAppFromOverview', (appName: string, appUrl: string, description: string, options?: { onboardingEnabled?: boolean }) => {
     cy.contains('button', 'Apps').click();
     cy.contains('button', 'Create').click();
 
     cy.get('input[name="name"]').type(appName);
     cy.get('input[name="appUrl"]').type(appUrl);
     cy.get('textarea[name="description"]').type(description);
+
+    // Handle onboarding settings if specified
+    if (options?.onboardingEnabled === false) {
+        // Uncheck the onboarding checkbox (it's checked by default)
+        cy.get('input#onboardingEnabled').uncheck();
+    }
 
     cy.intercept('POST', '**/api/apps/create').as('CreateApp');
 

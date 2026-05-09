@@ -1,7 +1,7 @@
 import {Controller, Get, Options, Param, Req, Res} from "@nestjs/common";
 import {Request, Response} from "express";
 import {DiscoveryService} from "../services/discovery.service";
-import {TenantService} from "../services/tenant.service";
+import {ClientService} from "../services/client.service";
 
 /**
  * Controller for the OIDC Discovery endpoint.
@@ -10,31 +10,44 @@ import {TenantService} from "../services/tenant.service";
  *
  * No authentication required — the endpoint is public so clients can fetch
  * configuration before any authentication has occurred.
+ *
+ * The endpoint supports two URL patterns:
+ * - /{tenant-domain}/.well-known/openid-configuration (e.g., /mordor.local/.well-known/openid-configuration)
+ * - /{app-client-alias}/.well-known/openid-configuration (e.g., /my-app.mordor.local/.well-known/openid-configuration)
+ *
+ * Both patterns work because:
+ * - Default_Clients have alias = tenant domain
+ * - App_Clients have alias = {app-slug}.{owner-tenant-domain}
+ *
+ * The discovery document is served for the client's tenant.
  */
-@Controller(":tenantDomain/.well-known")
+@Controller(":clientAlias/.well-known")
 export class DiscoveryController {
     constructor(
         private readonly discoveryService: DiscoveryService,
-        private readonly tenantService: TenantService,
+        private readonly clientService: ClientService,
     ) {
     }
 
     /**
-     * Returns the OIDC Discovery document for the requested tenant.
+     * Returns the OIDC Discovery document for the requested client's tenant.
      *
-     * @param tenantDomain - The tenant domain from the URL path
+     * @param clientAlias - The client alias (tenant domain or App_Client alias) from the URL path
      * @param req - The Express request object
      * @param res - The Express response object
      */
     @Get("openid-configuration")
     async getOpenIdConfiguration(
-        @Param("tenantDomain") tenantDomain: string,
+        @Param("clientAlias") clientAlias: string,
         @Req() req: Request,
         @Res() res: Response,
     ): Promise<void> {
-        // Validate tenant exists
-        const tenant = await this.tenantService.findByDomainPublic(tenantDomain);
-        if (!tenant) {
+        // Find client by alias - works for both Default_Clients (alias = tenant domain)
+        // and App_Clients (alias = app-slug.tenant-domain)
+        let client;
+        try {
+            client = await this.clientService.findByAlias(clientAlias);
+        } catch {
             res.status(404).json({error: "not_found"});
             return;
         }
@@ -44,7 +57,8 @@ export class DiscoveryController {
         const host = (req.headers["x-forwarded-host"] as string) || req.get("host");
         const baseUrl = `${protocol}://${host}`;
 
-        // Build the discovery document
+        // Build the discovery document using the client's tenant domain
+        const tenantDomain = client.tenant.domain;
         const {body, etag} = this.discoveryService.buildDocument(baseUrl, tenantDomain);
 
         // Handle conditional request (304 Not Modified)

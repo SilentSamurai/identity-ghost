@@ -36,4 +36,10 @@ export class App {
 
     @Column({name: 'client_id'})
     clientId: string;
+
+    @Column({name: 'onboarding_enabled', type: 'boolean', default: true})
+    onboardingEnabled: boolean;
+
+    @Column({name: 'onboarding_callback_url', nullable: true})
+    onboardingCallbackUrl?: string;
 }

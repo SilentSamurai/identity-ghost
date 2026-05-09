@@ -49,6 +49,8 @@ export class AppController {
             createdAt: app.createdAt,
             clientId: app.client?.clientId,
             alias: app.client?.alias,
+            onboardingEnabled: app.onboardingEnabled,
+            onboardingCallbackUrl: app.onboardingCallbackUrl,
         };
     }
 
@@ -68,9 +70,11 @@ export class AppController {
         @Body('tenantId', ParseUUIDPipe) tenantId: string,
         @Body('name', schemaPipe(yup.string().required('name is required').max(128))) name: string,
         @Body('appUrl', schemaPipe(yup.string().required('app url is required').max(2048))) appUrl: string,
-        @Body('description', schemaPipe(yup.string().max(128))) description: string
+        @Body('description', schemaPipe(yup.string().max(128))) description: string,
+        @Body('onboardingEnabled', schemaPipe(yup.boolean().optional())) onboardingEnabled?: boolean,
+        @Body('onboardingCallbackUrl', schemaPipe(yup.string().max(2048).nullable().optional())) onboardingCallbackUrl?: string,
     ) {
-        const app = await this.appService.createApp(permission, tenantId, name, appUrl, description);
+        const app = await this.appService.createApp(permission, tenantId, name, appUrl, description, onboardingEnabled, onboardingCallbackUrl);
         return this.mapAppResponse(app);
     }
 
@@ -81,9 +85,11 @@ export class AppController {
         @Param('appId', ParseUUIDPipe) appId: string,
         @Body('name', schemaPipe(yup.string().required('name is required').max(128))) name: string,
         @Body('appUrl', schemaPipe(yup.string().required('app url is required').max(2048))) appUrl: string,
-        @Body('description', schemaPipe(yup.string().max(128))) description: string
+        @Body('description', schemaPipe(yup.string().max(128))) description: string,
+        @Body('onboardingEnabled', schemaPipe(yup.boolean().optional())) onboardingEnabled?: boolean,
+        @Body('onboardingCallbackUrl', schemaPipe(yup.string().max(2048).nullable().optional())) onboardingCallbackUrl?: string | null,
     ) {
-        const app = await this.appService.updateApp(permission, appId, name, appUrl, description);
+        const app = await this.appService.updateApp(permission, appId, name, appUrl, description, onboardingEnabled, onboardingCallbackUrl);
         return this.mapAppResponse(app);
     }
 

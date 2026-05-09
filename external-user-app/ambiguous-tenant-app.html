@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+    <title>Ambiguous Tenant Test App</title>
+    <link crossorigin="anonymous" href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css"
+        integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" rel="stylesheet">
+    <script type="importmap">
+    {
+        "imports": {
+            "oauth4webapi": "https://unpkg.com/oauth4webapi@3.5.0/build/index.js",
+            "jose": "https://unpkg.com/jose@5.9.6/dist/browser/index.js",
+            "jose/errors": "https://unpkg.com/jose@5.9.6/dist/browser/util/errors.js",
+            "jose/jwk/thumbprint": "https://unpkg.com/jose@5.9.6/dist/browser/jwk/thumbprint.js",
+            "jose/jwe/compact/decrypt": "https://unpkg.com/jose@5.9.6/dist/browser/jwe/compact/decrypt.js",
+            "jose/jwe/flattened/decrypt": "https://unpkg.com/jose@5.9.6/dist/browser/jwe/flattened/decrypt.js",
+            "jose/jwks/local": "https://unpkg.com/jose@5.9.6/dist/browser/jwks/local.js",
+            "jose/jws/compact/verify": "https://unpkg.com/jose@5.9.6/dist/browser/jws/compact/verify.js",
+            "jose/jws/flattened/verify": "https://unpkg.com/jose@5.9.6/dist/browser/jws/flattened/verify.js",
+            "jose/jwt/decrypt": "https://unpkg.com/jose@5.9.6/dist/browser/jwt/decrypt.js",
+            "jose/jwt/verify": "https://unpkg.com/jose@5.9.6/dist/browser/jwt/verify.js",
+            "jose/key/import": "https://unpkg.com/jose@5.9.6/dist/browser/key/import.js"
+        }
+    }
+    </script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #41464b;
+        }
+
+        .login-button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .login-button:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="row">
+            <div class="card">
+                <pre><code id="decodedToken"></code></pre>
+            </div>
+        </div>
+        <div class="row justify-content-center">
+            <div class="col-4">
+                <button class="login-button w-100" id="login-btn">
+                    Login
+                </button>
+            </div>
+        </div>
+    </div>
+</body>
+<script crossorigin="anonymous" integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM"
+    src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js"></script>
+<script type="module">
+    import * as client from 'https://unpkg.com/openid-client@6.8.4/build/index.js';
+
+    // This page simulates an external app owned by Mordor tenant.
+    // It uses the App_Client alias as client_id (per per-app-oauth-client-identity design).
+    // OIDC discovery also uses the App_Client alias - the server resolves it to the owner tenant.
+    const BASE_URL = 'http://localhost:9001';
+    const CLIENT_ID = 'ambiguous-tenant-test-app.mordor.local';
+    const REDIRECT_URI = window.location.origin + '/ambiguous-tenant-app.html';
+
+    let config = null;
+
+    async function initOIDC() {
+        // Discovery URL uses the App_Client alias - server resolves to owner tenant
+        const discoveryUrl = new URL(`${BASE_URL}/${CLIENT_ID}/.well-known/openid-configuration`);
+
+        config = await client.discovery(
+            discoveryUrl,
+            CLIENT_ID,
+            undefined,
+            undefined,
+            {
+                execute: [client.allowInsecureRequests]
+            }
+        );
+
+        console.log('OIDC configuration successful', config.serverMetadata());
+    }
+
+    async function startLogin() {
+        try {
+            if (!config) {
+                await initOIDC();
+            }
+
+            const code_verifier = client.randomPKCECodeVerifier();
+            const code_challenge = await client.calculatePKCECodeChallenge(code_verifier);
+
+            sessionStorage.setItem('pkce-code-verifier', code_verifier);
+
+            const state = client.randomState();
+            sessionStorage.setItem('oauth-state', state);
+
+            const redirectTo = client.buildAuthorizationUrl(config, {
+                redirect_uri: REDIRECT_URI,
+                code_challenge,
+                code_challenge_method: 'S256',
+                state,
+                scope: 'openid profile email'
+            });
+
+            console.log('Redirecting to:', redirectTo.href);
+            window.location.href = redirectTo.href;
+        } catch (error) {
+            console.error('Login failed:', error);
+            document.getElementById('decodedToken').innerText = 'Login failed: ' + error.message;
+        }
+    }
+
+    async function handleCallback() {
+        const urlParams = new URLSearchParams(window.location.search);
+
+        if (!urlParams.has('code')) {
+            return;
+        }
+
+        const storedState = sessionStorage.getItem('oauth-state');
+        const callbackState = urlParams.get('state');
+
+        if (!storedState) {
+            document.getElementById('decodedToken').innerText =
+                'Error: No stored state found — possible CSRF attack.';
+            return;
+        }
+
+        if (!callbackState) {
+            document.getElementById('decodedToken').innerText =
+                'Error: Missing state parameter in callback URL.';
+            return;
+        }
+
+        if (storedState !== callbackState) {
+            document.getElementById('decodedToken').innerText =
+                'Error: state mismatch — possible CSRF attack.';
+            sessionStorage.removeItem('pkce-code-verifier');
+            sessionStorage.removeItem('oauth-state');
+            return;
+        }
+
+        if (!config) {
+            await initOIDC();
+        }
+
+        const code_verifier = sessionStorage.getItem('pkce-code-verifier');
+
+        try {
+            const currentUrl = new URL(window.location.href);
+            const tokens = await client.authorizationCodeGrant(config, currentUrl, {
+                pkceCodeVerifier: code_verifier,
+                expectedState: storedState,
+                idTokenExpected: true
+            });
+
+            sessionStorage.removeItem('pkce-code-verifier');
+            sessionStorage.removeItem('oauth-state');
+
+            console.log('Token Endpoint Response:', tokens);
+
+            const access_token = tokens.access_token;
+            decodeToken(access_token);
+
+            const loginBtn = document.getElementById('login-btn');
+            loginBtn.innerText = 'Logged In';
+
+        } catch (error) {
+            console.error('Token exchange failed:', error);
+            document.getElementById('decodedToken').innerText = 'Error: Token exchange failed — ' + error.message;
+        }
+    }
+
+    function decodeToken(token) {
+        if (!token) return '';
+
+        try {
+            const tokenParts = token.split('.');
+            const decodedToken = {
+                header: JSON.parse(atob(tokenParts[0])),
+                payload: JSON.parse(atob(tokenParts[1])),
+                signature: tokenParts[2]
+            };
+            document.getElementById('decodedToken').innerText = JSON.stringify(decodedToken, null, 4);
+            return decodedToken.payload.sub || decodedToken.payload.email || 'User';
+        } catch (error) {
+            document.getElementById('decodedToken').innerText = 'Error decoding token: ' + error.message;
+            return '';
+        }
+    }
+
+    document.getElementById('login-btn').addEventListener('click', startLogin);
+
+    handleCallback()
+        .then(() => initOIDC())
+        .catch(error => {
+            console.error('Initialization failed:', error);
+            if (!document.getElementById('decodedToken').innerText) {
+                document.getElementById('decodedToken').innerText = 'OIDC discovery failed: ' + error.message;
+            }
+        });
+</script>
+
+</html>

@@ -15,10 +15,6 @@ describe('Ambiguous Tenant Flow', () => {
         email: "gandalf@mail.com",
         password: "gandalf9000"
     };
-    const SINGLE_TENANT_USER = {
-        email: "single-tenant-user@test.com",
-        password: "TestPassword123!"
-    };
     const TENANTS = {
         mordor: {
             name: "Mordor Tenant",
@@ -35,7 +31,7 @@ describe('Ambiguous Tenant Flow', () => {
     };
     const TEST_APP = {
         name: "Ambiguous Tenant Test App",
-        url: "http://localhost:3000",
+        url: "http://localhost:3000/ambiguous-tenant-app.html",
         description: "Test application for ambiguous tenant flow"
     };
 
@@ -43,7 +39,7 @@ describe('Ambiguous Tenant Flow', () => {
     it('should setup Mordor tenant', () => {
         cy.login(`admin@${TENANTS.mordor.domain}`, "admin9000", TENANTS.mordor.domain);
         cy.userOpenTenantOverview();
-        cy.addAppFromOverview(TEST_APP.name, TEST_APP.url, TEST_APP.description);
+        cy.addAppFromOverview(TEST_APP.name, TEST_APP.url, TEST_APP.description, { onboardingEnabled: false });
         cy.userPublishApp(TEST_APP.name);
         cy.logout();
     });
@@ -66,16 +62,23 @@ describe('Ambiguous Tenant Flow', () => {
         cy.logout();
     });
 
-    // Core test: login as ambiguous user via /authorize, verify tenant selection page appears,
-    // pick Gondor, and confirm the OAuth flow completes with an auth code redirect
+    // Core test: navigate to the external app, click Login to trigger OAuth flow,
+    // verify tenant selection page appears, pick Gondor, and confirm the flow completes
     it('should handle ambiguous tenant selection flow', () => {
-        cy.visit(`/authorize?client_id=${TENANTS.mordor.domain}&code_challenge=test&redirect_uri=https://example.com`);
+        // Navigate to the external app page (simulates a real user opening the app)
+        cy.visit(TEST_APP.url);
 
-        // 1. Login with ambiguous user — /login now returns requires_tenant_selection
+        // 1. Click Login — the app initiates the OAuth flow with PKCE via OIDC discovery
+        cy.get('#login-btn').contains('Login').click();
+
+        // The authorize endpoint detects no session and redirects to /authorize (login UI)
+        cy.url().should('include', '/authorize');
+
+        // 2. Login with ambiguous user — /login returns requires_tenant_selection
         cy.intercept('POST', '**/api/oauth/login*').as('login');
 
-        cy.get('#username').type(AMBIGUOUS_USER.email)
-        cy.get('#password').type(AMBIGUOUS_USER.password)
+        cy.get('#username').type(AMBIGUOUS_USER.email);
+        cy.get('#password').type(AMBIGUOUS_USER.password);
 
         cy.get('#login-btn').click();
 
@@ -87,16 +90,16 @@ describe('Ambiguous Tenant Flow', () => {
             expect(response!.body.tenants.length).to.equal(2);
         });
 
-        // 2. Verify tenant selection page
+        // 3. Verify tenant selection page
         cy.url().should('include', '/tenant-selection');
 
-        // 3. Intercept the second /login call (with hint) when user picks a tenant
+        // 4. Intercept the second /login call (with hint) when user picks a tenant
         cy.intercept('POST', '**/api/oauth/login*').as('loginWithHint');
 
-        // 4. Select tenant and complete flow
+        // 5. Select Gondor tenant
         cy.get('button').contains(TENANTS.gondor.domain).click();
 
-        // 5. Verify the login-with-hint call returns success (session created)
+        // 6. Verify the login-with-hint call returns success (session created)
         cy.wait('@loginWithHint').should(({request, response}) => {
             expect(response, 'response').to.exist;
             expect(response!.statusCode).to.be.oneOf([201, 200]);
@@ -104,9 +107,14 @@ describe('Ambiguous Tenant Flow', () => {
             expect(request.body).to.have.property('subscriber_tenant_hint', TENANTS.gondor.domain);
         });
 
-        // 6. Verify successful completion — redirected to client with auth code
-        cy.url().should('include', 'https://example.com/');
+        // 7. Handle consent page (App_Clients require consent)
+        cy.url().should('include', '/consent');
+        cy.get('button').contains('Grant Access').click();
+
+        // 8. Verify successful completion — redirected back to the app with auth code
+        cy.url().should('include', 'ambiguous-tenant-app.html');
         cy.url().should('include', 'code=');
+        cy.url().should('include', 'state=');
     });
 
     // Cleanup: unsubscribe Gondor from the test app

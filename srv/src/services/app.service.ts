@@ -29,12 +29,17 @@ export class AppService {
     ) {
     }
 
-    async createApp(permission: Permission, tenantId: string, name: string, appUrl: string, description?: string): Promise<App> {
+    async createApp(permission: Permission, tenantId: string, name: string, appUrl: string, description?: string, onboardingEnabled?: boolean, onboardingCallbackUrl?: string): Promise<App> {
         const tenant = await this.tenantService.findById(permission, tenantId);
         permission.isAuthorized(Action.Update, SubjectEnum.TENANT, {id: tenant.id});
 
         if (!isValidRedirectUri(appUrl)) {
             throw new BadRequestException('App URL is not a valid redirect URI');
+        }
+
+        // Validate onboardingCallbackUrl if provided
+        if (onboardingCallbackUrl && !isValidRedirectUri(onboardingCallbackUrl)) {
+            throw new BadRequestException('Onboarding callback URL is not a valid URI');
         }
 
         const slug = deriveSlug(name);
@@ -70,6 +75,8 @@ export class AppService {
                 owner: tenant,
                 client: appClient,
                 clientId: appClient.id,
+                onboardingEnabled: onboardingEnabled ?? true,
+                onboardingCallbackUrl: onboardingCallbackUrl || undefined,
             });
 
             return manager.save(app);
@@ -154,7 +161,7 @@ export class AppService {
         });
     }
 
-    async updateApp(permission: Permission, appId: string, name: string, appUrl: string, description?: string): Promise<App> {
+    async updateApp(permission: Permission, appId: string, name: string, appUrl: string, description?: string, onboardingEnabled?: boolean, onboardingCallbackUrl?: string | null): Promise<App> {
         const app = await this.getAppById(appId);
         permission.isAuthorized(Action.Update, SubjectEnum.TENANT, {id: app.owner.id});
 
@@ -162,12 +169,22 @@ export class AppService {
             throw new BadRequestException('App URL is not a valid redirect URI');
         }
 
+        // Validate onboardingCallbackUrl if provided (null means clear it)
+        if (onboardingCallbackUrl && !isValidRedirectUri(onboardingCallbackUrl)) {
+            throw new BadRequestException('Onboarding callback URL is not a valid URI');
+        }
+
         const nameChanged = name !== app.name;
         const appUrlChanged = appUrl !== app.appUrl;
         const descChanged = description !== undefined && description !== app.description;
+        const onboardingEnabledChanged = onboardingEnabled !== undefined && onboardingEnabled !== app.onboardingEnabled;
+        const onboardingCallbackUrlChanged = onboardingCallbackUrl !== undefined && onboardingCallbackUrl !== app.onboardingCallbackUrl;
 
-        if (!nameChanged && !appUrlChanged && descChanged) {
-            app.description = description;
+        // If only simple fields changed (no cascade needed), update directly
+        if (!nameChanged && !appUrlChanged && (descChanged || onboardingEnabledChanged || onboardingCallbackUrlChanged)) {
+            if (descChanged) app.description = description;
+            if (onboardingEnabledChanged) app.onboardingEnabled = onboardingEnabled!;
+            if (onboardingCallbackUrlChanged) app.onboardingCallbackUrl = onboardingCallbackUrl || undefined;
             return this.appRepository.save(app);
         }
 
@@ -183,6 +200,12 @@ export class AppService {
             app.appUrl = appUrl;
             if (description !== undefined) {
                 app.description = description;
+            }
+            if (onboardingEnabled !== undefined) {
+                app.onboardingEnabled = onboardingEnabled;
+            }
+            if (onboardingCallbackUrl !== undefined) {
+                app.onboardingCallbackUrl = onboardingCallbackUrl || undefined;
             }
 
             return manager.save(app);

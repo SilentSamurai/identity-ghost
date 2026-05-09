@@ -56,6 +56,9 @@ import {EditClientComponent} from './dialogs/edit-client.component';
                         <app-attribute label="Client ID">
                             {{ client.clientId }}
                         </app-attribute>
+                        <app-attribute label="Alias" *ngIf="client.alias">
+                            {{ client.alias }}
+                        </app-attribute>
                         <app-attribute label="Client Type">
                             <span *ngIf="client.isPublic" class="badge bg-info">Public</span>
                             <span *ngIf="!client.isPublic" class="badge bg-secondary">Confidential</span>
