@@ -113,6 +113,8 @@ describe('External Login → Logout → Re-Login', () => {
         cy.get('#decodedToken').should('not.be.empty');
 
         // ─── Now simulate a new authorize request with a known state ───────
+        // Must hit /api/oauth/authorize (not the Angular /authorize UI) so the
+        // backend can detect the sid cookie and redirect to /session-confirm
         const params = new URLSearchParams({
             client_id: clientId(),
             redirect_uri: REDIRECT_URI,
@@ -123,9 +125,9 @@ describe('External Login → Logout → Re-Login', () => {
             scope: 'openid profile email',
         });
 
-        cy.visit(`/authorize?${params.toString()}`);
+        cy.visit(`/api/oauth/authorize?${params.toString()}`);
 
-        // Wait for navigation to session-confirm (auth code exists in sessionStorage)
+        // Wait for navigation to session-confirm (sid cookie found by backend)
         cy.url({timeout: 10000}).should('include', '/session-confirm');
         cy.contains('button', 'Continue').should('be.visible').click();
 
@@ -139,7 +141,7 @@ describe('External Login → Logout → Re-Login', () => {
         const REDIRECT_URI = 'http://localhost:3000/';
         const testState = 'stale-code-state-test';
 
-        // ─── First login to get a valid auth code in sessionStorage ────────
+        // ─── First login to establish a session ───────────────────────────
         cy.visit('http://localhost:3000/');
         cy.intercept('POST', '**/api/oauth/token*').as('tokenCall');
         cy.get('#login-btn').click();
@@ -150,7 +152,8 @@ describe('External Login → Logout → Re-Login', () => {
         cy.wait('@tokenCall');
         cy.get('#decodedToken').should('not.be.empty');
 
-        // ─── Now visit authorize page directly with a new state ─────────────
+        // ─── Now visit /api/oauth/authorize directly with a new state ──────
+        // Must hit the backend endpoint so it detects the sid cookie
         const params = new URLSearchParams({
             client_id: clientId(),
             redirect_uri: REDIRECT_URI,
@@ -161,7 +164,7 @@ describe('External Login → Logout → Re-Login', () => {
             scope: 'openid profile email',
         });
 
-        cy.visit(`/authorize?${params.toString()}`);
+        cy.visit(`/api/oauth/authorize?${params.toString()}`);
 
         // Wait for navigation to session-confirm
         cy.url({timeout: 10000}).should('include', '/session-confirm');
@@ -169,5 +172,89 @@ describe('External Login → Logout → Re-Login', () => {
 
         // Critical: state must be present in the redirect
         cy.url({timeout: 10000}).should('include', `state=${testState}`);
+    });
+
+    it('session_confirmed=true skips session-confirm and issues code directly', () => {
+        const CODE_CHALLENGE = 'dp6NlaokagLZTUjEL7cYPlMchcQdWzRW3bkAEXEti9c';
+        const REDIRECT_URI = 'http://localhost:3000/';
+
+        // ─── First login to establish a session ────────────────────────────
+        cy.visit('http://localhost:3000/');
+        cy.intercept('POST', '**/api/oauth/token*').as('tokenCall');
+        cy.get('#login-btn').click();
+        cy.url().should('include', '/authorize');
+        cy.get('#username').should('be.visible').type(email());
+        cy.get('#password').should('be.visible').type(password());
+        cy.get('#login-btn').click();
+        cy.wait('@tokenCall');
+        cy.get('#decodedToken').should('not.be.empty');
+
+        // ─── Use cy.request with session_confirmed=true ────────────────────
+        const state = 'bypass-test-' + Date.now();
+        cy.getCookie('sid').then((cookie) => {
+            cy.request({
+                method: 'GET',
+                url: '/api/oauth/authorize',
+                qs: {
+                    client_id: clientId(),
+                    redirect_uri: REDIRECT_URI,
+                    code_challenge: CODE_CHALLENGE,
+                    code_challenge_method: 'S256',
+                    response_type: 'code',
+                    state,
+                    scope: 'openid profile email',
+                    session_confirmed: 'true',
+                },
+                headers: { Cookie: `sid=${cookie!.value}` },
+                followRedirect: false,
+            }).then((resp) => {
+                expect(resp.status).to.eq(302);
+                const location = resp.headers['location'] as string;
+                // Should redirect directly to client with code, bypassing session-confirm
+                expect(location).to.include(REDIRECT_URI);
+                expect(location).to.include('code=');
+                expect(location).to.include(`state=${state}`);
+            });
+        });
+    });
+
+    it('Logout from session-confirm clears sid cookie and shows login form', () => {
+        const CODE_CHALLENGE = 'dp6NlaokagLZTUjEL7cYPlMchcQdWzRW3bkAEXEti9c';
+        const REDIRECT_URI = 'http://localhost:3000/';
+
+        // ─── First login to establish a session ────────────────────────────
+        cy.visit('http://localhost:3000/');
+        cy.intercept('POST', '**/api/oauth/token*').as('tokenCall');
+        cy.get('#login-btn').click();
+        cy.url().should('include', '/authorize');
+        cy.get('#username').should('be.visible').type(email());
+        cy.get('#password').should('be.visible').type(password());
+        cy.get('#login-btn').click();
+        cy.wait('@tokenCall');
+        cy.get('#decodedToken').should('not.be.empty');
+
+        // ─── Trigger session-confirm via /api/oauth/authorize ──────────────
+        // Must hit the backend endpoint so it detects the sid cookie
+        const params = new URLSearchParams({
+            client_id: clientId(),
+            redirect_uri: REDIRECT_URI,
+            code_challenge: CODE_CHALLENGE,
+            code_challenge_method: 'S256',
+            response_type: 'code',
+            state: 'logout-test-' + Date.now(),
+            scope: 'openid profile email',
+        });
+        cy.visit(`/api/oauth/authorize?${params.toString()}`);
+        cy.url({timeout: 10000}).should('include', '/session-confirm');
+        cy.getCookie('sid').should('exist');
+
+        // ─── Click Logout ──────────────────────────────────────────────────
+        cy.contains('button', 'Logout').should('be.visible').click();
+
+        // Should clear the cookie and redirect back to the login form
+        cy.url({timeout: 10000}).should('include', '/authorize');
+        cy.get('#username').should('be.visible');
+        cy.get('#password').should('be.visible');
+        cy.getCookie('sid').should('not.exist');
     });
 });

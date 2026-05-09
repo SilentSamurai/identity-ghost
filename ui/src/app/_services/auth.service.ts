@@ -54,13 +54,16 @@ export class AuthService {
         );
     }
 
-    fetchAccessToken(code: string, verifier: string, client_id: string, subscriber_tenant_hint?: string): Promise<any> {
+    fetchAccessToken(code: string, verifier: string, client_id: string, redirect_uri?: string, subscriber_tenant_hint?: string): Promise<any> {
         const body: any = {
             grant_type: 'authorization_code',
             code,
             code_verifier: verifier,
             client_id,
         };
+        if (redirect_uri) {
+            body.redirect_uri = redirect_uri;
+        }
         if (subscriber_tenant_hint) {
             body.subscriber_tenant_hint = subscriber_tenant_hint;
         }
@@ -103,7 +106,7 @@ export class AuthService {
     async sessionLogout(): Promise<void> {
         await lastValueFrom(
             this.http.post(
-                `${AUTH_API}/session-logout`,
+                `${AUTH_API}/logout`,
                 {},
                 httpOptionsWithCredentials,
             ),
@@ -181,10 +184,8 @@ export class AuthService {
         await lastValueFrom(
             this.http.post(
                 `${AUTH_API}/logout`,
-                {
-                    refresh_token: refreshToken,
-                },
-                httpOptions,
+                {refresh_token: refreshToken},
+                httpOptionsWithCredentials,
             ),
         );
     }

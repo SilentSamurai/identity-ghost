@@ -71,16 +71,21 @@ export class TokenRevocationService {
     }
 
     /**
-     * Logout sequence: revoke the refresh token family (if provided),
-     * invalidate the login session (if sid provided),
-     * then return so the controller can clear session cookies.
+     * Logout sequence: revoke the refresh token family and invalidate the login session.
+     *
+     * When a sid is provided, all refresh tokens for that session are revoked via
+     * revokeBySid — so tenantId is only needed when revoking an explicit refresh_token
+     * without a sid. If tenantId is null (cookie-only flow), sid-based revocation
+     * still covers the session and its tokens.
      */
-    async logout(tenantId: string, refreshToken?: string, sid?: string): Promise<void> {
+    async logout(tenantId: string | null, refreshToken?: string, sid?: string): Promise<void> {
         if (sid) {
             await this.loginSessionService.invalidateSession(sid);
             await this.refreshTokenService.revokeBySid(sid);
         }
-        if (refreshToken) {
+        // Only attempt explicit refresh token revocation when we have a tenant context.
+        // When sid is present, revokeBySid above already covered all tokens for the session.
+        if (refreshToken && tenantId) {
             await this.revoke(tenantId, refreshToken);
         }
     }

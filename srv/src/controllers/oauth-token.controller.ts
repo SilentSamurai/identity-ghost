@@ -513,37 +513,6 @@ export class OAuthTokenController {
     }
 
     /**
-     * POST /session-logout — Cookie-authenticated logout.
-     * Invalidates the server-side session, revokes associated refresh tokens, and clears the sid cookie.
-     */
-    @Post("/session-logout")
-    @HttpCode(200)
-    @Header('Cache-Control', 'no-store')
-    @Header('Pragma', 'no-cache')
-    async sessionLogout(
-        @Req() req: ExpressRequest,
-        @Res({passthrough: true}) res: Response,
-    ): Promise<Record<string, never>> {
-        const sid = (req as any).signedCookies?.sid;
-        if (sid) {
-            await this.loginSessionService.invalidateSession(sid);
-            await this.refreshTokenService.revokeBySid(sid);
-        }
-
-        // Clear the sid cookie
-        res.cookie('sid', '', {
-            signed: true,
-            httpOnly: true,
-            secure: Environment.get('ENABLE_HTTPS') === 'true' || process.env.NODE_ENV === 'production',
-            sameSite: 'lax' as const,
-            path: '/api/oauth',
-            maxAge: 0,
-        });
-
-        return {};
-    }
-
-    /**
      * GET /session-info — Cookie-authenticated session info.
      * Returns the email of the currently authenticated user.
      */

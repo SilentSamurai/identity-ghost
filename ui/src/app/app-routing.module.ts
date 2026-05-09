@@ -14,6 +14,7 @@ import {TenantAccessAuthGuard} from './shared/tenant-auth-guard.service';
 import {CL02Component} from './secure/clients/CL02.component';
 import {GP02Component} from './secure/group/GP02.component';
 import {AuthorizeLoginComponent} from "./open-pages/authorize-login.component";
+import {OAuthCallbackComponent} from "./open-pages/oauth-callback.component";
 import {TenantSelectionComponent} from './open-pages/tenant-selection.component';
 import {ForgotPasswordComponent} from './open-pages/forgot-password.component';
 import {ResetPasswordComponent} from './open-pages/reset-password.component';
@@ -28,6 +29,7 @@ const routes: Routes = [
     {path: 'signup', component: SignUpComponent},
     {path: 'session-confirm', component: SessionConfirmationComponent},
     {path: 'authorize', component: AuthorizeLoginComponent},
+    {path: 'oauth/callback', component: OAuthCallbackComponent},
     {path: 'consent', component: ConsentComponent},
     {path: 'logout', component: LogoutComponent},
     {path: 'login', component: LoginComponent},

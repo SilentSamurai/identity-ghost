@@ -1,6 +1,6 @@
 import {TestBed} from '@angular/core/testing';
 import {HttpClientTestingModule, HttpTestingController,} from '@angular/common/http/testing';
-import {AuthService} from './auth.service';
+import {AuthService, LoginResponse} from './auth.service';
 
 describe('AuthService', () => {
     let service: AuthService;
@@ -24,7 +24,7 @@ describe('AuthService', () => {
     });
 
     it('should login successfully', async () => {
-        const mockResponse = {success: true};
+        const mockResponse: LoginResponse = {success: true};
 
         const loginPromise = service.login(
             'test@example.com',

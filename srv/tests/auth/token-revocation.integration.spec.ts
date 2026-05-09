@@ -9,9 +9,9 @@ import {ClientEntityClient} from '../api-client/client-entity-client';
  * POST /api/oauth/revoke
  * POST /api/oauth/logout
  *
- * Both endpoints are protected by JwtAuthGuard — callers must present a valid
- * Bearer token (or Basic client credentials). Tenant is derived from the
- * security context, not from body parameters.
+ * The revoke endpoint requires a valid Bearer token (JwtAuthGuard).
+ * The logout endpoint accepts a valid Bearer token OR a sid (body/cookie);
+ * returns 400 if neither is present.
  *
  * Validates:
  *   - Revocation endpoint exposure (Req 1.1, 1.2, 1.3)
@@ -442,14 +442,13 @@ describe('Token Revocation & Logout Endpoints (RFC 7009)', () => {
     // ── Logout: no authentication (Req 2.6) ─────────────────────────
 
     describe('logout without authentication', () => {
-        it('returns 401 when no Authorization header is provided', async () => {
-            const {refreshToken} = await getFreshTokens();
+        it('returns 400 when no Authorization header or sid is provided', async () => {
             const response = await app.getHttpServer()
                 .post('/api/oauth/logout')
-                .send({refresh_token: refreshToken})
+                .send({refresh_token: 'some-token'})
                 .set('Accept', 'application/json');
 
-            expect(response.status).toEqual(401);
+            expect(response.status).toEqual(400);
         });
     });
 

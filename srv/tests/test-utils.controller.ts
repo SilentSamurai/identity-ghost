@@ -4,6 +4,7 @@ import {IsNull, Repository} from "typeorm";
 import {LoginSession} from "../src/entity/login-session.entity";
 import {AuthCode} from "../src/entity/auth_code.entity";
 import {User} from "../src/entity/user.entity";
+import {Tenant} from "../src/entity/tenant.entity";
 
 /**
  * Test-only controller that exposes internal state manipulation endpoints.
@@ -23,6 +24,8 @@ export class TestUtilsController {
         private readonly authCodeRepo: Repository<AuthCode>,
         @InjectRepository(User)
         private readonly userRepo: Repository<User>,
+        @InjectRepository(Tenant)
+        private readonly tenantRepo: Repository<Tenant>,
     ) {
     }
 
@@ -129,6 +132,18 @@ export class TestUtilsController {
             {userId, tenantId, invalidatedAt: IsNull()},
             {invalidatedAt: new Date()},
         );
+    }
+
+    /**
+     * Set the skip_session_confirm flag on a tenant.
+     */
+    @Post("tenants/:id/skip-session-confirm")
+    @HttpCode(204)
+    async setSkipSessionConfirm(
+        @Param("id") id: string,
+        @Body() body: { skip: boolean },
+    ): Promise<void> {
+        await this.tenantRepo.update(id, {skipSessionConfirm: body.skip} as any);
     }
 
     /**

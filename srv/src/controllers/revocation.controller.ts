@@ -1,22 +1,21 @@
-import {Body, Controller, Get, Header, HttpCode, Post, Res, UseGuards} from '@nestjs/common';
-import {Response} from 'express';
+import {Body, Controller, Get, Header, HttpCode, Post, Req, Res, UseGuards} from '@nestjs/common';
+import {Request, Response} from 'express';
 import {TokenRevocationService} from '../auth/token-revocation.service';
 import {JwtAuthGuard} from '../auth/jwt-auth.guard';
 import {CurrentTenantId} from '../auth/auth.decorator';
 import {OAuthException} from '../exceptions/oauth-exception';
+import {Environment} from '../config/environment.service';
+import {AuthService} from '../auth/auth.service';
+import {ExtractJwt} from 'passport-jwt';
 
 /**
  * RFC 7009 Token Revocation and Logout endpoints.
- *
- * Both endpoints are protected by {@link JwtAuthGuard} — the caller must
- * present a valid Bearer token (or Basic client credentials). The guard
- * sets up the security context and resolves the tenant, so the controller
- * never touches the Authorization header directly.
  */
 @Controller('api/oauth')
 export class RevocationController {
     constructor(
         private readonly revocationService: TokenRevocationService,
+        private readonly authService: AuthService,
     ) {
     }
 
@@ -52,32 +51,60 @@ export class RevocationController {
     /**
      * POST /api/oauth/logout
      *
-     * Revokes the refresh token family (if provided) and clears session
-     * cookies. Tenant is derived from the authenticated security context.
+     * Invalidates the server-side login session and revokes the refresh token family.
      *
-     * Body:
-     *   - `refresh_token` (optional) — the refresh token to revoke
+     * Authentication rules:
+     *   - Valid Bearer JWT present → use tenant from token, proceed with logout → 200
+     *   - Invalid/missing JWT + sid present (body or cookie) → sid-only logout → 200
+     *   - Neither JWT nor sid → 400 (bad request — nothing to identify the session)
      *
-     * Returns HTTP 200 with `{}` and `Set-Cookie` headers that clear
-     * session cookies (`Max-Age=0`).
+     * Does not return 401 — logout is idempotent and we don't gate it on session validity.
+     * The sid cookie is always cleared in the response on 200.
      */
     @Post('logout')
-    @UseGuards(JwtAuthGuard)
     @HttpCode(200)
     @Header('Cache-Control', 'no-store')
     @Header('Pragma', 'no-cache')
     async logout(
-        @CurrentTenantId() tenantId: string,
+        @Req() req: Request,
         @Res({passthrough: true}) res: Response,
         @Body() body: { refresh_token?: string; sid?: string },
     ): Promise<Record<string, never>> {
-        await this.revocationService.logout(tenantId, body.refresh_token, body.sid);
+        // Accept sid from body (programmatic callers) or signed cookie (browser flows)
+        const sid = body.sid ?? (req as any).signedCookies?.sid;
 
-        // Clear session cookies by setting Max-Age=0
-        res.setHeader('Set-Cookie', [
-            'session=; Path=/; Max-Age=0; HttpOnly; SameSite=Strict',
-            'session.sig=; Path=/; Max-Age=0; HttpOnly; SameSite=Strict',
-        ]);
+        // Try to resolve tenant from Bearer token
+        let tenantId: string | null = null;
+        let jwtValid = false;
+        try {
+            const rawToken = ExtractJwt.fromAuthHeaderAsBearerToken()(req as any);
+            if (rawToken) {
+                const token = await this.authService.validateAccessToken(rawToken);
+                if (token.isTenantToken()) {
+                    tenantId = (token as any).tenant?.id ?? null;
+                }
+                jwtValid = true;
+            }
+        } catch {
+            // Bearer token absent or invalid — fall through to sid check
+        }
+
+        // Require at least one identifier — JWT or sid
+        if (!jwtValid && !sid) {
+            throw OAuthException.invalidRequest('A Bearer token or sid is required to logout');
+        }
+
+        await this.revocationService.logout(tenantId, body.refresh_token, sid);
+
+        // Clear the sid cookie
+        res.cookie('sid', '', {
+            signed: true,
+            httpOnly: true,
+            secure: Environment.get('ENABLE_HTTPS') === 'true' || process.env.NODE_ENV === 'production',
+            sameSite: 'lax' as const,
+            path: '/api/oauth',
+            maxAge: 0,
+        });
 
         return {};
     }

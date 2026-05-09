@@ -29,6 +29,7 @@ import {HttpErrorComponent} from './error-pages/HttpError.component';
 import {AbilityModule} from '@casl/angular';
 import {Ability, createMongoAbility, PureAbility,} from '@casl/ability';
 import {AuthorizeLoginComponent} from "./open-pages/authorize-login.component";
+import {OAuthCallbackComponent} from "./open-pages/oauth-callback.component";
 import {NgOptimizedImage} from "@angular/common";
 import {TenantSelectionComponent} from './open-pages/tenant-selection.component';
 import {WelcomeComponent} from './open-pages/welcome.component';
@@ -47,6 +48,7 @@ import {LogoutComponent} from './open-pages/logout.component';
         SessionConfirmationComponent,
         HttpErrorComponent,
         AuthorizeLoginComponent,
+        OAuthCallbackComponent,
         TenantSelectionComponent,
         ForgotPasswordComponent,
         ResetPasswordComponent,

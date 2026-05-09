@@ -13,6 +13,22 @@ import {RoleEnum} from "./entity/roleEnum";
 import {DataSource} from "typeorm/data-source/DataSource";
 import {SecurityService} from "./casl/security.service";
 
+/**
+ * Derives the admin UI's OAuth callback URI from BASE_URL.
+ * Returns an empty list (with a warning) if BASE_URL is not configured.
+ */
+function resolveAdminUiCallbackUris(configService: Environment, logger: Logger): string[] {
+    const baseUrl: string = configService.get('BASE_URL', '');
+    if (baseUrl) {
+        return [`${baseUrl.replace(/\/+$/, '')}/oauth/callback`];
+    }
+    logger.warn(
+        'BASE_URL is not set; admin UI OAuth callback will not be registered on seeded ' +
+        'clients. Set BASE_URL (e.g. http://localhost:4200) in your env file.'
+    );
+    return [];
+}
+
 @Injectable()
 export class StartUpService implements OnModuleInit {
     private readonly logger = new Logger("StartUpService");
@@ -96,6 +112,7 @@ export class StartUpService implements OnModuleInit {
         try {
             // 1) Get admin context for creating data
             const permission = this.securityService.createPermissionForStartupSeed();
+            const adminUiCallbackUris = resolveAdminUiCallbackUris(this.configService, this.logger);
 
             // 3) Define a list of dummy tenants to create
             const dummyTenants: { name: string; domain: string; signUp: boolean; redirectUris?: string[] }[] = [
@@ -219,13 +236,19 @@ export class StartUpService implements OnModuleInit {
                     adminUser.email,
                 );
 
-                // Enable password grant
-                // test fixtures can authenticate via the password grant.
+                // Enable password grant and register the admin-UI callback
+                // alongside any tenant-specific redirect URIs so that tenant
+                // admins can sign into the admin UI as a first-party client.
                 try {
                     const defaultClient = await this.clientService.findByAlias(domain);
+                    const mergedRedirectUris = Array.from(new Set([
+                        ...(defaultClient.redirectUris || []),
+                        ...(redirectUris || []),
+                        ...adminUiCallbackUris,
+                    ]));
                     await this.clientService.updateClient(permission, defaultClient.clientId, {
                         allowPasswordGrant: true,
-                        ...(redirectUris?.length ? {redirectUris} : {}),
+                        redirectUris: mergedRedirectUris,
                     });
                     this.logger.log(`Configured default client for ${domain}`);
                 } catch (e) {
@@ -328,21 +351,30 @@ export class StartUpService implements OnModuleInit {
                         normalUser,
                     );
                 }
+            }
 
-                // Enable password grant on the super tenant's default client so that
-                // admin tooling and test fixtures can authenticate via the password grant.
-                try {
-                    const defaultClient = await this.clientService.findByAlias(
-                        this.configService.get("SUPER_TENANT_DOMAIN"),
-                    );
-                    await this.clientService.updateClient(permission, defaultClient.clientId, {
-                        allowPasswordGrant: true,
-                        redirectUris: ['http://localhost:3000/callback'],
-                    });
-                    this.logger.log(`Enabled allowPasswordGrant on default client for ${this.configService.get("SUPER_TENANT_DOMAIN")}`);
-                } catch (e) {
-                    this.logger.warn(`Could not enable allowPasswordGrant on super tenant default client: ${e}`);
-                }
+            // Always (re)configure the super tenant's default client so that:
+            //   1) admin tooling and test fixtures can use the password grant, and
+            //   2) the admin UI's redirect_uri (window.location.origin + '/oauth/callback')
+            //      resolves against a registered URI.
+            // Running this block on every startup makes it idempotent for existing
+            // databases that were seeded before the redirect URIs were broadened.
+            try {
+                const superTenantDomain = this.configService.get("SUPER_TENANT_DOMAIN");
+                const defaultClient = await this.clientService.findByAlias(superTenantDomain);
+                const adminUiCallbackUris = resolveAdminUiCallbackUris(this.configService, this.logger);
+                const existing = new Set(defaultClient.redirectUris || []);
+                const merged = Array.from(new Set([...existing, ...adminUiCallbackUris, 'http://localhost:3000/callback']));
+
+                await this.clientService.updateClient(permission, defaultClient.clientId, {
+                    allowPasswordGrant: true,
+                    redirectUris: merged,
+                });
+                this.logger.log(
+                    `Configured super tenant default client (${superTenantDomain}) with redirect URIs: ${merged.join(', ')}`,
+                );
+            } catch (e) {
+                this.logger.warn(`Could not configure super tenant default client: ${e}`);
             }
         } catch (e) {
             console.error(e);

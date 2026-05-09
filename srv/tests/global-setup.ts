@@ -27,6 +27,7 @@ import {TypeOrmModule} from '@nestjs/typeorm';
 import {LoginSession} from '../src/entity/login-session.entity';
 import {AuthCode} from '../src/entity/auth_code.entity';
 import {User} from '../src/entity/user.entity';
+import {Tenant} from '../src/entity/tenant.entity';
 import {CorsOriginService} from '../src/services/cors-origin.service';
 import {getTestPorts, TestPorts} from './test-ports';
 import * as cookieParser from "cookie-parser";
@@ -112,7 +113,7 @@ export default async function globalSetup(): Promise<void> {
         // 4. Compile and start the NestJS app on configured port
         //    Register TestUtilsController for test-only endpoints (session expiry, auth code lookup)
         const moduleRef = await Test.createTestingModule({
-            imports: [AppModule, TypeOrmModule.forFeature([LoginSession, AuthCode, User])],
+            imports: [AppModule, TypeOrmModule.forFeature([LoginSession, AuthCode, User, Tenant])],
             controllers: [TestUtilsController],
         }).compile();
 

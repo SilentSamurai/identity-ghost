@@ -1,11 +1,37 @@
 import {Component, OnInit} from '@angular/core';
-import {AuthService} from '../_services/auth.service';
-import {SessionService} from '../_services/session.service';
-import {NonceService} from '../_services/nonce.service';
-import {ActivatedRoute, Router} from '@angular/router';
+import {ActivatedRoute} from '@angular/router';
 import {FormBuilder, FormGroup, Validators} from '@angular/forms';
 import {MessageService} from 'primeng/api';
+import {NonceService} from '../_services/nonce.service';
+import {StateService} from '../_services/state.service';
+import {PKCEService} from '../_services/pkce.service';
 
+const RETURN_PATH_KEY = 'oauth-return-path';
+const CLIENT_ID_KEY = 'oauth-client-id';
+
+/**
+ * Sign-in bootstrap page.
+ *
+ * This page is a thin OAuth 2.0 client bootstrapper — it does NOT collect
+ * credentials. Its job is:
+ *   1. Obtain a `client_id` (from ?client_id= or via a single-field form).
+ *   2. Generate OAuth state + OIDC nonce + PKCE (S256) code_verifier/challenge.
+ *   3. Persist them in sessionStorage so /oauth/callback can validate.
+ *   4. Full-page-navigate to /api/oauth/authorize.
+ *
+ * Credential entry is handled by the authorization server's credential page
+ * (AuthorizeLoginComponent at /authorize), which this server 302s to when no
+ * session cookie is present. That keeps this codebase with a single credential
+ * UI and matches the RFC 6749 model where interactive authentication is an
+ * implementation detail inside the authorization endpoint.
+ *
+ * Compliance references:
+ *   - RFC 6749 §4.1          Authorization Code
+ *   - RFC 6749 §10.12 / RFC 9700 §4.7  state CSRF protection
+ *   - RFC 7636               PKCE S256
+ *   - OIDC Core §3.1.2.1     nonce
+ *   - RFC 9700 §2.1.1        browser-based public clients
+ */
 @Component({
     selector: 'app-login',
     template: `
@@ -16,130 +42,48 @@ import {MessageService} from 'primeng/api';
         >
             <div *ngIf="loading" class="align-middle text-center" style="padding-top:25%">
                 <div class="spinner-border m-5" role="status">
-                    <span class="visually-hidden">Loading...</span>
+                    <span class="visually-hidden">Redirecting…</span>
                 </div>
+                <div class="mt-2">Redirecting to sign in…</div>
             </div>
 
             <form
-                (ngSubmit)="loginForm.valid && onSubmit()"
-                *ngIf="!isLoggedIn"
+                (ngSubmit)="loginForm.valid && onContinue()"
+                *ngIf="!loading"
                 [formGroup]="loginForm"
                 class="mt-3"
                 novalidate
             >
-                <!-- Step 1: Ask for Client ID when not frozen -->
-                <div *ngIf="!freezeClientId">
-                    <div class="form-group">
-                        <label for="client_id">Client Id</label>
-                        <input
-                            class="form-control"
-                            formControlName="client_id"
-                            id="client_id"
-                            placeholder="Enter Client ID"
-                            type="text"
-                        />
-                    </div>
-                    <div
-                        *ngIf="loginForm.get('client_id')?.invalid && (loginForm.get('client_id')?.touched || loginForm.get('client_id')?.dirty)"
-                        class="alert alert-danger mt-2"
-                        role="alert">
-                        Client Id is required.
-                    </div>
-
-                    <div class="form-group d-grid gap-2 py-3">
-                        <button
-                            (click)="onContinue()"
-                            [disabled]="loginForm.get('client_id')?.invalid"
-                            class="btn btn-primary btn-block btn-lg"
-                            id="continue-btn"
-                            type="button"
-                        >
-                            Continue
-                        </button>
-                    </div>
+                <div class="form-group">
+                    <label for="client_id">Client Id</label>
+                    <input
+                        class="form-control"
+                        formControlName="client_id"
+                        id="client_id"
+                        placeholder="Enter Client ID"
+                        type="text"
+                    />
+                </div>
+                <div
+                    *ngIf="loginForm.get('client_id')?.invalid && (loginForm.get('client_id')?.touched || loginForm.get('client_id')?.dirty)"
+                    class="alert alert-danger mt-2"
+                    role="alert">
+                    Client Id is required.
                 </div>
 
-                <!-- Step 2: After freezing client id, show credentials -->
-                <div *ngIf="freezeClientId">
-                    <div class="form-group">
-                        <label for="username">Username</label>
-                        <div class="input-group">
-                            <span class="input-group-text">&#64;</span>
-                            <input
-                                class="form-control"
-                                formControlName="username"
-                                id="username"
-                                placeholder="Enter Username / Email"
-                                type="text"
-                                aria-describedby="username-error"
-                            />
-                        </div>
-                        <div
-                            *ngIf="loginForm.get('username')?.errors && (loginForm.get('username')?.touched || loginForm.get('username')?.dirty)"
-                            class="alert alert-danger mt-2"
-                            role="alert"
-                            id="username-error">
-                            Username is required
-                        </div>
-                    </div>
-
-                    <div class="form-group mt-3">
-                        <label for="password">Password</label>
-                        <div class="input-group">
-                            <input
-                                [type]="isPasswordVisible ? 'text' : 'password'"
-                                class="form-control"
-                                formControlName="password"
-                                id="password"
-                                minlength="6"
-                                placeholder="Password"
-                                aria-describedby="password-error"
-                            />
-                            <button
-                                (click)="isPasswordVisible = !isPasswordVisible"
-                                class="input-group-text"
-                                type="button"
-                                aria-label="Toggle password visibility"
-                            >
-                                <i class="fa {{ !isPasswordVisible ? 'fa-eye' : 'fa-eye-slash' }}"></i>
-                            </button>
-                        </div>
-                        <div
-                            *ngIf="loginForm.get('password')?.errors && (loginForm.get('password')?.touched || loginForm.get('password')?.dirty)"
-                            class="alert alert-danger mt-2"
-                            role="alert"
-                            id="password-error">
-                            <div *ngIf="loginForm.get('password')?.errors?.['required']">
-                                Password is required
-                            </div>
-                            <div *ngIf="loginForm.get('password')?.errors?.['minlength']">
-                                Password must be at least 6 characters
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Client Id input removed on step 2; displayed above under image -->
-
-                    <div class="form-group d-grid gap-2 py-3">
-                        <button [disabled]="loginForm.invalid"
-                                class="btn btn-primary btn-block btn-lg"
-                                type="submit"
-                                id="login-btn">
-                            Login
-                        </button>
-                    </div>
-
-                    <div *ngIf="isLoginFailed" class="alert alert-danger" role="alert">
-                        Login failed: {{ errorMessage }}
-                    </div>
+                <div class="form-group d-grid gap-2 py-3">
+                    <button
+                        [disabled]="loginForm.get('client_id')?.invalid"
+                        class="btn btn-primary btn-block btn-lg"
+                        id="continue-btn"
+                        type="submit"
+                    >
+                        Continue
+                    </button>
                 </div>
             </form>
 
-            <div *ngIf="isLoggedIn" class="alert alert-success">
-                Logged in as {{ loginForm.value?.username }}.
-            </div>
-
-            <div class="d-flex justify-content-between">
+            <div *ngIf="!loading" class="d-flex justify-content-between">
                 <a class="mt-1" routerLink="/forgot-password">
                     Forgot Password
                 </a>
@@ -183,7 +127,6 @@ import {MessageService} from 'primeng/api';
             background-color: var(--bs-dark, #212529);
             border-color: var(--bs-border-color, #495057);
             color: var(--bs-body-color, #f8f9fa);
-            transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
         }
 
         [data-bs-theme="dark"] .form-control:focus {
@@ -193,39 +136,18 @@ import {MessageService} from 'primeng/api';
             box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
         }
 
-        [data-bs-theme="dark"] .form-control:hover {
-            border-color: var(--bs-primary, #0d6efd);
-        }
-
-        [data-bs-theme="dark"] .input-group-text {
-            background-color: var(--bs-dark, #212529);
-            border-color: var(--bs-border-color, #495057);
-            color: var(--bs-body-color, #f8f9fa);
-            transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
-        }
-
         [data-bs-theme="dark"] label {
             color: var(--bs-body-color, #f8f9fa);
-            transition: color 0.3s ease;
         }
 
         [data-bs-theme="dark"] .alert-danger {
             background-color: var(--bs-danger-bg-subtle, rgba(220, 53, 69, 0.15));
             border-color: var(--bs-danger-border-subtle, rgba(220, 53, 69, 0.3));
             color: var(--bs-danger-text-emphasis, #ea868f);
-            transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
-        }
-
-        [data-bs-theme="dark"] .alert-success {
-            background-color: var(--bs-success-bg-subtle, rgba(25, 135, 84, 0.15));
-            border-color: var(--bs-success-border-subtle, rgba(25, 135, 84, 0.3));
-            color: var(--bs-success-text-emphasis, #75b798);
-            transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
         }
 
         [data-bs-theme="dark"] a {
             color: var(--bs-link-color, #0d6efd);
-            transition: color 0.3s ease;
         }
 
         [data-bs-theme="dark"] a:hover {
@@ -236,7 +158,6 @@ import {MessageService} from 'primeng/api';
         [data-bs-theme="dark"] .btn-primary {
             background-color: var(--bs-primary, #0d6efd);
             border-color: var(--bs-primary, #0d6efd);
-            transition: background-color 0.3s ease, border-color 0.3s ease;
         }
 
         [data-bs-theme="dark"] .btn-primary:hover {
@@ -252,205 +173,130 @@ import {MessageService} from 'primeng/api';
 export class LoginComponent implements OnInit {
     loginForm: FormGroup;
     loading = true;
-    isLoggedIn = false;
-    isLoginFailed = false;
-    errorMessage = '';
-    freezeClientId = false;
-    isPasswordVisible = false;
-    code_challenge_method: string = 'S256';
     client_id: string = '';
 
+    private readonly CODE_CHALLENGE_METHOD = 'S256';
+
     constructor(
-        private authService: AuthService,
-        private router: Router,
         private route: ActivatedRoute,
         private fb: FormBuilder,
-        private tokenStorage: SessionService,
         private messageService: MessageService,
         private nonceService: NonceService,
+        private stateService: StateService,
+        private pkceService: PKCEService,
     ) {
         this.loginForm = this.fb.group({
             client_id: ['', Validators.required],
-            username: ['', Validators.required],
-            password: ['', [Validators.required, Validators.minLength(6)]],
         });
     }
 
     async ngOnInit(): Promise<void> {
-        let params = this.route.snapshot.queryParamMap;
+        const params = this.route.snapshot.queryParamMap;
 
-        // Check if user was redirected after email verification
+        // Post-verification banners
         if (params.has('verified')) {
             const verified = params.get('verified') === 'true';
-            if (verified) {
-                this.messageService.add({
+            this.messageService.add(verified
+                ? {
                     severity: 'success',
                     summary: 'Email Verified',
-                    detail: 'Your email has been verified successfully. You can now login.'
-                });
-            } else {
-                this.messageService.add({
+                    detail: 'Your email has been verified successfully. You can now login.',
+                }
+                : {
                     severity: 'error',
                     summary: 'Verification Failed',
-                    detail: 'Email verification failed. Please try again or contact support.'
+                    detail: 'Email verification failed. Please try again or contact support.',
                 });
-            }
         }
 
-        if (params.has('client_id')) {
-            this.client_id = params.get('client_id')!;
-            this.loginForm.get('client_id')?.setValue(this.client_id);
-            if (this.client_id && this.client_id.length > 0) {
-                this.freezeClientId = true;
-            }
+        // Preserve any OAuth error bounced back from a previous /oauth/callback attempt
+        // (e.g. state_required) so the user sees why they ended up here again.
+        const oauthError = params.get('error');
+        if (oauthError && !params.has('verified')) {
+            const description = params.get('error_description') || '';
+            this.messageService.add({
+                severity: 'warn',
+                summary: 'Sign-in interrupted',
+                detail: `${oauthError}${description ? ': ' + description : ''}`,
+                life: 6000,
+            });
         }
 
-        const code_challenge = await this.tokenStorage.getCodeChallenge(this.code_challenge_method);
+        // Carry the originally requested path through the OAuth round trip.
+        const redirectUri = params.get('redirect_uri');
+        if (redirectUri) {
+            window.sessionStorage.setItem(RETURN_PATH_KEY, redirectUri);
+        }
 
-        // Internal login no longer uses cached auth codes — skip auth code check
+        const clientId = params.get('client_id') || '';
+        if (clientId) {
+            // We already have a client_id → skip the form entirely and go straight
+            // to the authorization endpoint.
+            await this.startAuthorize(clientId);
+            return;
+        }
+
+        // No client_id yet — render the single-field form so the user can supply one.
         this.loading = false;
     }
 
-    // redirection to home page might not work sometime,
-    // check if internally anything is nav-ing to login page again
-    async onSubmit(): Promise<void> {
-        this.loading = true;
-        const {username, password} = this.loginForm.value;
-        const clientId = this.client_id || this.loginForm.get('client_id')?.value;
+    async onContinue(): Promise<void> {
+        const clientId = (this.loginForm.get('client_id')?.value || '').trim();
         if (!clientId) {
             this.loginForm.get('client_id')?.markAsTouched();
-            this.loading = false;
-            return;
-        }
-        const code_challenge = await this.tokenStorage.getCodeChallenge(this.code_challenge_method);
-        try {
-            // Login sets the sid cookie and returns {success: true}
-            await this.authService.login(username, password, clientId);
-
-            // After login, redirect to authorize to get an auth code for the admin UI
-            const params = new URLSearchParams();
-            params.set('client_id', clientId);
-            params.set('response_type', 'code');
-            params.set('redirect_uri', window.location.origin + '/home');
-            if (code_challenge) {
-                params.set('code_challenge', code_challenge);
-                params.set('code_challenge_method', this.code_challenge_method);
-            }
-            params.set('session_confirmed', 'true');
-            window.location.href = `/api/oauth/authorize?${params.toString()}`;
-        } catch (err: any) {
-            console.error(err);
-            this.errorMessage = err.error?.message || 'Login failed';
-            this.isLoginFailed = true;
-        } finally {
-            this.loading = false;
-        }
-    }
-
-    async redirect(code: string, clientId: string) {
-        await this.setAccessToken(code, clientId);
-        await this.router.navigate(["/home"], {
-            queryParams: {client_id: clientId},
-        });
-    }
-
-    onContinue() {
-        const clientIdCtrl = this.loginForm.get('client_id');
-        const clientId = (clientIdCtrl?.value || '').trim();
-        if (!clientId) {
-            clientIdCtrl?.markAsTouched();
             return;
         }
         this.client_id = clientId;
-        this.freezeClientId = true;
-        // Update URL with client_id without reloading the component
-        this.router.navigate([], {
-            relativeTo: this.route,
-            queryParams: {client_id: clientId},
-            queryParamsHandling: 'merge',
-        });
+        this.loading = true;
+        await this.startAuthorize(clientId);
     }
 
-    async onSigUpClick() {
-        const clientId = this.client_id || this.loginForm.get('client_id')?.value;
-        await this.router.navigate(['/register'], {
-            queryParams: {
-                client_id: clientId,
-            },
-        });
-    }
-
-    private async setAccessToken(code: string, clientId: string) {
+    /**
+     * Generate one-shot OAuth/OIDC parameters and navigate to /api/oauth/authorize.
+     * All per-request secrets are stored in sessionStorage (tab-scoped) so that
+     * /oauth/callback can validate state/nonce and complete the PKCE exchange.
+     */
+    private async startAuthorize(clientId: string): Promise<void> {
         try {
-            let verifier = this.tokenStorage.getCodeVerifier();
-            const data = await this.authService.fetchAccessToken(code, verifier, clientId);
+            // Fresh PKCE verifier for this flow (prevents verifier reuse across attempts).
+            this.pkceService.clearCodeVerifier();
+            const codeVerifier = this.pkceService.getCodeVerifier();
+            const codeChallenge = await this.pkceService.getCodeChallenge(this.CODE_CHALLENGE_METHOD);
+            void codeVerifier; // persisted inside PKCEService
 
-            // Validate nonce in ID token if a nonce was sent in the authorization request
-            const storedNonce = this.nonceService.retrieve();
-            if (storedNonce) {
-                // A nonce was sent — the token response must contain an id_token
-                if (!data.id_token) {
-                    this.tokenStorage.clearSession();
-                    this.nonceService.clear();
-                    this.messageService.add({
-                        severity: 'error',
-                        summary: 'Authentication Error',
-                        detail: 'Authentication failed: missing ID token',
-                        life: 5000
-                    });
-                    return;
-                }
+            const state = this.stateService.generate();
+            this.stateService.store(state);
 
-                const decodedIdToken = this.tokenStorage.decodeIdToken(data.id_token);
+            const nonce = this.nonceService.generate();
+            this.nonceService.store(nonce);
 
-                // The ID token must contain a nonce claim
-                if (!decodedIdToken.nonce) {
-                    this.tokenStorage.clearSession();
-                    this.nonceService.clear();
-                    this.messageService.add({
-                        severity: 'error',
-                        summary: 'Authentication Error',
-                        detail: 'Authentication failed: missing nonce',
-                        life: 5000
-                    });
-                    return;
-                }
-
-                // Validate the nonce claim matches the stored nonce
-                if (!this.nonceService.validate(decodedIdToken.nonce)) {
-                    this.tokenStorage.clearSession();
-                    this.messageService.add({
-                        severity: 'error',
-                        summary: 'Authentication Error',
-                        detail: 'Authentication failed: nonce mismatch',
-                        life: 5000
-                    });
-                    return;
-                }
+            window.sessionStorage.setItem(CLIENT_ID_KEY, clientId);
+            if (!window.sessionStorage.getItem(RETURN_PATH_KEY)) {
+                window.sessionStorage.setItem(RETURN_PATH_KEY, '/home');
             }
 
-            this.tokenStorage.saveToken(data.access_token);
-            if (data.refresh_token) {
-                this.tokenStorage.saveRefreshToken(data.refresh_token);
-            }
-            const [rules, profile] = await Promise.all([
-                this.authService.fetchPermissions(),
-                this.authService.fetchMyProfile(),
-            ]);
-            this.tokenStorage.saveUserProfile({
-                email: profile.email,
-                name: profile.name,
-                id: profile.id,
-            });
-            this.tokenStorage.savePermissions(rules);
+            const authorizeParams = new URLSearchParams();
+            authorizeParams.set('client_id', clientId);
+            authorizeParams.set('response_type', 'code');
+            authorizeParams.set('redirect_uri', window.location.origin + '/oauth/callback');
+            authorizeParams.set('scope', 'openid profile email');
+            authorizeParams.set('state', state);
+            authorizeParams.set('nonce', nonce);
+            authorizeParams.set('code_challenge', codeChallenge);
+            authorizeParams.set('code_challenge_method', this.CODE_CHALLENGE_METHOD);
+
+            // Full-page navigation — the server will either 302 back to /oauth/callback
+            // (if a valid sid cookie already exists) or 302 to /authorize for credential entry.
+            window.location.href = `/api/oauth/authorize?${authorizeParams.toString()}`;
         } catch (e: any) {
-            console.error(e);
+            console.error('Failed to start OAuth flow', e);
             this.messageService.add({
                 severity: 'error',
-                summary: 'Authentication Error',
-                detail: 'Failed to fetch access token. Please try logging in again.',
-                life: 5000
+                summary: 'Sign-in error',
+                detail: 'Could not start the sign-in flow. Please try again.',
+                life: 5000,
             });
+            this.loading = false;
         }
     }
 }
