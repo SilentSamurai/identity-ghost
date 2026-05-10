@@ -12,6 +12,26 @@ import {ClientService} from './client.service';
 import {deriveSlug, buildAlias} from '../utils/slug.util';
 import {isValidRedirectUri} from '../utils/redirect-uri.validator';
 import {AppClientAuditLogger} from '../log/app-client-audit.logger';
+import {TechnicalTokenService} from '../core/technical-token.service';
+
+/** Sentinel tenant ID sent in test webhook calls so the app can detect and ignore them. */
+export const WEBHOOK_TEST_TENANT_ID = '00000000-0000-0000-0000-000000000000';
+
+export interface WebhookTestResult {
+    url: string;
+    status: number | null;
+    latencyMs: number;
+    ok: boolean;
+    error?: string;
+    bodyValid: boolean;
+    body?: any;
+}
+
+export interface TestWebhookResponse {
+    onboardingEnabled: boolean;
+    onboard: WebhookTestResult | null;
+    offboard: WebhookTestResult | null;
+}
 
 @Injectable()
 export class AppService {
@@ -26,6 +46,7 @@ export class AppService {
         private readonly subscriptionService: SubscriptionService,
         private readonly clientService: ClientService,
         private readonly appClientAuditLogger: AppClientAuditLogger,
+        private readonly technicalTokenService: TechnicalTokenService,
     ) {
     }
 
@@ -217,5 +238,79 @@ export class AppService {
         permission.isAuthorized(Action.Update, SubjectEnum.TENANT, {id: app.owner.id});
         app.isPublic = true;
         return this.appRepository.save(app);
+    }
+
+    /**
+     * Fire a dry-run onboard + offboard webhook call against the app's configured URL.
+     * Sends X-Webhook-Test: true so the app handler can detect and short-circuit.
+     * No subscription, tenant, or user records are created.
+     *
+     * Authorization: caller must be TENANT_ADMIN of the owning tenant.
+     */
+    async testWebhook(permission: Permission, appId: string): Promise<TestWebhookResponse> {
+        const app = await this.getAppById(appId);
+        permission.isAuthorized(Action.Update, SubjectEnum.TENANT, {id: app.owner.id});
+
+        if (!app.onboardingEnabled) {
+            return {onboardingEnabled: false, onboard: null, offboard: null};
+        }
+
+        const baseUrl = (app.onboardingCallbackUrl || app.appUrl || '').replace(/\/+$/, '');
+        if (!baseUrl) {
+            return {onboardingEnabled: true, onboard: null, offboard: null};
+        }
+
+        // Obtain a technical token for the owner tenant (same as real subscription flow)
+        const ownerClient = await this.clientService.findByAlias(app.owner.domain);
+        const token = await this.technicalTokenService.createTechnicalAccessToken(ownerClient, []);
+
+        const headers: Record<string, string> = {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+            'X-Webhook-Test': 'true',
+        };
+        const body = JSON.stringify({tenantId: WEBHOOK_TEST_TENANT_ID});
+
+        const onboard = await this.probeEndpoint(`${baseUrl}/api/onboard/tenant`, headers, body);
+        const offboard = await this.probeEndpoint(`${baseUrl}/api/offboard/tenant`, headers, body);
+
+        return {onboardingEnabled: true, onboard, offboard};
+    }
+
+    private async probeEndpoint(
+        url: string,
+        headers: Record<string, string>,
+        body: string,
+    ): Promise<WebhookTestResult> {
+        const start = Date.now();
+        try {
+            const response = await fetch(url, {method: 'POST', headers, body});
+            const latencyMs = Date.now() - start;
+            let parsedBody: any = null;
+            let bodyValid = false;
+            try {
+                parsedBody = await response.json();
+                bodyValid = true;
+            } catch {
+                bodyValid = false;
+            }
+            return {
+                url,
+                status: response.status,
+                latencyMs,
+                ok: response.ok,
+                bodyValid,
+                body: parsedBody,
+            };
+        } catch (err) {
+            return {
+                url,
+                status: null,
+                latencyMs: Date.now() - start,
+                ok: false,
+                error: err instanceof Error ? err.message : String(err),
+                bodyValid: false,
+            };
+        }
     }
 }

@@ -61,6 +61,7 @@ import {AP01AComponent} from './apps/AP01A.component';
 import {CreateAppComponent} from './apps/dialogs/create-app.component';
 import {CreateAppAdminComponent} from './apps/dialogs/create-app-admin.component';
 import {UpdateAppComponent} from './apps/dialogs/update-app.component';
+import {TestWebhookAdminComponent} from './apps/dialogs/test-webhook.component';
 
 // Clients
 import {CL01AComponent} from './clients/CL01A.component';
@@ -115,6 +116,7 @@ import {KY01AComponent} from './keys/KY01A.component';
         CreateAppComponent,
         CreateAppAdminComponent,
         UpdateAppComponent,
+        TestWebhookAdminComponent,
         // Clients
         CL01AComponent,
         CL02ASelectionComponent,

@@ -1,90 +1,112 @@
 /**
- * Consent Screen Flow Tests
+ * Consent Screen Flow E2E Tests
  *
- * Tests the full consent screen UI flow from the user's perspective:
- * - Consent screen displays when login triggers a `requires_consent` response
- * - Consent screen shows client name and human-readable scope descriptions
- * - Scope-to-description mapping for openid, profile, and email
- * - "Approve" button submits consent and redirects with auth code
- * - "Deny" button redirects to client with error=access_denied
+ * Full integration tests for the OAuth consent screen. Uses real seeded data:
+ * - Tenant: shire.local
+ * - User: admin@shire.local / admin9000
+ * - Client: "Consent E2E Test" (third-party, public, needs consent)
  *
- * Uses cy.intercept() to mock backend responses rather than hitting a real backend.
- * All tests navigate to /authorize with PKCE params, fill in credentials, and
- * interact with the consent screen as a real user would.
+ * Flow driven by the external app at http://localhost:3000/consent-app.html:
+ * 1. Visit consent-app.html — sets client_id/scope/prompt on the login button, clicks it
+ * 2. External app builds /api/oauth/authorize URL with PKCE and redirects to backend
+ * 3. Backend has no session → redirects to Angular /authorize (login UI)
+ * 4. Enter credentials → POST /api/oauth/login → sets sid cookie
+ * 5. Angular navigates to /api/oauth/authorize?session_confirmed=true
+ * 6. Backend sees sid cookie + third-party client → no prior consent → 302 to /consent
+ * 7. Angular consent component loads → fetches session info → renders consent UI
+ * 8. User clicks Approve/Deny → JSON POST to /api/oauth/consent
+ * 9. Backend processes consent → PRG redirect back to /api/oauth/authorize
+ * 10. Backend issues code → redirects back to consent-app.html?code=... (or ?error=...)
+ * 11. External app exchanges code for tokens and displays result in DOM
  *
  * Validates: Requirements 4.1, 4.2, 4.3, 4.4, 4.5
  */
 describe('Consent Screen Flow', () => {
 
-    const REDIRECT_URI = 'https://consent-e2e.example.com/callback';
-    const CLIENT_ID = 'test-client-id';
-    const CLIENT_NAME = 'My Test App';
-    const CODE_CHALLENGE = 'test-code-challenge-value';
-    const CODE_CHALLENGE_METHOD = 'plain';
-    const STATE = 'cypress-consent-state-123';
-    const AUTH_CODE = 'test-auth-code-abc123';
+    const EXTERNAL_APP_URL = 'http://localhost:3000/consent-app.html';
+    // The external app itself is the registered redirect_uri — it handles the callback.
+    const REDIRECT_URI = 'http://localhost:3000/consent-app.html';
+    const CLIENT_NAME = 'Consent E2E Test';
 
     const TEST_USER = {
-        email: 'user@example.com',
-        password: 'password123',
+        email: 'admin@shire.local',
+        password: 'admin9000',
     };
 
+    let clientId: string;
+
+    before(() => {
+        cy.login(TEST_USER.email, TEST_USER.password, 'shire.local');
+
+        cy.window().then((win) => {
+            const token = win.sessionStorage.getItem('auth-token')!;
+            expect(token, 'auth-token should be present in sessionStorage after login').to.be.a('string').and.not.be.empty;
+
+            cy.request({
+                method: 'GET',
+                url: '/api/clients/my/clients',
+                headers: {Authorization: `Bearer ${token}`},
+            }).then((resp) => {
+                const client = resp.body.find((c: any) => c.name === CLIENT_NAME);
+                expect(client, `Client "${CLIENT_NAME}" should be seeded`).to.exist;
+                clientId = client.clientId;
+            });
+        });
+    });
+
+    beforeEach(() => {
+        cy.clearCookies();
+        cy.clearLocalStorage();
+    });
+
     /**
-     * Navigate to /authorize with all required PKCE params and stub the login
-     * endpoint to return a requires_consent response.
+     * Visit the external consent app, inject clientId/scopes onto the login button,
+     * click it, complete login, and wait until the browser lands on /consent.
+     *
+     * The external app uses REDIRECT_URI (consent-app.html) so after Approve/Deny
+     * the browser returns to the external app — no non-existent host involved.
+     *
+     * Always uses prompt=consent to force the consent screen regardless of prior consent.
      */
-    function visitAuthorizeAndStubConsentRequired(requestedScopes: string[]) {
-        cy.intercept('POST', '**/api/oauth/login*', {
-            statusCode: 200,
-            body: {
-                requires_consent: true,
-                requested_scopes: requestedScopes,
-                client_name: CLIENT_NAME,
-                client_id: CLIENT_ID,
-            },
-        }).as('loginRequiresConsent');
+    function startAuthorizeFlow(scopes: string[]) {
+        // DO NOT REMOVE: Visit "/" first to initialize Cypress within the app's origin.
+        // Skipping this causes Cypress to lose track of previous test steps (e.g. the
+        // `cy.login()` call in `before()` — the auth token in sessionStorage gets
+        // dropped), leading to cryptic failures on subsequent requests.
+        cy.visit("/");
+        cy.visit(EXTERNAL_APP_URL);
 
-        cy.visit(
-            `/authorize?client_id=${CLIENT_ID}` +
-            `&code_challenge=${CODE_CHALLENGE}` +
-            `&code_challenge_method=${CODE_CHALLENGE_METHOD}` +
-            `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
-            `&state=${STATE}` +
-            `&scope=${requestedScopes.join('%20')}` +
-            `&response_type=code`,
-        );
+        cy.get('#login-btn')
+            .invoke('attr', 'data-client-id', clientId)
+            .invoke('attr', 'data-scope', scopes.join(' '))
+            .invoke('attr', 'data-prompt', 'consent')
+            .click();
 
-        cy.get('#username').type(TEST_USER.email);
-        cy.get('#password').type(TEST_USER.password);
+        cy.get('#username').should('be.visible').type(TEST_USER.email);
+        cy.get('#password').should('be.visible').type(TEST_USER.password);
         cy.get('#login-btn').click();
 
-        cy.wait('@loginRequiresConsent');
+        cy.url().should('include', '/consent');
     }
 
     // ─── Consent Screen Display ───────────────────────────────────────
 
     describe('consent screen display', () => {
 
-        // Validates: Requirement 4.1 — consent screen displays when login triggers requires_consent
-        it('displays consent screen when login returns requires_consent', () => {
-            visitAuthorizeAndStubConsentRequired(['openid', 'profile', 'email']);
-
-            cy.url().should('include', '/consent');
+        it('displays consent screen when login triggers requires_consent', () => {
+            startAuthorizeFlow(['openid', 'profile', 'email']);
         });
 
-        // Validates: Requirement 4.2 — consent screen shows client name
-        it('shows the client name on the consent screen', () => {
-            visitAuthorizeAndStubConsentRequired(['openid', 'profile', 'email']);
+        it('shows the client name and user email on the consent screen', () => {
+            startAuthorizeFlow(['openid', 'profile', 'email']);
 
-            cy.url().should('include', '/consent');
-            cy.contains(CLIENT_NAME).should('be.visible');
+            cy.contains(`${clientId} is requesting access`).should('be.visible');
+            cy.contains(`Signed in as ${TEST_USER.email}`).should('be.visible');
         });
 
-        // Validates: Requirement 4.1 — consent screen lists requested scopes with descriptions
         it('shows human-readable scope descriptions for all requested scopes', () => {
-            visitAuthorizeAndStubConsentRequired(['openid', 'profile', 'email']);
+            startAuthorizeFlow(['openid', 'profile', 'email']);
 
-            cy.url().should('include', '/consent');
             cy.contains('Verify your identity').should('be.visible');
             cy.contains('View your profile information (name)').should('be.visible');
             cy.contains('View your email address').should('be.visible');
@@ -92,45 +114,33 @@ describe('Consent Screen Flow', () => {
 
     });
 
-    // ─── Scope-to-Description Mapping ────────────────────────────────
+    // ─── Scope Descriptions ────────────────────────────────────────────
 
     describe('scope-to-description mapping', () => {
 
-        // Validates: Requirement 4.5 — openid maps to "Verify your identity"
         it('maps openid scope to "Verify your identity"', () => {
-            visitAuthorizeAndStubConsentRequired(['openid']);
-
-            cy.url().should('include', '/consent');
+            startAuthorizeFlow(['openid']);
             cy.contains('Verify your identity').should('be.visible');
             cy.contains('View your profile information (name)').should('not.exist');
             cy.contains('View your email address').should('not.exist');
         });
 
-        // Validates: Requirement 4.5 — profile maps to "View your profile information (name)"
         it('maps profile scope to "View your profile information (name)"', () => {
-            visitAuthorizeAndStubConsentRequired(['profile']);
-
-            cy.url().should('include', '/consent');
+            startAuthorizeFlow(['profile']);
             cy.contains('View your profile information (name)').should('be.visible');
             cy.contains('Verify your identity').should('not.exist');
             cy.contains('View your email address').should('not.exist');
         });
 
-        // Validates: Requirement 4.5 — email maps to "View your email address"
         it('maps email scope to "View your email address"', () => {
-            visitAuthorizeAndStubConsentRequired(['email']);
-
-            cy.url().should('include', '/consent');
+            startAuthorizeFlow(['email']);
             cy.contains('View your email address').should('be.visible');
             cy.contains('Verify your identity').should('not.exist');
             cy.contains('View your profile information (name)').should('not.exist');
         });
 
-        // Validates: Requirement 4.5 — all three scopes shown together
         it('shows all three scope descriptions when all scopes are requested', () => {
-            visitAuthorizeAndStubConsentRequired(['openid', 'profile', 'email']);
-
-            cy.url().should('include', '/consent');
+            startAuthorizeFlow(['openid', 'profile', 'email']);
             cy.contains('Verify your identity').should('be.visible');
             cy.contains('View your profile information (name)').should('be.visible');
             cy.contains('View your email address').should('be.visible');
@@ -142,208 +152,125 @@ describe('Consent Screen Flow', () => {
 
     describe('approve flow', () => {
 
-        // Validates: Requirement 4.3 — Approve button submits consent and redirects with auth code
         it('Approve button submits consent and redirects to client with auth code', () => {
-            visitAuthorizeAndStubConsentRequired(['openid', 'profile', 'email']);
-
-            cy.url().should('include', '/consent');
-
-            cy.intercept('POST', '**/api/oauth/consent*', {
-                statusCode: 200,
-                body: {
-                    authentication_code: AUTH_CODE,
-                },
-            }).as('consentApprove');
-
-            // Intercept the external redirect to prevent cross-origin navigation.
-            // When the component sets window.location.href, the browser issues a
-            // GET to the redirect URI — we catch it here and return a stub response.
-            cy.intercept('GET', `${REDIRECT_URI}*`, {statusCode: 200, body: 'ok'}).as('clientRedirect');
+            startAuthorizeFlow(['openid', 'profile', 'email']);
 
             cy.contains('button', 'Approve').click();
 
-            cy.wait('@consentApprove').should(({request, response}) => {
-                expect(response).to.exist;
-                expect(response!.statusCode).to.eq(200);
-                expect(response!.body.authentication_code).to.eq(AUTH_CODE);
-                expect(request.body.consent_action).to.eq('approve');
-                expect(request.body.approved_scopes).to.deep.include.members(['openid', 'profile', 'email']);
-            });
+            // After consent, flow goes to session-confirm before redirecting to external app
+            cy.url({timeout: 10000}).should('include', '/session-confirm');
+            cy.contains('button', 'Continue').should('be.visible').click();
 
-            // Verify redirect to client redirect_uri with code param
-            cy.wait('@clientRedirect').its('request.url').should((url) => {
-                expect(url).to.include(REDIRECT_URI);
-                expect(url).to.include(`code=${AUTH_CODE}`);
+            // Backend redirects to consent-app.html?code=... — the external app loads
+            cy.origin('http://localhost:3000', () => {
+                cy.url().should('include', 'code=');
+                cy.get('#auth-code').invoke('text').should('not.be.empty');
             });
         });
 
-        // Validates: Requirement 4.3 — Approve sends correct fields to consent endpoint
-        it('Approve button sends correct consent payload to the backend', () => {
-            visitAuthorizeAndStubConsentRequired(['openid', 'email']);
+        it('Approve button includes all requested scopes in the consent payload', () => {
+            // Set up intercept BEFORE starting the flow to ensure we capture the consent POST
+            cy.intercept('POST', '**/api/oauth/consent*').as('consentSubmit');
 
-            cy.url().should('include', '/consent');
-
-            cy.intercept('POST', '**/api/oauth/consent*', {
-                statusCode: 200,
-                body: {authentication_code: AUTH_CODE},
-            }).as('consentPayload');
-
-            // Intercept the external redirect to prevent cross-origin navigation
-            cy.intercept('GET', `${REDIRECT_URI}*`, {statusCode: 200, body: 'ok'}).as('clientRedirect');
+            startAuthorizeFlow(['openid', 'profile', 'email']);
 
             cy.contains('button', 'Approve').click();
 
-            cy.wait('@consentPayload').should(({request}) => {
-                expect(request.body.consent_action).to.eq('approve');
-                expect(request.body.client_id).to.eq(CLIENT_ID);
-                expect(request.body.code_challenge).to.eq(CODE_CHALLENGE);
-                expect(request.body.code_challenge_method).to.eq(CODE_CHALLENGE_METHOD);
-                expect(request.body.email).to.eq(TEST_USER.email);
-                expect(request.body.password).to.eq(TEST_USER.password);
+            cy.wait('@consentSubmit').should(({request}) => {
+                // Consent component sends JSON with decision, client_id, scope, csrf_token
+                const body = request.body;
+
+                expect(body.decision).to.eq('grant');
+                expect(body.client_id).to.eq(clientId);
+                expect(body.scope).to.include('openid');
+                expect(body.scope).to.include('profile');
+                expect(body.scope).to.include('email');
             });
         });
 
     });
 
-    // ─── Deny Flow ────────────────────────────────────────────────────
+    // ─── Deny Flow ───────────────────────────────────────────────────
 
     describe('deny flow', () => {
 
-        // Validates: Requirement 4.4 — Deny button redirects to client with error=access_denied
         it('Deny button redirects to client redirect_uri with error=access_denied', () => {
-            visitAuthorizeAndStubConsentRequired(['openid', 'profile', 'email']);
-
-            cy.url().should('include', '/consent');
-
-            cy.intercept('POST', '**/api/oauth/consent*', {
-                statusCode: 200,
-                body: {
-                    error: 'access_denied',
-                    error_description: 'The resource owner denied the request',
-                },
-            }).as('consentDeny');
-
-            // Intercept the external redirect to prevent cross-origin navigation
-            cy.intercept('GET', `${REDIRECT_URI}*`, {statusCode: 200, body: 'ok'}).as('clientRedirect');
+            startAuthorizeFlow(['openid', 'profile', 'email']);
 
             cy.contains('button', 'Deny').click();
 
-            cy.wait('@consentDeny').should(({request, response}) => {
-                expect(response).to.exist;
-                expect(response!.statusCode).to.eq(200);
-                expect(response!.body.error).to.eq('access_denied');
-                expect(request.body.consent_action).to.eq('deny');
-            });
-
-            // Verify redirect to client redirect_uri with error params
-            cy.wait('@clientRedirect').its('request.url').should((url) => {
-                expect(url).to.include(REDIRECT_URI);
-                expect(url).to.include('error=access_denied');
+            cy.origin('http://localhost:3000', () => {
+                cy.get('#error-code').should('have.text', 'access_denied');
+                cy.get('#error-description').invoke('text').should('include', 'denied');
             });
         });
 
-        // Validates: Requirement 4.4 — Deny includes state in redirect
-        it('Deny redirect includes state parameter', () => {
-            visitAuthorizeAndStubConsentRequired(['openid']);
-
-            cy.url().should('include', '/consent');
-
-            cy.intercept('POST', '**/api/oauth/consent*', {
-                statusCode: 200,
-                body: {
-                    error: 'access_denied',
-                    error_description: 'The resource owner denied the request',
-                },
-            }).as('consentDenyWithState');
-
-            // Intercept the external redirect to prevent cross-origin navigation
-            cy.intercept('GET', `${REDIRECT_URI}*`, {statusCode: 200, body: 'ok'}).as('clientRedirect');
+        it('Deny redirect preserves the state parameter', () => {
+            startAuthorizeFlow(['openid']);
 
             cy.contains('button', 'Deny').click();
 
-            cy.wait('@consentDenyWithState');
-
-            cy.wait('@clientRedirect').its('request.url').should((url) => {
-                expect(url).to.include(`state=${STATE}`);
+            cy.origin('http://localhost:3000', () => {
+                cy.get('#error-code').should('have.text', 'access_denied');
+                cy.url().should('include', 'state=');
             });
         });
 
     });
 
-    // ─── Prompt=consent Flow ──────────────────────────────────────────
+    // ─── Prompt=consent ───────────────────────────────────────────────
 
     describe('prompt=consent forces consent screen', () => {
 
-        // Validates: Requirement 3.1 — prompt=consent forces consent screen even when consent was previously granted
-        it('prompt=consent forces consent screen even when consent was previously granted', () => {
-            // Stub login to return requires_consent when prompt=consent is in the request
-            cy.intercept('POST', '**/api/oauth/login*', (req) => {
-                if (req.body.prompt && req.body.prompt.includes('consent')) {
-                    req.reply({
-                        statusCode: 200,
-                        body: {
-                            requires_consent: true,
-                            requested_scopes: ['openid', 'profile', 'email'],
-                            client_name: CLIENT_NAME,
-                            client_id: CLIENT_ID,
-                        },
-                    });
-                } else {
-                    req.reply({
-                        statusCode: 200,
-                        body: {
-                            authentication_code: AUTH_CODE,
-                        },
-                    });
-                }
-            }).as('loginWithPrompt');
+        /**
+         * Same as startAuthorizeFlow but with prompt=consent, forcing the consent
+         * screen even when the user has previously granted consent.
+         */
+        function startAuthorizeFlowWithPrompt(scopes: string[]) {
+            cy.visit(EXTERNAL_APP_URL);
 
-            cy.visit(
-                `/authorize?client_id=${CLIENT_ID}` +
-                `&code_challenge=${CODE_CHALLENGE}` +
-                `&code_challenge_method=${CODE_CHALLENGE_METHOD}` +
-                `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
-                `&state=${STATE}` +
-                `&scope=openid%20profile%20email` +
-                `&response_type=code` +
-                `&prompt=consent`,
-            );
+            cy.get('#login-btn')
+                .invoke('attr', 'data-client-id', clientId)
+                .invoke('attr', 'data-scope', scopes.join(' '))
+                .invoke('attr', 'data-prompt', 'consent')
+                .click();
 
-            cy.get('#username').type(TEST_USER.email);
-            cy.get('#password').type(TEST_USER.password);
+            cy.get('#username').should('be.visible').type(TEST_USER.email);
+            cy.get('#password').should('be.visible').type(TEST_USER.password);
             cy.get('#login-btn').click();
 
-            cy.wait('@loginWithPrompt').should(({request}) => {
-                expect(request.body.prompt).to.eq('consent');
-            });
-
-            // Should navigate to consent screen
             cy.url().should('include', '/consent');
-            cy.contains(CLIENT_NAME).should('be.visible');
-        });
+        }
 
-        // Validates: Requirement 3.2 — prompt is forwarded in consent submission
-        it('prompt is forwarded in consent submission', () => {
-            visitAuthorizeAndStubConsentRequired(['openid', 'profile', 'email']);
-
-            cy.url().should('include', '/consent');
-
-            cy.intercept('POST', '**/api/oauth/consent*', {
-                statusCode: 200,
-                body: {
-                    authentication_code: AUTH_CODE,
-                },
-            }).as('consentWithPrompt');
-
-            // Intercept the external redirect
-            cy.intercept('GET', `${REDIRECT_URI}*`, {statusCode: 200, body: 'ok'}).as('clientRedirect');
-
+        it('prompt=consent forces consent screen even when consent was previously granted', () => {
+            // 1. First visit — grant consent so it is stored in DB
+            startAuthorizeFlow(['openid', 'profile', 'email']);
             cy.contains('button', 'Approve').click();
 
-            cy.wait('@consentWithPrompt').should(({request}) => {
-                expect(request.body.consent_action).to.eq('approve');
+            // After consent, flow goes to session-confirm before redirecting to external app
+            cy.url({timeout: 10000}).should('include', '/session-confirm');
+            cy.contains('button', 'Continue').should('be.visible').click();
+
+            cy.origin('http://localhost:3000', () => {
+                cy.get('#auth-code').invoke('text').should('not.be.empty');
             });
+
+            // 2. Clear cookies so there is no active session
+            cy.clearCookies();
+
+            // 3. Second visit with prompt=consent — must show consent screen despite prior grant
+            startAuthorizeFlowWithPrompt(['openid', 'profile', 'email']);
+
+            cy.contains(`${clientId} is requesting access`).should('be.visible');
         });
+
+        it('prompt=consent forces consent screen when no prior consent exists', () => {
+            startAuthorizeFlowWithPrompt(['openid', 'profile', 'email']);
+
+            cy.contains(`${clientId} is requesting access`).should('be.visible');
+            cy.contains('Verify your identity').should('be.visible');
+        });
+
     });
 
 });

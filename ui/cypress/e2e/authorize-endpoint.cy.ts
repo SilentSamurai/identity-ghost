@@ -47,6 +47,7 @@ describe('GET /api/oauth/authorize', () => {
 
     describe('happy path', () => {
         it('redirects to login UI when no session cookie is present', () => {
+            cy.clearCookies();
             cy.request({
                 method: 'GET',
                 url: API_BASE,

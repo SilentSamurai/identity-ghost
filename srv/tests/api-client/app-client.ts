@@ -5,15 +5,22 @@ export class AppClient extends HttpClient {
         super(app, accessToken);
     }
 
-    public async createApp(tenantId: string, name: string, appUrl: string, description?: string) {
+    public async createApp(
+        tenantId: string,
+        name: string,
+        appUrl: string,
+        description?: string,
+        onboardingEnabled?: boolean,
+        onboardingCallbackUrl?: string,
+    ) {
+        const body: Record<string, any> = {tenantId, name, appUrl};
+        if (description !== undefined) body.description = description;
+        if (onboardingEnabled !== undefined) body.onboardingEnabled = onboardingEnabled;
+        if (onboardingCallbackUrl !== undefined) body.onboardingCallbackUrl = onboardingCallbackUrl;
+
         const response = await this.app.getHttpServer()
             .post('/api/apps/create')
-            .send({
-                tenantId,
-                name,
-                appUrl,
-                description
-            })
+            .send(body)
             .set('Authorization', `Bearer ${this.accessToken}`)
             .set('Accept', 'application/json');
 
@@ -174,6 +181,16 @@ export class AppClient extends HttpClient {
             .set('Accept', 'application/json');
         expect2xx(response);
         expect(Array.isArray(response.body)).toBe(true);
+        return response.body;
+    }
+
+    public async testWebhook(appId: string) {
+        const response = await this.app.getHttpServer()
+            .post(`/api/apps/${appId}/test-webhook`)
+            .set('Authorization', `Bearer ${this.accessToken}`)
+            .set('Accept', 'application/json');
+        expect2xx(response);
+        expect(response.body).toHaveProperty('onboardingEnabled');
         return response.body;
     }
 

@@ -66,6 +66,7 @@ describe('Ambiguous Tenant Flow', () => {
     // verify tenant selection page appears, pick Gondor, and confirm the flow completes
     it('should handle ambiguous tenant selection flow', () => {
         // Navigate to the external app page (simulates a real user opening the app)
+        cy.visit("/login");
         cy.visit(TEST_APP.url);
 
         // 1. Click Login — the app initiates the OAuth flow with PKCE via OIDC discovery
@@ -109,7 +110,7 @@ describe('Ambiguous Tenant Flow', () => {
 
         // 7. Handle consent page (App_Clients require consent)
         cy.url().should('include', '/consent');
-        cy.get('button').contains('Grant Access').click();
+        cy.get('button').contains('Approve').click();
 
         // 8. Verify successful completion — redirected back to the app with auth code
         cy.url().should('include', 'ambiguous-tenant-app.html');

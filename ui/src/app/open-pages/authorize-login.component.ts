@@ -220,6 +220,7 @@ export class AuthorizeLoginComponent implements OnInit {
     private nonce = '';
     private resource = '';
     private subscriberTenantHint = '';
+    private prompt = '';  // IMPORTANT: Must preserve prompt=consent to force consent screen
 
     constructor(
         private authService: AuthService,
@@ -260,6 +261,7 @@ export class AuthorizeLoginComponent implements OnInit {
         this.nonce = params.get('nonce') || '';
         this.resource = params.get('resource') || '';
         this.subscriberTenantHint = params.get('subscriber_tenant_hint') || '';
+        this.prompt = params.get('prompt') || '';  // Preserve prompt=consent
 
         this.loginForm.patchValue({client_id: this.clientId});
         if (this.clientId.length > 0) {
@@ -303,6 +305,7 @@ export class AuthorizeLoginComponent implements OnInit {
                             codeChallengeMethod: this.codeChallengeMethod,
                             nonce: this.nonce,
                             resource: this.resource,
+                            prompt: this.prompt,  // Preserve prompt=consent
                         },
                     },
                 });
@@ -323,6 +326,8 @@ export class AuthorizeLoginComponent implements OnInit {
             if (this.nonce) authorizeParams.set('nonce', this.nonce);
             if (this.resource) authorizeParams.set('resource', this.resource);
             if (this.subscriberTenantHint) authorizeParams.set('subscriber_tenant_hint', this.subscriberTenantHint);
+            // IMPORTANT: Preserve prompt=consent to force consent screen for external apps
+            if (this.prompt) authorizeParams.set('prompt', this.prompt);
             authorizeParams.set('session_confirmed', 'true');
 
             // Full-page navigation — browser attaches the newly set sid cookie automatically

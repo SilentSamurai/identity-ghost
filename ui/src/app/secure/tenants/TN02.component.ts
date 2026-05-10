@@ -13,6 +13,7 @@ import {StaticSource} from "../../component/model/StaticSource";
 import {AppService} from '../../_services/app.service';
 import {CreateAppComponent} from '../apps/dialogs/create-app.component';
 import {UpdateAppComponent} from '../apps/dialogs/update-app.component';
+import {TestWebhookComponent} from '../apps/dialogs/test-webhook.component';
 import {CreateSubscriptionComponent} from "./dialogs/create-subscription.component";
 import {ModalService} from "../../component/dialogs/modal.service";
 import {SubscriptionService} from "../../_services/subscription.service";
@@ -278,6 +279,17 @@ import {CreateGroupComponent} from "../group/dialogs/create-group.component";
                                         aria-label="Edit app"
                                     >
                                         <i class="fa fa-solid fa-pencil"></i>
+                                    </button>
+                                    <button
+                                        *ngIf="app.onboardingEnabled"
+                                        (click)="onTestWebhook(app)"
+                                        [disabled]="!isTenantAdmin"
+                                        class="btn btn-sm btn-outline-info"
+                                        type="button"
+                                        title="Test onboarding webhook"
+                                        aria-label="Test webhook"
+                                    >
+                                        <i class="fa fa-solid fa-plug"></i>
                                     </button>
                                     <button
                                         (click)="onDeleteApp(app)"
@@ -729,6 +741,10 @@ export class TN02Component implements OnInit {
         if (deletedApp) {
             await this.loadData();
         }
+    }
+
+    async onTestWebhook(app: any) {
+        await this.modalService.open(TestWebhookComponent, {initData: {app}});
     }
 
     async onCreateSubscription() {

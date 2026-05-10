@@ -88,6 +88,7 @@ export class SessionConfirmationComponent implements OnInit {
     private nonce = '';
     private resource = '';
     private subscriberTenantHint = '';
+    private prompt = '';  // IMPORTANT: Must preserve prompt=consent to force consent screen
 
     constructor(
         private router: Router,
@@ -110,6 +111,7 @@ export class SessionConfirmationComponent implements OnInit {
         this.nonce = params.get('nonce') || '';
         this.resource = params.get('resource') || '';
         this.subscriberTenantHint = params.get('subscriber_tenant_hint') || '';
+        this.prompt = params.get('prompt') || '';  // Preserve prompt=consent
 
         // Fetch user email from session-info endpoint (cookie-authenticated)
         // PII never comes from query params
@@ -161,6 +163,8 @@ export class SessionConfirmationComponent implements OnInit {
         if (this.nonce) params.set('nonce', this.nonce);
         if (this.resource) params.set('resource', this.resource);
         if (this.subscriberTenantHint) params.set('subscriber_tenant_hint', this.subscriberTenantHint);
+        // IMPORTANT: Preserve prompt=consent to force consent screen for external apps
+        if (this.prompt) params.set('prompt', this.prompt);
         return params;
     }
 

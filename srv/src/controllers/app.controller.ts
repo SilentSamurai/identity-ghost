@@ -181,6 +181,15 @@ export class AppController {
         return app;
     }
 
+    @Post('/:appId/test-webhook')
+    @UseGuards(JwtAuthGuard)
+    async testWebhook(
+        @CurrentPermission() permission: Permission,
+        @Param('appId', ParseUUIDPipe) appId: string,
+    ) {
+        return this.appService.testWebhook(permission, appId);
+    }
+
     @Post('/:appId/onboard-customer')
     @UseGuards(JwtAuthGuard)
     async onboardCustomer(

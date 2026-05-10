@@ -102,11 +102,11 @@ describe('Per-App OAuth Client Identity — App_Client Lifecycle', () => {
 
     it('should create an app and display clientId and alias in the success view (super-admin context)', () => {
         cy.adminLogin(Cypress.env('superAdminEmail'), Cypress.env('superAdminPassword'));
-        cy.goToAdminPage('AP01A');
+        cy.goToAdminPage('AP01');
 
         cy.contains('button', 'Create App').click();
 
-        cy.get('app-create-app-admin select[id="tenantSelect"]').select('Shire (shire.local)');
+        cy.get('app-create-app-admin select[id="tenantSelect"]').select('Shire Tenant (shire.local)');
 
         const adminAppName = `AppClient-Admin-${uniqueSuffix}`;
         cy.get('app-create-app-admin input[id="name"]').type(adminAppName);

@@ -12,6 +12,7 @@ interface OAuthParams {
     codeChallengeMethod: string;
     nonce: string;
     resource: string;
+    prompt: string;  // IMPORTANT: Must preserve prompt=consent to force consent screen
 }
 
 interface LoginParams {
@@ -158,6 +159,8 @@ export class TenantSelectionComponent implements OnInit {
                 }
                 if (this.oauthParams.nonce) params.set('nonce', this.oauthParams.nonce);
                 if (this.oauthParams.resource) params.set('resource', this.oauthParams.resource);
+                // IMPORTANT: Preserve prompt=consent to force consent screen for external apps
+                if (this.oauthParams.prompt) params.set('prompt', this.oauthParams.prompt);
                 params.set('subscriber_tenant_hint', tenant.domain);
                 params.set('session_confirmed', 'true');
 

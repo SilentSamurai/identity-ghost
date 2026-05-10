@@ -207,6 +207,68 @@ describe('AppController', () => {
         });
     });
 
+    describe('onboarding configuration', () => {
+        beforeEach(async () => {
+            await fixture.webhook.clearOnboardRequests();
+            await fixture.webhook.clearOffboardRequests();
+        });
+
+        it('should skip onboard webhook when onboardingEnabled is false', async () => {
+            const subscriberAppClient = new AppClient(fixture, subscriberAccessToken);
+            const app = await appClient.createApp(
+                creatorTenantId,
+                `test-app-no-onboard-${uuid()}`,
+                `http://localhost:${fixture.webhook.boundPort}`,
+                'No onboard test',
+                false,
+            );
+            await appClient.publishApp(app.id);
+
+            const subscription = await subscriberAppClient.subscribeApp(app.id, subscriberTenantId);
+            expect(subscription.status).toEqual('success');
+
+            const onboardRequests = (await fixture.webhook.getOnboardRequestsForTenant(subscriberTenantId)).requests;
+            expect(onboardRequests.length).toEqual(0);
+        });
+
+        it('should skip offboard webhook when onboardingEnabled is false', async () => {
+            const subscriberAppClient = new AppClient(fixture, subscriberAccessToken);
+            const app = await appClient.createApp(
+                creatorTenantId,
+                `test-app-no-offboard-${uuid()}`,
+                `http://localhost:${fixture.webhook.boundPort}`,
+                'No offboard test',
+                false,
+            );
+            await appClient.publishApp(app.id);
+
+            await subscriberAppClient.subscribeApp(app.id, subscriberTenantId);
+            await subscriberAppClient.unsubscribeApp(app.id, subscriberTenantId);
+
+            const offboardRequests = (await fixture.webhook.getOffboardRequestsForTenant(subscriberTenantId)).requests;
+            expect(offboardRequests.length).toEqual(0);
+        });
+
+        it('should use onboardingCallbackUrl instead of appUrl when provided', async () => {
+            const subscriberAppClient = new AppClient(fixture, subscriberAccessToken);
+            const app = await appClient.createApp(
+                creatorTenantId,
+                `test-app-callback-url-${uuid()}`,
+                `http://localhost:1`,
+                'Callback URL test',
+                true,
+                `http://localhost:${fixture.webhook.boundPort}`,
+            );
+            await appClient.publishApp(app.id);
+
+            const subscription = await subscriberAppClient.subscribeApp(app.id, subscriberTenantId);
+            expect(subscription.status).toEqual('success');
+
+            const onboardRequests = (await fixture.webhook.getOnboardRequestsForTenant(subscriberTenantId)).requests;
+            expect(onboardRequests.length).toBeGreaterThan(0);
+        });
+    });
+
     it('should include the correct scope in the access token after subscribing', async () => {
         const subscriberAppClient = new AppClient(fixture, subscriberAccessToken);
         const app = await appClient.createApp(

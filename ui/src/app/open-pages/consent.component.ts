@@ -1,6 +1,8 @@
 import {Component, OnInit} from '@angular/core';
 import {ActivatedRoute, Router} from '@angular/router';
 import {AuthService} from '../_services/auth.service';
+import {HttpClient} from '@angular/common/http';
+import {lastValueFrom} from 'rxjs';
 
 @Component({
     selector: 'app-consent',
@@ -41,34 +43,18 @@ import {AuthService} from '../_services/auth.service';
                     </div>
                 </div>
 
-                <!-- Hidden form for PRG POST to /api/oauth/consent -->
-                <form #consentForm id="consent-form" method="POST" action="/api/oauth/consent">
-                    <input type="hidden" name="client_id" [value]="clientId">
-                    <input type="hidden" name="redirect_uri" [value]="redirectUri">
-                    <input type="hidden" name="response_type" [value]="responseType">
-                    <input type="hidden" name="scope" [value]="scope">
-                    <input type="hidden" name="state" [value]="state">
-                    <input type="hidden" name="code_challenge" [value]="codeChallenge">
-                    <input type="hidden" name="code_challenge_method" [value]="codeChallengeMethod">
-                    <input type="hidden" name="nonce" [value]="nonce">
-                    <input type="hidden" name="resource" [value]="resource">
-                    <input type="hidden" name="subscriber_tenant_hint" [value]="subscriberTenantHint">
-                    <input type="hidden" name="csrf_token" [value]="csrfToken">
-                    <input type="hidden" name="decision" [value]="decision" id="decision-input">
-
-                    <div class="d-grid gap-2">
-                        <button type="button"
-                                (click)="onGrant()"
-                                class="btn btn-primary btn-lg">
-                            Grant Access
-                        </button>
-                        <button type="button"
-                                (click)="onDeny()"
-                                class="btn btn-outline-secondary btn-lg">
-                            Deny
-                        </button>
-                    </div>
-                </form>
+                <div class="d-grid gap-2">
+                    <button type="button"
+                            (click)="onGrant()"
+                            class="btn btn-primary btn-lg">
+                        Approve
+                    </button>
+                    <button type="button"
+                            (click)="onDeny()"
+                            class="btn btn-outline-secondary btn-lg">
+                        Deny
+                    </button>
+                </div>
             </div>
         </app-centered-card>
     `,
@@ -132,7 +118,6 @@ export class ConsentComponent implements OnInit {
     email = '';
     clientId = '';
     requestedScopes: string[] = [];
-    decision = '';
 
     // OAuth params
     redirectUri = '';
@@ -150,6 +135,7 @@ export class ConsentComponent implements OnInit {
         private route: ActivatedRoute,
         private router: Router,
         private authService: AuthService,
+        private http: HttpClient,
     ) {
     }
 
@@ -204,17 +190,40 @@ export class ConsentComponent implements OnInit {
         this.submitDecision('deny');
     }
 
-    private submitDecision(decision: 'grant' | 'deny'): void {
-        this.decision = decision;
-        // Use a native form POST so the browser follows the 302 redirect chain automatically
-        // The CSRF token is in the POST body (not URL) — never leaks via Referer/history
-        const form = document.getElementById('consent-form') as HTMLFormElement;
-        const decisionInput = document.getElementById('decision-input') as HTMLInputElement;
-        if (decisionInput) {
-            decisionInput.value = decision;
-        }
-        if (form) {
-            form.submit();
+    private async submitDecision(decision: 'grant' | 'deny'): Promise<void> {
+        this.loading = true;
+
+        const body = {
+            decision,
+            client_id: this.clientId,
+            scope: this.scope,
+            csrf_token: this.csrfToken,
+        };
+
+        try {
+            // POST to /api/oauth/consent — records consent decision
+            await lastValueFrom(
+                this.http.post<{success: true}>('/api/oauth/consent', body, {
+                    withCredentials: true,
+                }),
+            );
+
+            // On success, redirect to authorize — it will check consent and handle accordingly
+            const params = new URLSearchParams();
+            params.set('client_id', this.clientId);
+            params.set('redirect_uri', this.redirectUri);
+            params.set('response_type', this.responseType || 'code');
+            if (this.scope) params.set('scope', this.scope);
+            if (this.state) params.set('state', this.state);
+            if (this.codeChallenge) params.set('code_challenge', this.codeChallenge);
+            if (this.codeChallengeMethod) params.set('code_challenge_method', this.codeChallengeMethod);
+            if (this.nonce) params.set('nonce', this.nonce);
+            if (this.resource) params.set('resource', this.resource);
+            if (this.subscriberTenantHint) params.set('subscriber_tenant_hint', this.subscriberTenantHint);
+            window.location.href = `/api/oauth/authorize?${params.toString()}`;
+        } catch (err: any) {
+            console.error('Consent submission failed:', err);
+            this.loading = false;
         }
     }
 

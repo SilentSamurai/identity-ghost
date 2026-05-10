@@ -422,6 +422,12 @@ export class StartUpService implements OnModuleInit {
                             isPublic: true
                         },
                         {
+                            name: "Consent E2E Test",
+                            redirectUris: ["https://consent-e2e.example.com/callback", "http://localhost:3000/consent-app.html"],
+                            allowedScopes: "openid profile email",
+                            isPublic: true
+                        },
+                        {
                             name: "Shire PKCE Required",
                             redirectUris: ["https://pkce-required-e2e.example.com/callback"],
                             allowedScopes: "openid profile email",
@@ -558,7 +564,20 @@ export class StartUpService implements OnModuleInit {
                         );
                         this.logger.log(`Created client: ${client.name} in ${entry.domain}`);
                     } catch (e) {
-                        this.logger.warn(`Client ${client.name} in ${entry.domain} may already exist`);
+                        // Client already exists — merge any new redirect URIs idempotently
+                        try {
+                            const tenantClients = await this.clientService.findByTenantId(tenant.id);
+                            const existing = tenantClients.find(c => c.name === client.name);
+                            if (existing && client.redirectUris?.length) {
+                                const merged = Array.from(new Set([...(existing.redirectUris || []), ...client.redirectUris]));
+                                if (merged.length !== (existing.redirectUris || []).length) {
+                                    await this.clientService.updateClient(permission, existing.clientId, {redirectUris: merged});
+                                    this.logger.log(`Updated redirect URIs for client: ${client.name} in ${entry.domain}`);
+                                }
+                            }
+                        } catch {
+                            this.logger.warn(`Client ${client.name} in ${entry.domain} may already exist`);
+                        }
                     }
                 }
             }

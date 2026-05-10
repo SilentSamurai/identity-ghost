@@ -11,9 +11,11 @@
  * OAuthExceptionFilter for proper OAuth error formatting.
  */
 import {
+    BadRequestException,
     Body,
     ClassSerializerInterceptor,
     Controller,
+    ForbiddenException,
     Get,
     Header,
     HttpCode,
@@ -120,7 +122,11 @@ export class OAuthTokenController {
 
             // 5. Session valid — resolve client and consent
             const client = await this.clientService.findByClientIdOrAlias(query.client_id!);
-            const isFirstParty = await this.firstPartyResolver.isFirstParty(client);
+
+            // First-party = redirect_uri points to auth server itself (user stays on auth server)
+            // Third-party = redirect_uri points to external app (user authorizing external app)
+            // See FirstPartyResolver for detailed explanation
+            const isFirstParty = this.firstPartyResolver.isFirstParty(client, validated.redirectUri);
 
             // Task 15.3: Log when authorize resolves to an App_Client
             const linkedApp = await this.appService.findByClientId(client.id);
@@ -356,7 +362,6 @@ export class OAuthTokenController {
 
     @Post("/login")
     async login(
-        @Req() req: ExpressRequest,
         @Res({passthrough: true}) res: Response,
         @Body(new ValidationPipe(ValidationSchema.LoginSchema))
         body: {
@@ -377,10 +382,12 @@ export class OAuthTokenController {
         }
 
         // Check if this is a first-party app (stored identity lookup)
-        const isFirstParty = await this.firstPartyResolver.isFirstParty(client);
+        // Note: For tenant resolution, we only check if it's the default client.
+        // Consent decisions are made in /authorize using isFirstParty() with redirect_uri.
+        const isDefaultClient = this.firstPartyResolver.isDefaultClient(client);
 
         // For third-party apps without a hint, check for ambiguous tenants
-        if (!isFirstParty && !body.subscriber_tenant_hint) {
+        if (!isDefaultClient && !body.subscriber_tenant_hint) {
             const subscriberTenants = await this.tenantAmbiguityService.findSubscriberTenants(
                 user.id,
                 client.clientId,
@@ -430,33 +437,22 @@ export class OAuthTokenController {
     @Post("/consent")
     async consent(
         @Req() req: ExpressRequest,
-        @Res() res: Response,
         @Body()
         body: {
             client_id: string;
-            redirect_uri: string;
             scope?: string;
-            state?: string;
-            response_type?: string;
-            code_challenge?: string;
-            code_challenge_method?: string;
-            nonce?: string;
-            resource?: string;
-            subscriber_tenant_hint?: string;
             csrf_token: string;
             decision: 'grant' | 'deny';
         },
-    ): Promise<void> {
+    ): Promise<{success: true}> {
         // 1. Validate session from signed cookie first
         const sid = (req as any).signedCookies?.sid;
         if (!sid) {
-            res.status(401).send('No session');
-            return;
+            throw new UnauthorizedException('No session');
         }
         const session = await this.loginSessionService.findSessionBySid(sid);
         if (!session) {
-            res.status(401).send('Session expired');
-            return;
+            throw new UnauthorizedException('Session expired');
         }
 
         // 2. Validate CSRF token using constant-time comparison
@@ -478,55 +474,28 @@ export class OAuthTokenController {
         }
 
         if (!csrfValid) {
-            res.status(403).send('Invalid CSRF token');
-            return;
+            throw new ForbiddenException('Invalid CSRF token');
         }
 
-        // 3. Validate redirect_uri against client's registered URIs
+        // 3. Validate client exists
         let client: Client;
         try {
             client = await this.clientService.findByClientIdOrAlias(body.client_id);
         } catch {
-            res.status(400).send('Unknown client_id');
-            return;
+            throw new BadRequestException('Unknown client_id');
         }
 
-        const registeredUris: string[] = client.redirectUris || [];
-        if (registeredUris.length > 0 && !registeredUris.includes(body.redirect_uri)) {
-            res.status(400).send('Invalid redirect_uri');
-            return;
+        // 4. Record consent decision (grant or deny)
+        // For deny, we don't record anything - frontend will redirect with error
+        if (body.decision === 'grant') {
+            const resolvedScopes = this.scopeResolverService.resolveScopes(
+                body.scope || '', client.allowedScopes || 'openid profile email',
+            );
+            await this.consentService.grantConsent(session.userId, client.clientId, resolvedScopes);
         }
 
-        // Handle denial — redirect to client with error
-        if (body.decision === 'deny') {
-            const params = new URLSearchParams();
-            params.set('error', 'access_denied');
-            params.set('error_description', 'User denied consent');
-            if (body.state) params.set('state', body.state);
-            res.redirect(302, `${body.redirect_uri}?${params.toString()}`);
-            return;
-        }
-
-        // Handle grant — record consent and PRG redirect to authorize
-        const resolvedScopes = this.scopeResolverService.resolveScopes(
-            body.scope || '', client.allowedScopes || 'openid profile email',
-        );
-        await this.consentService.grantConsent(session.userId, client.clientId, resolvedScopes);
-
-        // PRG: redirect to authorize — it will see session + consent and issue code
-        const params = new URLSearchParams();
-        params.set('client_id', body.client_id);
-        params.set('redirect_uri', body.redirect_uri);
-        params.set('response_type', body.response_type || 'code');
-        if (body.scope) params.set('scope', body.scope);
-        if (body.state) params.set('state', body.state);
-        if (body.code_challenge) params.set('code_challenge', body.code_challenge);
-        if (body.code_challenge_method) params.set('code_challenge_method', body.code_challenge_method);
-        if (body.nonce) params.set('nonce', body.nonce);
-        if (body.resource) params.set('resource', body.resource);
-        if (body.subscriber_tenant_hint) params.set('subscriber_tenant_hint', body.subscriber_tenant_hint);
-        params.set('session_confirmed', 'true');
-        res.redirect(302, `/api/oauth/authorize?${params.toString()}`);
+        // Return success — frontend handles the redirect to authorize or client
+        return {success: true};
     }
 
     /**

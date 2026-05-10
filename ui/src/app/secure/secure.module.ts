@@ -30,6 +30,7 @@ import {SecretDisplayComponent} from './clients/dialogs/secret-display.component
 import {UpdateTenantComponent} from './tenants/dialogs/update-tenant.component';
 import {CreateAppComponent} from './apps/dialogs/create-app.component';
 import {UpdateAppComponent} from './apps/dialogs/update-app.component';
+import {TestWebhookComponent} from './apps/dialogs/test-webhook.component';
 import {CreatePolicyModalComponent} from './roles/create-policy-modal.component';
 import {UpdateRoleModalComponent} from './roles/update-role-modal.component';
 import {GP02Component} from './group/GP02.component';
@@ -54,6 +55,7 @@ import {UpdateGroupComponent} from './group/dialogs/update-group.component';
         UpdateTenantComponent,
         CreateAppComponent,
         UpdateAppComponent,
+        TestWebhookComponent,
         CreatePolicyModalComponent,
         UpdateRoleModalComponent,
         GP02Component,

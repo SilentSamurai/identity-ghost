@@ -12,6 +12,7 @@ import {StaticSource} from '../../component/model/StaticSource';
 import {AppService} from '../../_services/app.service';
 import {CreateAppComponent} from '../apps/dialogs/create-app.component';
 import {ModalService} from '../../component/dialogs/modal.service';
+import {TestWebhookAdminComponent} from '../apps/dialogs/test-webhook.component';
 import {ClientService} from '../../_services/client.service';
 import {CreateClientAdminComponent} from '../clients/dialogs/create-client-admin.component';
 import {SecretDisplayAdminComponent} from '../clients/dialogs/secret-display-admin.component';
@@ -187,6 +188,16 @@ import {CreateGroupComponent} from '../group/dialogs/create-group.component';
                                         aria-label="Delete app"
                                     >
                                         <i class="fa fa-solid fa-trash"></i>
+                                    </button>
+                                    <button
+                                        *ngIf="app.onboardingEnabled"
+                                        (click)="onTestWebhook(app)"
+                                        class="btn btn-sm btn-outline-info ms-1"
+                                        type="button"
+                                        title="Test onboarding webhook"
+                                        aria-label="Test webhook"
+                                    >
+                                        <i class="fa fa-solid fa-plug"></i>
                                     </button>
                                 </td>
                             </ng-template>
@@ -616,6 +627,10 @@ export class TN02AComponent implements OnInit {
         if (deleted) {
             await this.loadData();
         }
+    }
+
+    async onTestWebhook(app: any) {
+        await this.modalService.open(TestWebhookAdminComponent, {initData: {app}});
     }
 
     onViewApp(subscription: any) {

@@ -22,9 +22,11 @@ const Tiles = {
 };
 
 function loginViaUi(username: string, password: string) {
-    // Provide client_id to skip step 1 in login form
+    // Visiting /login?client_id= triggers an immediate redirect to /authorize
+    // (LoginComponent detects the client_id param and navigates to the OAuth
+    // authorization endpoint, which in turn redirects to /authorize for credential entry).
     cy.visit(`/login?client_id=${CLIENT_ID}`);
-    cy.url().should('include', '/login');
+    cy.url({timeout: 10000}).should('include', '/authorize');
 
     cy.get('input#username').clear().type(username);
     cy.get('input#password').clear().type(password);

@@ -81,4 +81,14 @@ export class AppService {
             this.http.patch(`${API_URL}/apps/${appId}/publish`, {}, this.getHttpOptions())
         );
     }
+
+    async testWebhook(appId: string) {
+        return lastValueFrom(
+            this.http.post(`${API_URL}/apps/${appId}/test-webhook`, {}, this.getHttpOptions())
+        ) as Promise<{
+            onboardingEnabled: boolean;
+            onboard: { url: string; status: number | null; latencyMs: number; ok: boolean; error?: string; bodyValid: boolean; body?: any } | null;
+            offboard: { url: string; status: number | null; latencyMs: number; ok: boolean; error?: string; bodyValid: boolean; body?: any } | null;
+        }>;
+    }
 }
