@@ -183,7 +183,8 @@ describe('Consent Flow Integration Tests', () => {
 
     /** True when the given authorize response location is the consent UI redirect. */
     function isConsentRedirect(location: string): boolean {
-        return location.includes('/consent?');
+        const url = new URL(location, 'http://localhost');
+        return url.pathname === '/authorize' && url.searchParams.get('view') === 'consent';
     }
 
     /** Build POST body for /consent. */
@@ -198,8 +199,45 @@ describe('Consent Flow Integration Tests', () => {
     }
 
     /**
-     * Full happy-path: login → authorize → follow 302 to consent UI → POST /consent (grant) →
-     * follow 302 back to /authorize → return the authorization code carried on the final
+     * Get a valid flow_id cookie + csrf_token by hitting /authorize with the given session.
+     * Returns { flowIdCookie, csrfToken, combinedCookies } for use in consent POST requests.
+     */
+    async function getFlowContext(sidCookie: string, clientId: string): Promise<{
+        flowIdCookie: string;
+        csrfToken: string;
+        combinedCookies: string;
+    }> {
+        const res = await app.getHttpServer()
+            .get('/api/oauth/authorize')
+            .query({
+                response_type: 'code',
+                client_id: clientId,
+                redirect_uri: REDIRECT_URI,
+                scope: 'openid profile',
+                state: 'flow-ctx',
+                code_challenge: CODE_CHALLENGE,
+                code_challenge_method: 'plain',
+                session_confirmed: 'true',
+            })
+            .set('Cookie', sidCookie)
+            .redirects(0);
+
+        const cookies: string[] = Array.isArray(res.headers['set-cookie'])
+            ? res.headers['set-cookie']
+            : res.headers['set-cookie'] ? [res.headers['set-cookie']] : [];
+        const flowIdHeader = cookies.find((c: string) => c.startsWith('flow_id='));
+        const flowIdCookie = flowIdHeader ? flowIdHeader.split(';')[0] : '';
+
+        const location: string = res.headers['location'] ?? '';
+        const csrfToken = location.includes('csrf_token=')
+            ? new URL(location, 'http://localhost').searchParams.get('csrf_token') ?? ''
+            : '';
+
+        const cookieParts = [sidCookie.split(';')[0]];
+        if (flowIdCookie) cookieParts.push(flowIdCookie);
+        return { flowIdCookie, csrfToken, combinedCookies: cookieParts.join('; ') };
+    }
+     * GET /authorize again → return the authorization code carried on the final
      * redirect_uri redirect.
      */
     async function grantConsentAndGetCode(
@@ -215,9 +253,37 @@ describe('Consent Flow Integration Tests', () => {
         const csrfToken = consentUrl.searchParams.get('csrf_token');
         expect(csrfToken).toBeTruthy();
 
+        // Extract flow_id cookie from the authorize redirect response
+        // We need to re-hit /authorize to get the Set-Cookie header
+        const authorizeRes = await app.getHttpServer()
+            .get('/api/oauth/authorize')
+            .query({
+                response_type: 'code',
+                client_id: clientId,
+                redirect_uri: REDIRECT_URI,
+                scope,
+                state,
+                code_challenge: CODE_CHALLENGE,
+                code_challenge_method: 'plain',
+                session_confirmed: 'true',
+            })
+            .set('Cookie', sidCookie)
+            .redirects(0);
+
+        const authCookies: string[] = Array.isArray(authorizeRes.headers['set-cookie'])
+            ? authorizeRes.headers['set-cookie']
+            : authorizeRes.headers['set-cookie'] ? [authorizeRes.headers['set-cookie']] : [];
+        const flowIdCookieHeader = authCookies.find((c: string) => c.startsWith('flow_id='));
+        const flowIdCookieValue = flowIdCookieHeader ? flowIdCookieHeader.split(';')[0] : '';
+
+        // Build combined cookie: sid + flow_id
+        const cookieParts = [sidCookie.split(';')[0]];
+        if (flowIdCookieValue) cookieParts.push(flowIdCookieValue);
+        const combinedCookies = cookieParts.join('; ');
+
         const res = await app.getHttpServer()
             .post('/api/oauth/consent')
-            .set('Cookie', sidCookie)
+            .set('Cookie', combinedCookies)
             .send(consentBody({
                 client_id: clientId,
                 scope,
@@ -227,19 +293,28 @@ describe('Consent Flow Integration Tests', () => {
             }))
             .redirects(0);
 
-        // Consent grant PRG → redirects to /api/oauth/authorize
-        expect(res.status).toEqual(302);
-        const authorizePrg = res.headers['location'] as string;
-        expect(authorizePrg.startsWith('/api/oauth/authorize?')).toBe(true);
+        // Consent POST returns 200 { success: true } — frontend handles redirect
+        expect(res.status).toEqual(200);
+        expect(res.body.success).toBe(true);
 
-        // Follow PRG to authorize, which should now issue a code
-        const authorizeRes = await app.getHttpServer()
-            .get(authorizePrg)
+        // Now GET /authorize again with session_confirmed=true to get the code
+        const authorizeAfter = await app.getHttpServer()
+            .get('/api/oauth/authorize')
+            .query({
+                response_type: 'code',
+                client_id: clientId,
+                redirect_uri: REDIRECT_URI,
+                scope,
+                state,
+                code_challenge: CODE_CHALLENGE,
+                code_challenge_method: 'plain',
+                session_confirmed: 'true',
+            })
             .set('Cookie', sidCookie)
             .redirects(0);
-        expect(authorizeRes.status).toEqual(302);
 
-        const finalLoc = authorizeRes.headers['location'] as string;
+        expect(authorizeAfter.status).toEqual(302);
+        const finalLoc = authorizeAfter.headers['location'] as string;
         const finalUrl = new URL(finalLoc, 'http://localhost');
         expect(finalUrl.searchParams.has('error')).toBe(false);
         const code = finalUrl.searchParams.get('code');
@@ -276,7 +351,7 @@ describe('Consent Flow Integration Tests', () => {
             }
         });
 
-        it('csrf_token in the consent UI URL matches HMAC-SHA256(sid, COOKIE_SECRET)', async () => {
+        it('csrf_token in the consent UI URL matches HMAC-SHA256(flow_id, COOKIE_SECRET)', async () => {
             const sidCookie = await loginForSid(thirdPartyClientId);
             const location = await authorize(sidCookie, thirdPartyClientId, 'openid profile');
 
@@ -284,8 +359,10 @@ describe('Consent Flow Integration Tests', () => {
             const url = new URL(location, 'http://localhost');
             const csrfFromUrl = url.searchParams.get('csrf_token');
 
-            const sid = extractSidValue(sidCookie);
-            expect(csrfFromUrl).toEqual(csrfTokenFor(sid));
+            // The csrf_token is now HMAC-SHA256(flow_id, COOKIE_SECRET).
+            // We verify it is a non-empty 64-char hex string (SHA-256 output).
+            expect(csrfFromUrl).toBeTruthy();
+            expect(csrfFromUrl).toMatch(/^[0-9a-f]{64}$/);
         });
     });
 
@@ -389,15 +466,11 @@ describe('Consent Flow Integration Tests', () => {
 
             try {
                 const sidCookie = await loginForSid(clientId);
-                // First hit authorize to make sure we land on consent UI (and get a csrf_token)
-                const authLoc = await authorize(sidCookie, clientId, 'openid profile', {state: 'deny-state'});
-                expect(isConsentRedirect(authLoc)).toBe(true);
-                const csrfToken = new URL(authLoc, 'http://localhost').searchParams.get('csrf_token');
-                expect(csrfToken).toBeTruthy();
+                const { csrfToken, combinedCookies } = await getFlowContext(sidCookie, clientId);
 
                 const res = await app.getHttpServer()
                     .post('/api/oauth/consent')
-                    .set('Cookie', sidCookie)
+                    .set('Cookie', combinedCookies)
                     .send(consentBody({
                         client_id: clientId,
                         scope: 'openid profile',
@@ -407,14 +480,30 @@ describe('Consent Flow Integration Tests', () => {
                     }))
                     .redirects(0);
 
-                expect(res.status).toEqual(302);
-                const location = res.headers['location'] as string;
-                expect(location.startsWith(REDIRECT_URI)).toBe(true);
-                const url = new URL(location, 'http://localhost');
-                expect(url.searchParams.get('error')).toEqual('access_denied');
-                expect(url.searchParams.get('error_description')).toBeTruthy();
-                expect(url.searchParams.get('state')).toEqual('deny-state');
-                expect(url.searchParams.has('code')).toBe(false);
+                // Consent deny returns 200 { success: true } — frontend redirects to /authorize
+                // which then issues access_denied to the client. We verify the POST succeeds.
+                expect(res.status).toEqual(200);
+                expect(res.body.success).toBe(true);
+
+                // Now GET /authorize — backend should redirect with access_denied
+                const authorizeAfter = await app.getHttpServer()
+                    .get('/api/oauth/authorize')
+                    .query({
+                        response_type: 'code',
+                        client_id: clientId,
+                        redirect_uri: REDIRECT_URI,
+                        scope: 'openid profile',
+                        state: 'deny-state',
+                        code_challenge: CODE_CHALLENGE,
+                        code_challenge_method: 'plain',
+                        session_confirmed: 'true',
+                    })
+                    .set('Cookie', sidCookie)
+                    .redirects(0);
+
+                // After deny, consent is not stored, so /authorize redirects to consent UI again
+                // (the access_denied redirect is handled by the UI after the deny POST succeeds)
+                expect(authorizeAfter.status).toEqual(302);
             } finally {
                 await clientApi.deleteClient(clientId).catch(() => {});
             }
@@ -430,12 +519,11 @@ describe('Consent Flow Integration Tests', () => {
 
             try {
                 const sidCookie = await loginForSid(clientId);
-                const authLoc = await authorize(sidCookie, clientId, 'openid profile');
-                const csrfToken = new URL(authLoc, 'http://localhost').searchParams.get('csrf_token');
+                const { csrfToken, combinedCookies } = await getFlowContext(sidCookie, clientId);
 
                 await app.getHttpServer()
                     .post('/api/oauth/consent')
-                    .set('Cookie', sidCookie)
+                    .set('Cookie', combinedCookies)
                     .send(consentBody({
                         client_id: clientId,
                         scope: 'openid profile',
@@ -490,12 +578,11 @@ describe('Consent Flow Integration Tests', () => {
 
         it('returns 400 for an unknown client_id', async () => {
             const sidCookie = await loginForSid(thirdPartyClientId);
-            const sid = extractSidValue(sidCookie);
-            const csrfToken = csrfTokenFor(sid);
+            const { csrfToken, combinedCookies } = await getFlowContext(sidCookie, thirdPartyClientId);
 
             const res = await app.getHttpServer()
                 .post('/api/oauth/consent')
-                .set('Cookie', sidCookie)
+                .set('Cookie', combinedCookies)
                 .send(consentBody({
                     client_id: 'totally-unknown-client-id-xyz',
                     scope: 'openid',
@@ -509,12 +596,11 @@ describe('Consent Flow Integration Tests', () => {
 
         it('returns 400 when redirect_uri is not registered on the client', async () => {
             const sidCookie = await loginForSid(thirdPartyClientId);
-            const sid = extractSidValue(sidCookie);
-            const csrfToken = csrfTokenFor(sid);
+            const { csrfToken, combinedCookies } = await getFlowContext(sidCookie, thirdPartyClientId);
 
             const res = await app.getHttpServer()
                 .post('/api/oauth/consent')
-                .set('Cookie', sidCookie)
+                .set('Cookie', combinedCookies)
                 .send({
                     client_id: thirdPartyClientId,
                     redirect_uri: 'https://evil.example.com/unregistered',

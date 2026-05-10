@@ -114,19 +114,19 @@ describe('Session Auth Flow', () => {
     function isLoginRedirect(location: string | undefined): boolean {
         if (!location) return false;
         const url = new URL(location, 'http://localhost');
-        return url.pathname === '/authorize';
+        return url.pathname === '/authorize' && url.searchParams.get('view') === 'login';
     }
 
     function isConsentRedirect(location: string | undefined): boolean {
         if (!location) return false;
         const url = new URL(location, 'http://localhost');
-        return url.pathname === '/consent';
+        return url.pathname === '/authorize' && url.searchParams.get('view') === 'consent';
     }
 
     function isSessionConfirmRedirect(location: string | undefined): boolean {
         if (!location) return false;
         const url = new URL(location, 'http://localhost');
-        return url.pathname === '/session-confirm';
+        return url.pathname === '/authorize' && url.searchParams.get('view') === 'session-confirm';
     }
 
     function isCodeRedirect(location: string | undefined): boolean {
@@ -144,14 +144,46 @@ describe('Session Auth Flow', () => {
 
     describe('17.2 — Login cookie attributes', () => {
         it('sets signed sid cookie with correct attributes', async () => {
-            const res = await app.getHttpServer()
+            // Get flow_id cookie and csrf_token from /authorize first
+            const preAuth = await app.getHttpServer()
+                .get('/api/oauth/authorize')
+                .query({
+                    response_type: 'code',
+                    client_id: 'auth.server.com',
+                    redirect_uri: 'https://session-auth-test.local/callback',
+                    scope: 'openid profile email',
+                    state: 'test-state',
+                    code_challenge: CODE_CHALLENGE,
+                    code_challenge_method: 'plain',
+                })
+                .redirects(0);
+
+            const preAuthCookies: string[] = Array.isArray(preAuth.headers['set-cookie'])
+                ? preAuth.headers['set-cookie']
+                : preAuth.headers['set-cookie'] ? [preAuth.headers['set-cookie']] : [];
+            const flowIdHeader = preAuthCookies.find((c: string) => c.startsWith('flow_id='));
+            const flowIdCookieValue = flowIdHeader ? flowIdHeader.split(';')[0] : '';
+
+            const preAuthLocation: string = preAuth.headers['location'] ?? '';
+            const csrfToken = preAuthLocation.includes('csrf_token=')
+                ? new URL(preAuthLocation, 'http://localhost').searchParams.get('csrf_token') ?? ''
+                : '';
+
+            const loginReq = app.getHttpServer()
                 .post('/api/oauth/login')
                 .send({
                     email: ADMIN_EMAIL,
                     password: ADMIN_PASSWORD,
                     client_id: 'auth.server.com',
+                    csrf_token: csrfToken,
                 })
                 .set('Accept', 'application/json');
+
+            if (flowIdCookieValue) {
+                loginReq.set('Cookie', flowIdCookieValue);
+            }
+
+            const res = await loginReq;
 
             expect(res.status).toEqual(201);
 

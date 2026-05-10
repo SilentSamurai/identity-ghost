@@ -20,7 +20,6 @@ import {BrowserAnimationsModule} from '@angular/platform-browser/animations';
 import {ToastModule} from 'primeng/toast';
 import {ConfirmationService, MessageService} from 'primeng/api';
 import {RouterModule} from '@angular/router';
-import {SessionConfirmationComponent} from './open-pages/session-confirmation.component';
 import {SecureModule} from './secure/secure.module';
 import {CardModule} from 'primeng/card';
 import {ComponentModule} from './component/component.module';
@@ -28,15 +27,19 @@ import {ConfirmDialogModule} from 'primeng/confirmdialog';
 import {HttpErrorComponent} from './error-pages/HttpError.component';
 import {AbilityModule} from '@casl/angular';
 import {Ability, createMongoAbility, PureAbility,} from '@casl/ability';
-import {AuthorizeLoginComponent} from "./open-pages/authorize-login.component";
 import {OAuthCallbackComponent} from "./open-pages/oauth-callback.component";
 import {NgOptimizedImage} from "@angular/common";
-import {TenantSelectionComponent} from './open-pages/tenant-selection.component';
 import {WelcomeComponent} from './open-pages/welcome.component';
 import {SignUpComponent} from './open-pages/signup.component';
 import {OpenNavbarComponent} from './open-pages/open-navbar.component';
-import {ConsentComponent} from './open-pages/consent.component';
 import {LogoutComponent} from './open-pages/logout.component';
+import {AuthorizeComponent} from './open-pages/authorize.component';
+import {LoginViewComponent} from './open-pages/authorize/views/login-view.component';
+import {ConsentViewComponent} from './open-pages/authorize/views/consent-view.component';
+import {SessionConfirmViewComponent} from './open-pages/authorize/views/session-confirm-view.component';
+import {TenantSelectionViewComponent} from './open-pages/authorize/views/tenant-selection-view.component';
+import {ErrorViewComponent} from './open-pages/authorize/views/error-view.component';
+import {LoadingViewComponent} from './open-pages/authorize/views/loading-view.component';
 
 @NgModule({
     schemas: [CUSTOM_ELEMENTS_SCHEMA],
@@ -45,19 +48,22 @@ import {LogoutComponent} from './open-pages/logout.component';
         LoginComponent,
         RegisterComponent,
         ProfileComponent,
-        SessionConfirmationComponent,
         HttpErrorComponent,
-        AuthorizeLoginComponent,
         OAuthCallbackComponent,
-        TenantSelectionComponent,
         ForgotPasswordComponent,
         ResetPasswordComponent,
         CenteredCardComponent,
         WelcomeComponent,
         SignUpComponent,
         OpenNavbarComponent,
-        ConsentComponent,
         LogoutComponent,
+        AuthorizeComponent,
+        LoginViewComponent,
+        ConsentViewComponent,
+        SessionConfirmViewComponent,
+        TenantSelectionViewComponent,
+        ErrorViewComponent,
+        LoadingViewComponent,
     ],
     imports: [
         BrowserModule,

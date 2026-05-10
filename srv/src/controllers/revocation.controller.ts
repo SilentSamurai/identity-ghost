@@ -6,6 +6,8 @@ import {CurrentTenantId} from '../auth/auth.decorator';
 import {OAuthException} from '../exceptions/oauth-exception';
 import {Environment} from '../config/environment.service';
 import {AuthService} from '../auth/auth.service';
+import {CsrfTokenService} from '../auth/csrf-token.service';
+import {FlowIdCookieService} from '../auth/flow-id-cookie.service';
 import {ExtractJwt} from 'passport-jwt';
 
 /**
@@ -16,6 +18,7 @@ export class RevocationController {
     constructor(
         private readonly revocationService: TokenRevocationService,
         private readonly authService: AuthService,
+        private readonly csrfTokenService: CsrfTokenService,
     ) {
     }
 
@@ -58,6 +61,18 @@ export class RevocationController {
      *   - Invalid/missing JWT + sid present (body or cookie) → sid-only logout → 200
      *   - Neither JWT nor sid → 400 (bad request — nothing to identify the session)
      *
+     * CSRF enforcement (Req 7.4, 12.1–12.4):
+     *   - UI-initiated logouts are detected by the presence of the signed `flow_id`
+     *     cookie. In that case the body MUST contain a valid `csrf_token` and the
+     *     `sid` is resolved exclusively from the signed `sid` cookie — any `sid`
+     *     value in the body is ignored.
+     *   - Programmatic Bearer-authenticated callers do not carry a `flow_id`
+     *     cookie; their existing behavior is preserved (no `csrf_token` required,
+     *     `sid` may still be supplied in the body).
+     *
+     * Logout remains idempotent (Req 12.7): a second POST after a successful
+     * logout is a no-op and still returns 200.
+     *
      * Does not return 401 — logout is idempotent and we don't gate it on session validity.
      * The sid cookie is always cleared in the response on 200.
      */
@@ -68,10 +83,25 @@ export class RevocationController {
     async logout(
         @Req() req: Request,
         @Res({passthrough: true}) res: Response,
-        @Body() body: { refresh_token?: string; sid?: string },
+        @Body() body: { refresh_token?: string; sid?: string; csrf_token?: string },
     ): Promise<Record<string, never>> {
-        // Accept sid from body (programmatic callers) or signed cookie (browser flows)
-        const sid = body.sid ?? (req as any).signedCookies?.sid;
+        // Detect UI-initiated logouts by the presence of the signed `flow_id` cookie.
+        const flowIdCookie = (req as any).signedCookies?.[FlowIdCookieService.COOKIE_NAME];
+        const isUiInitiated = typeof flowIdCookie === 'string' && flowIdCookie.length > 0;
+
+        if (isUiInitiated) {
+            // UI callers MUST provide a valid csrf_token bound to the `flow_id` cookie.
+            // Throws ForbiddenException (403) on missing/invalid token, before any
+            // session invalidation side-effect.
+            this.csrfTokenService.verifyOrThrow(flowIdCookie, body.csrf_token);
+        }
+
+        // For UI callers, the `sid` MUST come from the signed cookie only — the body
+        // is never consulted (Req 7.4). For programmatic callers (no `flow_id` cookie),
+        // preserve the existing behavior of accepting `sid` from the body as a fallback.
+        const sid = isUiInitiated
+            ? (req as any).signedCookies?.sid
+            : body.sid ?? (req as any).signedCookies?.sid;
 
         // Try to resolve tenant from Bearer token
         let tenantId: string | null = null;

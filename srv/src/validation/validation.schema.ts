@@ -180,6 +180,10 @@ const LoginSchema = yup.object().shape({
         .matches(PASSWORD_REGEXP, PASSWORD_MESSAGE)
         .max(128),
     client_id: yup.string().required("client_id is required"),
+    // CSRF token bound to the signed `flow_id` cookie. Verified by
+    // `CsrfTokenService.verifyOrThrow` in `OAuthTokenController.login`
+    // before any credential validation (Req 8.3, 12.1–12.4).
+    csrf_token: yup.string().required("csrf_token is required"),
     subscriber_tenant_hint: yup.string().optional().max(256),
 });
 

@@ -15,7 +15,6 @@ import {
     Body,
     ClassSerializerInterceptor,
     Controller,
-    ForbiddenException,
     Get,
     Header,
     HttpCode,
@@ -29,7 +28,6 @@ import {
     UseInterceptors,
 } from "@nestjs/common";
 import {Request as ExpressRequest, Response} from "express";
-import * as crypto from "crypto";
 
 import {User} from "../entity/user.entity";
 import {AuthService} from "../auth/auth.service";
@@ -57,6 +55,8 @@ import {TenantAmbiguityService, TenantInfo} from "../auth/tenant-ambiguity.servi
 import {FirstPartyResolver} from "../auth/first-party-resolver";
 import {AppClientAuditLogger} from "../log/app-client-audit.logger";
 import {AppService} from "../services/app.service";
+import {FlowIdCookieService} from "../auth/flow-id-cookie.service";
+import {CsrfTokenService} from "../auth/csrf-token.service";
 
 const logger = new Logger("OAuthTokenController");
 
@@ -79,6 +79,8 @@ export class OAuthTokenController {
         private readonly firstPartyResolver: FirstPartyResolver,
         private readonly appClientAuditLogger: AppClientAuditLogger,
         private readonly appService: AppService,
+        private readonly flowIdCookieService: FlowIdCookieService,
+        private readonly csrfTokenService: CsrfTokenService,
     ) {
     }
 
@@ -93,7 +95,8 @@ export class OAuthTokenController {
 
             // 1. Forced login: from_logout or prompt=login
             if (query.from_logout === 'true' || validated.prompt === 'login') {
-                return this.redirectToLoginUI(res, query, validated);
+                const flowId = this.flowIdCookieService.mintIfAbsent(req, res);
+                return this.redirectToAuthorizeUI(res, query, validated, 'login', flowId);
             }
 
             // 2. Unsupported prompt values
@@ -117,7 +120,8 @@ export class OAuthTokenController {
                         res, validated.redirectUri, 'login_required', 'No valid session', validated.state,
                     );
                 }
-                return this.redirectToLoginUI(res, query, validated);
+                const flowId = this.flowIdCookieService.mintIfAbsent(req, res);
+                return this.redirectToAuthorizeUI(res, query, validated, 'login', flowId);
             }
 
             // 5. Session valid — resolve client and consent
@@ -158,33 +162,46 @@ export class OAuthTokenController {
             // prompt=consent — force re-approval (session-confirm first if configured)
             if (validated.prompt === 'consent') {
                 if (!skipConfirm && !confirmed) {
-                    return this.redirectToSessionConfirmUI(res, query, validated);
+                    const flowId = this.flowIdCookieService.mintIfAbsent(req, res);
+                    return this.redirectToAuthorizeUI(res, query, validated, 'session-confirm', flowId);
                 }
-                return this.redirectToConsentUI(res, query, validated, session.sid);
+                const flowId = this.flowIdCookieService.mintIfAbsent(req, res);
+                return this.redirectToAuthorizeUI(res, query, validated, 'consent', flowId);
             }
 
             // No consent → consent UI
             if (!consentGranted) {
-                return this.redirectToConsentUI(res, query, validated, session.sid);
+                const flowId = this.flowIdCookieService.mintIfAbsent(req, res);
+                return this.redirectToAuthorizeUI(res, query, validated, 'consent', flowId);
             }
 
             // Consent exists → issue code or session-confirm
             if (skipConfirm || confirmed) {
                 return this.issueCodeAndRedirect(res, session, client, query, validated);
             }
-            return this.redirectToSessionConfirmUI(res, query, validated);
+            const flowId = this.flowIdCookieService.mintIfAbsent(req, res);
+            return this.redirectToAuthorizeUI(res, query, validated, 'session-confirm', flowId);
 
         } catch (error) {
             if (error instanceof AuthorizeRedirectException) {
-                const params = new URLSearchParams();
-                params.set('error', error.errorCode);
-                params.set('error_description', error.errorDescription);
-                if (error.state) {
-                    params.set('state', error.state);
-                }
-                res.redirect(302, `${error.redirectUri}?${params.toString()}`);
-                return;
+                // Post-redirect OAuth error per RFC 6749 §4.1.2.1.
+                // Funnel through `redirectWithError` so `flow_id` is cleared
+                // on the same response that issues the 302 (Req 5.14, 12.6).
+                return this.redirectWithError(
+                    res,
+                    error.redirectUri,
+                    error.errorCode,
+                    error.errorDescription,
+                    error.state,
+                );
             }
+            // Pre-redirect error (unknown `client_id`, unregistered
+            // `redirect_uri`, etc.). Per Req 5.6 the error is rendered on
+            // the auth server without redirecting to External_Client, but
+            // we still clear any `flow_id` cookie carried over from a
+            // previous flow so it does not linger after the abandoned
+            // request.
+            this.flowIdCookieService.clear(res);
             throw error;
         }
     }
@@ -210,6 +227,13 @@ export class OAuthTokenController {
 
     /**
      * Issue an authorization code and redirect to the client's redirect_uri.
+     *
+     * Clears the `flow_id` cookie before the 302 so the completed flow's
+     * CSRF context is terminated on External_Client redirect (Req 5.14,
+     * 12.6). The redirect URL carries only `code` and `state` — no
+     * internal signals (`view`, `csrf_token`, `session_confirmed`,
+     * `from_logout`, `sid`, `flow_id`) appear in the query string
+     * (Req 5.4, 5.13).
      */
     private async issueCodeAndRedirect(
         res: Response,
@@ -236,23 +260,55 @@ export class OAuthTokenController {
         const params = new URLSearchParams();
         params.set('code', authCode);
         if (validated.state) params.set('state', validated.state);
+        this.flowIdCookieService.clear(res);
         res.redirect(302, `${validated.redirectUri}?${params.toString()}`);
     }
 
     /**
-     * Redirect to the login UI, preserving all OAuth params.
+     * Redirect to the unified `/authorize` UI route with the requested `view`.
+     *
+     * Builds the target URL as:
+     *   `${BASE_URL}/authorize?view=<view>&csrf_token=<t>&<all OAuth params from query>`
+     *
+     * Every OAuth parameter present on the original authorize request is
+     * forwarded unchanged (Req 5.15). The internal signaling params
+     * `session_confirmed`, `from_logout`, `sid`, and `flow_id` are never
+     * forwarded onto this UI redirect (Req 5.8, 5.13).
+     *
+     * The CSRF token is computed from the caller-supplied `flowId` via
+     * `CsrfTokenService.computeFromFlowId`, which returns
+     * `HMAC-SHA256(COOKIE_SECRET, flowId)`. Callers obtain `flowId` from
+     * `FlowIdCookieService.mintIfAbsent(req, res)` immediately before
+     * calling this helper, so the same token is emitted for every UI
+     * redirect within one flow (Req 5.10, 5.11, 5.12).
+     *
+     * Requirements: 5.1, 5.2, 5.3, 5.7, 5.8, 5.9, 5.10, 5.11, 5.12, 5.15
      */
-    private redirectToLoginUI(
+    private redirectToAuthorizeUI(
         res: Response,
         query: AuthorizeQueryParams,
         validated: import('../auth/authorize.service').ValidatedAuthorizeRequest,
+        view: 'login' | 'consent' | 'session-confirm',
+        flowId: string = '',
     ): void {
         const params = new URLSearchParams();
+
+        // Non-OAuth signaling params come first for readability of the URL.
+        params.set('view', view);
+        params.set(
+            'csrf_token',
+            flowId ? this.csrfTokenService.computeFromFlowId(flowId) : '',
+        );
+
+        // OAuth parameters (Req 5.15). Prefer the validated/normalized values
+        // where available — they have already been defaulted / coerced by
+        // AuthorizeService.validateAuthorizeRequest — and fall back to the
+        // raw query for fields the validator does not echo back.
         params.set('client_id', query.client_id!);
         params.set('redirect_uri', validated.redirectUri);
+        params.set('response_type', validated.responseType);
         params.set('scope', validated.scope);
         params.set('state', validated.state);
-        params.set('response_type', validated.responseType);
         if (validated.codeChallenge) {
             params.set('code_challenge', validated.codeChallenge);
             params.set('code_challenge_method', validated.codeChallengeMethod);
@@ -262,75 +318,27 @@ export class OAuthTokenController {
         if (validated.prompt) params.set('prompt', validated.prompt);
         if (validated.maxAge !== undefined) params.set('max_age', String(validated.maxAge));
         if (query.id_token_hint) params.set('id_token_hint', query.id_token_hint);
-        if (validated.subscriberTenantHint) params.set('subscriber_tenant_hint', validated.subscriberTenantHint);
-        if (query.from_logout === 'true') params.set('from_logout', 'true');
+        if (validated.subscriberTenantHint) {
+            params.set('subscriber_tenant_hint', validated.subscriberTenantHint);
+        }
+
+        // Intentionally NOT forwarded (Req 5.8, 5.13):
+        //   - session_confirmed / from_logout: one-shot internal flags, consumed by
+        //     the backend on the redirect that carried them and never echoed onwards.
+        //   - sid / flow_id: session/flow cookie values must never appear in URLs.
+
         res.redirect(302, `${Environment.get('BASE_URL', '')}/authorize?${params.toString()}`);
     }
 
     /**
-     * Redirect to the session-confirm UI, preserving all OAuth params.
-     */
-    private redirectToSessionConfirmUI(
-        res: Response,
-        query: AuthorizeQueryParams,
-        validated: import('../auth/authorize.service').ValidatedAuthorizeRequest,
-    ): void {
-        const params = new URLSearchParams();
-        params.set('client_id', query.client_id!);
-        params.set('redirect_uri', validated.redirectUri);
-        params.set('response_type', validated.responseType);
-        params.set('state', validated.state);
-        params.set('scope', validated.scope);
-        if (validated.codeChallenge) {
-            params.set('code_challenge', validated.codeChallenge);
-            params.set('code_challenge_method', validated.codeChallengeMethod);
-        }
-        if (validated.nonce) params.set('nonce', validated.nonce);
-        if (validated.resource) params.set('resource', validated.resource);
-        if (validated.prompt) params.set('prompt', validated.prompt);
-        if (validated.maxAge !== undefined) params.set('max_age', String(validated.maxAge));
-        if (query.id_token_hint) params.set('id_token_hint', query.id_token_hint);
-        if (validated.subscriberTenantHint) params.set('subscriber_tenant_hint', validated.subscriberTenantHint);
-        res.redirect(302, `${Environment.get('BASE_URL', '')}/session-confirm?${params.toString()}`);
-    }
-
-    /**
-     * Redirect to the consent UI with a stateless CSRF token.
-     */
-    private redirectToConsentUI(
-        res: Response,
-        query: AuthorizeQueryParams,
-        validated: import('../auth/authorize.service').ValidatedAuthorizeRequest,
-        sid: string,
-    ): void {
-        // Stateless CSRF token — deterministic per session, multi-tab safe
-        const csrfToken = crypto
-            .createHmac('sha256', Environment.get('COOKIE_SECRET', 'dev-cookie-secret-do-not-use-in-prod'))
-            .update(sid)
-            .digest('hex');
-
-        const params = new URLSearchParams();
-        params.set('client_id', query.client_id!);
-        params.set('redirect_uri', validated.redirectUri);
-        params.set('response_type', validated.responseType);
-        params.set('state', validated.state);
-        params.set('scope', validated.scope);
-        params.set('csrf_token', csrfToken);
-        if (validated.codeChallenge) {
-            params.set('code_challenge', validated.codeChallenge);
-            params.set('code_challenge_method', validated.codeChallengeMethod);
-        }
-        if (validated.nonce) params.set('nonce', validated.nonce);
-        if (validated.resource) params.set('resource', validated.resource);
-        if (validated.prompt) params.set('prompt', validated.prompt);
-        if (validated.maxAge !== undefined) params.set('max_age', String(validated.maxAge));
-        if (query.id_token_hint) params.set('id_token_hint', query.id_token_hint);
-        if (validated.subscriberTenantHint) params.set('subscriber_tenant_hint', validated.subscriberTenantHint);
-        res.redirect(302, `${Environment.get('BASE_URL', '')}/consent?${params.toString()}`);
-    }
-
-    /**
-     * Redirect to redirect_uri with an OAuth error.
+     * Redirect to redirect_uri with an OAuth error (RFC 6749 §4.1.2.1).
+     *
+     * Clears the `flow_id` cookie before the 302 so the abandoned flow's
+     * CSRF context is terminated on External_Client redirect (Req 5.14,
+     * 12.6). The redirect URL carries only `error`, `error_description`,
+     * and (when present) the original `state` — no internal signals
+     * (`view`, `csrf_token`, `session_confirmed`, `from_logout`, `sid`,
+     * `flow_id`) appear in the query string (Req 5.5, 5.13).
      */
     private redirectWithError(
         res: Response,
@@ -343,6 +351,7 @@ export class OAuthTokenController {
         params.set('error', error);
         params.set('error_description', description);
         if (state) params.set('state', state);
+        this.flowIdCookieService.clear(res);
         res.redirect(302, `${redirectUri}?${params.toString()}`);
     }
 
@@ -362,15 +371,26 @@ export class OAuthTokenController {
 
     @Post("/login")
     async login(
+        @Req() req: ExpressRequest,
         @Res({passthrough: true}) res: Response,
         @Body(new ValidationPipe(ValidationSchema.LoginSchema))
         body: {
             client_id: string;
             password: string;
             email: string;
+            csrf_token: string;
             subscriber_tenant_hint?: string;
         },
     ): Promise<{ success: true } | { requires_tenant_selection: true; tenants: TenantInfo[] }> {
+        // Validate CSRF token against the signed `flow_id` cookie BEFORE any
+        // credential validation, session creation, or tenant lookup. On 403
+        // we do not touch the auth subsystem at all — no session is created
+        // and no tenant lists are returned (Req 8.3, 12.1, 12.2, 12.3, 12.4).
+        this.csrfTokenService.verifyOrThrow(
+            req.signedCookies?.flow_id,
+            body.csrf_token,
+        );
+
         const user: User = await this.authService.validate(body.email, body.password);
 
         // Resolve Client entity by clientId or alias
@@ -445,7 +465,15 @@ export class OAuthTokenController {
             decision: 'grant' | 'deny';
         },
     ): Promise<{success: true}> {
-        // 1. Validate session from signed cookie first
+        // 1. Validate CSRF token against the signed `flow_id` cookie BEFORE any
+        // consent record write. On 403 no session lookup or consent write occurs
+        // (Req 6.3, 6.4, 12.1, 12.2, 12.3, 12.4).
+        this.csrfTokenService.verifyOrThrow(
+            req.signedCookies?.flow_id,
+            body.csrf_token,
+        );
+
+        // 2. Validate session from signed cookie
         const sid = (req as any).signedCookies?.sid;
         if (!sid) {
             throw new UnauthorizedException('No session');
@@ -453,28 +481,6 @@ export class OAuthTokenController {
         const session = await this.loginSessionService.findSessionBySid(sid);
         if (!session) {
             throw new UnauthorizedException('Session expired');
-        }
-
-        // 2. Validate CSRF token using constant-time comparison
-        const expectedToken = crypto
-            .createHmac('sha256', Environment.get('COOKIE_SECRET', 'dev-cookie-secret-do-not-use-in-prod'))
-            .update(sid)
-            .digest('hex');
-
-        let csrfValid = false;
-        try {
-            csrfValid = body.csrf_token &&
-                body.csrf_token.length === expectedToken.length &&
-                crypto.timingSafeEqual(
-                    Buffer.from(body.csrf_token, 'hex'),
-                    Buffer.from(expectedToken, 'hex'),
-                );
-        } catch {
-            csrfValid = false;
-        }
-
-        if (!csrfValid) {
-            throw new ForbiddenException('Invalid CSRF token');
         }
 
         // 3. Validate client exists

@@ -133,6 +133,9 @@ export class TokenFixture {
     /**
      * Login using OAuth authorization code flow.
      * Returns the response which may contain an authentication_code or requires_tenant_selection.
+     *
+     * Automatically obtains a flow_id cookie and csrf_token from GET /authorize
+     * before posting to /login (required since CSRF enforcement was added).
      */
     public async login(
         email: string,
@@ -142,23 +145,55 @@ export class TokenFixture {
         subscriberTenantHint?: string,
         opts?: { scope?: string; nonce?: string; codeChallengeMethod?: string }
     ): Promise<any> {
+        // Get flow_id cookie and csrf_token from /authorize first
+        const preAuth = await this.app.getHttpServer()
+            .get('/api/oauth/authorize')
+            .query({
+                response_type: 'code',
+                client_id: clientId,
+                redirect_uri: 'https://login-fixture.local/callback',
+                scope: opts?.scope ?? 'openid profile email',
+                state: 'fixture-login-state',
+                code_challenge: codeChallenge,
+                code_challenge_method: opts?.codeChallengeMethod ?? 'plain',
+            })
+            .redirects(0);
+
+        const preAuthCookies: string[] = Array.isArray(preAuth.headers['set-cookie'])
+            ? preAuth.headers['set-cookie']
+            : preAuth.headers['set-cookie'] ? [preAuth.headers['set-cookie']] : [];
+        const flowIdHeader = preAuthCookies.find((c: string) => c.startsWith('flow_id='));
+        const flowIdCookieValue = flowIdHeader ? flowIdHeader.split(';')[0] : '';
+
+        const preAuthLocation: string = preAuth.headers['location'] ?? '';
+        const csrfToken = preAuthLocation.includes('csrf_token=')
+            ? new URL(preAuthLocation, 'http://localhost').searchParams.get('csrf_token') ?? ''
+            : '';
+
         const body: any = {
             email,
             password,
             client_id: clientId,
             code_challenge_method: opts?.codeChallengeMethod || 'plain',
-            code_challenge: codeChallenge
+            code_challenge: codeChallenge,
+            csrf_token: csrfToken,
         };
         if (subscriberTenantHint) {
             body.subscriber_tenant_hint = subscriberTenantHint;
         }
         if (opts?.scope) body.scope = opts.scope;
         if (opts?.nonce) body.nonce = opts.nonce;
-        const response = await this.app.getHttpServer()
+
+        const req = this.app.getHttpServer()
             .post('/api/oauth/login')
             .send(body)
             .set('Accept', 'application/json');
 
+        if (flowIdCookieValue) {
+            req.set('Cookie', flowIdCookieValue);
+        }
+
+        const response = await req;
         expect2xx(response);
         return response.body;
     }
@@ -238,16 +273,89 @@ export class TokenFixture {
     }
 
     /**
+     * Get a flow_id cookie and csrf_token by hitting GET /authorize without a session.
+     * Use this in tests that call POST /api/oauth/login directly (not via loginForCookie).
+     *
+     * Returns { flowIdCookie, csrfToken } where flowIdCookie is the raw "flow_id=..." value
+     * (without attributes) suitable for use in a Cookie header.
+     */
+    public async getFlowContext(clientId: string): Promise<{ flowIdCookie: string; csrfToken: string }> {
+        const res = await this.app.getHttpServer()
+            .get('/api/oauth/authorize')
+            .query({
+                response_type: 'code',
+                client_id: clientId,
+                redirect_uri: 'https://login-fixture.local/callback',
+                scope: 'openid profile email',
+                state: 'flow-ctx-state',
+                code_challenge: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq',
+                code_challenge_method: 'plain',
+            })
+            .redirects(0);
+
+        const cookies: string[] = Array.isArray(res.headers['set-cookie'])
+            ? res.headers['set-cookie']
+            : res.headers['set-cookie'] ? [res.headers['set-cookie']] : [];
+        const flowIdHeader = cookies.find((c: string) => c.startsWith('flow_id='));
+        const flowIdCookie = flowIdHeader ? flowIdHeader.split(';')[0] : '';
+
+        const location: string = res.headers['location'] ?? '';
+        const csrfToken = location.includes('csrf_token=')
+            ? new URL(location, 'http://localhost').searchParams.get('csrf_token') ?? ''
+            : '';
+
+        return { flowIdCookie, csrfToken };
+    }
+
+    /**
      * Login and return the signed sid cookie.
      * Step 1 of the cookie-based auth code flow — useful when tests need
      * the code directly (e.g. PKCE, single-use, or authorize-level params).
+     *
+     * NOTE: POST /api/oauth/login now requires a valid csrf_token bound to a
+     * flow_id cookie. This helper hits GET /api/oauth/authorize first (without
+     * a session) to obtain the flow_id cookie and csrf_token, then uses them
+     * for the login POST.
      */
     public async loginForCookie(email: string, password: string, clientId: string): Promise<string> {
-        const res = await this.app.getHttpServer()
+        // Step 0: hit /authorize to mint a flow_id cookie and get a csrf_token
+        const authorizeRes = await this.app.getHttpServer()
+            .get('/api/oauth/authorize')
+            .query({
+                response_type: 'code',
+                client_id: clientId,
+                redirect_uri: 'https://login-fixture.local/callback',
+                scope: 'openid profile email',
+                state: 'fixture-state',
+                code_challenge: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq',
+                code_challenge_method: 'plain',
+            })
+            .redirects(0);
+
+        // Extract flow_id cookie and csrf_token from the authorize redirect
+        const authCookies: string[] = Array.isArray(authorizeRes.headers['set-cookie'])
+            ? authorizeRes.headers['set-cookie']
+            : authorizeRes.headers['set-cookie'] ? [authorizeRes.headers['set-cookie']] : [];
+        const flowIdCookie = authCookies.find((c: string) => c.startsWith('flow_id='));
+
+        const location: string = authorizeRes.headers['location'] ?? '';
+        const csrfToken = location.includes('csrf_token=')
+            ? new URL(location, 'http://localhost').searchParams.get('csrf_token') ?? ''
+            : '';
+
+        // Build cookie header: include flow_id if present
+        const cookieHeader = flowIdCookie ? flowIdCookie.split(';')[0] : '';
+
+        const loginReq = this.app.getHttpServer()
             .post('/api/oauth/login')
-            .send({email, password, client_id: clientId})
+            .send({email, password, client_id: clientId, csrf_token: csrfToken})
             .set('Accept', 'application/json');
 
+        if (cookieHeader) {
+            loginReq.set('Cookie', cookieHeader);
+        }
+
+        const res = await loginReq;
         expect2xx(res);
 
         const raw: string | string[] = res.headers['set-cookie'] ?? [];
@@ -261,8 +369,9 @@ export class TokenFixture {
      * Pre-grant consent for a third-party client so that authorizeForCode()
      * can issue a code without being redirected to the consent UI.
      *
-     * Computes the CSRF token from the sid using the dev cookie secret,
-     * then POSTs to /api/oauth/consent with decision=grant.
+     * Hits GET /authorize to get a flow_id cookie + csrf_token, logs in,
+     * then hits GET /authorize again with the session to land on the consent
+     * UI redirect, and finally POSTs to /api/oauth/consent with decision=grant.
      */
     public async preGrantConsent(
         email: string,
@@ -273,19 +382,38 @@ export class TokenFixture {
     ): Promise<void> {
         const sidCookie = await this.loginForCookie(email, password, clientId);
 
-        // Extract the raw sid value from the signed cookie string
-        // Cookie format: "sid=s%3A<value>.<signature>; Path=..."
-        const cookieValue = sidCookie.split(';')[0].split('=').slice(1).join('=');
-        // Decode URI component and strip the "s:" prefix added by cookie-parser
-        const decoded = decodeURIComponent(cookieValue).replace(/^s:/, '');
-        const sid = decoded.split('.')[0];
+        // Hit /authorize with the session to get the consent UI redirect (which carries csrf_token)
+        const authorizeRes = await this.app.getHttpServer()
+            .get('/api/oauth/authorize')
+            .query({
+                response_type: 'code',
+                client_id: clientId,
+                redirect_uri: redirectUri,
+                scope,
+                state: 'pre-grant-state',
+                code_challenge: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq',
+                code_challenge_method: 'plain',
+            })
+            .set('Cookie', sidCookie)
+            .redirects(0);
 
-        // Compute CSRF token: HMAC-SHA256(sid, COOKIE_SECRET)
-        const crypto = require('crypto');
-        const csrfToken = crypto
-            .createHmac('sha256', 'dev-cookie-secret-do-not-use-in-prod')
-            .update(sid)
-            .digest('hex');
+        // Extract flow_id cookie from the authorize response (it may have been minted here)
+        const authCookies: string[] = Array.isArray(authorizeRes.headers['set-cookie'])
+            ? authorizeRes.headers['set-cookie']
+            : authorizeRes.headers['set-cookie'] ? [authorizeRes.headers['set-cookie']] : [];
+        const flowIdCookieHeader = authCookies.find((c: string) => c.startsWith('flow_id='));
+        const flowIdCookieValue = flowIdCookieHeader ? flowIdCookieHeader.split(';')[0] : '';
+
+        // Extract csrf_token from the redirect location
+        const location: string = authorizeRes.headers['location'] ?? '';
+        const csrfToken = location.includes('csrf_token=')
+            ? new URL(location, 'http://localhost').searchParams.get('csrf_token') ?? ''
+            : '';
+
+        // Build combined cookie header: sid + flow_id
+        const cookieParts = [sidCookie.split(';')[0]];
+        if (flowIdCookieValue) cookieParts.push(flowIdCookieValue);
+        const combinedCookies = cookieParts.join('; ');
 
         const res = await this.app.getHttpServer()
             .post('/api/oauth/consent')
@@ -299,10 +427,10 @@ export class TokenFixture {
                 csrf_token: csrfToken,
                 decision: 'grant',
             })
-            .set('Cookie', sidCookie)
+            .set('Cookie', combinedCookies)
             .redirects(0);
 
-        // Consent redirects to /api/oauth/authorize (302) — that's success
+        // Consent returns 200 (success JSON) — that's success
         expect([302, 200]).toContain(res.status);
     }
 
@@ -423,11 +551,42 @@ export class TokenFixture {
         const scope = opts?.scope ?? 'openid profile email';
         const state = opts?.state ?? crypto.randomUUID();
 
-        // Step 1: Login — creates session, sets signed sid cookie
-        const loginRes = await this.app.getHttpServer()
+        // Step 1: Get flow_id cookie and csrf_token from /authorize (no session yet)
+        const preAuthorizeRes = await this.app.getHttpServer()
+            .get('/api/oauth/authorize')
+            .query({
+                response_type: 'code',
+                client_id: clientId,
+                redirect_uri: redirectUri,
+                scope,
+                state,
+                code_challenge: codeChallenge,
+                code_challenge_method: 'plain',
+            })
+            .redirects(0);
+
+        const preAuthCookies: string[] = Array.isArray(preAuthorizeRes.headers['set-cookie'])
+            ? preAuthorizeRes.headers['set-cookie']
+            : preAuthorizeRes.headers['set-cookie'] ? [preAuthorizeRes.headers['set-cookie']] : [];
+        const flowIdCookieHeader = preAuthCookies.find((c: string) => c.startsWith('flow_id='));
+        const flowIdCookieValue = flowIdCookieHeader ? flowIdCookieHeader.split(';')[0] : '';
+
+        const preAuthLocation: string = preAuthorizeRes.headers['location'] ?? '';
+        const csrfToken = preAuthLocation.includes('csrf_token=')
+            ? new URL(preAuthLocation, 'http://localhost').searchParams.get('csrf_token') ?? ''
+            : '';
+
+        // Step 2: Login — creates session, sets signed sid cookie
+        const loginReq = this.app.getHttpServer()
             .post('/api/oauth/login')
-            .send({email, password, client_id: clientId})
+            .send({email, password, client_id: clientId, csrf_token: csrfToken})
             .set('Accept', 'application/json');
+
+        if (flowIdCookieValue) {
+            loginReq.set('Cookie', flowIdCookieValue);
+        }
+
+        const loginRes = await loginReq;
 
         expect2xx(loginRes);
         // The login endpoint returns 201 (session created)
