@@ -34,7 +34,7 @@ describe('S256 enforcement and downgrade prevention', () => {
     beforeAll(async () => {
         app = new SharedTestFixture();
         tokenFixture = new TokenFixture(app);
-        const response = await tokenFixture.fetchAccessToken(adminEmail, adminPassword, 'auth.server.com');
+        const response = await tokenFixture.fetchPasswordGrantAccessToken(adminEmail, adminPassword, 'auth.server.com');
         accessToken = response.accessToken;
         clientApi = new ClientEntityClient(app, accessToken);
 
@@ -53,7 +53,7 @@ describe('S256 enforcement and downgrade prevention', () => {
      * Returns the raw authorize response (302 or error).
      */
     async function authorizeWith(clientId: string, redirectUri: string, method: string, challenge: string) {
-        const sidCookie = await tokenFixture.loginForCookie(adminEmail, adminPassword, clientId);
+        const sidCookie = await tokenFixture.loginForCookie(adminEmail, adminPassword, clientId, redirectUri);
         return app.getHttpServer()
             .get('/api/oauth/authorize')
             .query({
@@ -88,7 +88,7 @@ describe('S256 enforcement and downgrade prevention', () => {
         const redirectUri = 'https://pkce-test.example.com/callback';
 
         try {
-            const sidCookie = await tokenFixture.loginForCookie(adminEmail, adminPassword, clientId);
+            const sidCookie = await tokenFixture.loginForCookie(adminEmail, adminPassword, clientId, redirectUri);
             const response = await app.getHttpServer()
                 .get('/api/oauth/authorize')
                 .query({
@@ -127,7 +127,7 @@ describe('S256 enforcement and downgrade prevention', () => {
         try {
             await preGrantConsent(clientId, redirectUri, 'S256', s256Challenge);
             const code = await tokenFixture.authorizeForCode(
-                await tokenFixture.loginForCookie(adminEmail, adminPassword, clientId),
+                await tokenFixture.loginForCookie(adminEmail, adminPassword, clientId, redirectUri),
                 clientId,
                 redirectUri,
                 {codeChallenge: s256Challenge, codeChallengeMethod: 'S256'},
@@ -152,7 +152,7 @@ describe('S256 enforcement and downgrade prevention', () => {
         try {
             await preGrantConsent(clientId, redirectUri, 'plain', plainVerifier);
             const code = await tokenFixture.authorizeForCode(
-                await tokenFixture.loginForCookie(adminEmail, adminPassword, clientId),
+                await tokenFixture.loginForCookie(adminEmail, adminPassword, clientId, redirectUri),
                 clientId,
                 redirectUri,
                 {codeChallenge: plainVerifier, codeChallengeMethod: 'plain'},
@@ -181,7 +181,7 @@ describe('S256 enforcement and downgrade prevention', () => {
             await preGrantConsent(clientId, redirectUri, 'S256', s256Challenge);
 
             // Authorize with S256 — should succeed
-            const sidCookie1 = await tokenFixture.loginForCookie(adminEmail, adminPassword, clientId);
+            const sidCookie1 = await tokenFixture.loginForCookie(adminEmail, adminPassword, clientId, redirectUri);
             const code = await tokenFixture.authorizeForCode(sidCookie1, clientId, redirectUri, {
                 codeChallenge: s256Challenge,
                 codeChallengeMethod: 'S256',
@@ -206,7 +206,7 @@ describe('S256 enforcement and downgrade prevention', () => {
             await preGrantConsent(clientId, redirectUri, 'S256', s256Challenge);
 
             // Authorize with S256 — should succeed
-            const sidCookie = await tokenFixture.loginForCookie(adminEmail, adminPassword, clientId);
+            const sidCookie = await tokenFixture.loginForCookie(adminEmail, adminPassword, clientId, redirectUri);
             const code = await tokenFixture.authorizeForCode(sidCookie, clientId, redirectUri, {
                 codeChallenge: s256Challenge,
                 codeChallengeMethod: 'S256',
@@ -229,7 +229,7 @@ describe('S256 enforcement and downgrade prevention', () => {
 
         try {
             await preGrantConsent(clientId, redirectUri, 'plain', plainVerifier);
-            const sidCookie = await tokenFixture.loginForCookie(adminEmail, adminPassword, clientId);
+            const sidCookie = await tokenFixture.loginForCookie(adminEmail, adminPassword, clientId, redirectUri);
             const code = await tokenFixture.authorizeForCode(sidCookie, clientId, redirectUri, {
                 codeChallenge: plainVerifier,
                 codeChallengeMethod: 'plain',

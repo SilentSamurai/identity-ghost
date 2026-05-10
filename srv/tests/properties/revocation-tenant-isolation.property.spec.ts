@@ -31,7 +31,7 @@ describe('Property 7: Tenant isolation prevents cross-tenant revocation', () => 
         fixture = new SharedTestFixture();
         tokenFixture = new TokenFixture(fixture);
 
-        const adminResult = await tokenFixture.fetchAccessToken(
+        const adminResult = await tokenFixture.fetchPasswordGrantAccessToken(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com',
@@ -72,7 +72,7 @@ describe('Property 7: Tenant isolation prevents cross-tenant revocation', () => 
         await fc.assert(
             fc.asyncProperty(iterationArb, async (_iteration) => {
                 // Get a fresh refresh token from the default tenant
-                const result = await tokenFixture.fetchAccessToken(
+                const result = await tokenFixture.fetchPasswordGrantAccessToken(
                     'admin@auth.server.com',
                     'admin9000',
                     'auth.server.com',

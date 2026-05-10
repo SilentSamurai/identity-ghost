@@ -27,7 +27,7 @@ describe('Feature: user-consent-tracking, Property 2: Consent required iff reque
     beforeAll(async () => {
         fixture = new SharedTestFixture();
         tokenFixture = new TokenFixture(fixture);
-        const {accessToken} = await tokenFixture.fetchAccessToken(email, password, 'auth.server.com');
+        const {accessToken} = await tokenFixture.fetchPasswordGrantAccessToken(email, password, 'auth.server.com');
         clientApi = new ClientEntityClient(fixture, accessToken);
 
         const tenantClient = new TenantClient(fixture, accessToken);
@@ -48,7 +48,7 @@ describe('Feature: user-consent-tracking, Property 2: Consent required iff reque
      * Returns true iff /authorize redirected to the consent UI.
      */
     async function checkConsentRequired(clientId: string, requestedScopes: string[]): Promise<boolean> {
-        const sidCookie = await tokenFixture.loginForCookie(email, password, clientId);
+        const sidCookie = await tokenFixture.loginForCookie(email, password, clientId, REDIRECT_URI);
 
         const res = await fixture.getHttpServer()
             .get('/api/oauth/authorize')

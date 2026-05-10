@@ -36,7 +36,7 @@ describe('Offline Access & Refresh Token Gating Integration Tests', () => {
         const tokenFixture = new TokenFixture(app);
 
         // Get super-admin access token using the default first-party client
-        const tokenResponse = await tokenFixture.fetchAccessToken(
+        const tokenResponse = await tokenFixture.fetchPasswordGrantAccessToken(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com',

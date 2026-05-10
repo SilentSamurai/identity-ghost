@@ -228,7 +228,7 @@ describe('ID Token Generation Integration', () => {
             expect(initialPayload.nonce).toEqual(testNonce);
 
             // Step 2: Get client credentials for refresh (need client_id + client_secret)
-            const adminToken = await tokenFixture.fetchAccessToken(email, password, clientId);
+            const adminToken = await tokenFixture.fetchPasswordGrantAccessToken(email, password, clientId);
             const credsRes = await app.getHttpServer()
                 .get('/api/tenant/my/credentials')
                 .set('Authorization', `Bearer ${adminToken.accessToken}`);
@@ -275,7 +275,7 @@ describe('ID Token Generation Integration', () => {
          *   4. GET /authorize again without prompt=login → server issues the code.
          */
         async function authCodeWithPromptLogin(): Promise<string> {
-            const initialCookie = await tokenFixture.loginForCookie(promptEmail, password, promptClientId);
+            const initialCookie = await tokenFixture.loginForCookie(promptEmail, password, promptClientId, promptRedirectUri);
 
             const bounceRes = await app.getHttpServer()
                 .get('/api/oauth/authorize')

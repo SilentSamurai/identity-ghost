@@ -106,7 +106,7 @@ describe('OAuth login, verify, and exchange endpoint error response format (RFC 
         let clientId: string;
 
         beforeAll(async () => {
-            const tokenResult = await tokenFixture.fetchAccessToken(
+            const tokenResult = await tokenFixture.fetchPasswordGrantAccessToken(
                 'admin@auth.server.com',
                 'admin9000',
                 'auth.server.com',
@@ -139,7 +139,7 @@ describe('OAuth login, verify, and exchange endpoint error response format (RFC 
         let clientSecret: string;
 
         beforeAll(async () => {
-            const tokenResult = await tokenFixture.fetchAccessToken(
+            const tokenResult = await tokenFixture.fetchPasswordGrantAccessToken(
                 'admin@auth.server.com',
                 'admin9000',
                 'auth.server.com',
@@ -177,7 +177,7 @@ describe('OAuth login, verify, and exchange endpoint error response format (RFC 
 
         beforeAll(async () => {
             // First get a password-grant token to create a confidential client
-            const tokenResult = await tokenFixture.fetchAccessToken(
+            const tokenResult = await tokenFixture.fetchPasswordGrantAccessToken(
                 'admin@auth.server.com',
                 'admin9000',
                 'auth.server.com',

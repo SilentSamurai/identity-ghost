@@ -26,7 +26,7 @@ describe('Policy Flow (e2e)', () => {
     it('test policy flow', async () => {
 
         const tokenFixture = new TokenFixture(app);
-        let tokenResponse = await tokenFixture.fetchAccessToken(
+        let tokenResponse = await tokenFixture.fetchPasswordGrantAccessToken(
             "admin@shire.local",
             "admin9000",
             "shire.local"

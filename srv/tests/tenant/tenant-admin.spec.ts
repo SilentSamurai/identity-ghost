@@ -22,7 +22,7 @@ describe('e2e tenant admin', () => {
         const tokenFixture = new TokenFixture(app);
 
         // Super admin: create tenant, add member, assign TENANT_ADMIN
-        const superAdminResponse = await tokenFixture.fetchAccessToken(
+        const superAdminResponse = await tokenFixture.fetchPasswordGrantAccessToken(
             "admin@auth.server.com", "admin9000", "auth.server.com"
         );
         const superAdmin = new AdminTenantClient(app, superAdminResponse.accessToken);
@@ -39,7 +39,7 @@ describe('e2e tenant admin', () => {
         await superAdmin.updateMemberRoles(tenant.id, legolasId, ["TENANT_ADMIN"]);
 
         // Log in as the tenant admin
-        const tenantAdminResponse = await tokenFixture.fetchAccessToken(
+        const tenantAdminResponse = await tokenFixture.fetchPasswordGrantAccessToken(
             "legolas@mail.com", "legolas9000", "test-wesite.com"
         );
         adminClient = new TenantClient(app, tenantAdminResponse.accessToken);

@@ -22,7 +22,7 @@ describe('Feature: redirect-url-construction, Property 4: Redirect URL correctly
         app = new SharedTestFixture();
         tokenFixture = new TokenFixture(app);
 
-        const adminToken = await tokenFixture.fetchAccessToken(
+        const adminToken = await tokenFixture.fetchPasswordGrantAccessToken(
             ADMIN_EMAIL, ADMIN_PASSWORD, 'auth.server.com',
         );
         superAccessToken = adminToken.accessToken;
@@ -51,7 +51,7 @@ describe('Feature: redirect-url-construction, Property 4: Redirect URL correctly
 
         await fc.assert(
             fc.asyncProperty(stateArb, scopeArb, async (state, scope) => {
-                const sidCookie = await tokenFixture.loginForCookie(ADMIN_EMAIL, ADMIN_PASSWORD, testClientId);
+                const sidCookie = await tokenFixture.loginForCookie(ADMIN_EMAIL, ADMIN_PASSWORD, testClientId, REDIRECT_URI);
 
                 const res = await app.getHttpServer()
                     .get('/api/oauth/authorize')
@@ -85,7 +85,7 @@ describe('Feature: redirect-url-construction, Property 4: Redirect URL correctly
     });
 
     it('redirect URL does not leak sensitive parameters', async () => {
-        const sidCookie = await tokenFixture.loginForCookie(ADMIN_EMAIL, ADMIN_PASSWORD, testClientId);
+        const sidCookie = await tokenFixture.loginForCookie(ADMIN_EMAIL, ADMIN_PASSWORD, testClientId, REDIRECT_URI);
 
         const res = await app.getHttpServer()
             .get('/api/oauth/authorize')

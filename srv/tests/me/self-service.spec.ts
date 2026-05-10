@@ -85,7 +85,7 @@ describe('UsersController (e2e)', () => {
 
         it('should authenticate the user', async () => {
             // Test login to get access token
-            const authResponse = await tokenFixture.fetchAccessToken(
+            const authResponse = await tokenFixture.fetchPasswordGrantAccessToken(
                 testUserEmail,
                 testUserPassword,
                 clientId
@@ -156,7 +156,7 @@ describe('UsersController (e2e)', () => {
         });
 
         it('should get login with new email', async () => {
-            const authResponse = await tokenFixture.fetchAccessToken(
+            const authResponse = await tokenFixture.fetchPasswordGrantAccessToken(
                 updatedEmail,
                 testUserPassword,
                 clientId
@@ -177,7 +177,7 @@ describe('UsersController (e2e)', () => {
             expect(response.status).toBe(true);
 
             // Re-authenticate with new password to verify it was changed
-            const authResponse = await tokenFixture.fetchAccessToken(
+            const authResponse = await tokenFixture.fetchPasswordGrantAccessToken(
                 updatedEmail, // Use the updated email
                 updatedPassword,
                 clientId
@@ -219,7 +219,7 @@ describe('UsersController (e2e)', () => {
 
             // Try to login with deleted account - should fail
             try {
-                await tokenFixture.fetchAccessToken(
+                await tokenFixture.fetchPasswordGrantAccessToken(
                     updatedEmail,
                     updatedPassword,
                     clientId

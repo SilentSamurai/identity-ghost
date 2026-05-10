@@ -1,304 +1,110 @@
 import {expect2xx, TestFixture} from "./api-client/client";
 import {ClientEntityClient} from "./api-client/client-entity-client";
-import * as crypto from "crypto";
 
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+interface JwtPayload {
+    sub: string;
+    grant_type: string;
+    tenant: {
+        id: string;
+        name: string;
+        domain: string;
+    };
+    scopes?: string[];
+    roles?: string[];
+}
+
+interface TokenResponse {
+    access_token: string;
+    refresh_token?: string;
+    id_token?: string;
+    token_type: string;
+    expires_in: number;
+}
+
+interface CsrfContext {
+    flowIdCookie: string;
+    csrfToken: string;
+}
+
+interface AuthorizeParams {
+    clientId: string;
+    redirectUri?: string;
+    scope: string;
+    state: string;
+    codeChallenge: string;
+    codeChallengeMethod: string;
+    prompt?: string;
+    subscriberTenantHint?: string;
+    resource?: string;
+    nonce?: string;
+    maxAge?: number;
+}
+
+// ---------------------------------------------------------------------------
+// Helper utilities
+// ---------------------------------------------------------------------------
+
+/**
+ * Extract a specific cookie from Set-Cookie headers.
+ * Returns the full cookie string (name=value) without attributes.
+ */
+function extractCookie(headers: any, name: string): string {
+    const raw: string | string[] = headers['set-cookie'] ?? [];
+    const list = Array.isArray(raw) ? raw : [raw];
+    const cookie = list.find((c: string) => c.startsWith(`${name}=`));
+    return cookie ? cookie.split(';')[0] : '';
+}
+
+/**
+ * Combine multiple cookie strings into a single Cookie header value.
+ */
+function combineCookies(...cookies: string[]): string {
+    return cookies.filter(Boolean).join('; ');
+}
+
+// ---------------------------------------------------------------------------
+// TokenFixture — Composable OAuth flow builder
+// ---------------------------------------------------------------------------
 export class TokenFixture {
-
     private readonly app: TestFixture;
 
     constructor(app: TestFixture) {
         this.app = app;
     }
 
+    // -----------------------------------------------------------------------
+    // Atomic OAuth flow steps (building blocks)
+    // -----------------------------------------------------------------------
+
     /**
-     * Create a confidential (non-public) client for a tenant with client_credentials grant.
-     * Returns the clientId and plaintext clientSecret needed for fetchClientCredentialsToken.
-     *
-     * The default tenant client is public and has no secret, so tests that need
-     * client_credentials tokens must create a confidential client first.
+     * Step 0: Hit GET /authorize without a session to obtain flow_id cookie and csrf_token.
+     * This is required before calling POST /login due to CSRF protection.
      */
-    public async createConfidentialClient(
-        accessToken: string,
-        tenantId: string,
-        name: string = 'test-confidential-client',
-    ): Promise<{ clientId: string; clientSecret: string }> {
-        const clientEntityClient = new ClientEntityClient(this.app, accessToken);
-        const result = await clientEntityClient.createClient(tenantId, name, {
-            grantTypes: 'client_credentials',
-            allowedScopes: 'openid profile email',
-            isPublic: false,
-        });
-        return {
-            clientId: result.client.clientId,
-            clientSecret: result.clientSecret,
+    public async initializeFlow(params: AuthorizeParams): Promise<CsrfContext> {
+        const query: Record<string, string> = {
+            response_type: 'code',
+            client_id: params.clientId,
+            scope: params.scope,
+            state: params.state,
+            code_challenge: params.codeChallenge,
+            code_challenge_method: params.codeChallengeMethod,
         };
-    }
+        if (params.redirectUri) query.redirect_uri = params.redirectUri;
+        if (params.prompt) query.prompt = params.prompt;
+        if (params.subscriberTenantHint) query.subscriber_tenant_hint = params.subscriberTenantHint;
+        if (params.resource) query.resource = params.resource;
+        if (params.nonce) query.nonce = params.nonce;
+        if (params.maxAge !== undefined) query.max_age = String(params.maxAge);
 
-    public async fetchAccessToken(username: string, password: string, client_id: string): Promise<{
-        accessToken: string,
-        refreshToken: string,
-        jwt: any
-    }> {
-        const response = await this.app.getHttpServer()
-            .post('/api/oauth/token')
-            .send({
-                "grant_type": "password",
-                "username": username,
-                "password": password,
-                "client_id": client_id
-            })
-            .set('Accept', 'application/json');
-
-        console.log("fetchAccessToken Response: ", response.body);
-
-        expect2xx(response);
-
-        expect(response.status).toEqual(200);
-        expect(response.body.access_token).toBeDefined();
-        expect(response.body.expires_in).toBeDefined();
-        expect(response.body.token_type).toEqual('Bearer');
-        expect(response.body.refresh_token).toBeDefined();
-
-        let decode = this.app.jwtService().decode(response.body.access_token, {json: true}) as any;
-        expect(decode.sub).toBeDefined();
-        expect(decode.grant_type).toBeDefined();
-        expect(decode.tenant.id).toBeDefined();
-        expect(decode.tenant.name).toBeDefined();
-        expect(decode.tenant.domain).toBeDefined();
-
-        return {
-            accessToken: response.body.access_token,
-            refreshToken: response.body.refresh_token,
-            jwt: decode
-        }
-    }
-
-
-    public async getUser(email: string, password: string) {
-        const token = await this.fetchAccessToken(
-            email,
-            password,
-            "auth.server.com"
-        );
-        const response = await this.app.getHttpServer()
-            .get("/api/users/me")
-            .set('Authorization', `Bearer ${token.accessToken}`)
-            .set('Accept', 'application/json');
-
-        expect(response.status).toEqual(200);
-        console.log(response.body);
-        return response.body;
-    }
-
-    /**
-     * Fetch an access token using the client credentials grant.
-     * Takes clientId and clientSecret, and returns an object containing
-     * the access token, refresh token, and decoded JWT.
-     */
-    public async fetchClientCredentialsToken(clientId: string, clientSecret: string): Promise<{
-        accessToken: string,
-        refreshToken?: string,
-        jwt: any
-    }> {
-        const response = await this.app.getHttpServer()
-            .post('/api/oauth/token')
-            .send({
-                grant_type: "client_credentials",
-                client_id: clientId,
-                client_secret: clientSecret
-            })
-            .set('Accept', 'application/json');
-
-        console.log("fetchClientCredentialsToken Response: ", response.body);
-
-        expect2xx(response);
-        // Depending on your OAuth2 implementation, a 200 or 201 response code is typical
-        expect(response.status).toBeGreaterThanOrEqual(200);
-        expect(response.status).toBeLessThan(300);
-        expect(response.body.access_token).toBeDefined();
-        expect(response.body.token_type).toEqual('Bearer');
-
-        // The refresh token may or may not be present in client_credentials flows
-        const decode = this.app.jwtService().decode(response.body.access_token, {json: true}) as any;
-
-        // Additional checks on decoded token fields can be added here if needed
-
-        return {
-            accessToken: response.body.access_token,
-            refreshToken: response.body.refresh_token,
-            jwt: decode
-        };
-    }
-
-    /**
-     * Login using OAuth authorization code flow.
-     * Returns the response which may contain an authentication_code or requires_tenant_selection.
-     *
-     * Automatically obtains a flow_id cookie and csrf_token from GET /authorize
-     * before posting to /login (required since CSRF enforcement was added).
-     */
-    public async login(
-        email: string,
-        password: string,
-        clientId: string,
-        codeChallenge: string = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq',
-        subscriberTenantHint?: string,
-        opts?: { scope?: string; nonce?: string; codeChallengeMethod?: string }
-    ): Promise<any> {
-        // Get flow_id cookie and csrf_token from /authorize first
-        const preAuth = await this.app.getHttpServer()
-            .get('/api/oauth/authorize')
-            .query({
-                response_type: 'code',
-                client_id: clientId,
-                redirect_uri: 'https://login-fixture.local/callback',
-                scope: opts?.scope ?? 'openid profile email',
-                state: 'fixture-login-state',
-                code_challenge: codeChallenge,
-                code_challenge_method: opts?.codeChallengeMethod ?? 'plain',
-            })
-            .redirects(0);
-
-        const preAuthCookies: string[] = Array.isArray(preAuth.headers['set-cookie'])
-            ? preAuth.headers['set-cookie']
-            : preAuth.headers['set-cookie'] ? [preAuth.headers['set-cookie']] : [];
-        const flowIdHeader = preAuthCookies.find((c: string) => c.startsWith('flow_id='));
-        const flowIdCookieValue = flowIdHeader ? flowIdHeader.split(';')[0] : '';
-
-        const preAuthLocation: string = preAuth.headers['location'] ?? '';
-        const csrfToken = preAuthLocation.includes('csrf_token=')
-            ? new URL(preAuthLocation, 'http://localhost').searchParams.get('csrf_token') ?? ''
-            : '';
-
-        const body: any = {
-            email,
-            password,
-            client_id: clientId,
-            code_challenge_method: opts?.codeChallengeMethod || 'plain',
-            code_challenge: codeChallenge,
-            csrf_token: csrfToken,
-        };
-        if (subscriberTenantHint) {
-            body.subscriber_tenant_hint = subscriberTenantHint;
-        }
-        if (opts?.scope) body.scope = opts.scope;
-        if (opts?.nonce) body.nonce = opts.nonce;
-
-        const req = this.app.getHttpServer()
-            .post('/api/oauth/login')
-            .send(body)
-            .set('Accept', 'application/json');
-
-        if (flowIdCookieValue) {
-            req.set('Cookie', flowIdCookieValue);
-        }
-
-        const response = await req;
-        expect2xx(response);
-        return response.body;
-    }
-
-    public async exchangeCodeForToken(
-        code: string,
-        clientId: string,
-        codeVerifier: string = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq'
-    ): Promise<{
-        access_token?: string,
-        refresh_token?: string,
-        token_type?: string,
-        error?: string,
-        tenants?: Array<{ id: string, name: string, client_id: string, domain: string }>
-    }> {
-        const response = await this.app.getHttpServer()
-            .post('/api/oauth/token')
-            .send({
-                grant_type: 'authorization_code',
-                code,
-                code_verifier: codeVerifier,
-                client_id: clientId,
-            })
-            .set('Accept', 'application/json');
-
-        expect2xx(response);
-
-        // If there's an error response (like ambiguous tenants), return it directly
-        if (response.body.error) {
-            return response.body;
-        }
-
-        // Otherwise, return the token response
-        expect(response.body.access_token).toBeDefined();
-        expect(response.body.token_type).toEqual('Bearer');
-        return response.body;
-    }
-
-    /**
-     * Exchange an authentication code for an access token.
-     * Supports resolving subscription tenant ambiguity by providing subscription_tenant_id.
-     */
-    public async exchangeCodeWithHint(
-        code: string,
-        clientId: string,
-        subscriptionTenantId?: string,
-        codeVerifier: string = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq'
-    ): Promise<{
-        access_token?: string,
-        refresh_token?: string,
-        token_type?: string,
-        error?: string,
-        tenants?: Array<{ id: string, name: string, client_id: string, domain: string }>
-    }> {
-        const response = await this.app.getHttpServer()
-            .post('/api/oauth/token')
-            .send({
-                grant_type: 'authorization_code',
-                code,
-                code_verifier: codeVerifier,
-                client_id: clientId,
-                ...(subscriptionTenantId && {subscriber_tenant_hint: subscriptionTenantId})
-            })
-            .set('Accept', 'application/json');
-
-        expect2xx(response);
-
-        // If there's an error response (like ambiguous tenants), return it directly
-        if (response.body.error) {
-            return response.body;
-        }
-
-        // Otherwise, return the token response
-        expect(response.body.access_token).toBeDefined();
-        expect(response.body.token_type).toEqual('Bearer');
-        return response.body;
-    }
-
-    /**
-     * Get a flow_id cookie and csrf_token by hitting GET /authorize without a session.
-     * Use this in tests that call POST /api/oauth/login directly (not via loginForCookie).
-     *
-     * Returns { flowIdCookie, csrfToken } where flowIdCookie is the raw "flow_id=..." value
-     * (without attributes) suitable for use in a Cookie header.
-     */
-    public async getFlowContext(clientId: string): Promise<{ flowIdCookie: string; csrfToken: string }> {
         const res = await this.app.getHttpServer()
             .get('/api/oauth/authorize')
-            .query({
-                response_type: 'code',
-                client_id: clientId,
-                redirect_uri: 'https://login-fixture.local/callback',
-                scope: 'openid profile email',
-                state: 'flow-ctx-state',
-                code_challenge: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq',
-                code_challenge_method: 'plain',
-            })
+            .query(query)
             .redirects(0);
 
-        const cookies: string[] = Array.isArray(res.headers['set-cookie'])
-            ? res.headers['set-cookie']
-            : res.headers['set-cookie'] ? [res.headers['set-cookie']] : [];
-        const flowIdHeader = cookies.find((c: string) => c.startsWith('flow_id='));
-        const flowIdCookie = flowIdHeader ? flowIdHeader.split(';')[0] : '';
-
+        const flowIdCookie = extractCookie(res.headers, 'flow_id');
         const location: string = res.headers['location'] ?? '';
         const csrfToken = location.includes('csrf_token=')
             ? new URL(location, 'http://localhost').searchParams.get('csrf_token') ?? ''
@@ -308,336 +114,532 @@ export class TokenFixture {
     }
 
     /**
-     * Login and return the signed sid cookie.
-     * Step 1 of the cookie-based auth code flow — useful when tests need
-     * the code directly (e.g. PKCE, single-use, or authorize-level params).
-     *
-     * NOTE: POST /api/oauth/login now requires a valid csrf_token bound to a
-     * flow_id cookie. This helper hits GET /api/oauth/authorize first (without
-     * a session) to obtain the flow_id cookie and csrf_token, then uses them
-     * for the login POST.
+     * Step 1: POST /login with credentials to create a session.
+     * Returns the signed sid cookie.
      */
-    public async loginForCookie(email: string, password: string, clientId: string): Promise<string> {
-        // Step 0: hit /authorize to mint a flow_id cookie and get a csrf_token
-        const authorizeRes = await this.app.getHttpServer()
-            .get('/api/oauth/authorize')
-            .query({
-                response_type: 'code',
-                client_id: clientId,
-                redirect_uri: 'https://login-fixture.local/callback',
-                scope: 'openid profile email',
-                state: 'fixture-state',
-                code_challenge: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq',
-                code_challenge_method: 'plain',
-            })
-            .redirects(0);
-
-        // Extract flow_id cookie and csrf_token from the authorize redirect
-        const authCookies: string[] = Array.isArray(authorizeRes.headers['set-cookie'])
-            ? authorizeRes.headers['set-cookie']
-            : authorizeRes.headers['set-cookie'] ? [authorizeRes.headers['set-cookie']] : [];
-        const flowIdCookie = authCookies.find((c: string) => c.startsWith('flow_id='));
-
-        const location: string = authorizeRes.headers['location'] ?? '';
-        const csrfToken = location.includes('csrf_token=')
-            ? new URL(location, 'http://localhost').searchParams.get('csrf_token') ?? ''
-            : '';
-
-        // Build cookie header: include flow_id if present
-        const cookieHeader = flowIdCookie ? flowIdCookie.split(';')[0] : '';
-
-        const loginReq = this.app.getHttpServer()
-            .post('/api/oauth/login')
-            .send({email, password, client_id: clientId, csrf_token: csrfToken})
-            .set('Accept', 'application/json');
-
-        if (cookieHeader) {
-            loginReq.set('Cookie', cookieHeader);
+    public async login(
+        email: string,
+        password: string,
+        clientId: string,
+        csrfContext: CsrfContext,
+        subscriberTenantHint?: string,
+    ): Promise<string> {
+        const body: any = {
+            email,
+            password,
+            client_id: clientId,
+            csrf_token: csrfContext.csrfToken,
+        };
+        if (subscriberTenantHint) {
+            body.subscriber_tenant_hint = subscriberTenantHint;
         }
 
-        const res = await loginReq;
+        const req = this.app.getHttpServer()
+            .post('/api/oauth/login')
+            .send(body)
+            .set('Accept', 'application/json');
+
+        if (csrfContext.flowIdCookie) {
+            req.set('Cookie', csrfContext.flowIdCookie);
+        }
+
+        const res = await req;
         expect2xx(res);
 
-        const raw: string | string[] = res.headers['set-cookie'] ?? [];
-        const list = Array.isArray(raw) ? raw : [raw];
-        const sidCookie = list.find((c: string) => c.startsWith('sid='));
+        const sidCookie = extractCookie(res.headers, 'sid');
         expect(sidCookie).toBeDefined();
         return sidCookie;
     }
 
     /**
-     * Pre-grant consent for a third-party client so that authorizeForCode()
-     * can issue a code without being redirected to the consent UI.
-     *
-     * Hits GET /authorize to get a flow_id cookie + csrf_token, logs in,
-     * then hits GET /authorize again with the session to land on the consent
-     * UI redirect, and finally POSTs to /api/oauth/consent with decision=grant.
+     * Step 2a: GET /authorize with session to check if consent is required.
+     * Returns the redirect location and any updated cookies.
      */
-    public async preGrantConsent(
-        email: string,
-        password: string,
-        clientId: string,
-        redirectUri: string,
-        scope: string = 'openid profile email',
-    ): Promise<void> {
-        const sidCookie = await this.loginForCookie(email, password, clientId);
-
-        // Hit /authorize with the session to get the consent UI redirect (which carries csrf_token)
-        const authorizeRes = await this.app.getHttpServer()
-            .get('/api/oauth/authorize')
-            .query({
-                response_type: 'code',
-                client_id: clientId,
-                redirect_uri: redirectUri,
-                scope,
-                state: 'pre-grant-state',
-                code_challenge: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq',
-                code_challenge_method: 'plain',
-            })
-            .set('Cookie', sidCookie)
-            .redirects(0);
-
-        // Extract flow_id cookie from the authorize response (it may have been minted here)
-        const authCookies: string[] = Array.isArray(authorizeRes.headers['set-cookie'])
-            ? authorizeRes.headers['set-cookie']
-            : authorizeRes.headers['set-cookie'] ? [authorizeRes.headers['set-cookie']] : [];
-        const flowIdCookieHeader = authCookies.find((c: string) => c.startsWith('flow_id='));
-        const flowIdCookieValue = flowIdCookieHeader ? flowIdCookieHeader.split(';')[0] : '';
-
-        // Extract csrf_token from the redirect location
-        const location: string = authorizeRes.headers['location'] ?? '';
-        const csrfToken = location.includes('csrf_token=')
-            ? new URL(location, 'http://localhost').searchParams.get('csrf_token') ?? ''
-            : '';
-
-        // Build combined cookie header: sid + flow_id
-        const cookieParts = [sidCookie.split(';')[0]];
-        if (flowIdCookieValue) cookieParts.push(flowIdCookieValue);
-        const combinedCookies = cookieParts.join('; ');
-
-        const res = await this.app.getHttpServer()
-            .post('/api/oauth/consent')
-            .send({
-                client_id: clientId,
-                redirect_uri: redirectUri,
-                scope,
-                response_type: 'code',
-                code_challenge: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq',
-                code_challenge_method: 'plain',
-                csrf_token: csrfToken,
-                decision: 'grant',
-            })
-            .set('Cookie', combinedCookies)
-            .redirects(0);
-
-        // Consent returns 200 (success JSON) — that's success
-        expect([302, 200]).toContain(res.status);
-    }
-
-    /**
-     * GET /api/oauth/authorize with a sid cookie and return the auth code from the redirect.
-     * Step 2 of the cookie-based auth code flow — useful when tests need the code directly.
-     *
-     * @param sidCookie   The signed sid cookie returned by loginForCookie()
-     * @param clientId    OAuth client_id
-     * @param redirectUri Registered redirect URI for the client
-     * @param opts        Optional authorize params: scope, state, codeChallenge, prompt, subscriberTenantHint
-     */
-    public async authorizeForCode(
+    public async checkAuthorize(
+        params: AuthorizeParams,
         sidCookie: string,
-        clientId: string,
-        redirectUri: string,
-        opts?: {
-            scope?: string;
-            state?: string;
-            codeChallenge?: string;
-            codeChallengeMethod?: string;
-            prompt?: string;
-            subscriberTenantHint?: string;
-            resource?: string;
-            nonce?: string;
-            maxAge?: number;
-        },
-    ): Promise<string> {
-        const codeChallenge = opts?.codeChallenge ?? 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq';
+        flowIdCookie: string,
+    ): Promise<{ location: string; flowIdCookie: string }> {
         const query: Record<string, string> = {
             response_type: 'code',
-            client_id: clientId,
-            redirect_uri: redirectUri,
-            scope: opts?.scope ?? 'openid profile email',
-            state: opts?.state ?? 'test-state',
-            code_challenge: codeChallenge,
-            code_challenge_method: opts?.codeChallengeMethod ?? 'plain',
+            client_id: params.clientId,
+            scope: params.scope,
+            state: params.state,
+            code_challenge: params.codeChallenge,
+            code_challenge_method: params.codeChallengeMethod,
             session_confirmed: 'true',
         };
-        if (opts?.prompt) query.prompt = opts.prompt;
-        if (opts?.subscriberTenantHint) query.subscriber_tenant_hint = opts.subscriberTenantHint;
-        if (opts?.resource) query.resource = opts.resource;
-        if (opts?.nonce) query.nonce = opts.nonce;
-        if (opts?.maxAge !== undefined) query.max_age = String(opts.maxAge);
+        if (params.redirectUri) query.redirect_uri = params.redirectUri;
+        if (params.prompt) query.prompt = params.prompt;
+        if (params.subscriberTenantHint) query.subscriber_tenant_hint = params.subscriberTenantHint;
+        if (params.resource) query.resource = params.resource;
+        if (params.nonce) query.nonce = params.nonce;
+        if (params.maxAge !== undefined) query.max_age = String(params.maxAge);
 
         const res = await this.app.getHttpServer()
             .get('/api/oauth/authorize')
             .query(query)
-            .set('Cookie', sidCookie)
+            .set('Cookie', combineCookies(sidCookie, flowIdCookie))
             .redirects(0);
 
-        expect(res.status).toEqual(302);
-        const location: string = res.headers['location'];
+        const location: string = res.headers['location'] ?? '';
+        const updatedFlowId = extractCookie(res.headers, 'flow_id') || flowIdCookie;
+
+        return { location, flowIdCookie: updatedFlowId };
+    }
+
+    /**
+     * Step 2b: POST /consent to grant consent for a third-party client.
+     * Only needed if checkAuthorize() returns a location with view=consent.
+     */
+    public async grantConsent(
+        params: AuthorizeParams,
+        sidCookie: string,
+        flowIdCookie: string,
+        csrfToken: string,
+    ): Promise<void> {
+        const res = await this.app.getHttpServer()
+            .post('/api/oauth/consent')
+            .send({
+                client_id: params.clientId,
+                redirect_uri: params.redirectUri,
+                scope: params.scope,
+                response_type: 'code',
+                code_challenge: params.codeChallenge,
+                code_challenge_method: params.codeChallengeMethod,
+                csrf_token: csrfToken,
+                decision: 'grant',
+            })
+            .set('Cookie', combineCookies(sidCookie, flowIdCookie))
+            .redirects(0);
+
+        expect([200, 201, 302]).toContain(res.status);
+    }
+
+    /**
+     * Step 3: GET /authorize with session_confirmed=true to obtain the authorization code.
+     * Assumes consent has been granted (if required).
+     */
+    public async getAuthorizationCode(
+        params: AuthorizeParams,
+        sidCookie: string,
+        flowIdCookie: string,
+    ): Promise<string> {
+        const { location } = await this.checkAuthorize(params, sidCookie, flowIdCookie);
+
+        expect(location).toBeDefined();
         const redirectUrl = new URL(location, 'http://localhost');
         expect(redirectUrl.searchParams.has('error')).toBe(false);
+
         const code = redirectUrl.searchParams.get('code');
         expect(code).toBeDefined();
-        return code;
+        return code!;
     }
 
     /**
-     * Convenience helper: login → authorize → return auth code.
-     * Combines loginForCookie() + authorizeForCode() for tests that need
-     * the code directly (PKCE, single-use, subscriber hints, etc.)
-     * but don't want to manage the cookie themselves.
+     * Step 4: POST /token to exchange authorization code for tokens.
      */
-    public async fetchAuthCode(
+    public async exchangeAuthorizationCode(
+        code: string,
+        clientId: string,
+        codeVerifier: string,
+        redirectUri?: string,
+        subscriptionTenantId?: string,
+    ): Promise<TokenResponse> {
+        const body: any = {
+            grant_type: 'authorization_code',
+            code,
+            code_verifier: codeVerifier,
+            client_id: clientId,
+        };
+        if (redirectUri) body.redirect_uri = redirectUri;
+        if (subscriptionTenantId) body.subscriber_tenant_hint = subscriptionTenantId;
+
+        const res = await this.app.getHttpServer()
+            .post('/api/oauth/token')
+            .send(body)
+            .set('Accept', 'application/json');
+
+        expect2xx(res);
+
+        // Handle ambiguous tenant error
+        if (res.body.error) {
+            return res.body;
+        }
+
+        expect(res.body.access_token).toBeDefined();
+        expect(res.body.token_type).toEqual('Bearer');
+        return res.body;
+    }
+
+    // -----------------------------------------------------------------------
+    // Partial flows (stop at specific stages)
+    // -----------------------------------------------------------------------
+
+    /**
+     * Partial flow: Initialize + Login → returns sid cookie.
+     * Use when you need to test authorize/consent/code steps independently.
+     */
+    public async fetchSidCookieFlow(
         email: string,
         password: string,
-        clientId: string,
-        redirectUri: string,
-        opts?: {
-            scope?: string;
-            state?: string;
-            codeChallenge?: string;
-            codeChallengeMethod?: string;
-            prompt?: string;
-            subscriberTenantHint?: string;
-            resource?: string;
-            nonce?: string;
-            maxAge?: number;
-        },
+        params: AuthorizeParams,
+        subscriberTenantHint?: string,
     ): Promise<string> {
-        const sidCookie = await this.loginForCookie(email, password, clientId);
-        return this.authorizeForCode(sidCookie, clientId, redirectUri, opts);
+        const csrfContext = await this.initializeFlow(params);
+        return this.login(email, password, params.clientId, csrfContext, subscriberTenantHint);
     }
 
     /**
-     * Full authorization code flow via the new cookie-based login → authorize → token pipeline.
-     *
-     * Steps:
-     *   1. POST /api/oauth/login  — validates credentials, creates a session, sets signed sid cookie
-     *   2. GET  /api/oauth/authorize — reads the sid cookie, issues an auth code, redirects to redirect_uri
-     *   3. POST /api/oauth/token  — exchanges the auth code for tokens
-     *
-     * Returns the full token response (access_token, id_token, refresh_token, etc.).
-     *
-     * @param email       User email
-     * @param password    User password
-     * @param clientId    OAuth client_id (alias or UUID)
-     * @param redirectUri Must be registered on the client (or empty string for clients with no registered URIs)
-     * @param opts        Optional scope, nonce, state, codeVerifier overrides
+     * Partial flow: Initialize + Login + Authorize → returns authorization code.
+     * Use when you need to test token exchange independently.
+     */
+    public async fetchAuthCodeFlow(
+        email: string,
+        password: string,
+        params: AuthorizeParams,
+    ): Promise<string> {
+        const csrfContext = await this.initializeFlow(params);
+        const sidCookie = await this.login(email, password, params.clientId, csrfContext);
+        return this.getAuthorizationCode(params, sidCookie, csrfContext.flowIdCookie);
+    }
+
+    /**
+     * Partial flow: Initialize + Login + Consent (if needed) + Authorize → returns authorization code.
+     * Use when testing third-party client flows that require consent.
+     */
+    public async fetchAuthCodeWithConsentFlow(
+        email: string,
+        password: string,
+        params: AuthorizeParams,
+    ): Promise<string> {
+        const csrfContext = await this.initializeFlow(params);
+        const sidCookie = await this.login(email, password, params.clientId, csrfContext);
+
+        // Check if consent is required
+        const { location, flowIdCookie } = await this.checkAuthorize(params, sidCookie, csrfContext.flowIdCookie);
+
+        if (location.includes('view=consent')) {
+            const csrfToken = new URL(location, 'http://localhost').searchParams.get('csrf_token') ?? '';
+            await this.grantConsent(params, sidCookie, flowIdCookie, csrfToken);
+        }
+
+        return this.getAuthorizationCode(params, sidCookie, flowIdCookie);
+    }
+
+    // -----------------------------------------------------------------------
+    // Full flows (end-to-end)
+    // -----------------------------------------------------------------------
+
+    /**
+     * Full OAuth authorization code flow: Initialize → Login → Authorize → Exchange.
+     * Returns the complete token response.
+     */
+    public async fetchTokenWithAuthCodeFlow(
+        email: string,
+        password: string,
+        params: AuthorizeParams,
+        codeVerifier: string,
+    ): Promise<TokenResponse> {
+        const code = await this.fetchAuthCodeFlow(email, password, params);
+        return this.exchangeAuthorizationCode(code, params.clientId, codeVerifier, params.redirectUri);
+    }
+
+    /**
+     * Full OAuth authorization code flow with consent handling.
+     * Automatically grants consent if required by a third-party client.
+     */
+    public async fetchTokenWithAuthCodeFlowAndConsent(
+        email: string,
+        password: string,
+        params: AuthorizeParams,
+        codeVerifier: string,
+    ): Promise<TokenResponse> {
+        const code = await this.fetchAuthCodeWithConsentFlow(email, password, params);
+        return this.exchangeAuthorizationCode(code, params.clientId, codeVerifier, params.redirectUri);
+    }
+
+    // -----------------------------------------------------------------------
+    // Legacy password grant (deprecated but still used in tests)
+    // -----------------------------------------------------------------------
+
+    /**
+     * Legacy: Fetch access token using password grant (deprecated OAuth 2.0 flow).
+     * Use authorization code flow for new tests.
+     */
+    public async fetchAccessTokenFlow(
+        username: string,
+        password: string,
+        clientId: string,
+    ): Promise<{ accessToken: string; refreshToken: string; jwt: JwtPayload }> {
+        const res = await this.app.getHttpServer()
+            .post('/api/oauth/token')
+            .send({
+                grant_type: "password",
+                username,
+                password,
+                client_id: clientId,
+            })
+            .set('Accept', 'application/json');
+
+        expect2xx(res);
+        expect(res.status).toEqual(200);
+        expect(res.body.access_token).toBeDefined();
+        expect(res.body.refresh_token).toBeDefined();
+        expect(res.body.token_type).toEqual('Bearer');
+
+        const jwt = this.app.jwtService().decode(res.body.access_token, { json: true }) as JwtPayload;
+        expect(jwt.sub).toBeDefined();
+        expect(jwt.tenant.id).toBeDefined();
+
+        return {
+            accessToken: res.body.access_token,
+            refreshToken: res.body.refresh_token,
+            jwt,
+        };
+    }
+
+    // -----------------------------------------------------------------------
+    // Client credentials grant
+    // -----------------------------------------------------------------------
+
+    /**
+     * Create a confidential (non-public) client for client_credentials grant.
+     * Returns clientId and plaintext clientSecret.
+     */
+    public async createConfidentialClient(
+        accessToken: string,
+        tenantId: string,
+        name: string,
+        grantTypes: string,
+        allowedScopes: string,
+    ): Promise<{ clientId: string; clientSecret: string }> {
+        const clientEntityClient = new ClientEntityClient(this.app, accessToken);
+        const result = await clientEntityClient.createClient(tenantId, name, {
+            grantTypes,
+            allowedScopes,
+            isPublic: false,
+        });
+        return {
+            clientId: result.client.clientId,
+            clientSecret: result.clientSecret,
+        };
+    }
+
+    /**
+     * Fetch access token using client credentials grant.
+     */
+    public async fetchClientCredentialsTokenFlow(
+        clientId: string,
+        clientSecret: string,
+    ): Promise<{ accessToken: string; refreshToken?: string; jwt: JwtPayload }> {
+        const res = await this.app.getHttpServer()
+            .post('/api/oauth/token')
+            .send({
+                grant_type: "client_credentials",
+                client_id: clientId,
+                client_secret: clientSecret,
+            })
+            .set('Accept', 'application/json');
+
+        expect2xx(res);
+        expect(res.body.access_token).toBeDefined();
+        expect(res.body.token_type).toEqual('Bearer');
+
+        const jwt = this.app.jwtService().decode(res.body.access_token, { json: true }) as JwtPayload;
+
+        return {
+            accessToken: res.body.access_token,
+            refreshToken: res.body.refresh_token,
+            jwt,
+        };
+    }
+
+    // -----------------------------------------------------------------------
+    // Utility methods
+    // -----------------------------------------------------------------------
+
+    /**
+     * Get the current user profile using an access token.
+     * This is a flow because it calls fetchAccessTokenFlow internally.
+     */
+    public async getUserFlow(email: string, password: string): Promise<any> {
+        const { accessToken } = await this.fetchAccessTokenFlow(email, password, "auth.server.com");
+        const res = await this.app.getHttpServer()
+            .get("/api/users/me")
+            .set('Authorization', `Bearer ${accessToken}`)
+            .set('Accept', 'application/json');
+
+        expect(res.status).toEqual(200);
+        return res.body;
+    }
+
+    /**
+     * Pre-grant consent for a third-party client.
+     * Use this to set up test state before running authorize flows.
+     * This is a flow because it calls initializeFlow internally.
+     */
+    public async preGrantConsentFlow(
+        email: string,
+        password: string,
+        params: AuthorizeParams,
+    ): Promise<void> {
+        const csrfContext = await this.initializeFlow(params);
+        const sidCookie = await this.login(email, password, params.clientId, csrfContext);
+
+        // Hit /authorize to get consent redirect
+        const { location, flowIdCookie } = await this.checkAuthorize(params, sidCookie, csrfContext.flowIdCookie);
+
+        if (!location.includes('view=consent')) {
+            return; // Consent not required
+        }
+
+        const csrfToken = new URL(location, 'http://localhost').searchParams.get('csrf_token') ?? '';
+        await this.grantConsent(params, sidCookie, flowIdCookie, csrfToken);
+    }
+
+    // -----------------------------------------------------------------------
+    // Deprecated/legacy methods (kept for backward compatibility)
+    // -----------------------------------------------------------------------
+
+    /**
+     * @deprecated Use fetchTokenWithAuthCodeFlow instead.
+     * Legacy method that combines login + authorize + token exchange.
      */
     public async fetchTokenWithLoginFlow(
         email: string,
         password: string,
         clientId: string,
         redirectUri: string,
-        opts?: {
-            scope?: string;
-            nonce?: string;
-            state?: string;
-            codeVerifier?: string;
-        },
-    ): Promise<any> {
-        const codeVerifier = opts?.codeVerifier ?? 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq';
-        const codeChallenge = codeVerifier; // plain method: challenge === verifier
-        const scope = opts?.scope ?? 'openid profile email';
-        const state = opts?.state ?? crypto.randomUUID();
-
-        // Step 1: Get flow_id cookie and csrf_token from /authorize (no session yet)
-        const preAuthorizeRes = await this.app.getHttpServer()
-            .get('/api/oauth/authorize')
-            .query({
-                response_type: 'code',
-                client_id: clientId,
-                redirect_uri: redirectUri,
-                scope,
-                state,
-                code_challenge: codeChallenge,
-                code_challenge_method: 'plain',
-            })
-            .redirects(0);
-
-        const preAuthCookies: string[] = Array.isArray(preAuthorizeRes.headers['set-cookie'])
-            ? preAuthorizeRes.headers['set-cookie']
-            : preAuthorizeRes.headers['set-cookie'] ? [preAuthorizeRes.headers['set-cookie']] : [];
-        const flowIdCookieHeader = preAuthCookies.find((c: string) => c.startsWith('flow_id='));
-        const flowIdCookieValue = flowIdCookieHeader ? flowIdCookieHeader.split(';')[0] : '';
-
-        const preAuthLocation: string = preAuthorizeRes.headers['location'] ?? '';
-        const csrfToken = preAuthLocation.includes('csrf_token=')
-            ? new URL(preAuthLocation, 'http://localhost').searchParams.get('csrf_token') ?? ''
-            : '';
-
-        // Step 2: Login — creates session, sets signed sid cookie
-        const loginReq = this.app.getHttpServer()
-            .post('/api/oauth/login')
-            .send({email, password, client_id: clientId, csrf_token: csrfToken})
-            .set('Accept', 'application/json');
-
-        if (flowIdCookieValue) {
-            loginReq.set('Cookie', flowIdCookieValue);
-        }
-
-        const loginRes = await loginReq;
-
-        expect2xx(loginRes);
-        // The login endpoint returns 201 (session created)
-
-        // Extract the signed sid cookie from the Set-Cookie header
-        const setCookieHeader: string | string[] = loginRes.headers['set-cookie'] ?? [];
-        const cookies = Array.isArray(setCookieHeader) ? setCookieHeader : [setCookieHeader];
-        const sidCookie = cookies.find((c: string) => c.startsWith('sid='));
-        expect(sidCookie).toBeDefined();
-
-        // Step 2: GET /authorize — server reads sid cookie, issues auth code, redirects
-        const authorizeRes = await this.app.getHttpServer()
-            .get('/api/oauth/authorize')
-            .query({
-                response_type: 'code',
-                client_id: clientId,
-                redirect_uri: redirectUri,
-                scope,
-                state,
-                code_challenge: codeChallenge,
-                code_challenge_method: 'plain',
-                session_confirmed: 'true',
-                ...(opts?.nonce ? {nonce: opts.nonce} : {}),
-            })
-            .set('Cookie', sidCookie)
-            .redirects(0);
-
-        expect(authorizeRes.status).toEqual(302);
-        const location: string = authorizeRes.headers['location'];
-        expect(location).toBeDefined();
-
-        const redirectUrl = new URL(location, 'http://localhost');
-        expect(redirectUrl.searchParams.has('error')).toBe(false);
-        const code = redirectUrl.searchParams.get('code');
-        expect(code).toBeDefined();
-
-        // Step 3: Exchange auth code for tokens
-        const tokenRes = await this.app.getHttpServer()
-            .post('/api/oauth/token')
-            .send({
-                grant_type: 'authorization_code',
-                code,
-                code_verifier: codeVerifier,
-                client_id: clientId,
-                redirect_uri: redirectUri,
-            })
-            .set('Accept', 'application/json');
-
-        expect2xx(tokenRes);
-        expect(tokenRes.body.access_token).toBeDefined();
-        return tokenRes.body;
+        scope: string,
+        state: string,
+        codeChallenge: string,
+        codeChallengeMethod: string,
+        nonce?: string,
+    ): Promise<TokenResponse> {
+        const params: AuthorizeParams = {
+            clientId,
+            redirectUri,
+            scope,
+            state,
+            codeChallenge,
+            codeChallengeMethod,
+            nonce,
+        };
+        return this.fetchTokenWithAuthCodeFlow(email, password, params, codeChallenge);
     }
 
+    /**
+     * @deprecated Use login() with initializeFlow() instead.
+     * Legacy method that posts credentials directly to /login.
+     */
+    public async loginLegacy(
+        email: string,
+        password: string,
+        clientId: string,
+        codeChallenge: string,
+        codeChallengeMethod: string,
+        scope: string,
+        state: string,
+        subscriberTenantHint?: string,
+        redirectUri?: string,
+        nonce?: string,
+    ): Promise<any> {
+        const params: AuthorizeParams = {
+            clientId,
+            redirectUri,
+            scope,
+            state,
+            codeChallenge,
+            codeChallengeMethod,
+            nonce,
+        };
+        const csrfContext = await this.initializeFlow(params);
+
+        const body: any = {
+            email,
+            password,
+            client_id: clientId,
+            code_challenge_method: codeChallengeMethod,
+            code_challenge: codeChallenge,
+            csrf_token: csrfContext.csrfToken,
+        };
+        if (subscriberTenantHint) body.subscriber_tenant_hint = subscriberTenantHint;
+        if (scope) body.scope = scope;
+        if (nonce) body.nonce = nonce;
+
+        const req = this.app.getHttpServer()
+            .post('/api/oauth/login')
+            .send(body)
+            .set('Accept', 'application/json');
+
+        if (csrfContext.flowIdCookie) {
+            req.set('Cookie', csrfContext.flowIdCookie);
+        }
+
+        const res = await req;
+        expect2xx(res);
+        return res.body;
+    }
+
+    /**
+     * @deprecated Use exchangeAuthorizationCode() instead.
+     * Legacy method for exchanging auth code for tokens.
+     */
+    public async exchangeCodeForToken(
+        code: string,
+        clientId: string,
+        codeVerifier: string,
+    ): Promise<TokenResponse> {
+        return this.exchangeAuthorizationCode(code, clientId, codeVerifier);
+    }
+
+    /**
+     * @deprecated Use exchangeAuthorizationCode() with subscriptionTenantId parameter.
+     */
+    public async exchangeCodeWithHint(
+        code: string,
+        clientId: string,
+        codeVerifier: string,
+        subscriptionTenantId?: string,
+    ): Promise<TokenResponse> {
+        return this.exchangeAuthorizationCode(code, clientId, codeVerifier, undefined, subscriptionTenantId);
+    }
+
+    /**
+     * @deprecated Use getAuthorizationCode() instead.
+     * Legacy method that hits /authorize with a session cookie.
+     */
+    public async authorizeForCode(
+        sidCookie: string,
+        clientId: string,
+        redirectUri: string,
+        scope: string,
+        state: string,
+        codeChallenge: string,
+        codeChallengeMethod: string,
+        prompt?: string,
+        subscriberTenantHint?: string,
+        resource?: string,
+        nonce?: string,
+        maxAge?: number,
+    ): Promise<string> {
+        const params: AuthorizeParams = {
+            clientId,
+            redirectUri,
+            scope,
+            state,
+            codeChallenge,
+            codeChallengeMethod,
+            prompt,
+            subscriberTenantHint,
+            resource,
+            nonce,
+            maxAge,
+        };
+        // We need a flowIdCookie, but legacy callers don't provide it.
+        // For backward compatibility, we'll initialize a new flow context.
+        const csrfContext = await this.initializeFlow(params);
+        return this.getAuthorizationCode(params, sidCookie, csrfContext.flowIdCookie);
+    }
 }

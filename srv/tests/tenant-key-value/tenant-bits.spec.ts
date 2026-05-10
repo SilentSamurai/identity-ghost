@@ -29,7 +29,7 @@ describe('TenantBits API', () => {
         app = new SharedTestFixture();
         const tokenFixture = new TokenFixture(app);
         // Create two tenants
-        const adminResponse = await tokenFixture.fetchAccessToken(
+        const adminResponse = await tokenFixture.fetchPasswordGrantAccessToken(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com'
@@ -150,7 +150,7 @@ describe('TenantBits API', () => {
     //
     it('should reject requests with a user (password grant) token', async () => {
         const tokenFixture = new TokenFixture(app);
-        const userResponse = await tokenFixture.fetchAccessToken(
+        const userResponse = await tokenFixture.fetchPasswordGrantAccessToken(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com'

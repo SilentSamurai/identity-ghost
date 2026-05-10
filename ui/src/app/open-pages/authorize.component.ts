@@ -479,9 +479,8 @@ export class AuthorizeComponent implements OnInit, OnDestroy {
                 this.pendingCredentials = null;
                 this._pendingTenants = [];
 
-                // P3: redirect target is always /api/oauth/authorize (same origin).
-                // No one-shot flags (session_confirmed / from_logout) on this path.
-                window.location.href = this.redirectBuilder.toAuthorizeEndpoint(this.oauthParams!);
+                // After login the session is fresh — skip session-confirm.
+                window.location.href = this.redirectBuilder.toAuthorizeEndpoint(this.oauthParams!, { session_confirmed: true });
             } else if ('requires_tenant_selection' in response && response.requires_tenant_selection === true) {
                 // The user belongs to multiple tenants for this client.
                 // Store credentials and tenant list in Component_State ONLY —
@@ -585,8 +584,8 @@ export class AuthorizeComponent implements OnInit, OnDestroy {
                 this.pendingCredentials = null;
                 this._pendingTenants = [];
 
-                // P3: redirect to /api/oauth/authorize (same origin, no one-shot flags).
-                window.location.href = this.redirectBuilder.toAuthorizeEndpoint(this.oauthParams!);
+                // After login the session is fresh — skip session-confirm.
+                window.location.href = this.redirectBuilder.toAuthorizeEndpoint(this.oauthParams!, { session_confirmed: true });
             } else {
                 // Unexpected response shape — treat as an error.
                 this.inflight.tenantPick = false;

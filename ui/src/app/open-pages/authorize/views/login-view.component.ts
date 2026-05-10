@@ -43,35 +43,35 @@ import {FormBuilder, FormGroup, Validators} from '@angular/forms';
                 novalidate
             >
                 <div class="form-group">
-                    <label for="login-view-email">Username</label>
+                    <label for="username">Username</label>
                     <div class="input-group">
                         <span class="input-group-text">&#64;</span>
                         <input
-                            id="login-view-email"
+                            id="username"
                             type="text"
                             class="form-control"
                             formControlName="email"
                             placeholder="Enter Username / Email"
                             autocomplete="username"
                             [attr.disabled]="inflight ? true : null"
-                            aria-describedby="login-view-email-error"
+                            aria-describedby="username-error"
                         />
                     </div>
                     <div
                         *ngIf="form.get('email')?.errors && (form.get('email')?.touched || form.get('email')?.dirty)"
                         class="alert alert-danger mt-2"
                         role="alert"
-                        id="login-view-email-error"
+                        id="username-error"
                     >
                         Username is required
                     </div>
                 </div>
 
                 <div class="form-group mt-3">
-                    <label for="login-view-password">Password</label>
+                    <label for="password">Password</label>
                     <div class="input-group">
                         <input
-                            id="login-view-password"
+                            id="password"
                             [type]="passwordVisible ? 'text' : 'password'"
                             class="form-control"
                             formControlName="password"
@@ -79,7 +79,7 @@ import {FormBuilder, FormGroup, Validators} from '@angular/forms';
                             autocomplete="current-password"
                             minlength="6"
                             [attr.disabled]="inflight ? true : null"
-                            aria-describedby="login-view-password-error"
+                            aria-describedby="password-error"
                         />
                         <button
                             (click)="passwordVisible = !passwordVisible"
@@ -95,7 +95,7 @@ import {FormBuilder, FormGroup, Validators} from '@angular/forms';
                         *ngIf="form.get('password')?.errors && (form.get('password')?.touched || form.get('password')?.dirty)"
                         class="alert alert-danger mt-2"
                         role="alert"
-                        id="login-view-password-error"
+                        id="password-error"
                     >
                         <div *ngIf="form.get('password')?.errors?.['required']">
                             Password is required

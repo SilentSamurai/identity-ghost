@@ -36,7 +36,7 @@ describe('Token Introspection Endpoint (RFC 7662)', () => {
         tokenFixture = new TokenFixture(app);
 
         // 1. Get a user access token (password grant)
-        const tokenResult = await tokenFixture.fetchAccessToken(
+        const tokenResult = await tokenFixture.fetchPasswordGrantAccessToken(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com',

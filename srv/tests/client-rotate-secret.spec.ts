@@ -15,7 +15,7 @@ describe("Client Secret Rotation - Public to Confidential", () => {
     beforeAll(async () => {
         app = new SharedTestFixture();
         const tokenFixture = new TokenFixture(app);
-        const response = await tokenFixture.fetchAccessToken(email, password, domain);
+        const response = await tokenFixture.fetchPasswordGrantAccessToken(email, password, domain);
         accessToken = response.accessToken;
         clientApi = new ClientEntityClient(app, accessToken);
 

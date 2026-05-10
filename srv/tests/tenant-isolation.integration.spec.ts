@@ -37,7 +37,7 @@ describe('Tenant isolation', () => {
         tokenFixture = new TokenFixture(app);
 
         // Obtain super-admin access token
-        const response = await tokenFixture.fetchAccessToken(
+        const response = await tokenFixture.fetchPasswordGrantAccessToken(
             "admin@auth.server.com",
             "admin9000",
             "auth.server.com",

@@ -66,7 +66,7 @@ describe('Feature: resource-indicator-support, Property 3: Auth code resource ro
     beforeAll(async () => {
         app = new SharedTestFixture();
         tokenFixture = new TokenFixture(app);
-        const response = await tokenFixture.fetchAccessToken(email, password, 'auth.server.com');
+        const response = await tokenFixture.fetchPasswordGrantAccessToken(email, password, 'auth.server.com');
         clientApi = new ClientEntityClient(app, response.accessToken);
 
         const tenantClient = new TenantClient(app, response.accessToken);
@@ -95,7 +95,7 @@ describe('Feature: resource-indicator-support, Property 3: Auth code resource ro
                     await tokenFixture.preGrantConsent(email, password, clientId, REDIRECT_URI);
 
                     // Login → authorize with resource → get auth code
-                    const sidCookie = await tokenFixture.loginForCookie(email, password, clientId);
+                    const sidCookie = await tokenFixture.loginForCookie(email, password, clientId, REDIRECT_URI);
                     const code = await tokenFixture.authorizeForCode(sidCookie, clientId, REDIRECT_URI, {
                         codeChallenge: CODE_CHALLENGE,
                         codeChallengeMethod: 'plain',
@@ -154,7 +154,7 @@ describe('Feature: resource-indicator-support, Property 3: Auth code resource ro
             try {
                 await tokenFixture.preGrantConsent(email, password, clientId, REDIRECT_URI);
 
-                const sidCookie = await tokenFixture.loginForCookie(email, password, clientId);
+                const sidCookie = await tokenFixture.loginForCookie(email, password, clientId, REDIRECT_URI);
                 const code = await tokenFixture.authorizeForCode(sidCookie, clientId, REDIRECT_URI, {
                     codeChallenge: CODE_CHALLENGE,
                     codeChallengeMethod: 'plain',

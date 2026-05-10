@@ -23,7 +23,7 @@ describe('Feature: session-consent-direct, Property 2: Valid sessions with conse
         app = new SharedTestFixture();
         tokenFixture = new TokenFixture(app);
 
-        const adminToken = await tokenFixture.fetchAccessToken(
+        const adminToken = await tokenFixture.fetchPasswordGrantAccessToken(
             ADMIN_EMAIL, ADMIN_PASSWORD, 'auth.server.com',
         );
         superAccessToken = adminToken.accessToken;
@@ -61,7 +61,7 @@ describe('Feature: session-consent-direct, Property 2: Valid sessions with conse
 
         await fc.assert(
             fc.asyncProperty(scopeArb, stateArb, async (scope, state) => {
-                const sidCookie = await tokenFixture.loginForCookie(ADMIN_EMAIL, ADMIN_PASSWORD, clientId);
+                const sidCookie = await tokenFixture.loginForCookie(ADMIN_EMAIL, ADMIN_PASSWORD, clientId, REDIRECT_URI);
 
                 const res = await app.getHttpServer()
                     .get('/api/oauth/authorize')

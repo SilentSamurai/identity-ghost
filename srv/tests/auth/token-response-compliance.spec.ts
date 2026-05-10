@@ -28,7 +28,7 @@ describe('Token Response RFC 6749 Compliance', () => {
         tokenFixture = new TokenFixture(app);
 
         // Create a confidential client upfront for client_credentials tests
-        const tokenResult = await tokenFixture.fetchAccessToken(
+        const tokenResult = await tokenFixture.fetchPasswordGrantAccessToken(
             "admin@auth.server.com",
             "admin9000",
             "auth.server.com",

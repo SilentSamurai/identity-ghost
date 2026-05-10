@@ -42,7 +42,7 @@ describe('AppController', () => {
         tokenFixture = new TokenFixture(fixture);
 
         // Authenticate as super admin to create isolated tenants
-        const superAdmin = await tokenFixture.fetchAccessToken(
+        const superAdmin = await tokenFixture.fetchPasswordGrantAccessToken(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com'
@@ -74,12 +74,12 @@ describe('AppController', () => {
         await adminClient.updateMemberRoles(subscriberTenantId, subscriberUserId, ['TENANT_ADMIN']);
 
         // Authenticate as the tenant admins
-        const creatorTokenResponse = await tokenFixture.fetchAccessToken(
+        const creatorTokenResponse = await tokenFixture.fetchPasswordGrantAccessToken(
             creatorEmail, creatorPassword, creatorDomain
         );
         creatorAccessToken = creatorTokenResponse.accessToken;
 
-        const subscriberTokenResponse = await tokenFixture.fetchAccessToken(
+        const subscriberTokenResponse = await tokenFixture.fetchPasswordGrantAccessToken(
             subscriberEmail, subscriberPassword, subscriberDomain
         );
         subscriberAccessToken = subscriberTokenResponse.accessToken;
@@ -282,7 +282,7 @@ describe('AppController', () => {
         await subscriberAppClient.subscribeApp(app.id, subscriberTenantId);
 
         // Fetch access token for the subscriber again (should now include scope)
-        const tokenResponse = await tokenFixture.fetchAccessToken(
+        const tokenResponse = await tokenFixture.fetchPasswordGrantAccessToken(
             subscriberEmail,
             subscriberPassword,
             creatorDomain

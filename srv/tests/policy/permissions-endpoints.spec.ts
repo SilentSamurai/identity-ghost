@@ -36,7 +36,7 @@ describe('Permissions Endpoints (e2e)', () => {
         effect: Effect,
         conditions: any
     }) {
-        const adminToken = await tokenFixture.fetchAccessToken(email, pass, domain);
+        const adminToken = await tokenFixture.fetchPasswordGrantAccessToken(email, pass, domain);
         const tenantClient = new TenantClient(app, adminToken.accessToken);
         const usersClient = new UsersClient(app, adminToken.accessToken);
         const policyClient = new PolicyClient(app, adminToken.accessToken);
@@ -88,7 +88,7 @@ describe('Permissions Endpoints (e2e)', () => {
         it('returns CASL rules with Read grants for TENANT_VIEWER token', async () => {
             // arrange
             // admin@auth.server.com has SUPER_ADMIN, TENANT_ADMIN, TENANT_VIEWER
-            const superToken = await tokenFixture.fetchAccessToken(
+            const superToken = await tokenFixture.fetchPasswordGrantAccessToken(
                 "admin@auth.server.com", "admin9000", "auth.server.com"
             );
             const policyClient = new PolicyClient(app, superToken.accessToken);
@@ -120,7 +120,7 @@ describe('Permissions Endpoints (e2e)', () => {
 
         it('returns CASL rules with Manage grants for TENANT_ADMIN token', async () => {
             // arrange
-            const adminToken = await tokenFixture.fetchAccessToken(
+            const adminToken = await tokenFixture.fetchPasswordGrantAccessToken(
                 "admin@perms-test.local", "admin9000", "perms-test.local"
             );
             const policyClient = new PolicyClient(app, adminToken.accessToken);
@@ -159,7 +159,7 @@ describe('Permissions Endpoints (e2e)', () => {
 
         it('each rule has action and subject fields', async () => {
             // arrange
-            const adminToken = await tokenFixture.fetchAccessToken(
+            const adminToken = await tokenFixture.fetchPasswordGrantAccessToken(
                 "admin@perms-test.local", "admin9000", "perms-test.local"
             );
             const policyClient = new PolicyClient(app, adminToken.accessToken);
@@ -189,7 +189,7 @@ describe('Permissions Endpoints (e2e)', () => {
             );
 
             // Re-fetch token so it includes the new custom role
-            const freshToken = await tokenFixture.fetchAccessToken(
+            const freshToken = await tokenFixture.fetchPasswordGrantAccessToken(
                 "admin@auth.server.com", "admin9000", "auth.server.com"
             );
             const freshPolicyClient = new PolicyClient(app, freshToken.accessToken);
@@ -216,7 +216,7 @@ describe('Permissions Endpoints (e2e)', () => {
 
         it('returns empty array for token with only internal roles', async () => {
             // arrange
-            const adminToken = await tokenFixture.fetchAccessToken(
+            const adminToken = await tokenFixture.fetchPasswordGrantAccessToken(
                 "admin@auth.server.com", "admin9000", "auth.server.com"
             );
             const policyClient = new PolicyClient(app, adminToken.accessToken);
@@ -231,7 +231,7 @@ describe('Permissions Endpoints (e2e)', () => {
 
         it('returns empty array when user has no custom roles', async () => {
             // arrange
-            const adminToken = await tokenFixture.fetchAccessToken(
+            const adminToken = await tokenFixture.fetchPasswordGrantAccessToken(
                 "admin@auth.server.com", "admin9000", "auth.server.com"
             );
             const policyClient = new PolicyClient(app, adminToken.accessToken);

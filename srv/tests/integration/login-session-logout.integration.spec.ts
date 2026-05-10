@@ -24,7 +24,7 @@ describe('Login Session Logout', () => {
         tokenFixture = new TokenFixture(app);
 
         // Get a token to fetch tenant credentials
-        const adminResult = await tokenFixture.fetchAccessToken(
+        const adminResult = await tokenFixture.fetchPasswordGrantAccessToken(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com',

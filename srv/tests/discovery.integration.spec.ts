@@ -27,7 +27,7 @@ describe('OIDC Discovery endpoint', () => {
         app = new SharedTestFixture();
 
         const tokenFixture = new TokenFixture(app);
-        const response = await tokenFixture.fetchAccessToken(
+        const response = await tokenFixture.fetchPasswordGrantAccessToken(
             "admin@auth.server.com",
             "admin9000",
             "auth.server.com",
@@ -67,7 +67,7 @@ describe('OIDC Discovery endpoint', () => {
         await helper.setUserPassword(discoUserId, 'discoPass123');
         await helper.verifyUser(discoUserEmail);
 
-        const tenantTokenRes = await tokenFixture.fetchAccessToken(
+        const tenantTokenRes = await tokenFixture.fetchPasswordGrantAccessToken(
             discoUserEmail, 'discoPass123', tenantA.domain
         );
 

@@ -26,7 +26,7 @@ describe('Feature: password-grant-deprecation, Property 1: Disallowed clients al
     beforeAll(async () => {
         fixture = new SharedTestFixture();
         const tokenFixture = new TokenFixture(fixture);
-        const {accessToken} = await tokenFixture.fetchAccessToken(
+        const {accessToken} = await tokenFixture.fetchPasswordGrantAccessToken(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com',

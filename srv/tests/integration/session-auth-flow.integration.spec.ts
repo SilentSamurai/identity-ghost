@@ -27,7 +27,7 @@ describe('Session Auth Flow', () => {
         app = new SharedTestFixture();
         tokenFixture = new TokenFixture(app);
 
-        const adminToken = await tokenFixture.fetchAccessToken(
+        const adminToken = await tokenFixture.fetchPasswordGrantAccessToken(
             ADMIN_EMAIL, ADMIN_PASSWORD, 'auth.server.com',
         );
         superAccessToken = adminToken.accessToken;
@@ -63,7 +63,7 @@ describe('Session Auth Flow', () => {
     // ── Helpers ──────────────────────────────────────────────────────
 
     async function loginForCookie(clientId: string): Promise<string> {
-        return tokenFixture.loginForCookie(ADMIN_EMAIL, ADMIN_PASSWORD, clientId);
+        return tokenFixture.loginForCookie(ADMIN_EMAIL, ADMIN_PASSWORD, clientId, REDIRECT_URI);
     }
 
     function extractSidValue(signedCookie: string): string {

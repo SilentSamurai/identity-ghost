@@ -71,7 +71,7 @@ describe('Feature: resource-indicator-support, Property 4: Auth code resource ta
     beforeAll(async () => {
         app = new SharedTestFixture();
         tokenFixture = new TokenFixture(app);
-        const response = await tokenFixture.fetchAccessToken(email, password, 'auth.server.com');
+        const response = await tokenFixture.fetchPasswordGrantAccessToken(email, password, 'auth.server.com');
         clientApi = new ClientEntityClient(app, response.accessToken);
 
         const tenantClient = new TenantClient(app, response.accessToken);
@@ -87,7 +87,7 @@ describe('Feature: resource-indicator-support, Property 4: Auth code resource ta
      * Helper: login → authorize with resource → return auth code.
      */
     async function loginAndGetCodeWithResource(clientId: string, resource?: string): Promise<string> {
-        const sidCookie = await tokenFixture.loginForCookie(email, password, clientId);
+        const sidCookie = await tokenFixture.loginForCookie(email, password, clientId, REDIRECT_URI);
         return tokenFixture.authorizeForCode(sidCookie, clientId, REDIRECT_URI, {
             codeChallenge: CODE_CHALLENGE,
             codeChallengeMethod: 'plain',

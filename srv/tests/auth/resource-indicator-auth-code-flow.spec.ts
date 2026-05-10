@@ -24,7 +24,7 @@ describe('Resource Indicator Auth Code Flow', () => {
     beforeAll(async () => {
         app = new SharedTestFixture();
         tokenFixture = new TokenFixture(app);
-        const response = await tokenFixture.fetchAccessToken(
+        const response = await tokenFixture.fetchPasswordGrantAccessToken(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com',
@@ -53,7 +53,7 @@ describe('Resource Indicator Auth Code Flow', () => {
      * Uses loginForCookie() + authorizeForCode() with resource param.
      */
     async function loginAndGetCodeWithResource(clientId: string, resource: string): Promise<string> {
-        const sidCookie = await tokenFixture.loginForCookie('admin@auth.server.com', 'admin9000', clientId);
+        const sidCookie = await tokenFixture.loginForCookie('admin@auth.server.com', 'admin9000', clientId, REDIRECT_URI);
         return tokenFixture.authorizeForCode(sidCookie, clientId, REDIRECT_URI, {
             codeChallenge: CODE_CHALLENGE,
             codeChallengeMethod: 'plain',

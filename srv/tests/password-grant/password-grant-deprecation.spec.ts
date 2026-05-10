@@ -40,7 +40,7 @@ describe('Password Grant Deprecation Integration Tests', () => {
         const tokenFixture = new TokenFixture(app);
 
         // Get super-admin access token using the default first-party client
-        const tokenResponse = await tokenFixture.fetchAccessToken(
+        const tokenResponse = await tokenFixture.fetchPasswordGrantAccessToken(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com',
@@ -138,6 +138,7 @@ describe('Password Grant Deprecation Integration Tests', () => {
             'admin@auth.server.com',
             'admin9000',
             options.client_id,
+            redirectUri,
         );
 
         // Step 2: GET /authorize — this is where consent is evaluated.

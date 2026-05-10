@@ -28,7 +28,7 @@ describe('Refresh Token Issuance', () => {
         let tokenResponse: any;
 
         beforeAll(async () => {
-            tokenResponse = await tokenFixture.fetchAccessToken(
+            tokenResponse = await tokenFixture.fetchPasswordGrantAccessToken(
                 'admin@auth.server.com',
                 'admin9000',
                 'auth.server.com',

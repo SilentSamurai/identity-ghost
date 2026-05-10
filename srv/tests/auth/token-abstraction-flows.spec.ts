@@ -31,7 +31,7 @@ describe('Token Abstraction Flows', () => {
 
         // Obtain password grant tokens and create a confidential client upfront
         const tokenFixture = new TokenFixture(app);
-        const response = await tokenFixture.fetchAccessToken(
+        const response = await tokenFixture.fetchPasswordGrantAccessToken(
             "admin@auth.server.com",
             "admin9000",
             "auth.server.com"

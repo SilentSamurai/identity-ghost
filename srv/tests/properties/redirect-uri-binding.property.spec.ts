@@ -31,7 +31,7 @@ describe('Feature: redirect-uri-validation, Property 4: Token exchange binding a
     beforeAll(async () => {
         app = new SharedTestFixture();
         tokenFixture = new TokenFixture(app);
-        const {accessToken} = await tokenFixture.fetchAccessToken(email, password, 'auth.server.com');
+        const {accessToken} = await tokenFixture.fetchPasswordGrantAccessToken(email, password, 'auth.server.com');
 
         clientApi = new ClientEntityClient(app, accessToken);
         const tenantClient = new TenantClient(app, accessToken);
@@ -152,7 +152,7 @@ describe('Feature: redirect-uri-validation, Property 5: Null stored redirect_uri
     beforeAll(async () => {
         app = new SharedTestFixture();
         tokenFixture = new TokenFixture(app);
-        const {accessToken} = await tokenFixture.fetchAccessToken(email, password, 'auth.server.com');
+        const {accessToken} = await tokenFixture.fetchPasswordGrantAccessToken(email, password, 'auth.server.com');
 
         clientApi = new ClientEntityClient(app, accessToken);
         const tenantClient = new TenantClient(app, accessToken);

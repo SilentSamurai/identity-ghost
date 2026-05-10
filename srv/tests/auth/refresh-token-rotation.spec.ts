@@ -29,7 +29,7 @@ describe('Refresh Token Rotation', () => {
         tokenFixture = new TokenFixture(app);
 
         // 1. Get initial tokens via password grant
-        const result = await tokenFixture.fetchAccessToken(
+        const result = await tokenFixture.fetchPasswordGrantAccessToken(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com',
@@ -77,7 +77,7 @@ describe('Refresh Token Rotation', () => {
 
     it('returns a valid access token alongside the new refresh token', async () => {
         // Get a fresh token first
-        const freshTokens = await tokenFixture.fetchAccessToken(
+        const freshTokens = await tokenFixture.fetchPasswordGrantAccessToken(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com',
@@ -103,7 +103,7 @@ describe('Refresh Token Rotation', () => {
 
     it('old refresh token cannot be used again after rotation (single-use)', async () => {
         // Get a fresh token
-        const freshTokens = await tokenFixture.fetchAccessToken(
+        const freshTokens = await tokenFixture.fetchPasswordGrantAccessToken(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com',
@@ -133,7 +133,7 @@ describe('Refresh Token Rotation', () => {
 
     it('supports chained rotation (A → B → C)', async () => {
         // Get a fresh token
-        const freshTokens = await tokenFixture.fetchAccessToken(
+        const freshTokens = await tokenFixture.fetchPasswordGrantAccessToken(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com',
@@ -168,7 +168,7 @@ describe('Refresh Token Rotation', () => {
     });
 
     it('preserves scope through rotation', async () => {
-        const freshTokens = await tokenFixture.fetchAccessToken(
+        const freshTokens = await tokenFixture.fetchPasswordGrantAccessToken(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com',

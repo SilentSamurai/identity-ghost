@@ -18,7 +18,7 @@ describe("e2e forgot/reset password flow", () => {
 
         // Verify the user via the admin HTTP API (replaces direct repository access)
         const tokenFixture = new TokenFixture(app);
-        const {accessToken} = await tokenFixture.fetchAccessToken(
+        const {accessToken} = await tokenFixture.fetchPasswordGrantAccessToken(
             "admin@auth.server.com", "admin9000", "auth.server.com"
         );
         const verifyRes = await app.getHttpServer()

@@ -30,7 +30,7 @@ describe('PKCE Optional Flow: authorize → token exchange without code_challeng
         tokenFixture = new TokenFixture(fixture);
 
         // Get a tenant-scoped token for the test tenant to retrieve its ID
-        const {jwt} = await tokenFixture.fetchAccessToken(
+        const {jwt} = await tokenFixture.fetchPasswordGrantAccessToken(
             ADMIN_EMAIL,
             ADMIN_PASSWORD,
             TENANT_DOMAIN,
@@ -38,7 +38,7 @@ describe('PKCE Optional Flow: authorize → token exchange without code_challeng
         const tenantId = jwt.tenant.id;
 
         // Get super-admin token to create a client
-        const {accessToken: superToken} = await tokenFixture.fetchAccessToken(
+        const {accessToken: superToken} = await tokenFixture.fetchPasswordGrantAccessToken(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com',
@@ -73,7 +73,7 @@ describe('PKCE Optional Flow: authorize → token exchange without code_challeng
         await fc.assert(
             fc.asyncProperty(stateArb, scopeArb, async (state, scope) => {
                 // Step 1: Login to get a sid cookie
-                const sidCookie = await tokenFixture.loginForCookie(ADMIN_EMAIL, ADMIN_PASSWORD, testClientId);
+                const sidCookie = await tokenFixture.loginForCookie(ADMIN_EMAIL, ADMIN_PASSWORD, testClientId, REDIRECT_URI);
 
                 // Step 2: GET /api/oauth/authorize WITHOUT code_challenge
                 const authorizeRes = await fixture.getHttpServer()

@@ -30,7 +30,7 @@ describe('AuthorizeSchema validation — GET /api/oauth/authorize', () => {
         app = new SharedTestFixture();
 
         const tokenFixture = new TokenFixture(app);
-        const {accessToken} = await tokenFixture.fetchAccessToken(
+        const {accessToken} = await tokenFixture.fetchPasswordGrantAccessToken(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com',

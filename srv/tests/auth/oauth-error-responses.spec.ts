@@ -85,7 +85,7 @@ describe('OAuth token endpoint error response format (RFC 6749 §5.2)', () => {
 
         beforeAll(async () => {
             // Get a valid access token to fetch real client credentials
-            const tokenResult = await tokenFixture.fetchAccessToken(
+            const tokenResult = await tokenFixture.fetchPasswordGrantAccessToken(
                 'admin@auth.server.com',
                 'admin9000',
                 'auth.server.com',

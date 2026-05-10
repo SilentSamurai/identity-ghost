@@ -29,7 +29,7 @@ describe('Permission migration — authorization preserved', () => {
         tokenFixture = new TokenFixture(app);
 
         // --- Super admin: create tenant, add two members ---
-        const superAdminToken = await tokenFixture.fetchAccessToken(
+        const superAdminToken = await tokenFixture.fetchPasswordGrantAccessToken(
             "admin@auth.server.com", "admin9000", "auth.server.com"
         );
         superAdminClient = new AdminTenantClient(app, superAdminToken.accessToken);
@@ -52,13 +52,13 @@ describe('Permission migration — authorization preserved', () => {
         await superAdminClient.updateMemberRoles(tenant.id, gimliId, ["TENANT_VIEWER"]);
 
         // --- Log in as TENANT_ADMIN ---
-        const adminToken = await tokenFixture.fetchAccessToken(
+        const adminToken = await tokenFixture.fetchPasswordGrantAccessToken(
             "legolas@mail.com", "legolas9000", tenantDomain
         );
         adminClient = new TenantClient(app, adminToken.accessToken);
 
         // --- Log in as TENANT_VIEWER ---
-        const viewerToken = await tokenFixture.fetchAccessToken(
+        const viewerToken = await tokenFixture.fetchPasswordGrantAccessToken(
             "gimli@mail.com", "gimli9000", tenantDomain
         );
         viewerClient = new TenantClient(app, viewerToken.accessToken);

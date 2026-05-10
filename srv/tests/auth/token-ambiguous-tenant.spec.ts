@@ -45,7 +45,7 @@ describe('Ambiguous Subscription Tenant Flow', () => {
     beforeAll(async () => {
         app = new SharedTestFixture();
         tokenFixture = new TokenFixture(app);
-        const superAdminTokenResponse = await tokenFixture.fetchAccessToken(
+        const superAdminTokenResponse = await tokenFixture.fetchPasswordGrantAccessToken(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com'
@@ -89,7 +89,7 @@ describe('Ambiguous Subscription Tenant Flow', () => {
             await adminTenantClient.subscribeToApp(subscriber2.id, createdApp.id);
 
             try {
-                await tokenFixture.fetchAccessToken(testUserEmail, testUserPassword, appOwnerTenant.domain);
+                await tokenFixture.fetchPasswordGrantAccessToken(testUserEmail, testUserPassword, appOwnerTenant.domain);
                 fail('Expected BadRequestException for ambiguous tenants');
             } catch (error) {
                 expect(error.status).toBe(400);

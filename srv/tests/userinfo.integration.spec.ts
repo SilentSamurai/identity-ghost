@@ -231,7 +231,7 @@ describe('UserInfo Endpoint Integration', () => {
     describe('client credentials token (TechnicalToken)', () => {
         it('should return 401 because UserInfo requires a user access token', async () => {
             // Get an admin access token to create a confidential client
-            const adminToken = await tokenFixture.fetchAccessToken(email, password, clientId);
+            const adminToken = await tokenFixture.fetchPasswordGrantAccessToken(email, password, clientId);
 
             // Create a confidential client for the tenant
             const decoded = app.jwtService().decode(adminToken.accessToken, {json: true}) as any;

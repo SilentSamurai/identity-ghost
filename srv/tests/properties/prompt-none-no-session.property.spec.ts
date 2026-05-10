@@ -22,7 +22,7 @@ describe('Feature: prompt-none-no-session, Property 7: prompt=none with no sessi
         app = new SharedTestFixture();
         tokenFixture = new TokenFixture(app);
 
-        const adminToken = await tokenFixture.fetchAccessToken(
+        const adminToken = await tokenFixture.fetchPasswordGrantAccessToken(
             ADMIN_EMAIL, ADMIN_PASSWORD, 'auth.server.com',
         );
         superAccessToken = adminToken.accessToken;
@@ -76,7 +76,7 @@ describe('Feature: prompt-none-no-session, Property 7: prompt=none with no sessi
     });
 
     it('prompt=none with valid session + consent issues a code (not an error)', async () => {
-        const sidCookie = await tokenFixture.loginForCookie(ADMIN_EMAIL, ADMIN_PASSWORD, testClientId);
+        const sidCookie = await tokenFixture.loginForCookie(ADMIN_EMAIL, ADMIN_PASSWORD, testClientId, REDIRECT_URI);
 
         const res = await app.getHttpServer()
             .get('/api/oauth/authorize')
@@ -114,7 +114,7 @@ describe('Feature: prompt-none-no-session, Property 7: prompt=none with no sessi
         const freshClientId = freshClient.client.clientId;
 
         try {
-            const sidCookie = await tokenFixture.loginForCookie(ADMIN_EMAIL, ADMIN_PASSWORD, freshClientId);
+            const sidCookie = await tokenFixture.loginForCookie(ADMIN_EMAIL, ADMIN_PASSWORD, freshClientId, REDIRECT_URI);
 
             const res = await app.getHttpServer()
                 .get('/api/oauth/authorize')

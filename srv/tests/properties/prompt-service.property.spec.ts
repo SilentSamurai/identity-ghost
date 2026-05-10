@@ -654,7 +654,7 @@ describe('Feature: oidc-prompt-max-age, Property 8: auth_time claim inclusion wh
         const usesPromptLogin = options.prompt === 'login';
 
         // Establish a fresh session first.
-        const sidCookie = await tokenFixture.loginForCookie(ADMIN_EMAIL, ADMIN_PASSWORD, CLIENT_ID);
+        const sidCookie = await tokenFixture.loginForCookie(ADMIN_EMAIL, ADMIN_PASSWORD, CLIENT_ID, REDIRECT_URI);
 
         const authorizeQuery: Record<string, string> = {
             response_type: 'code',
@@ -676,7 +676,7 @@ describe('Feature: oidc-prompt-max-age, Property 8: auth_time claim inclusion wh
             // Re-login to get a fresh authTime, then authorize WITH prompt=login in the query
             // so the issued code carries requireAuthTime (in the current implementation this
             // is set when prompt=login is present OR when max_age is present).
-            const freshCookie = await tokenFixture.loginForCookie(ADMIN_EMAIL, ADMIN_PASSWORD, CLIENT_ID);
+            const freshCookie = await tokenFixture.loginForCookie(ADMIN_EMAIL, ADMIN_PASSWORD, CLIENT_ID, REDIRECT_URI);
             // Server sees prompt=login and always bounces to /authorize UI; strip prompt on retry.
             const retry = await app.getHttpServer()
                 .get('/api/oauth/authorize')
@@ -719,7 +719,7 @@ describe('Feature: oidc-prompt-max-age, Property 8: auth_time claim inclusion wh
         // If /authorize bounced to the login UI (e.g. max_age=0 with stale session),
         // re-login and retry.
         if (!redirectUrl.searchParams.has('code')) {
-            const freshCookie = await tokenFixture.loginForCookie(ADMIN_EMAIL, ADMIN_PASSWORD, CLIENT_ID);
+            const freshCookie = await tokenFixture.loginForCookie(ADMIN_EMAIL, ADMIN_PASSWORD, CLIENT_ID, REDIRECT_URI);
             const retry = await app.getHttpServer()
                 .get('/api/oauth/authorize')
                 .query(authorizeQuery)

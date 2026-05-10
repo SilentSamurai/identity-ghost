@@ -21,7 +21,7 @@ describe('Feature: logout-session-invalidation, Property 6: Logout invalidates s
         app = new SharedTestFixture();
         tokenFixture = new TokenFixture(app);
 
-        const adminToken = await tokenFixture.fetchAccessToken(
+        const adminToken = await tokenFixture.fetchPasswordGrantAccessToken(
             ADMIN_EMAIL, ADMIN_PASSWORD, 'auth.server.com',
         );
         superAccessToken = adminToken.accessToken;
@@ -56,7 +56,7 @@ describe('Feature: logout-session-invalidation, Property 6: Logout invalidates s
     }
 
     it('POST /logout invalidates the session server-side and clears the cookie', async () => {
-        const sidCookie = await tokenFixture.loginForCookie(ADMIN_EMAIL, ADMIN_PASSWORD, testClientId);
+        const sidCookie = await tokenFixture.loginForCookie(ADMIN_EMAIL, ADMIN_PASSWORD, testClientId, REDIRECT_URI);
         const sid = extractSidValue(sidCookie);
         expect(sid).toBeTruthy();
 
@@ -92,7 +92,7 @@ describe('Feature: logout-session-invalidation, Property 6: Logout invalidates s
     });
 
     it('logout is idempotent for any already-invalidated session', async () => {
-        const sidCookie = await tokenFixture.loginForCookie(ADMIN_EMAIL, ADMIN_PASSWORD, testClientId);
+        const sidCookie = await tokenFixture.loginForCookie(ADMIN_EMAIL, ADMIN_PASSWORD, testClientId, REDIRECT_URI);
         const sid = extractSidValue(sidCookie);
 
         await app.getHttpServer()

@@ -80,7 +80,7 @@ describe('Consent Flow Integration Tests', () => {
         app = new SharedTestFixture();
         tokenFixture = new TokenFixture(app);
 
-        const tokenResponse = await tokenFixture.fetchAccessToken(
+        const tokenResponse = await tokenFixture.fetchPasswordGrantAccessToken(
             ADMIN_EMAIL,
             ADMIN_PASSWORD,
             'auth.server.com',
@@ -147,7 +147,7 @@ describe('Consent Flow Integration Tests', () => {
 
     /** Issue POST /login, returning the signed sid cookie string. */
     async function loginForSid(clientId: string): Promise<string> {
-        return tokenFixture.loginForCookie(ADMIN_EMAIL, ADMIN_PASSWORD, clientId);
+        return tokenFixture.loginForCookie(ADMIN_EMAIL, ADMIN_PASSWORD, clientId, REDIRECT_URI);
     }
 
     /**
@@ -237,6 +237,7 @@ describe('Consent Flow Integration Tests', () => {
         if (flowIdCookie) cookieParts.push(flowIdCookie);
         return { flowIdCookie, csrfToken, combinedCookies: cookieParts.join('; ') };
     }
+    /**
      * GET /authorize again → return the authorization code carried on the final
      * redirect_uri redirect.
      */

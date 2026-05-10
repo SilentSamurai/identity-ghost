@@ -31,7 +31,7 @@ describe('GET /api/oauth/authorize', () => {
     beforeAll(async () => {
         app = new SharedTestFixture();
         const tokenFixture = new TokenFixture(app);
-        const response = await tokenFixture.fetchAccessToken(
+        const response = await tokenFixture.fetchAccessTokenFlow(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com',
@@ -326,18 +326,39 @@ describe('GET /api/oauth/authorize', () => {
 
             try {
                 const tokenFixture = new TokenFixture(app);
-                await tokenFixture.preGrantConsent('admin@auth.server.com', 'admin9000', clientId, REDIRECT_URI);
-
-                // Authorize with S256 — should succeed
-                const sidCookie = await tokenFixture.loginForCookie('admin@auth.server.com', 'admin9000', clientId);
-                const code = await tokenFixture.authorizeForCode(sidCookie, clientId, REDIRECT_URI, {
+                await tokenFixture.preGrantConsentFlow('admin@auth.server.com', 'admin9000', {
+                    clientId,
+                    redirectUri: REDIRECT_URI,
+                    scope: 'openid profile email',
+                    state: 'pre-grant-state',
                     codeChallenge: 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
                     codeChallengeMethod: 'S256',
                 });
+
+                // Authorize with S256 — should succeed
+                const sidCookie = await tokenFixture.fetchSidCookieFlow('admin@auth.server.com', 'admin9000', {
+                    clientId,
+                    redirectUri: REDIRECT_URI,
+                    scope: 'openid profile email',
+                    state: 's256-state',
+                    codeChallenge: 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
+                    codeChallengeMethod: 'S256',
+                });
+                const code = await tokenFixture.getAuthorizationCode(
+                    {
+                        clientId,
+                        redirectUri: REDIRECT_URI,
+                        scope: 'openid profile email',
+                        state: 's256-state',
+                        codeChallenge: 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
+                        codeChallengeMethod: 'S256',
+                    },
+                    sidCookie,
+                    '', // flowIdCookie not needed for this test
+                );
                 expect(code).toBeDefined();
 
                 // Authorize with plain — also succeeds (pkceMethodUsed not tracked in new flow)
-                const sidCookie2 = await tokenFixture.loginForCookie('admin@auth.server.com', 'admin9000', clientId);
                 const response = await authorizeRequest({
                     response_type: 'code',
                     client_id: clientId,

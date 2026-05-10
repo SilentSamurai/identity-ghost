@@ -58,7 +58,7 @@ describe('Membership Verification Integration Tests', () => {
         tokenFixture = new TokenFixture(fixture);
 
         // Get super admin token for tenant/user management
-        const superAdmin = await tokenFixture.fetchAccessToken(
+        const superAdmin = await tokenFixture.fetchPasswordGrantAccessToken(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com'
@@ -108,12 +108,12 @@ describe('Membership Verification Integration Tests', () => {
         await adminClient.addMembers(creatorTenantId, [testUserEmail]);
 
         // Authenticate as the tenant admins
-        const creatorTokenResponse = await tokenFixture.fetchAccessToken(
+        const creatorTokenResponse = await tokenFixture.fetchPasswordGrantAccessToken(
             creatorEmail, creatorPassword, creatorDomain
         );
         creatorAccessToken = creatorTokenResponse.accessToken;
 
-        const subscriberTokenResponse = await tokenFixture.fetchAccessToken(
+        const subscriberTokenResponse = await tokenFixture.fetchPasswordGrantAccessToken(
             subscriberEmail, subscriberPassword, subscriberDomain
         );
         subscriberAccessToken = subscriberTokenResponse.accessToken;
@@ -140,7 +140,7 @@ describe('Membership Verification Integration Tests', () => {
     describe('6.2 Member access succeeds', () => {
         it('returns HTTP 200 when user is a valid member of the tenant', async () => {
             // Get a token for the test user who is a member of creator tenant
-            const tokenResponse = await tokenFixture.fetchAccessToken(
+            const tokenResponse = await tokenFixture.fetchPasswordGrantAccessToken(
                 testUserEmail,
                 testUserPassword,
                 creatorDomain
@@ -165,7 +165,7 @@ describe('Membership Verification Integration Tests', () => {
     describe('6.3 Removed member is rejected', () => {
         it('returns HTTP 401 with invalid_token when user is removed from tenant', async () => {
             // Get a token for the test user
-            const tokenResponse = await tokenFixture.fetchAccessToken(
+            const tokenResponse = await tokenFixture.fetchPasswordGrantAccessToken(
                 testUserEmail,
                 testUserPassword,
                 creatorDomain
@@ -209,7 +209,7 @@ describe('Membership Verification Integration Tests', () => {
             await adminClient.addMembers(creatorTenantId, [testUserEmail]);
 
             // Get a fresh token
-            const tokenResponse = await tokenFixture.fetchAccessToken(
+            const tokenResponse = await tokenFixture.fetchPasswordGrantAccessToken(
                 testUserEmail,
                 testUserPassword,
                 creatorDomain
@@ -285,7 +285,7 @@ describe('Membership Verification Integration Tests', () => {
             // Get a token for subscriber user scoped to creator tenant (via subscription)
             // The subscriber user authenticates with their own tenant domain but requests
             // access to the creator's tenant domain (app owner)
-            const tokenResponse = await tokenFixture.fetchAccessToken(
+            const tokenResponse = await tokenFixture.fetchPasswordGrantAccessToken(
                 subscriberEmail,
                 subscriberPassword,
                 creatorDomain  // Request access to creator's tenant (app owner)
@@ -312,7 +312,7 @@ describe('Membership Verification Integration Tests', () => {
             await adminClient.addMembers(creatorTenantId, [testUserEmail]);
 
             // Get a token for the test user
-            const tokenResponse = await tokenFixture.fetchAccessToken(
+            const tokenResponse = await tokenFixture.fetchPasswordGrantAccessToken(
                 testUserEmail,
                 testUserPassword,
                 creatorDomain
@@ -400,7 +400,7 @@ describe('Membership Verification Integration Tests', () => {
             await adminClient.addMembers(creatorTenantId, [testUserEmail]);
 
             // Get a token for the test user
-            const tokenResponse = await tokenFixture.fetchAccessToken(
+            const tokenResponse = await tokenFixture.fetchPasswordGrantAccessToken(
                 testUserEmail,
                 testUserPassword,
                 creatorDomain
@@ -468,7 +468,7 @@ describe('Membership Verification Integration Tests', () => {
             await adminClient.addMembers(creatorTenantId, [testUserEmail]);
 
             // Get a token for the test user
-            const tokenResponse = await tokenFixture.fetchAccessToken(
+            const tokenResponse = await tokenFixture.fetchPasswordGrantAccessToken(
                 testUserEmail,
                 testUserPassword,
                 creatorDomain

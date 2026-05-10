@@ -23,7 +23,7 @@ describe('Property 4: Family-wide revocation', () => {
         fixture = new SharedTestFixture();
         tokenFixture = new TokenFixture(fixture);
 
-        const adminResult = await tokenFixture.fetchAccessToken(
+        const adminResult = await tokenFixture.fetchPasswordGrantAccessToken(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com',
@@ -48,7 +48,7 @@ describe('Property 4: Family-wide revocation', () => {
         await fc.assert(
             fc.asyncProperty(familySizeArb, async (familySize) => {
                 // Build a token chain of the given size
-                const result = await tokenFixture.fetchAccessToken(
+                const result = await tokenFixture.fetchPasswordGrantAccessToken(
                     'admin@auth.server.com',
                     'admin9000',
                     'auth.server.com',

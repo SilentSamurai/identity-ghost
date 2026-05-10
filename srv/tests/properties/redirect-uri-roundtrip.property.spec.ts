@@ -35,7 +35,7 @@ describe('Feature: redirect-uri-validation, Property 3: Auth code stores redirec
     beforeAll(async () => {
         app = new SharedTestFixture();
         tokenFixture = new TokenFixture(app);
-        const {accessToken} = await tokenFixture.fetchAccessToken(email, password, 'auth.server.com');
+        const {accessToken} = await tokenFixture.fetchPasswordGrantAccessToken(email, password, 'auth.server.com');
 
         clientApi = new ClientEntityClient(app, accessToken);
         const tenantClient = new TenantClient(app, accessToken);

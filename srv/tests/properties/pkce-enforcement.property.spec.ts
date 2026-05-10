@@ -43,7 +43,7 @@ describe('PKCE Enforcement: required PKCE, voluntary PKCE, downgrade prevention,
         tokenFixture = new TokenFixture(fixture);
 
         // Get tenant-scoped token to retrieve tenant ID
-        const {jwt} = await tokenFixture.fetchAccessToken(
+        const {jwt} = await tokenFixture.fetchPasswordGrantAccessToken(
             ADMIN_EMAIL,
             ADMIN_PASSWORD,
             TENANT_DOMAIN,
@@ -51,7 +51,7 @@ describe('PKCE Enforcement: required PKCE, voluntary PKCE, downgrade prevention,
         const tenantId = jwt.tenant.id;
 
         // Get super-admin token to create clients
-        const {accessToken: superToken} = await tokenFixture.fetchAccessToken(
+        const {accessToken: superToken} = await tokenFixture.fetchPasswordGrantAccessToken(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com',
@@ -144,7 +144,7 @@ describe('PKCE Enforcement: required PKCE, voluntary PKCE, downgrade prevention,
                     const codeChallenge = generateS256Challenge(verifier);
 
                     // Login → get sid cookie → authorize with S256 code_challenge → get auth code
-                    const sidCookie = await tokenFixture.loginForCookie(ADMIN_EMAIL, ADMIN_PASSWORD, pkceOptionalClientId);
+                    const sidCookie = await tokenFixture.loginForCookie(ADMIN_EMAIL, ADMIN_PASSWORD, pkceOptionalClientId, REDIRECT_URI);
                     const code = await tokenFixture.authorizeForCode(sidCookie, pkceOptionalClientId, REDIRECT_URI, {
                         scope,
                         state,
@@ -181,7 +181,7 @@ describe('PKCE Enforcement: required PKCE, voluntary PKCE, downgrade prevention,
                     const codeChallenge = generateS256Challenge(verifier);
 
                     // Login → authorize with S256 → get auth code
-                    const sidCookie = await tokenFixture.loginForCookie(ADMIN_EMAIL, ADMIN_PASSWORD, pkceOptionalClientId);
+                    const sidCookie = await tokenFixture.loginForCookie(ADMIN_EMAIL, ADMIN_PASSWORD, pkceOptionalClientId, REDIRECT_URI);
                     const code = await tokenFixture.authorizeForCode(sidCookie, pkceOptionalClientId, REDIRECT_URI, {
                         scope,
                         state,

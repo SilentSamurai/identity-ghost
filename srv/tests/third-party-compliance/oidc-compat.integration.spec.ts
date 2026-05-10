@@ -5,6 +5,7 @@ import {TokenFixture} from '../token.fixture';
 import {SearchClient} from '../api-client/search-client';
 import {ClientEntityClient} from '../api-client/client-entity-client';
 import {expect2xx} from "../api-client/client";
+import {confirmSession, extractCookie, extractFlowContext, extractFlowIdCookieAndCsrf, grantConsent, login} from '../fetch-utils';
 
 /**
  * OAuth 2.0 / OIDC Compatibility Tests (Ported from compat-tests/oidc-compat.test.mjs)
@@ -35,36 +36,17 @@ describe('OIDC Compatibility (openid-client v5)', () => {
     let publicClient: Client;
 
     /**
-     * Extract the `sid=...` cookie pair (just the name=value part, no attributes)
-     * from a fetch Response's Set-Cookie header(s).
-     */
-    function extractSidCookie(res: Response): string {
-        const headers = res.headers as any;
-        const cookies: string[] = typeof headers.getSetCookie === 'function'
-            ? headers.getSetCookie()
-            : (headers.get('set-cookie') ? [headers.get('set-cookie') as string] : []);
-
-        for (const c of cookies) {
-            const trimmed = c.trim();
-            if (trimmed.startsWith('sid=')) {
-                return trimmed.split(';')[0];
-            }
-        }
-        throw new Error(`sid cookie not found in Set-Cookie: ${JSON.stringify(cookies)}`);
-    }
-
-    /**
-     * Simulates the browser-driven OAuth flow end-to-end, mirroring what the Angular UI does:
-     *   1. GET  /api/oauth/authorize            → 302 to the login UI (no session yet)
-     *   2. POST /api/oauth/login                → 2xx, Set-Cookie: sid=... (session created)
-     *   3. GET  /api/oauth/authorize (with sid) → 302 to redirect_uri?code=...&state=...
+     * Orchestrates the full browser-driven OAuth flow using the fetch-utils helpers:
+     *   1. extractFlowIdAndCsrf  — GET /authorize (no session), mint flow_id + csrf_token
+     *   2. login                 — POST /login, get sid cookie
+     *   3. GET /authorize        — may hit consent or session-confirm before issuing code
+     *   3a. grantConsent         — POST /consent decision=grant, retry /authorize
+     *   3b. confirmSession       — retry /authorize with session_confirmed=true
      *
-     * openid-client is a Relying Party library: it builds the authorize URL and
-     * exchanges the code at /token. Everything in between is user-agent work, which
-     * we perform here with fetch + a manually carried sid cookie.
-     *
-     * `session_confirmed=true` is added to the authorize URL to bypass the session-confirm UI,
-     * which the tenant has enabled (skipSessionConfirm: false).
+     * Correct order per the authorize controller:
+     *   no consent → consent UI
+     *   consent exists + not confirmed → session-confirm
+     *   consent exists + confirmed → issue code
      */
     async function authorizeAndLogin(
         oidcClient: Client,
@@ -77,8 +59,6 @@ describe('OIDC Compatibility (openid-client v5)', () => {
     ): Promise<{ code: string; state: string }> {
         const state = generators.state();
 
-        // Build the authorize URL via openid-client. session_confirmed=true is passed
-        // through verbatim as a custom param.
         const authUrl = oidcClient.authorizationUrl({
             scope: opts.scope,
             code_challenge: opts.code_challenge,
@@ -86,41 +66,35 @@ describe('OIDC Compatibility (openid-client v5)', () => {
             state,
             nonce: opts.nonce,
             redirect_uri: redirectUri,
-            session_confirmed: 'true',
         });
+        const authUrlWithConfirm = `${authUrl}&session_confirmed=true`;
 
-        // 1. First /authorize (no session) — expect redirect to the login UI.
-        const preLoginAuthorizeRes = await fetch(authUrl, {redirect: 'manual'});
-        expect(preLoginAuthorizeRes.status).toBe(302);
+        // 1. Mint flow_id cookie and csrf_token (stable for the entire flow).
+        const {flowIdCookie, csrfToken} = await extractFlowIdCookieAndCsrf(authUrl);
 
-        // 2. POST credentials to /api/oauth/login — creates session, sets signed sid cookie.
-        const loginRes = await fetch(`${baseUrl}/api/oauth/login`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                email: adminEmail,
-                password: adminPassword,
-                client_id: oidcClient.metadata.client_id,
-            }),
-        });
-        expect2xx(loginRes);
+        // 2. POST credentials → sid cookie.
+        const sidCookie = await login(baseUrl, oidcClient.metadata.client_id!, adminEmail, adminPassword, flowIdCookie, csrfToken);
 
-        const sidCookie = extractSidCookie(loginRes);
+        // All subsequent /authorize calls carry sid + flow_id.
+        const sessionCookies = [sidCookie, flowIdCookie].filter(Boolean).join('; ');
 
-        // 3. Hit /authorize again with the sid cookie — server issues a code and
-        //    redirects to redirect_uri?code=...&state=...
-        const authorizeRes = await fetch(authUrl, {
-            redirect: 'manual',
-            headers: {cookie: sidCookie},
-        });
+        // 3. /authorize with session — server checks consent first, then session-confirm.
+        let authorizeRes = await fetch(authUrlWithConfirm, {redirect: 'manual', headers: {cookie: sessionCookies}});
+        let authorizeLocation = authorizeRes.headers.get('location') ?? '';
         expect(authorizeRes.status).toBe(302);
 
-        const location = authorizeRes.headers.get('location');
-        expect(location).toBeTruthy();
+        // 3a. Grant consent if required, then retry /authorize.
+        const consentResult = await grantConsent(
+            baseUrl, oidcClient.metadata.client_id!, opts.scope, sessionCookies, authorizeLocation, authUrlWithConfirm,
+        );
+        authorizeLocation = consentResult.authorizeLocation;
 
-        const redirectUrl = new URL(location!, baseUrl);
+        // 3b. Confirm session if required, then retry /authorize.
+        const sessionResult = await confirmSession(authUrlWithConfirm, sessionCookies, authorizeLocation);
+        authorizeLocation = sessionResult.authorizeLocation;
+
+        const redirectUrl = new URL(authorizeLocation, baseUrl);
         expect(redirectUrl.searchParams.has('error')).toBe(false);
-
         const code = redirectUrl.searchParams.get('code');
         expect(code).toBeTruthy();
 
@@ -134,7 +108,7 @@ describe('OIDC Compatibility (openid-client v5)', () => {
         baseUrl = `http://127.0.0.1:${ports.app}`;
 
         // 1. Get a super admin token to find the tenant
-        const {accessToken: superAdminToken} = await tokenFixture.fetchAccessToken(
+        const {accessToken: superAdminToken} = await tokenFixture.fetchPasswordGrantAccessToken(
             superAdminEmail,
             superAdminPassword,
             superTenantDomain
@@ -150,7 +124,7 @@ describe('OIDC Compatibility (openid-client v5)', () => {
         tenantId = tenant.id;
 
         // 3. Get a tenant-scoped token to create/update clients
-        const {accessToken: tenantAccessToken} = await tokenFixture.fetchAccessToken(
+        const {accessToken: tenantAccessToken} = await tokenFixture.fetchPasswordGrantAccessToken(
             adminEmail,
             adminPassword,
             tenantDomain

@@ -16,7 +16,7 @@ describe('e2e positive token flow', () => {
         const tokenFixture = new TokenFixture(app);
 
         // Get access token via password grant (binds refresh token to default public client)
-        const response = await tokenFixture.fetchAccessToken(
+        const response = await tokenFixture.fetchPasswordGrantAccessToken(
             "admin@auth.server.com",
             "admin9000",
             "auth.server.com"

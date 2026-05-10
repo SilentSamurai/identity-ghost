@@ -121,7 +121,7 @@ describe('OAuth error detail suppression', () => {
         });
 
         it('POST /api/oauth/verify with invalid client_secret — no internal fields', async () => {
-            const tokenResult = await tokenFixture.fetchAccessToken(
+            const tokenResult = await tokenFixture.fetchPasswordGrantAccessToken(
                 'admin@auth.server.com',
                 'admin9000',
                 'auth.server.com',

@@ -35,7 +35,7 @@ describe('Admin key management endpoints', () => {
         app = new SharedTestFixture();
         tokenFixture = new TokenFixture(app);
 
-        const adminResult = await tokenFixture.fetchAccessToken(
+        const adminResult = await tokenFixture.fetchPasswordGrantAccessToken(
             "admin@auth.server.com",
             "admin9000",
             "auth.server.com",
@@ -49,7 +49,7 @@ describe('Admin key management endpoints', () => {
         const breeTenant = await searchClient.findTenantBy({domain: 'bree.local'});
         const helper = new HelperFixture(app, adminAccessToken);
         await helper.enablePasswordGrant(breeTenant.id, 'bree.local');
-        const nonSuperAdminResult = await tokenFixture.fetchAccessToken(
+        const nonSuperAdminResult = await tokenFixture.fetchPasswordGrantAccessToken(
             'admin@bree.local', 'admin9000', 'bree.local',
         );
         nonSuperAdminToken = nonSuperAdminResult.accessToken;

@@ -41,7 +41,7 @@ describe('ID Token Audience Validation Integration', () => {
 
         if (opts?.resource) {
             // Use loginForCookie + authorizeForCode with resource param
-            const sidCookie = await tokenFixture.loginForCookie(email, password, effectiveClientId);
+            const sidCookie = await tokenFixture.loginForCookie(email, password, effectiveClientId, effectiveRedirectUri);
             return tokenFixture.authorizeForCode(sidCookie, effectiveClientId, effectiveRedirectUri, {
                 scope: opts?.scope,
                 nonce: opts?.nonce,
@@ -108,7 +108,7 @@ describe('ID Token Audience Validation Integration', () => {
         app = new SharedTestFixture();
         tokenFixture = new TokenFixture(app);
 
-        const {accessToken} = await tokenFixture.fetchAccessToken(
+        const {accessToken} = await tokenFixture.fetchPasswordGrantAccessToken(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com',

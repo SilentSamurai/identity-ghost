@@ -54,7 +54,7 @@ describe('e2e user lock/unlock', () => {
         tokenFixture = new TokenFixture(app);
 
         // Authenticate as the super-admin so all subsequent requests have full privileges
-        const response = await tokenFixture.fetchAccessToken(
+        const response = await tokenFixture.fetchPasswordGrantAccessToken(
             "admin@auth.server.com",
             "admin9000",
             "auth.server.com"
@@ -170,7 +170,7 @@ describe('e2e user lock/unlock', () => {
      */
     it('should return 403 when non-super-admin attempts to lock a user', async () => {
         // Authenticate as a regular tenant admin — not a super-admin
-        const nonSuperAdminToken = await tokenFixture.fetchAccessToken(
+        const nonSuperAdminToken = await tokenFixture.fetchPasswordGrantAccessToken(
             "admin@shire.local",
             "admin9000",
             "shire.local"
@@ -250,7 +250,7 @@ describe('e2e user lock/unlock', () => {
         // Ensure unlocked so we can obtain a valid refresh token
         await usersClient.unlockUser(shireAdmin.id);
 
-        const tokenResponse = await tokenFixture.fetchAccessToken(
+        const tokenResponse = await tokenFixture.fetchPasswordGrantAccessToken(
             "admin@shire.local",
             "admin9000",
             "shire.local"
@@ -303,7 +303,7 @@ describe('e2e user lock/unlock', () => {
         // Ensure unlocked so we can obtain a valid access token
         await usersClient.unlockUser(shireAdmin.id);
 
-        const tokenResponse = await tokenFixture.fetchAccessToken(
+        const tokenResponse = await tokenFixture.fetchPasswordGrantAccessToken(
             "admin@shire.local",
             "admin9000",
             "shire.local"
@@ -352,7 +352,7 @@ describe('e2e user lock/unlock', () => {
      * check — leaking lock status could aid social-engineering attacks.
      */
     it('should not include locked field in /api/users/me response', async () => {
-        const tokenResponse = await tokenFixture.fetchAccessToken(
+        const tokenResponse = await tokenFixture.fetchPasswordGrantAccessToken(
             "admin@shire.local",
             "admin9000",
             "shire.local"

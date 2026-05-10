@@ -24,7 +24,7 @@ describe('Feature: session-confirmed-no-bypass-consent, Property 2b: session_con
         app = new SharedTestFixture();
         tokenFixture = new TokenFixture(app);
 
-        const adminToken = await tokenFixture.fetchAccessToken(
+        const adminToken = await tokenFixture.fetchPasswordGrantAccessToken(
             ADMIN_EMAIL, ADMIN_PASSWORD, 'auth.server.com',
         );
         superAccessToken = adminToken.accessToken;
@@ -59,7 +59,7 @@ describe('Feature: session-confirmed-no-bypass-consent, Property 2b: session_con
                 const thirdPartyClientId = thirdParty.client.clientId;
 
                 try {
-                    const sidCookie = await tokenFixture.loginForCookie(ADMIN_EMAIL, ADMIN_PASSWORD, thirdPartyClientId);
+                    const sidCookie = await tokenFixture.loginForCookie(ADMIN_EMAIL, ADMIN_PASSWORD, thirdPartyClientId, REDIRECT_URI);
 
                     const res = await app.getHttpServer()
                         .get('/api/oauth/authorize')

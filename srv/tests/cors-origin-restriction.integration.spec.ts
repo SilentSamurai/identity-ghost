@@ -26,7 +26,7 @@ describe('CORS origin restriction', () => {
         app = new SharedTestFixture();
 
         const tokenFixture = new TokenFixture(app);
-        const response = await tokenFixture.fetchAccessToken(
+        const response = await tokenFixture.fetchPasswordGrantAccessToken(
             "admin@auth.server.com",
             "admin9000",
             "auth.server.com",

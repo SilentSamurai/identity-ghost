@@ -39,7 +39,7 @@ describe('S256 end-to-end verification', () => {
         tokenFixture = new TokenFixture(app);
 
         // Obtain an admin token to create test resources
-        const tokenResponse = await tokenFixture.fetchAccessToken(email, password, 'auth.server.com');
+        const tokenResponse = await tokenFixture.fetchPasswordGrantAccessToken(email, password, 'auth.server.com');
         const accessToken = tokenResponse.accessToken;
 
         clientApi = new ClientEntityClient(app, accessToken);
@@ -78,7 +78,7 @@ describe('S256 end-to-end verification', () => {
 
     /** Helper: authorize and obtain an auth code with a given challenge and method */
     async function authorizeWithChallenge(challenge: string, method: string): Promise<string> {
-        const sidCookie = await tokenFixture.loginForCookie(email, password, isolatedClientId);
+        const sidCookie = await tokenFixture.loginForCookie(email, password, isolatedClientId, isolatedRedirectUri);
         return tokenFixture.authorizeForCode(sidCookie, isolatedClientId, isolatedRedirectUri, {
             codeChallenge: challenge,
             codeChallengeMethod: method,
@@ -129,7 +129,7 @@ describe('S256 end-to-end verification', () => {
         try {
             await tokenFixture.preGrantConsent(email, password, freshClientId, isolatedRedirectUri);
 
-            const sidCookie = await tokenFixture.loginForCookie(email, password, freshClientId);
+            const sidCookie = await tokenFixture.loginForCookie(email, password, freshClientId, isolatedRedirectUri);
             const code = await tokenFixture.authorizeForCode(sidCookie, freshClientId, isolatedRedirectUri, {
                 codeChallenge: verifier,
                 codeChallengeMethod: 'plain',

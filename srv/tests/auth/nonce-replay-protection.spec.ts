@@ -120,7 +120,7 @@ describe('Nonce Replay Protection', () => {
             const longNonce = 'a'.repeat(513);
 
             // Nonce is now validated at the authorize endpoint (post-redirect error)
-            const sidCookie = await tokenFixture.loginForCookie(email, password, clientId);
+            const sidCookie = await tokenFixture.loginForCookie(email, password, clientId, redirectUri);
             const res = await app.getHttpServer()
                 .get('/api/oauth/authorize')
                 .query({
