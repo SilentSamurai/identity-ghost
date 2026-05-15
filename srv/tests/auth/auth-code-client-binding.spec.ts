@@ -30,7 +30,14 @@ describe('client_id binding verification at token exchange', () => {
 
     // Requirement 3.2: token exchange with a different client_id must be rejected
     it('should return invalid_grant when client_id does not match the stored value', async () => {
-        const code = await tokenFixture.fetchAuthCode(email, password, clientId, redirectUri);
+        const code = await tokenFixture.fetchAuthCodeWithConsentFlow(email, password, {
+            clientId,
+            redirectUri,
+            scope: 'openid profile email',
+            state: 'test-state',
+            codeChallenge: verifier,
+            codeChallengeMethod: 'plain',
+        });
 
         const response = await app.getHttpServer()
             .post('/api/oauth/token')
@@ -49,7 +56,14 @@ describe('client_id binding verification at token exchange', () => {
 
     // Requirement 3.1: token exchange with the matching client_id must succeed
     it('should succeed when client_id matches the stored value', async () => {
-        const code = await tokenFixture.fetchAuthCode(email, password, clientId, redirectUri);
+        const code = await tokenFixture.fetchAuthCodeWithConsentFlow(email, password, {
+            clientId,
+            redirectUri,
+            scope: 'openid profile email',
+            state: 'test-state',
+            codeChallenge: verifier,
+            codeChallengeMethod: 'plain',
+        });
 
         const response = await app.getHttpServer()
             .post('/api/oauth/token')

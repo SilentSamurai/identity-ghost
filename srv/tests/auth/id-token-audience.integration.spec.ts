@@ -40,17 +40,29 @@ describe('ID Token Audience Validation Integration', () => {
         const effectiveRedirectUri = opts?.client_id ? REDIRECT_URI : redirectUri;
 
         if (opts?.resource) {
-            // Use loginForCookie + authorizeForCode with resource param
-            const sidCookie = await tokenFixture.loginForCookie(email, password, effectiveClientId, effectiveRedirectUri);
-            return tokenFixture.authorizeForCode(sidCookie, effectiveClientId, effectiveRedirectUri, {
-                scope: opts?.scope,
+            // Use initializeFlow → login → getAuthorizationCode with resource param
+            const params = {
+                clientId: effectiveClientId,
+                redirectUri: effectiveRedirectUri,
+                scope: opts?.scope ?? 'openid profile email',
+                state: 'test-state',
+                codeChallenge: verifier,
+                codeChallengeMethod: 'plain',
                 nonce: opts?.nonce,
-                resource: opts?.resource,
-            });
+                resource: opts.resource,
+            };
+            const csrfContext = await tokenFixture.initializeFlow(params);
+            const sidCookie = await tokenFixture.login(email, password, effectiveClientId, csrfContext);
+            return tokenFixture.getAuthorizationCode(params, sidCookie, csrfContext.flowIdCookie);
         }
 
-        return tokenFixture.fetchAuthCode(email, password, effectiveClientId, effectiveRedirectUri, {
-            scope: opts?.scope,
+        return tokenFixture.fetchAuthCodeWithConsentFlow(email, password, {
+            clientId: effectiveClientId,
+            redirectUri: effectiveRedirectUri,
+            scope: opts?.scope ?? 'openid profile email',
+            state: 'test-state',
+            codeChallenge: verifier,
+            codeChallengeMethod: 'plain',
             nonce: opts?.nonce,
         });
     }
@@ -108,7 +120,7 @@ describe('ID Token Audience Validation Integration', () => {
         app = new SharedTestFixture();
         tokenFixture = new TokenFixture(app);
 
-        const {accessToken} = await tokenFixture.fetchPasswordGrantAccessToken(
+        const {accessToken} = await tokenFixture.fetchAccessTokenFlow(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com',
@@ -135,7 +147,14 @@ describe('ID Token Audience Validation Integration', () => {
         testClientWithResources = {id: created.client.id, clientId: created.client.clientId};
 
         // Pre-grant consent so the auth code flow works for this third-party client
-        await tokenFixture.preGrantConsent(email, password, testClientWithResources.clientId, REDIRECT_URI);
+        await tokenFixture.preGrantConsentFlow(email, password, {
+            clientId: testClientWithResources.clientId,
+            redirectUri: REDIRECT_URI,
+            scope: 'openid profile email',
+            state: 'consent-state',
+            codeChallenge: verifier,
+            codeChallengeMethod: 'plain',
+        });
     });
 
     afterAll(async () => {

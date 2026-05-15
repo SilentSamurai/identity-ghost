@@ -625,13 +625,24 @@ describe('Feature: oidc-prompt-max-age, Property 8: auth_time claim inclusion wh
     const ADMIN_EMAIL = 'admin@prompt-prop-test.local';
     const ADMIN_PASSWORD = 'admin9000';
     const CLIENT_ID = 'prompt-prop-test.local';
-    const REDIRECT_URI = 'http://localhost:3000/callback';
+    const REDIRECT_URI = 'http://localhost:4200/oauth/callback';
     const CODE_CHALLENGE = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq';
     const CODE_VERIFIER = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq';
 
-    beforeAll(() => {
+    beforeAll(async () => {
         app = new SharedTestFixture();
         tokenFixture = new TokenFixture(app);
+
+        // Pre-grant consent so /authorize issues codes directly.
+        // External redirect_uri = third-party, so consent is always required unless pre-granted.
+        await tokenFixture.preGrantConsentFlow(ADMIN_EMAIL, ADMIN_PASSWORD, {
+            clientId: CLIENT_ID,
+            redirectUri: REDIRECT_URI,
+            scope: 'openid profile email',
+            state: 'consent-setup',
+            codeChallenge: CODE_CHALLENGE,
+            codeChallengeMethod: 'plain',
+        });
     });
 
     afterAll(async () => {
@@ -654,7 +665,14 @@ describe('Feature: oidc-prompt-max-age, Property 8: auth_time claim inclusion wh
         const usesPromptLogin = options.prompt === 'login';
 
         // Establish a fresh session first.
-        const sidCookie = await tokenFixture.loginForCookie(ADMIN_EMAIL, ADMIN_PASSWORD, CLIENT_ID, REDIRECT_URI);
+        const sidCookie = await tokenFixture.fetchSidCookieFlow(ADMIN_EMAIL, ADMIN_PASSWORD, {
+            clientId: CLIENT_ID,
+            redirectUri: REDIRECT_URI,
+            scope: 'openid profile email',
+            state: 'test-state',
+            codeChallenge: CODE_CHALLENGE,
+            codeChallengeMethod: 'plain',
+        });
 
         const authorizeQuery: Record<string, string> = {
             response_type: 'code',
@@ -676,7 +694,14 @@ describe('Feature: oidc-prompt-max-age, Property 8: auth_time claim inclusion wh
             // Re-login to get a fresh authTime, then authorize WITH prompt=login in the query
             // so the issued code carries requireAuthTime (in the current implementation this
             // is set when prompt=login is present OR when max_age is present).
-            const freshCookie = await tokenFixture.loginForCookie(ADMIN_EMAIL, ADMIN_PASSWORD, CLIENT_ID, REDIRECT_URI);
+            const freshCookie = await tokenFixture.fetchSidCookieFlow(ADMIN_EMAIL, ADMIN_PASSWORD, {
+                clientId: CLIENT_ID,
+                redirectUri: REDIRECT_URI,
+                scope: 'openid profile email',
+                state: 'test-state',
+                codeChallenge: CODE_CHALLENGE,
+                codeChallengeMethod: 'plain',
+            });
             // Server sees prompt=login and always bounces to /authorize UI; strip prompt on retry.
             const retry = await app.getHttpServer()
                 .get('/api/oauth/authorize')
@@ -719,7 +744,14 @@ describe('Feature: oidc-prompt-max-age, Property 8: auth_time claim inclusion wh
         // If /authorize bounced to the login UI (e.g. max_age=0 with stale session),
         // re-login and retry.
         if (!redirectUrl.searchParams.has('code')) {
-            const freshCookie = await tokenFixture.loginForCookie(ADMIN_EMAIL, ADMIN_PASSWORD, CLIENT_ID, REDIRECT_URI);
+            const freshCookie = await tokenFixture.fetchSidCookieFlow(ADMIN_EMAIL, ADMIN_PASSWORD, {
+                clientId: CLIENT_ID,
+                redirectUri: REDIRECT_URI,
+                scope: 'openid profile email',
+                state: 'test-state',
+                codeChallenge: CODE_CHALLENGE,
+                codeChallengeMethod: 'plain',
+            });
             const retry = await app.getHttpServer()
                 .get('/api/oauth/authorize')
                 .query(authorizeQuery)

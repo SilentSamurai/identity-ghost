@@ -27,7 +27,7 @@ describe('Feature: user-consent-tracking, Property 3: Missing consent record alw
     beforeAll(async () => {
         fixture = new SharedTestFixture();
         tokenFixture = new TokenFixture(fixture);
-        const {accessToken} = await tokenFixture.fetchPasswordGrantAccessToken(email, password, 'auth.server.com');
+        const {accessToken} = await tokenFixture.fetchAccessTokenFlow(email, password, 'auth.server.com');
         clientApi = new ClientEntityClient(fixture, accessToken);
 
         const tenantClient = new TenantClient(fixture, accessToken);
@@ -50,29 +50,21 @@ describe('Feature: user-consent-tracking, Property 3: Missing consent record alw
      *   { consentRequired: false, code }  if /authorize issued a code to redirect_uri
      */
     async function checkConsent(clientId: string, scopes: string[]): Promise<{ consentRequired: boolean; code?: string }> {
-        const sidCookie = await tokenFixture.loginForCookie(email, password, clientId, REDIRECT_URI);
+        const params = {
+            clientId,
+            redirectUri: REDIRECT_URI,
+            scope: scopes.join(' '),
+            state: 'consent-check',
+            codeChallenge: CODE_CHALLENGE,
+            codeChallengeMethod: 'plain',
+        };
+        const csrfContext = await tokenFixture.initializeFlow(params);
+        const sidCookie = await tokenFixture.login(email, password, clientId, csrfContext);
 
-        const res = await fixture.getHttpServer()
-            .get('/api/oauth/authorize')
-            .query({
-                response_type: 'code',
-                client_id: clientId,
-                redirect_uri: REDIRECT_URI,
-                scope: scopes.join(' '),
-                state: 'consent-check',
-                code_challenge: CODE_CHALLENGE,
-                code_challenge_method: 'plain',
-                session_confirmed: 'true',
-            })
-            .set('Cookie', sidCookie)
-            .redirects(0);
-
-        expect(res.status).toEqual(302);
-        const location = res.headers['location'] as string;
-        expect(location).toBeDefined();
+        const { location } = await tokenFixture.checkAuthorize(params, sidCookie, csrfContext.flowIdCookie);
 
         // Consent UI redirect → consent required
-        if (location.includes('/consent?')) {
+        if (location.includes('view=consent') || location.includes('/consent?')) {
             return {consentRequired: true};
         }
 
@@ -180,7 +172,14 @@ describe('Feature: user-consent-tracking, Property 3: Missing consent record alw
 
                     try {
                         // Grant consent for client A for the requested scopes
-                        await tokenFixture.preGrantConsent(email, password, clientIdA, REDIRECT_URI, requestedScopes.join(' '));
+                        await tokenFixture.preGrantConsentFlow(email, password, {
+                            clientId: clientIdA,
+                            redirectUri: REDIRECT_URI,
+                            scope: requestedScopes.join(' '),
+                            state: 'consent-state',
+                            codeChallenge: CODE_CHALLENGE,
+                            codeChallengeMethod: 'plain',
+                        });
 
                         // Client B has NO consent record — must still require consent
                         const result = await checkConsent(clientIdB, requestedScopes);

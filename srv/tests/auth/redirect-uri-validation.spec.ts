@@ -26,7 +26,7 @@ describe('Authorization endpoint redirect URI validation', () => {
     beforeAll(async () => {
         app = new SharedTestFixture();
         const tokenFixture = new TokenFixture(app);
-        const response = await tokenFixture.fetchPasswordGrantAccessToken(
+        const response = await tokenFixture.fetchAccessTokenFlow(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com',
@@ -212,7 +212,7 @@ describe('Authorize endpoint redirect URI validation', () => {
     beforeAll(async () => {
         app = new SharedTestFixture();
         tokenFixture = new TokenFixture(app);
-        const response = await tokenFixture.fetchPasswordGrantAccessToken(email, password, 'auth.server.com');
+        const response = await tokenFixture.fetchAccessTokenFlow(email, password, 'auth.server.com');
         accessToken = response.accessToken;
         clientApi = new ClientEntityClient(app, accessToken);
         adminTenantClient = new AdminTenantClient(app, accessToken);
@@ -231,7 +231,14 @@ describe('Authorize endpoint redirect URI validation', () => {
         singleUriClientId = singleUri.client.clientId;
 
         // Pre-grant consent so authorize can issue codes
-        await tokenFixture.preGrantConsent(email, password, singleUriClientId, REDIRECT_URI);
+        await tokenFixture.preGrantConsentFlow(email, password, {
+            clientId: singleUriClientId,
+            redirectUri: REDIRECT_URI,
+            scope: 'openid profile email',
+            state: 'consent-state',
+            codeChallenge: challenge,
+            codeChallengeMethod: 'plain',
+        });
     });
 
     afterAll(async () => {
@@ -242,8 +249,11 @@ describe('Authorize endpoint redirect URI validation', () => {
     // ─── Req 2.1, 3.1: Valid redirect_uri → auth code with stored redirect_uri ──
 
     it('should create auth code with stored redirect_uri when redirect_uri matches a registered URI (Req 2.1, 3.1)', async () => {
-        const sidCookie = await tokenFixture.loginForCookie(email, password, singleUriClientId, REDIRECT_URI);
-        const code = await tokenFixture.authorizeForCode(sidCookie, singleUriClientId, REDIRECT_URI, {
+        const code = await tokenFixture.fetchAuthCodeWithConsentFlow(email, password, {
+            clientId: singleUriClientId,
+            redirectUri: REDIRECT_URI,
+            scope: 'openid profile email',
+            state: 'test-state',
             codeChallenge: challenge,
             codeChallengeMethod: 'plain',
         });
@@ -269,7 +279,14 @@ describe('Authorize endpoint redirect URI validation', () => {
     // ─── Req 2.2: Invalid redirect_uri → 400 with invalid_request at authorize ────
 
     it('should return 400 invalid_request when redirect_uri does not match any registered URI (Req 2.2)', async () => {
-        const sidCookie = await tokenFixture.loginForCookie(email, password, singleUriClientId, REDIRECT_URI);
+        const sidCookie = await tokenFixture.fetchSidCookieFlow(email, password, {
+            clientId: singleUriClientId,
+            redirectUri: REDIRECT_URI,
+            scope: 'openid profile email',
+            state: 'test-state',
+            codeChallenge: challenge,
+            codeChallengeMethod: 'plain',
+        });
         const res = await app.getHttpServer()
             .get('/api/oauth/authorize')
             .query({
@@ -295,12 +312,15 @@ describe('Authorize endpoint redirect URI validation', () => {
     // The stored redirect_uri will be that single URI.
 
     it('should create auth code when redirect_uri is omitted (uses single registered URI) (Req 2.3, 3.2)', async () => {
-        const sidCookie = await tokenFixture.loginForCookie(email, password, singleUriClientId, REDIRECT_URI);
-        // authorizeForCode always passes redirect_uri; use the registered one
-        const code = await tokenFixture.authorizeForCode(sidCookie, singleUriClientId, REDIRECT_URI, {
+        const code = await tokenFixture.fetchAuthCodeWithConsentFlow(email, password, {
+            clientId: singleUriClientId,
+            redirectUri: REDIRECT_URI,
+            scope: 'openid profile email',
+            state: 'test-state',
             codeChallenge: challenge,
             codeChallengeMethod: 'plain',
         });
+        // authorizeForCode always passes redirect_uri; use the registered one
 
         expect(code).toBeDefined();
 
@@ -346,7 +366,7 @@ describe('Token exchange redirect URI binding', () => {
     beforeAll(async () => {
         app = new SharedTestFixture();
         tokenFixture = new TokenFixture(app);
-        const response = await tokenFixture.fetchPasswordGrantAccessToken(email, password, 'auth.server.com');
+        const response = await tokenFixture.fetchAccessTokenFlow(email, password, 'auth.server.com');
         accessToken = response.accessToken;
         clientApi = new ClientEntityClient(app, accessToken);
         adminTenantClient = new AdminTenantClient(app, accessToken);
@@ -365,7 +385,14 @@ describe('Token exchange redirect URI binding', () => {
         singleUriClientId = singleUri.client.clientId;
 
         // Pre-grant consent so authorize can issue codes
-        await tokenFixture.preGrantConsent(email, password, singleUriClientId, REDIRECT_URI);
+        await tokenFixture.preGrantConsentFlow(email, password, {
+            clientId: singleUriClientId,
+            redirectUri: REDIRECT_URI,
+            scope: 'openid profile email',
+            state: 'consent-state',
+            codeChallenge: challenge,
+            codeChallengeMethod: 'plain',
+        });
     });
 
     afterAll(async () => {
@@ -375,8 +402,11 @@ describe('Token exchange redirect URI binding', () => {
 
     /** Helper: create a fresh auth code via the new cookie-based flow */
     async function getAuthCode(redirectUri: string): Promise<string> {
-        const sidCookie = await tokenFixture.loginForCookie(email, password, singleUriClientId, redirectUri);
-        return tokenFixture.authorizeForCode(sidCookie, singleUriClientId, redirectUri, {
+        return tokenFixture.fetchAuthCodeWithConsentFlow(email, password, {
+            clientId: singleUriClientId,
+            redirectUri,
+            scope: 'openid profile email',
+            state: 'test-state',
             codeChallenge: challenge,
             codeChallengeMethod: 'plain',
         });
@@ -470,7 +500,7 @@ describe('Error response format compliance', () => {
     beforeAll(async () => {
         app = new SharedTestFixture();
         tokenFixture = new TokenFixture(app);
-        const response = await tokenFixture.fetchPasswordGrantAccessToken(email, password, 'auth.server.com');
+        const response = await tokenFixture.fetchAccessTokenFlow(email, password, 'auth.server.com');
         accessToken = response.accessToken;
         clientApi = new ClientEntityClient(app, accessToken);
         adminTenantClient = new AdminTenantClient(app, accessToken);
@@ -489,7 +519,14 @@ describe('Error response format compliance', () => {
         singleUriClientId = singleUri.client.clientId;
 
         // Pre-grant consent so authorize can issue codes
-        await tokenFixture.preGrantConsent(email, password, singleUriClientId, REGISTERED_URI);
+        await tokenFixture.preGrantConsentFlow(email, password, {
+            clientId: singleUriClientId,
+            redirectUri: REGISTERED_URI,
+            scope: 'openid profile email',
+            state: 'consent-state',
+            codeChallenge: challenge,
+            codeChallengeMethod: 'plain',
+        });
     });
 
     afterAll(async () => {
@@ -523,8 +560,11 @@ describe('Error response format compliance', () => {
     // ─── Req 5.2: Token endpoint errors return JSON with error=invalid_grant ──
 
     it('should return JSON with error=invalid_grant when token endpoint rejects redirect_uri mismatch (Req 5.2)', async () => {
-        const sidCookie = await tokenFixture.loginForCookie(email, password, singleUriClientId, REGISTERED_URI);
-        const code = await tokenFixture.authorizeForCode(sidCookie, singleUriClientId, REGISTERED_URI, {
+        const code = await tokenFixture.fetchAuthCodeWithConsentFlow(email, password, {
+            clientId: singleUriClientId,
+            redirectUri: REGISTERED_URI,
+            scope: 'openid profile email',
+            state: 'test-state',
             codeChallenge: challenge,
             codeChallengeMethod: 'plain',
         });
@@ -552,8 +592,11 @@ describe('Error response format compliance', () => {
     // ─── Req 5.2: Token endpoint error when redirect_uri omitted but stored ──
 
     it('should return JSON with error=invalid_grant when token endpoint redirect_uri is omitted but stored (Req 5.2)', async () => {
-        const sidCookie = await tokenFixture.loginForCookie(email, password, singleUriClientId, REGISTERED_URI);
-        const code = await tokenFixture.authorizeForCode(sidCookie, singleUriClientId, REGISTERED_URI, {
+        const code = await tokenFixture.fetchAuthCodeWithConsentFlow(email, password, {
+            clientId: singleUriClientId,
+            redirectUri: REGISTERED_URI,
+            scope: 'openid profile email',
+            state: 'test-state',
             codeChallenge: challenge,
             codeChallengeMethod: 'plain',
         });
@@ -598,8 +641,11 @@ describe('Error response format compliance', () => {
     // ─── Req 5.3: Token endpoint error does not leak submitted redirect_uri ──
 
     it('should not include the submitted redirect_uri in the token error response body (Req 5.3)', async () => {
-        const sidCookie = await tokenFixture.loginForCookie(email, password, singleUriClientId, REGISTERED_URI);
-        const code = await tokenFixture.authorizeForCode(sidCookie, singleUriClientId, REGISTERED_URI, {
+        const code = await tokenFixture.fetchAuthCodeWithConsentFlow(email, password, {
+            clientId: singleUriClientId,
+            redirectUri: REGISTERED_URI,
+            scope: 'openid profile email',
+            state: 'test-state',
             codeChallenge: challenge,
             codeChallengeMethod: 'plain',
         });

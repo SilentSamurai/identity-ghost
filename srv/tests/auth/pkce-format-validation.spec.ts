@@ -30,7 +30,11 @@ describe('PKCE format validation at token endpoint', () => {
 
     /** Helper: obtain a fresh single-use auth code via the new cookie-based flow */
     async function getAuthCode(): Promise<string> {
-        return tokenFixture.fetchAuthCode(email, password, clientId, redirectUri, {
+        return tokenFixture.fetchAuthCodeWithConsentFlow(email, password, {
+            clientId,
+            redirectUri,
+            scope: 'openid profile email',
+            state: 'test-state',
             codeChallenge: validChallenge,
             codeChallengeMethod: 'plain',
         });

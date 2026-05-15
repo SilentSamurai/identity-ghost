@@ -3,6 +3,7 @@ import {TokenFixture} from "../token.fixture";
 
 describe('e2e positive token flow', () => {
     let app: SharedTestFixture;
+    let tokenFixture: TokenFixture;
     let refreshToken = "";
     let accessToken = "";
     // Default public client's UUID — matches the client that issued the refresh token
@@ -13,10 +14,10 @@ describe('e2e positive token flow', () => {
 
     beforeAll(async () => {
         app = new SharedTestFixture();
-        const tokenFixture = new TokenFixture(app);
+        tokenFixture = new TokenFixture(app);
 
         // Get access token via password grant (binds refresh token to default public client)
-        const response = await tokenFixture.fetchPasswordGrantAccessToken(
+        const response = await tokenFixture.fetchAccessTokenFlow(
             "admin@auth.server.com",
             "admin9000",
             "auth.server.com"
@@ -33,7 +34,7 @@ describe('e2e positive token flow', () => {
 
         // Create a confidential client for client_credentials and verify flows
         const decoded = app.jwtService().decode(accessToken, {json: true}) as any;
-        const confCreds = await tokenFixture.createConfidentialClient(accessToken, decoded.tenant.id);
+        const confCreds = await tokenFixture.createConfidentialClient(accessToken, decoded.tenant.id, "Test Confidential Client", "client_credentials", "openid profile email");
         confidentialClientId = confCreds.clientId;
         confidentialClientSecret = confCreds.clientSecret;
     });
@@ -62,19 +63,13 @@ describe('e2e positive token flow', () => {
     });
 
     it(`/POST Client Credentials`, async () => {
-        const response = await app.getHttpServer()
-            .post('/api/oauth/token')
-            .send({
-                "grant_type": "client_credentials",
-                "client_id": confidentialClientId,
-                "client_secret": confidentialClientSecret
-            })
-            .set('Accept', 'application/json');
+        const response = await tokenFixture.fetchClientCredentialsTokenFlow(
+            confidentialClientId,
+            confidentialClientSecret
+        );
 
-        expect(response.status).toEqual(200);
-        expect(response.body.access_token).toBeDefined();
-        expect(response.body.expires_in).toBeDefined();
-        expect(response.body.token_type).toEqual('Bearer');
+        expect(response.accessToken).toBeDefined();
+        expect(response.jwt).toBeDefined();
     });
 
     it(`/POST Verify Token`, async () => {

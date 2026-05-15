@@ -34,8 +34,11 @@ describe('redirect_uri binding in authorization code flow', () => {
      * If redirectUri is provided, it gets stored with the auth code in the database.
      */
     async function loginAndGetCode(redirectUri?: string): Promise<string> {
-        const sidCookie = await tokenFixture.loginForCookie(email, password, clientId, redirectUri ?? registeredRedirectUri);
-        return tokenFixture.authorizeForCode(sidCookie, clientId, redirectUri ?? registeredRedirectUri, {
+        return tokenFixture.fetchAuthCodeWithConsentFlow(email, password, {
+            clientId,
+            redirectUri: redirectUri ?? registeredRedirectUri,
+            scope: 'openid profile email',
+            state: 'test-state',
             codeChallenge: verifier,
             codeChallengeMethod: 'plain',
         });

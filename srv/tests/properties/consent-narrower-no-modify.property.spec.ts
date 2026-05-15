@@ -28,7 +28,7 @@ describe('Feature: user-consent-tracking, Property 5: Narrower requests do not m
     beforeAll(async () => {
         fixture = new SharedTestFixture();
         tokenFixture = new TokenFixture(fixture);
-        const {accessToken} = await tokenFixture.fetchPasswordGrantAccessToken(email, password, 'auth.server.com');
+        const {accessToken} = await tokenFixture.fetchAccessTokenFlow(email, password, 'auth.server.com');
         clientApi = new ClientEntityClient(fixture, accessToken);
 
         const tenantClient = new TenantClient(fixture, accessToken);
@@ -49,28 +49,20 @@ describe('Feature: user-consent-tracking, Property 5: Narrower requests do not m
      * Returns true if /authorize redirected to the consent UI.
      */
     async function isConsentRequired(clientId: string, requestedScopes: string[]): Promise<boolean> {
-        const sidCookie = await tokenFixture.loginForCookie(email, password, clientId, REDIRECT_URI);
+        const params = {
+            clientId,
+            redirectUri: REDIRECT_URI,
+            scope: requestedScopes.join(' '),
+            state: 'narrower-check',
+            codeChallenge: CODE_CHALLENGE,
+            codeChallengeMethod: 'plain',
+        };
+        const csrfContext = await tokenFixture.initializeFlow(params);
+        const sidCookie = await tokenFixture.login(email, password, clientId, csrfContext);
 
-        const res = await fixture.getHttpServer()
-            .get('/api/oauth/authorize')
-            .query({
-                response_type: 'code',
-                client_id: clientId,
-                redirect_uri: REDIRECT_URI,
-                scope: requestedScopes.join(' '),
-                state: 'narrower-check',
-                code_challenge: CODE_CHALLENGE,
-                code_challenge_method: 'plain',
-                session_confirmed: 'true',
-            })
-            .set('Cookie', sidCookie)
-            .redirects(0);
+        const { location } = await tokenFixture.checkAuthorize(params, sidCookie, csrfContext.flowIdCookie);
 
-        expect(res.status).toEqual(302);
-        const location = res.headers['location'] as string;
-        expect(location).toBeDefined();
-
-        if (location.includes('/consent?')) return true;
+        if (location.includes('view=consent') || location.includes('/consent?')) return true;
 
         const url = new URL(location, 'http://localhost');
         expect(url.searchParams.has('error')).toBe(false);
@@ -127,7 +119,14 @@ describe('Feature: user-consent-tracking, Property 5: Narrower requests do not m
 
                     try {
                         // Step 1: Create consent record with G
-                        await tokenFixture.preGrantConsent(email, password, clientId, REDIRECT_URI, grantedScopes.join(' '));
+                        await tokenFixture.preGrantConsentFlow(email, password, {
+                            clientId,
+                            redirectUri: REDIRECT_URI,
+                            scope: grantedScopes.join(' '),
+                            state: 'consent-state',
+                            codeChallenge: CODE_CHALLENGE,
+                            codeChallengeMethod: 'plain',
+                        });
 
                         // Step 2: Call /authorize with R ⊆ G — must NOT require consent
                         expect(await isConsentRequired(clientId, requestedScopes)).toBe(false);
@@ -164,7 +163,14 @@ describe('Feature: user-consent-tracking, Property 5: Narrower requests do not m
 
                     try {
                         // Create consent record with G
-                        await tokenFixture.preGrantConsent(email, password, clientId, REDIRECT_URI, grantedScopes.join(' '));
+                        await tokenFixture.preGrantConsentFlow(email, password, {
+                            clientId,
+                            redirectUri: REDIRECT_URI,
+                            scope: grantedScopes.join(' '),
+                            state: 'consent-state',
+                            codeChallenge: CODE_CHALLENGE,
+                            codeChallengeMethod: 'plain',
+                        });
 
                         // Call /authorize multiple times with different subsets of G
                         for (let i = 1; i <= grantedScopes.length; i++) {
@@ -201,7 +207,14 @@ describe('Feature: user-consent-tracking, Property 5: Narrower requests do not m
                     const clientId = client.client.clientId;
 
                     try {
-                        await tokenFixture.preGrantConsent(email, password, clientId, REDIRECT_URI, scopes.join(' '));
+                        await tokenFixture.preGrantConsentFlow(email, password, {
+                            clientId,
+                            redirectUri: REDIRECT_URI,
+                            scope: scopes.join(' '),
+                            state: 'consent-state',
+                            codeChallenge: CODE_CHALLENGE,
+                            codeChallengeMethod: 'plain',
+                        });
 
                         expect(await isConsentRequired(clientId, scopes)).toBe(false);
 
@@ -234,7 +247,14 @@ describe('Feature: user-consent-tracking, Property 5: Narrower requests do not m
             const fullScopes = ['openid', 'profile', 'email'];
             const narrowScopes = ['openid'];
 
-            await tokenFixture.preGrantConsent(email, password, clientId, REDIRECT_URI, fullScopes.join(' '));
+            await tokenFixture.preGrantConsentFlow(email, password, {
+                clientId,
+                redirectUri: REDIRECT_URI,
+                scope: fullScopes.join(' '),
+                state: 'consent-state',
+                codeChallenge: CODE_CHALLENGE,
+                codeChallengeMethod: 'plain',
+            });
 
             expect(await isConsentRequired(clientId, narrowScopes)).toBe(false);
 

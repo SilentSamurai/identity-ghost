@@ -28,7 +28,7 @@ describe('Feature: user-consent-tracking, Property 4: Granting consent produces 
     beforeAll(async () => {
         fixture = new SharedTestFixture();
         tokenFixture = new TokenFixture(fixture);
-        const {accessToken} = await tokenFixture.fetchPasswordGrantAccessToken(email, password, 'auth.server.com');
+        const {accessToken} = await tokenFixture.fetchAccessTokenFlow(email, password, 'auth.server.com');
         clientApi = new ClientEntityClient(fixture, accessToken);
 
         const tenantClient = new TenantClient(fixture, accessToken);
@@ -44,9 +44,16 @@ describe('Feature: user-consent-tracking, Property 4: Granting consent produces 
         await fixture.close();
     });
 
-    /** Grant consent via tokenFixture.preGrantConsent (cookie + CSRF). */
+    /** Grant consent via tokenFixture.preGrantConsentFlow (cookie + CSRF). */
     async function grantConsent(clientId: string, scopes: string[]): Promise<void> {
-        await tokenFixture.preGrantConsent(email, password, clientId, REDIRECT_URI, scopes.join(' '));
+        await tokenFixture.preGrantConsentFlow(email, password, {
+            clientId,
+            redirectUri: REDIRECT_URI,
+            scope: scopes.join(' '),
+            state: 'consent-state',
+            codeChallenge: CODE_CHALLENGE,
+            codeChallengeMethod: 'plain',
+        });
     }
 
     /**
@@ -54,28 +61,20 @@ describe('Feature: user-consent-tracking, Property 4: Granting consent produces 
      * Returns true if /authorize redirected to the consent UI.
      */
     async function isConsentRequired(clientId: string, requestedScopes: string[]): Promise<boolean> {
-        const sidCookie = await tokenFixture.loginForCookie(email, password, clientId, REDIRECT_URI);
+        const params = {
+            clientId,
+            redirectUri: REDIRECT_URI,
+            scope: requestedScopes.join(' '),
+            state: 'union-check',
+            codeChallenge: CODE_CHALLENGE,
+            codeChallengeMethod: 'plain',
+        };
+        const csrfContext = await tokenFixture.initializeFlow(params);
+        const sidCookie = await tokenFixture.login(email, password, clientId, csrfContext);
 
-        const res = await fixture.getHttpServer()
-            .get('/api/oauth/authorize')
-            .query({
-                response_type: 'code',
-                client_id: clientId,
-                redirect_uri: REDIRECT_URI,
-                scope: requestedScopes.join(' '),
-                state: 'union-check',
-                code_challenge: CODE_CHALLENGE,
-                code_challenge_method: 'plain',
-                session_confirmed: 'true',
-            })
-            .set('Cookie', sidCookie)
-            .redirects(0);
+        const { location } = await tokenFixture.checkAuthorize(params, sidCookie, csrfContext.flowIdCookie);
 
-        expect(res.status).toEqual(302);
-        const location = res.headers['location'] as string;
-        expect(location).toBeDefined();
-
-        if (location.includes('/consent?')) return true;
+        if (location.includes('view=consent') || location.includes('/consent?')) return true;
 
         const url = new URL(location, 'http://localhost');
         expect(url.searchParams.has('error')).toBe(false);

@@ -27,7 +27,7 @@ describe('Session Auth Flow', () => {
         app = new SharedTestFixture();
         tokenFixture = new TokenFixture(app);
 
-        const adminToken = await tokenFixture.fetchPasswordGrantAccessToken(
+        const adminToken = await tokenFixture.fetchAccessTokenFlow(
             ADMIN_EMAIL, ADMIN_PASSWORD, 'auth.server.com',
         );
         superAccessToken = adminToken.accessToken;
@@ -54,26 +54,39 @@ describe('Session Auth Flow', () => {
         if (testDefault) {
             await clientApi.updateClient(testDefault.clientId, {redirectUris: [REDIRECT_URI]});
         }
-    });
+
+        // Pre-grant consent for the default client (external redirect_uri = third-party)
+        await tokenFixture.preGrantConsentFlow(ADMIN_EMAIL, ADMIN_PASSWORD, {
+            clientId: testTenantDomain,
+            redirectUri: REDIRECT_URI,
+            scope: 'openid profile email',
+            state: 'setup-consent',
+            codeChallenge: CODE_CHALLENGE,
+            codeChallengeMethod: 'plain',
+        });
+    }, 60_000);
 
     afterAll(async () => {
         await app.close();
     });
 
-    // ── Helpers ──────────────────────────────────────────────────────
+     // ── Helpers ──────────────────────────────────────────────────────
 
-    async function loginForCookie(clientId: string): Promise<string> {
-        return tokenFixture.loginForCookie(ADMIN_EMAIL, ADMIN_PASSWORD, clientId, REDIRECT_URI);
-    }
+     async function loginForCookie(clientId: string): Promise<string> {
+         return tokenFixture.fetchSidCookieFlow(ADMIN_EMAIL, ADMIN_PASSWORD, {
+             clientId,
+             redirectUri: REDIRECT_URI,
+             scope: 'openid profile email',
+             state: 'test-state',
+             codeChallenge: CODE_CHALLENGE,
+             codeChallengeMethod: 'plain',
+         });
+     }
 
     function extractSidValue(signedCookie: string): string {
         const cookieValue = signedCookie.split(';')[0].split('=').slice(1).join('=');
         const decoded = decodeURIComponent(cookieValue).replace(/^s:/, '');
         return decoded.split('.')[0];
-    }
-
-    function csrfTokenFor(sid: string): string {
-        return crypto.createHmac('sha256', COOKIE_SECRET).update(sid).digest('hex');
     }
 
     async function authorize(
@@ -144,13 +157,16 @@ describe('Session Auth Flow', () => {
 
     describe('17.2 — Login cookie attributes', () => {
         it('sets signed sid cookie with correct attributes', async () => {
+            // Use a redirect_uri registered on auth.server.com (seeded at startup)
+            const authServerRedirectUri = 'http://localhost:3000/callback';
+
             // Get flow_id cookie and csrf_token from /authorize first
             const preAuth = await app.getHttpServer()
                 .get('/api/oauth/authorize')
                 .query({
                     response_type: 'code',
                     client_id: 'auth.server.com',
-                    redirect_uri: 'https://session-auth-test.local/callback',
+                    redirect_uri: authServerRedirectUri,
                     scope: 'openid profile email',
                     state: 'test-state',
                     code_challenge: CODE_CHALLENGE,
@@ -218,14 +234,31 @@ describe('Session Auth Flow', () => {
         });
 
         it('returns 400 with invalid_grant on wrong password', async () => {
-            const res = await app.getHttpServer()
+            // Use a redirect_uri registered on auth.server.com
+            const csrfContext = await tokenFixture.initializeFlow({
+                clientId: 'auth.server.com',
+                redirectUri: 'http://localhost:3000/callback',
+                scope: 'openid profile email',
+                state: 'test-state',
+                codeChallenge: CODE_CHALLENGE,
+                codeChallengeMethod: 'plain',
+            });
+
+            const req = app.getHttpServer()
                 .post('/api/oauth/login')
                 .send({
                     email: ADMIN_EMAIL,
                     password: 'wrong-password',
                     client_id: 'auth.server.com',
+                    csrf_token: csrfContext.csrfToken,
                 })
                 .set('Accept', 'application/json');
+
+            if (csrfContext.flowIdCookie) {
+                req.set('Cookie', csrfContext.flowIdCookie);
+            }
+
+            const res = await req;
 
             expect(res.status).toEqual(400);
             expect(res.body.error).toEqual('invalid_grant');
@@ -236,7 +269,7 @@ describe('Session Auth Flow', () => {
     // ── 17.3: Authorize with valid session ───────────────────────────
 
     describe('17.3 — Authorize with valid session', () => {
-        it('valid cookie + first-party + session_confirmed → redirect with code', async () => {
+        it('valid cookie + consent granted + session_confirmed → redirect with code', async () => {
             const sidCookie = await loginForCookie(testTenantDomain);
             const result = await authorize(sidCookie, testTenantDomain, {session_confirmed: 'true'});
 
@@ -244,7 +277,7 @@ describe('Session Auth Flow', () => {
             expect(isCodeRedirect(result.location)).toBe(true);
         });
 
-        it('valid cookie + first-party + no session_confirmed + skipSessionConfirm=false → session-confirm UI', async () => {
+        it('valid cookie + consent granted + no session_confirmed + skipSessionConfirm=false → session-confirm UI', async () => {
             const sidCookie = await loginForCookie(testTenantDomain);
             const result = await authorize(sidCookie, testTenantDomain, {});
 
@@ -252,7 +285,7 @@ describe('Session Auth Flow', () => {
             expect(isSessionConfirmRedirect(result.location)).toBe(true);
         });
 
-        it('valid cookie + first-party + skipSessionConfirm=true + no session_confirmed → redirect with code', async () => {
+        it('valid cookie + consent granted + skipSessionConfirm=true + no session_confirmed → redirect with code', async () => {
             const skipTenantDomain = `saf-skip-${String(Date.now()).slice(-6)}.local`;
             const skipTenant = await tenantApi.createTenant(
                 `SAFSkip`, skipTenantDomain,
@@ -266,6 +299,16 @@ describe('Session Auth Flow', () => {
             if (defaultClient) {
                 await clientApi.updateClient(defaultClient.clientId, {redirectUris: [REDIRECT_URI]});
             }
+
+            // Pre-grant consent for this tenant's default client
+            await tokenFixture.preGrantConsentFlow(ADMIN_EMAIL, ADMIN_PASSWORD, {
+                clientId: skipTenantDomain,
+                redirectUri: REDIRECT_URI,
+                scope: 'openid profile email',
+                state: 'consent-state',
+                codeChallenge: CODE_CHALLENGE,
+                codeChallengeMethod: 'plain',
+            });
 
             const sidCookie = await loginForCookie(skipTenantDomain);
             const result = await authorize(sidCookie, skipTenantDomain, {});
@@ -350,7 +393,7 @@ describe('Session Auth Flow', () => {
             expect(isConsentRedirect(result.location)).toBe(true);
         });
 
-        it('prompt=consent + valid session + first-party + no session_confirmed → session-confirm UI', async () => {
+        it('prompt=consent + valid session + default client + no session_confirmed → session-confirm UI', async () => {
             const sidCookie = await loginForCookie(testTenantDomain);
             const result = await authorize(sidCookie, testTenantDomain, {prompt: 'consent'});
 
@@ -358,7 +401,7 @@ describe('Session Auth Flow', () => {
             expect(isSessionConfirmRedirect(result.location)).toBe(true);
         });
 
-        it('prompt=consent + valid session + first-party + session_confirmed → consent UI', async () => {
+        it('prompt=consent + valid session + default client + session_confirmed → consent UI', async () => {
             const sidCookie = await loginForCookie(testTenantDomain);
             const result = await authorize(sidCookie, testTenantDomain, {prompt: 'consent', session_confirmed: 'true'});
 

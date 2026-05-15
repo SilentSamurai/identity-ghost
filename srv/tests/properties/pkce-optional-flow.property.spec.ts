@@ -30,7 +30,7 @@ describe('PKCE Optional Flow: authorize → token exchange without code_challeng
         tokenFixture = new TokenFixture(fixture);
 
         // Get a tenant-scoped token for the test tenant to retrieve its ID
-        const {jwt} = await tokenFixture.fetchPasswordGrantAccessToken(
+        const {jwt} = await tokenFixture.fetchAccessTokenFlow(
             ADMIN_EMAIL,
             ADMIN_PASSWORD,
             TENANT_DOMAIN,
@@ -38,7 +38,7 @@ describe('PKCE Optional Flow: authorize → token exchange without code_challeng
         const tenantId = jwt.tenant.id;
 
         // Get super-admin token to create a client
-        const {accessToken: superToken} = await tokenFixture.fetchPasswordGrantAccessToken(
+        const {accessToken: superToken} = await tokenFixture.fetchAccessTokenFlow(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com',
@@ -57,7 +57,14 @@ describe('PKCE Optional Flow: authorize → token exchange without code_challeng
 
         // Pre-grant consent so /authorize issues codes directly
         // (third-party clients require consent)
-        await tokenFixture.preGrantConsent(ADMIN_EMAIL, ADMIN_PASSWORD, testClientId, REDIRECT_URI);
+        await tokenFixture.preGrantConsentFlow(ADMIN_EMAIL, ADMIN_PASSWORD, {
+            clientId: testClientId,
+            redirectUri: REDIRECT_URI,
+            scope: 'openid profile email',
+            state: 'consent-state',
+            codeChallenge: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq',
+            codeChallengeMethod: 'plain',
+        });
     });
 
     afterAll(async () => {
@@ -73,7 +80,14 @@ describe('PKCE Optional Flow: authorize → token exchange without code_challeng
         await fc.assert(
             fc.asyncProperty(stateArb, scopeArb, async (state, scope) => {
                 // Step 1: Login to get a sid cookie
-                const sidCookie = await tokenFixture.loginForCookie(ADMIN_EMAIL, ADMIN_PASSWORD, testClientId, REDIRECT_URI);
+                const sidCookie = await tokenFixture.fetchSidCookieFlow(ADMIN_EMAIL, ADMIN_PASSWORD, {
+                    clientId: testClientId,
+                    redirectUri: REDIRECT_URI,
+                    scope: 'openid profile email',
+                    state: 'test-state',
+                    codeChallenge: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq',
+                    codeChallengeMethod: 'plain',
+                });
 
                 // Step 2: GET /api/oauth/authorize WITHOUT code_challenge
                 const authorizeRes = await fixture.getHttpServer()

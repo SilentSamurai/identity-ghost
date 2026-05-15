@@ -158,7 +158,7 @@ export class HelperFixture {
         domain: string,
     ): Promise<{ accessToken: string; refreshToken: string; jwt: any }> {
         const tokenFixture = new TokenFixture(this.app);
-        return tokenFixture.fetchPasswordGrantAccessToken(email, password, domain);
+        return tokenFixture.fetchAccessTokenFlow(email, password, domain);
     }
 
 }

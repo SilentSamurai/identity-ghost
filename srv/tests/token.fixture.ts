@@ -13,7 +13,12 @@ interface JwtPayload {
         domain: string;
     };
     scopes?: string[];
+    scope?: string;
     roles?: string[];
+    client_id?: string;
+    aud?: string | string[];
+    jti?: string;
+    [key: string]: any;
 }
 
 interface TokenResponse {
@@ -29,7 +34,7 @@ interface CsrfContext {
     csrfToken: string;
 }
 
-interface AuthorizeParams {
+export interface AuthorizeParams {
     clientId: string;
     redirectUri?: string;
     scope: string;
@@ -410,9 +415,9 @@ export class TokenFixture {
     public async createConfidentialClient(
         accessToken: string,
         tenantId: string,
-        name: string,
-        grantTypes: string,
-        allowedScopes: string,
+        name: string = 'Confidential Client',
+        grantTypes: string = 'client_credentials',
+        allowedScopes: string = 'openid profile email',
     ): Promise<{ clientId: string; clientSecret: string }> {
         const clientEntityClient = new ClientEntityClient(this.app, accessToken);
         const result = await clientEntityClient.createClient(tenantId, name, {
@@ -609,37 +614,133 @@ export class TokenFixture {
     /**
      * @deprecated Use getAuthorizationCode() instead.
      * Legacy method that hits /authorize with a session cookie.
+     * Supports both positional args and an object-based signature.
      */
     public async authorizeForCode(
         sidCookie: string,
         clientId: string,
         redirectUri: string,
-        scope: string,
-        state: string,
-        codeChallenge: string,
-        codeChallengeMethod: string,
+        scopeOrOpts?: string | {
+            scope?: string;
+            state?: string;
+            codeChallenge?: string;
+            codeChallengeMethod?: string;
+            prompt?: string;
+            subscriberTenantHint?: string;
+            resource?: string;
+            nonce?: string;
+            maxAge?: number;
+        },
+        state?: string,
+        codeChallenge?: string,
+        codeChallengeMethod?: string,
         prompt?: string,
         subscriberTenantHint?: string,
         resource?: string,
         nonce?: string,
         maxAge?: number,
     ): Promise<string> {
-        const params: AuthorizeParams = {
-            clientId,
-            redirectUri,
-            scope,
-            state,
-            codeChallenge,
-            codeChallengeMethod,
-            prompt,
-            subscriberTenantHint,
-            resource,
-            nonce,
-            maxAge,
-        };
+        let params: AuthorizeParams;
+        if (typeof scopeOrOpts === 'object' && scopeOrOpts !== null) {
+            params = {
+                clientId,
+                redirectUri,
+                scope: scopeOrOpts.scope ?? 'openid profile email',
+                state: scopeOrOpts.state ?? 'test-state',
+                codeChallenge: scopeOrOpts.codeChallenge ?? 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq',
+                codeChallengeMethod: scopeOrOpts.codeChallengeMethod ?? 'plain',
+                prompt: scopeOrOpts.prompt,
+                subscriberTenantHint: scopeOrOpts.subscriberTenantHint,
+                resource: scopeOrOpts.resource,
+                nonce: scopeOrOpts.nonce,
+                maxAge: scopeOrOpts.maxAge,
+            };
+        } else {
+            params = {
+                clientId,
+                redirectUri,
+                scope: (scopeOrOpts as string) ?? 'openid profile email',
+                state: state ?? 'test-state',
+                codeChallenge: codeChallenge ?? 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq',
+                codeChallengeMethod: codeChallengeMethod ?? 'plain',
+                prompt,
+                subscriberTenantHint,
+                resource,
+                nonce,
+                maxAge,
+            };
+        }
         // We need a flowIdCookie, but legacy callers don't provide it.
         // For backward compatibility, we'll initialize a new flow context.
         const csrfContext = await this.initializeFlow(params);
         return this.getAuthorizationCode(params, sidCookie, csrfContext.flowIdCookie);
+    }
+
+    /**
+     * @deprecated Use fetchSidCookieFlow() instead.
+     * Legacy method that logs in and returns the sid cookie.
+     */
+    public async loginForCookie(
+        email: string,
+        password: string,
+        clientId: string,
+        redirectUri: string,
+    ): Promise<string> {
+        return this.fetchSidCookieFlow(email, password, {
+            clientId,
+            redirectUri,
+            scope: 'openid profile email',
+            state: 'test-state',
+            codeChallenge: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq',
+            codeChallengeMethod: 'plain',
+        });
+    }
+
+    /**
+     * @deprecated Use fetchAuthCodeWithConsentFlow() instead.
+     * Legacy method that logs in, handles consent, and returns an auth code.
+     */
+    public async fetchAuthCode(
+        email: string,
+        password: string,
+        clientId: string,
+        redirectUri: string,
+        opts?: {
+            codeChallenge?: string;
+            codeChallengeMethod?: string;
+            scope?: string;
+            nonce?: string;
+        },
+    ): Promise<string> {
+        return this.fetchAuthCodeWithConsentFlow(email, password, {
+            clientId,
+            redirectUri,
+            scope: opts?.scope ?? 'openid profile email',
+            state: 'test-state',
+            codeChallenge: opts?.codeChallenge ?? 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq',
+            codeChallengeMethod: opts?.codeChallengeMethod ?? 'plain',
+            nonce: opts?.nonce,
+        });
+    }
+
+    /**
+     * @deprecated Use preGrantConsentFlow() instead.
+     * Legacy method that pre-grants consent for a third-party client.
+     */
+    public async preGrantConsent(
+        email: string,
+        password: string,
+        clientId: string,
+        redirectUri: string,
+        scope?: string,
+    ): Promise<void> {
+        return this.preGrantConsentFlow(email, password, {
+            clientId,
+            redirectUri,
+            scope: scope ?? 'openid profile email',
+            state: 'consent-state',
+            codeChallenge: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq',
+            codeChallengeMethod: 'plain',
+        });
     }
 }

@@ -22,7 +22,7 @@ describe('e2e tenant technical credential', () => {
 
     it(`/POST Fetch Access Token`, async () => {
         let tokenFixture = new TokenFixture(app);
-        let response = await tokenFixture.fetchPasswordGrantAccessToken(
+        let response = await tokenFixture.fetchAccessTokenFlow(
             "admin@auth.server.com",
             "admin9000",
             "auth.server.com"

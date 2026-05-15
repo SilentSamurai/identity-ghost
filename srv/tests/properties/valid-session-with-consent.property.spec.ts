@@ -23,7 +23,7 @@ describe('Feature: session-consent-direct, Property 2: Valid sessions with conse
         app = new SharedTestFixture();
         tokenFixture = new TokenFixture(app);
 
-        const adminToken = await tokenFixture.fetchPasswordGrantAccessToken(
+        const adminToken = await tokenFixture.fetchAccessTokenFlow(
             ADMIN_EMAIL, ADMIN_PASSWORD, 'auth.server.com',
         );
         superAccessToken = adminToken.accessToken;
@@ -50,6 +50,16 @@ describe('Feature: session-consent-direct, Property 2: Valid sessions with conse
         const uniqueSuffix = String(Date.now()).slice(-6);
         const {clientId} = await setupTenantAndClient(uniqueSuffix);
 
+        // Pre-grant consent for the widest scope so all sub-scopes are covered
+        await tokenFixture.preGrantConsentFlow(ADMIN_EMAIL, ADMIN_PASSWORD, {
+            clientId,
+            redirectUri: REDIRECT_URI,
+            scope: 'openid profile email',
+            state: 'consent-setup',
+            codeChallenge: CODE_CHALLENGE,
+            codeChallengeMethod: 'plain',
+        });
+
         const scopeArb = fc.constantFrom(
             'openid',
             'openid profile',
@@ -61,7 +71,14 @@ describe('Feature: session-consent-direct, Property 2: Valid sessions with conse
 
         await fc.assert(
             fc.asyncProperty(scopeArb, stateArb, async (scope, state) => {
-                const sidCookie = await tokenFixture.loginForCookie(ADMIN_EMAIL, ADMIN_PASSWORD, clientId, REDIRECT_URI);
+                const sidCookie = await tokenFixture.fetchSidCookieFlow(ADMIN_EMAIL, ADMIN_PASSWORD, {
+                    clientId,
+                    redirectUri: REDIRECT_URI,
+                    scope: 'openid profile email',
+                    state: 'test-state',
+                    codeChallenge: CODE_CHALLENGE,
+                    codeChallengeMethod: 'plain',
+                });
 
                 const res = await app.getHttpServer()
                     .get('/api/oauth/authorize')

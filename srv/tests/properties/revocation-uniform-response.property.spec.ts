@@ -22,7 +22,7 @@ describe('Property 6: Uniform response for any token string', () => {
         fixture = new SharedTestFixture();
         const tokenFixture = new TokenFixture(fixture);
 
-        const adminResult = await tokenFixture.fetchPasswordGrantAccessToken(
+        const adminResult = await tokenFixture.fetchAccessTokenFlow(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com',

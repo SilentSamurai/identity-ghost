@@ -60,16 +60,31 @@ describe('OAuth login, verify, and exchange endpoint error response format (RFC 
 
     describe('POST /api/oauth/login — invalid credentials (wrong password)', () => {
         it('returns 400 with error=invalid_grant and RFC body shape', async () => {
-            const response = await app.getHttpServer()
+            // Initialize a flow to obtain flow_id cookie and csrf_token (required by CSRF protection)
+            const csrfContext = await tokenFixture.initializeFlow({
+                clientId: 'auth.server.com',
+                redirectUri: 'http://localhost:3000/callback',
+                scope: 'openid profile email',
+                state: 'test-state',
+                codeChallenge: 'test-challenge',
+                codeChallengeMethod: 'plain',
+            });
+
+            const req = app.getHttpServer()
                 .post('/api/oauth/login')
                 .send({
                     email: 'admin@auth.server.com',
                     password: 'wrongPass1',
                     client_id: 'auth.server.com',
-                    code_challenge: 'test-challenge',
-                    code_challenge_method: 'plain',
+                    csrf_token: csrfContext.csrfToken,
                 })
                 .set('Accept', 'application/json');
+
+            if (csrfContext.flowIdCookie) {
+                req.set('Cookie', csrfContext.flowIdCookie);
+            }
+
+            const response = await req;
 
             expect(response.status).toEqual(400);
             expect(response.body.error).toEqual('invalid_grant');
@@ -81,16 +96,31 @@ describe('OAuth login, verify, and exchange endpoint error response format (RFC 
 
     describe('POST /api/oauth/login — unknown client_id', () => {
         it('returns 401 with error=invalid_client and RFC body shape', async () => {
-            const response = await app.getHttpServer()
+            // Initialize a flow to obtain flow_id cookie and csrf_token (required by CSRF protection)
+            const csrfContext = await tokenFixture.initializeFlow({
+                clientId: 'auth.server.com',
+                redirectUri: 'http://localhost:3000/callback',
+                scope: 'openid profile email',
+                state: 'test-state',
+                codeChallenge: 'test-challenge',
+                codeChallengeMethod: 'plain',
+            });
+
+            const req = app.getHttpServer()
                 .post('/api/oauth/login')
                 .send({
                     email: 'admin@auth.server.com',
                     password: 'admin9000',
                     client_id: 'nonexistent.domain.com',
-                    code_challenge: 'test-challenge',
-                    code_challenge_method: 'plain',
+                    csrf_token: csrfContext.csrfToken,
                 })
                 .set('Accept', 'application/json');
+
+            if (csrfContext.flowIdCookie) {
+                req.set('Cookie', csrfContext.flowIdCookie);
+            }
+
+            const response = await req;
 
             expect(response.status).toEqual(401);
             expect(response.body.error).toEqual('invalid_client');
@@ -106,7 +136,7 @@ describe('OAuth login, verify, and exchange endpoint error response format (RFC 
         let clientId: string;
 
         beforeAll(async () => {
-            const tokenResult = await tokenFixture.fetchPasswordGrantAccessToken(
+            const tokenResult = await tokenFixture.fetchAccessTokenFlow(
                 'admin@auth.server.com',
                 'admin9000',
                 'auth.server.com',
@@ -139,7 +169,7 @@ describe('OAuth login, verify, and exchange endpoint error response format (RFC 
         let clientSecret: string;
 
         beforeAll(async () => {
-            const tokenResult = await tokenFixture.fetchPasswordGrantAccessToken(
+            const tokenResult = await tokenFixture.fetchAccessTokenFlow(
                 'admin@auth.server.com',
                 'admin9000',
                 'auth.server.com',
@@ -177,7 +207,7 @@ describe('OAuth login, verify, and exchange endpoint error response format (RFC 
 
         beforeAll(async () => {
             // First get a password-grant token to create a confidential client
-            const tokenResult = await tokenFixture.fetchPasswordGrantAccessToken(
+            const tokenResult = await tokenFixture.fetchAccessTokenFlow(
                 'admin@auth.server.com',
                 'admin9000',
                 'auth.server.com',
@@ -188,7 +218,7 @@ describe('OAuth login, verify, and exchange endpoint error response format (RFC 
             clientSecret = creds.clientSecret;
 
             // Now get a client_credentials token (grant_type=client_credentials, not password)
-            const ccToken = await tokenFixture.fetchClientCredentialsToken(clientId, clientSecret);
+            const ccToken = await tokenFixture.fetchClientCredentialsTokenFlow(clientId, clientSecret);
             clientCredentialsAccessToken = ccToken.accessToken;
         });
 

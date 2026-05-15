@@ -33,7 +33,7 @@ describe('Per-App OAuth Client Identity — First-Party Classification', () => {
         fixture = new SharedTestFixture();
         tokenFixture = new TokenFixture(fixture);
 
-        const superAdmin = await tokenFixture.fetchPasswordGrantAccessToken(
+        const superAdmin = await tokenFixture.fetchAccessTokenFlow(
             'admin@auth.server.com',
             'admin9000',
             SUPER_TENANT_DOMAIN,

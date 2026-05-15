@@ -16,7 +16,7 @@ describe('e2e token exchange flow', () => {
 
         // Obtain super admin token
         const tokenFixture = new TokenFixture(app);
-        const response = await tokenFixture.fetchPasswordGrantAccessToken(
+        const response = await tokenFixture.fetchAccessTokenFlow(
             "admin@auth.server.com",
             "admin9000",
             "auth.server.com"
@@ -43,7 +43,13 @@ describe('e2e token exchange flow', () => {
         tenantDomain = uniqueDomain;
 
         // Create confidential client for the new tenant
-        const creds = await tokenFixture.createConfidentialClient(superAdminToken, tenant.id);
+        const creds = await tokenFixture.createConfidentialClient(
+            superAdminToken,
+            tenant.id,
+            "confidential-client",
+            "client_credentials",
+            "openid profile email"
+        );
         clientId = creds.clientId;
         clientSecret = creds.clientSecret;
         expect(clientId).toBeDefined();

@@ -71,7 +71,7 @@ describe('Feature: resource-indicator-support, Property 4: Auth code resource ta
     beforeAll(async () => {
         app = new SharedTestFixture();
         tokenFixture = new TokenFixture(app);
-        const response = await tokenFixture.fetchPasswordGrantAccessToken(email, password, 'auth.server.com');
+        const response = await tokenFixture.fetchAccessTokenFlow(email, password, 'auth.server.com');
         clientApi = new ClientEntityClient(app, response.accessToken);
 
         const tenantClient = new TenantClient(app, response.accessToken);
@@ -87,12 +87,18 @@ describe('Feature: resource-indicator-support, Property 4: Auth code resource ta
      * Helper: login → authorize with resource → return auth code.
      */
     async function loginAndGetCodeWithResource(clientId: string, resource?: string): Promise<string> {
-        const sidCookie = await tokenFixture.loginForCookie(email, password, clientId, REDIRECT_URI);
-        return tokenFixture.authorizeForCode(sidCookie, clientId, REDIRECT_URI, {
+        const params = {
+            clientId,
+            redirectUri: REDIRECT_URI,
+            scope: 'openid profile email',
+            state: 'resource-precedence',
             codeChallenge: CODE_CHALLENGE,
             codeChallengeMethod: 'plain',
             resource,
-        });
+        };
+        const csrfContext = await tokenFixture.initializeFlow(params);
+        const sidCookie = await tokenFixture.login(email, password, clientId, csrfContext);
+        return tokenFixture.getAuthorizationCode(params, sidCookie, csrfContext.flowIdCookie);
     }
 
     it('auth code resource takes precedence over token request resource', async () => {
@@ -110,7 +116,14 @@ describe('Feature: resource-indicator-support, Property 4: Auth code resource ta
 
                 try {
                     // Pre-grant consent so authorize can issue a code
-                    await tokenFixture.preGrantConsent(email, password, clientId, REDIRECT_URI);
+                    await tokenFixture.preGrantConsentFlow(email, password, {
+                        clientId,
+                        redirectUri: REDIRECT_URI,
+                        scope: 'openid profile email',
+                        state: 'consent-state',
+                        codeChallenge: CODE_CHALLENGE,
+                        codeChallengeMethod: 'plain',
+                    });
 
                     // Authorize with authCodeResource
                     const code = await loginAndGetCodeWithResource(clientId, authCodeResource);
@@ -161,7 +174,14 @@ describe('Feature: resource-indicator-support, Property 4: Auth code resource ta
         const clientId = client.client.clientId;
 
         try {
-            await tokenFixture.preGrantConsent(email, password, clientId, REDIRECT_URI);
+            await tokenFixture.preGrantConsentFlow(email, password, {
+                clientId,
+                redirectUri: REDIRECT_URI,
+                scope: 'openid profile email',
+                state: 'consent-state',
+                codeChallenge: CODE_CHALLENGE,
+                codeChallengeMethod: 'plain',
+            });
 
             const code = await loginAndGetCodeWithResource(clientId, authCodeResource);
 
@@ -204,7 +224,14 @@ describe('Feature: resource-indicator-support, Property 4: Auth code resource ta
         const clientId = client.client.clientId;
 
         try {
-            await tokenFixture.preGrantConsent(email, password, clientId, REDIRECT_URI);
+            await tokenFixture.preGrantConsentFlow(email, password, {
+                clientId,
+                redirectUri: REDIRECT_URI,
+                scope: 'openid profile email',
+                state: 'consent-state',
+                codeChallenge: CODE_CHALLENGE,
+                codeChallengeMethod: 'plain',
+            });
 
             // Authorize WITHOUT a resource → stored resource on auth code is null
             const code = await loginAndGetCodeWithResource(clientId, undefined);

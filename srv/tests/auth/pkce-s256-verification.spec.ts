@@ -39,7 +39,7 @@ describe('S256 end-to-end verification', () => {
         tokenFixture = new TokenFixture(app);
 
         // Obtain an admin token to create test resources
-        const tokenResponse = await tokenFixture.fetchPasswordGrantAccessToken(email, password, 'auth.server.com');
+        const tokenResponse = await tokenFixture.fetchAccessTokenFlow(email, password, 'auth.server.com');
         const accessToken = tokenResponse.accessToken;
 
         clientApi = new ClientEntityClient(app, accessToken);
@@ -65,7 +65,14 @@ describe('S256 end-to-end verification', () => {
         isolatedClientId = created.client.clientId;
 
         // Pre-grant consent so authorize can issue codes without redirecting to consent UI
-        await tokenFixture.preGrantConsent(email, password, isolatedClientId, isolatedRedirectUri);
+        await tokenFixture.preGrantConsentFlow(email, password, {
+            clientId: isolatedClientId,
+            redirectUri: isolatedRedirectUri,
+            scope: 'openid profile email',
+            state: 'consent-state',
+            codeChallenge: verifier,
+            codeChallengeMethod: 'plain',
+        });
     });
 
     afterAll(async () => {
@@ -78,8 +85,11 @@ describe('S256 end-to-end verification', () => {
 
     /** Helper: authorize and obtain an auth code with a given challenge and method */
     async function authorizeWithChallenge(challenge: string, method: string): Promise<string> {
-        const sidCookie = await tokenFixture.loginForCookie(email, password, isolatedClientId, isolatedRedirectUri);
-        return tokenFixture.authorizeForCode(sidCookie, isolatedClientId, isolatedRedirectUri, {
+        return tokenFixture.fetchAuthCodeWithConsentFlow(email, password, {
+            clientId: isolatedClientId,
+            redirectUri: isolatedRedirectUri,
+            scope: 'openid profile email',
+            state: 'test-state',
             codeChallenge: challenge,
             codeChallengeMethod: method,
         });
@@ -127,10 +137,20 @@ describe('S256 end-to-end verification', () => {
         const freshClientId = freshCreated.client.clientId;
 
         try {
-            await tokenFixture.preGrantConsent(email, password, freshClientId, isolatedRedirectUri);
+            await tokenFixture.preGrantConsentFlow(email, password, {
+                clientId: freshClientId,
+                redirectUri: isolatedRedirectUri,
+                scope: 'openid profile email',
+                state: 'consent-state',
+                codeChallenge: verifier,
+                codeChallengeMethod: 'plain',
+            });
 
-            const sidCookie = await tokenFixture.loginForCookie(email, password, freshClientId, isolatedRedirectUri);
-            const code = await tokenFixture.authorizeForCode(sidCookie, freshClientId, isolatedRedirectUri, {
+            const code = await tokenFixture.fetchAuthCodeWithConsentFlow(email, password, {
+                clientId: freshClientId,
+                redirectUri: isolatedRedirectUri,
+                scope: 'openid profile email',
+                state: 'test-state',
                 codeChallenge: verifier,
                 codeChallengeMethod: 'plain',
             });

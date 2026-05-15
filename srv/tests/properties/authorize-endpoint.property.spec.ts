@@ -23,7 +23,7 @@ describe('Feature: authorize-endpoint, Property 1: Invalid response_type rejecti
     beforeAll(async () => {
         fixture = new SharedTestFixture();
         const tokenFixture = new TokenFixture(fixture);
-        const {accessToken} = await tokenFixture.fetchPasswordGrantAccessToken(
+        const {accessToken} = await tokenFixture.fetchAccessTokenFlow(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com',
@@ -99,7 +99,7 @@ describe('Feature: authorize-endpoint, Property 2: Redirect URI exact match', ()
     beforeAll(async () => {
         fixture = new SharedTestFixture();
         const tokenFixture = new TokenFixture(fixture);
-        const {accessToken} = await tokenFixture.fetchPasswordGrantAccessToken(
+        const {accessToken} = await tokenFixture.fetchAccessTokenFlow(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com',
@@ -175,7 +175,7 @@ describe('Feature: authorize-endpoint, Property 3: State parameter round-trip', 
     beforeAll(async () => {
         fixture = new SharedTestFixture();
         const tokenFixture = new TokenFixture(fixture);
-        const {accessToken} = await tokenFixture.fetchPasswordGrantAccessToken(
+        const {accessToken} = await tokenFixture.fetchAccessTokenFlow(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com',
@@ -253,7 +253,7 @@ describe('Feature: authorize-endpoint, Property 5: Scope excludes role names', (
     beforeAll(async () => {
         fixture = new SharedTestFixture();
         const tokenFixture = new TokenFixture(fixture);
-        const {accessToken} = await tokenFixture.fetchPasswordGrantAccessToken(
+        const {accessToken} = await tokenFixture.fetchAccessTokenFlow(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com',
@@ -340,7 +340,7 @@ describe('Feature: authorize-endpoint, Property 6: Post-redirect errors include 
     beforeAll(async () => {
         fixture = new SharedTestFixture();
         const tokenFixture = new TokenFixture(fixture);
-        const {accessToken} = await tokenFixture.fetchPasswordGrantAccessToken(
+        const {accessToken} = await tokenFixture.fetchAccessTokenFlow(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com',
@@ -464,7 +464,7 @@ describe('Feature: authorize-endpoint, Property 7: Pre-redirect errors never red
     beforeAll(async () => {
         fixture = new SharedTestFixture();
         const tokenFixture = new TokenFixture(fixture);
-        const {accessToken} = await tokenFixture.fetchPasswordGrantAccessToken(
+        const {accessToken} = await tokenFixture.fetchAccessTokenFlow(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com',
@@ -578,7 +578,7 @@ describe('Feature: authorize-endpoint, Property 8: Error codes are standard OAut
     beforeAll(async () => {
         fixture = new SharedTestFixture();
         const tokenFixture = new TokenFixture(fixture);
-        const {accessToken} = await tokenFixture.fetchPasswordGrantAccessToken(
+        const {accessToken} = await tokenFixture.fetchAccessTokenFlow(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com',

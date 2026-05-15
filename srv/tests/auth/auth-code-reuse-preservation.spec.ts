@@ -33,7 +33,11 @@ describe('Preservation: valid codes continue to pass verification', () => {
      * Validates: Requirement 3.2
      */
     it('login should issue a fresh authorization code', async () => {
-        const code = await tokenFixture.fetchAuthCode(email, password, clientId, redirectUri, {
+        const code = await tokenFixture.fetchAuthCodeWithConsentFlow(email, password, {
+            clientId,
+            redirectUri,
+            scope: 'openid profile email',
+            state: 'test-state',
             codeChallenge: challenge,
             codeChallengeMethod: 'plain',
         });
@@ -47,11 +51,19 @@ describe('Preservation: valid codes continue to pass verification', () => {
      * Validates: Requirement 3.2
      */
     it('consecutive logins should issue distinct authorization codes', async () => {
-        const code1 = await tokenFixture.fetchAuthCode(email, password, clientId, redirectUri, {
+        const code1 = await tokenFixture.fetchAuthCodeWithConsentFlow(email, password, {
+            clientId,
+            redirectUri,
+            scope: 'openid profile email',
+            state: 'test-state',
             codeChallenge: challenge,
             codeChallengeMethod: 'plain',
         });
-        const code2 = await tokenFixture.fetchAuthCode(email, password, clientId, redirectUri, {
+        const code2 = await tokenFixture.fetchAuthCodeWithConsentFlow(email, password, {
+            clientId,
+            redirectUri,
+            scope: 'openid profile email',
+            state: 'test-state',
             codeChallenge: challenge,
             codeChallengeMethod: 'plain',
         });
@@ -64,7 +76,11 @@ describe('Preservation: valid codes continue to pass verification', () => {
      * Validates: Requirements 3.1, 3.4
      */
     it('verify-auth-code should return status: true for a fresh unused code', async () => {
-        const code = await tokenFixture.fetchAuthCode(email, password, clientId, redirectUri, {
+        const code = await tokenFixture.fetchAuthCodeWithConsentFlow(email, password, {
+            clientId,
+            redirectUri,
+            scope: 'openid profile email',
+            state: 'test-state',
             codeChallenge: challenge,
             codeChallengeMethod: 'plain',
         });
@@ -88,7 +104,11 @@ describe('Preservation: valid codes continue to pass verification', () => {
      * Validates: Requirement 3.1
      */
     it('verify-auth-code should be idempotent for fresh codes', async () => {
-        const code = await tokenFixture.fetchAuthCode(email, password, clientId, redirectUri, {
+        const code = await tokenFixture.fetchAuthCodeWithConsentFlow(email, password, {
+            clientId,
+            redirectUri,
+            scope: 'openid profile email',
+            state: 'test-state',
             codeChallenge: challenge,
             codeChallengeMethod: 'plain',
         });
@@ -124,7 +144,11 @@ describe('Preservation: valid codes continue to pass verification', () => {
      * Validates: Requirement 3.3
      */
     it('token exchange should succeed for a fresh unused code', async () => {
-        const code = await tokenFixture.fetchAuthCode(email, password, clientId, redirectUri, {
+        const code = await tokenFixture.fetchAuthCodeWithConsentFlow(email, password, {
+            clientId,
+            redirectUri,
+            scope: 'openid profile email',
+            state: 'test-state',
             codeChallenge: challenge,
             codeChallengeMethod: 'plain',
         });
@@ -150,7 +174,11 @@ describe('Preservation: valid codes continue to pass verification', () => {
      * Validates: Requirement 3.3
      */
     it('token exchange should return a valid JWT with user claims', async () => {
-        const code = await tokenFixture.fetchAuthCode(email, password, clientId, redirectUri, {
+        const code = await tokenFixture.fetchAuthCodeWithConsentFlow(email, password, {
+            clientId,
+            redirectUri,
+            scope: 'openid profile email',
+            state: 'test-state',
             codeChallenge: challenge,
             codeChallengeMethod: 'plain',
         });
@@ -182,7 +210,11 @@ describe('Preservation: valid codes continue to pass verification', () => {
      * Validates: Requirements 3.1, 3.3, 3.4
      */
     it('verify then exchange should both succeed for a fresh code', async () => {
-        const code = await tokenFixture.fetchAuthCode(email, password, clientId, redirectUri, {
+        const code = await tokenFixture.fetchAuthCodeWithConsentFlow(email, password, {
+            clientId,
+            redirectUri,
+            scope: 'openid profile email',
+            state: 'test-state',
             codeChallenge: challenge,
             codeChallengeMethod: 'plain',
         });
@@ -222,7 +254,11 @@ describe('Preservation: valid codes continue to pass verification', () => {
      * Validates: Requirement 3.4
      */
     it('verify-auth-code should reject a code with wrong client_id', async () => {
-        const code = await tokenFixture.fetchAuthCode(email, password, clientId, redirectUri, {
+        const code = await tokenFixture.fetchAuthCodeWithConsentFlow(email, password, {
+            clientId,
+            redirectUri,
+            scope: 'openid profile email',
+            state: 'test-state',
             codeChallenge: challenge,
             codeChallengeMethod: 'plain',
         });

@@ -34,7 +34,7 @@ describe('S256 enforcement and downgrade prevention', () => {
     beforeAll(async () => {
         app = new SharedTestFixture();
         tokenFixture = new TokenFixture(app);
-        const response = await tokenFixture.fetchPasswordGrantAccessToken(adminEmail, adminPassword, 'auth.server.com');
+        const response = await tokenFixture.fetchAccessTokenFlow(adminEmail, adminPassword, 'auth.server.com');
         accessToken = response.accessToken;
         clientApi = new ClientEntityClient(app, accessToken);
 
@@ -48,35 +48,6 @@ describe('S256 enforcement and downgrade prevention', () => {
         await app.close();
     });
 
-    /**
-     * Helper: attempt authorize with a given client_id, challenge, and method.
-     * Returns the raw authorize response (302 or error).
-     */
-    async function authorizeWith(clientId: string, redirectUri: string, method: string, challenge: string) {
-        const sidCookie = await tokenFixture.loginForCookie(adminEmail, adminPassword, clientId, redirectUri);
-        return app.getHttpServer()
-            .get('/api/oauth/authorize')
-            .query({
-                response_type: 'code',
-                client_id: clientId,
-                redirect_uri: redirectUri,
-                scope: 'openid profile email',
-                state: 'test-state',
-                code_challenge: challenge,
-                code_challenge_method: method,
-                session_confirmed: 'true',
-            })
-            .set('Cookie', sidCookie)
-            .redirects(0);
-    }
-
-    /**
-     * Helper: pre-grant consent for a client so authorize can proceed.
-     */
-    async function preGrantConsent(clientId: string, redirectUri: string, method: string, challenge: string): Promise<void> {
-        await tokenFixture.preGrantConsent('admin@auth.server.com', 'admin9000', clientId, redirectUri);
-    }
-
     it('rejects plain method when client has require_pkce=true', async () => {
         const created = await clientApi.createClient(testTenantId, 'PKCE Required Client', {
             requirePkce: true,
@@ -88,7 +59,17 @@ describe('S256 enforcement and downgrade prevention', () => {
         const redirectUri = 'https://pkce-test.example.com/callback';
 
         try {
-            const sidCookie = await tokenFixture.loginForCookie(adminEmail, adminPassword, clientId, redirectUri);
+            // Get a sid cookie using a different client that accepts plain (auth.server.com).
+            // The require_pkce check only fires when a session exists and authorize is called.
+            const sidCookie = await tokenFixture.fetchSidCookieFlow(adminEmail, adminPassword, {
+                clientId: 'auth.server.com',
+                redirectUri: 'http://localhost:3000/callback',
+                scope: 'openid profile email',
+                state: 'test-state',
+                codeChallenge: plainVerifier,
+                codeChallengeMethod: 'plain',
+            });
+
             const response = await app.getHttpServer()
                 .get('/api/oauth/authorize')
                 .query({
@@ -125,13 +106,15 @@ describe('S256 enforcement and downgrade prevention', () => {
         const redirectUri = 'https://pkce-test.example.com/callback';
 
         try {
-            await preGrantConsent(clientId, redirectUri, 'S256', s256Challenge);
-            const code = await tokenFixture.authorizeForCode(
-                await tokenFixture.loginForCookie(adminEmail, adminPassword, clientId, redirectUri),
+            // Pre-grant consent then get code with S256
+            const code = await tokenFixture.fetchAuthCodeWithConsentFlow(adminEmail, adminPassword, {
                 clientId,
                 redirectUri,
-                {codeChallenge: s256Challenge, codeChallengeMethod: 'S256'},
-            );
+                scope: 'openid profile email',
+                state: 'test-state',
+                codeChallenge: s256Challenge,
+                codeChallengeMethod: 'S256',
+            });
             expect(code).toBeDefined();
             expect(typeof code).toBe('string');
         } finally {
@@ -150,13 +133,14 @@ describe('S256 enforcement and downgrade prevention', () => {
         const redirectUri = 'https://pkce-test.example.com/callback';
 
         try {
-            await preGrantConsent(clientId, redirectUri, 'plain', plainVerifier);
-            const code = await tokenFixture.authorizeForCode(
-                await tokenFixture.loginForCookie(adminEmail, adminPassword, clientId, redirectUri),
+            const code = await tokenFixture.fetchAuthCodeWithConsentFlow(adminEmail, adminPassword, {
                 clientId,
                 redirectUri,
-                {codeChallenge: plainVerifier, codeChallengeMethod: 'plain'},
-            );
+                scope: 'openid profile email',
+                state: 'test-state',
+                codeChallenge: plainVerifier,
+                codeChallengeMethod: 'plain',
+            });
             expect(code).toBeDefined();
             expect(typeof code).toBe('string');
         } finally {
@@ -178,11 +162,12 @@ describe('S256 enforcement and downgrade prevention', () => {
         const redirectUri = 'https://pkce-test.example.com/callback';
 
         try {
-            await preGrantConsent(clientId, redirectUri, 'S256', s256Challenge);
-
             // Authorize with S256 — should succeed
-            const sidCookie1 = await tokenFixture.loginForCookie(adminEmail, adminPassword, clientId, redirectUri);
-            const code = await tokenFixture.authorizeForCode(sidCookie1, clientId, redirectUri, {
+            const code = await tokenFixture.fetchAuthCodeWithConsentFlow(adminEmail, adminPassword, {
+                clientId,
+                redirectUri,
+                scope: 'openid profile email',
+                state: 'test-state',
                 codeChallenge: s256Challenge,
                 codeChallengeMethod: 'S256',
             });
@@ -203,11 +188,11 @@ describe('S256 enforcement and downgrade prevention', () => {
         const redirectUri = 'https://pkce-test.example.com/callback';
 
         try {
-            await preGrantConsent(clientId, redirectUri, 'S256', s256Challenge);
-
-            // Authorize with S256 — should succeed
-            const sidCookie = await tokenFixture.loginForCookie(adminEmail, adminPassword, clientId, redirectUri);
-            const code = await tokenFixture.authorizeForCode(sidCookie, clientId, redirectUri, {
+            const code = await tokenFixture.fetchAuthCodeWithConsentFlow(adminEmail, adminPassword, {
+                clientId,
+                redirectUri,
+                scope: 'openid profile email',
+                state: 'test-state',
                 codeChallenge: s256Challenge,
                 codeChallengeMethod: 'S256',
             });
@@ -228,9 +213,11 @@ describe('S256 enforcement and downgrade prevention', () => {
         const redirectUri = 'https://pkce-test.example.com/callback';
 
         try {
-            await preGrantConsent(clientId, redirectUri, 'plain', plainVerifier);
-            const sidCookie = await tokenFixture.loginForCookie(adminEmail, adminPassword, clientId, redirectUri);
-            const code = await tokenFixture.authorizeForCode(sidCookie, clientId, redirectUri, {
+            const code = await tokenFixture.fetchAuthCodeWithConsentFlow(adminEmail, adminPassword, {
+                clientId,
+                redirectUri,
+                scope: 'openid profile email',
+                state: 'test-state',
                 codeChallenge: plainVerifier,
                 codeChallengeMethod: 'plain',
             });

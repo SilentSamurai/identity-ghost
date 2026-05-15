@@ -25,11 +25,14 @@ describe('ID Token Generation Integration', () => {
 
     /** Helper: login → authorize → auth code (cookie-based flow) */
     async function loginForCode(opts?: { scope?: string; nonce?: string }): Promise<string> {
-        return tokenFixture.fetchAuthCode(email, password, clientId, redirectUri, {
-            scope: opts?.scope,
-            nonce: opts?.nonce,
+        return tokenFixture.fetchAuthCodeWithConsentFlow(email, password, {
+            clientId,
+            redirectUri,
+            scope: opts?.scope ?? 'openid profile email',
+            state: 'test-state',
             codeChallenge: challenge,
             codeChallengeMethod: 'plain',
+            nonce: opts?.nonce,
         });
     }
 
@@ -228,7 +231,7 @@ describe('ID Token Generation Integration', () => {
             expect(initialPayload.nonce).toEqual(testNonce);
 
             // Step 2: Get client credentials for refresh (need client_id + client_secret)
-            const adminToken = await tokenFixture.fetchPasswordGrantAccessToken(email, password, clientId);
+            const adminToken = await tokenFixture.fetchAccessTokenFlow(email, password, clientId);
             const credsRes = await app.getHttpServer()
                 .get('/api/tenant/my/credentials')
                 .set('Authorization', `Bearer ${adminToken.accessToken}`);
@@ -275,7 +278,15 @@ describe('ID Token Generation Integration', () => {
          *   4. GET /authorize again without prompt=login → server issues the code.
          */
         async function authCodeWithPromptLogin(): Promise<string> {
-            const initialCookie = await tokenFixture.loginForCookie(promptEmail, password, promptClientId, promptRedirectUri);
+            const promptParams = {
+                clientId: promptClientId,
+                redirectUri: promptRedirectUri,
+                scope: 'openid profile email',
+                state: 'test-state',
+                codeChallenge: challenge,
+                codeChallengeMethod: 'plain',
+            };
+            const initialCookie = await tokenFixture.fetchSidCookieFlow(promptEmail, password, promptParams);
 
             const bounceRes = await app.getHttpServer()
                 .get('/api/oauth/authorize')
@@ -298,8 +309,11 @@ describe('ID Token Generation Integration', () => {
             expect(bounceRes.headers['location']).not.toContain('code=');
 
             // Re-authenticate and authorize without prompt=login
-            return tokenFixture.fetchAuthCode(promptEmail, password, promptClientId, promptRedirectUri, {
+            return tokenFixture.fetchAuthCodeWithConsentFlow(promptEmail, password, {
+                clientId: promptClientId,
+                redirectUri: promptRedirectUri,
                 scope: 'openid profile email',
+                state: 'test-state',
                 codeChallenge: challenge,
                 codeChallengeMethod: 'plain',
             });
@@ -334,10 +348,12 @@ describe('ID Token Generation Integration', () => {
         });
 
         it('should include auth_time in ID token when max_age is used', async () => {
-            const code = await tokenFixture.fetchAuthCode(
-                promptEmail, password, promptClientId, promptRedirectUri,
-                {
+            const code = await tokenFixture.fetchAuthCodeWithConsentFlow(
+                promptEmail, password, {
+                    clientId: promptClientId,
+                    redirectUri: promptRedirectUri,
                     scope: 'openid profile email',
+                    state: 'test-state',
                     codeChallenge: challenge,
                     codeChallengeMethod: 'plain',
                     maxAge: 3600,

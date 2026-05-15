@@ -31,9 +31,17 @@ describe('Login Session Threading', () => {
     });
 
     it('auth code flow — sid is threaded from login to ID token', async () => {
-        // Full cookie-based flow: login → authorize → token exchange
-        const tokenResponse = await tokenFixture.fetchTokenWithLoginFlow(
-            EMAIL, PASSWORD, CLIENT_ID, REDIRECT_URI,
+        // Full cookie-based flow: login → authorize (with consent handling) → token exchange
+        const tokenResponse = await tokenFixture.fetchTokenWithAuthCodeFlowAndConsent(
+            EMAIL, PASSWORD, {
+                clientId: CLIENT_ID,
+                redirectUri: REDIRECT_URI,
+                scope: 'openid profile email',
+                state: 'test-state',
+                codeChallenge: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq',
+                codeChallengeMethod: 'plain',
+            },
+            'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq',
         );
 
         expect(tokenResponse.id_token).toBeDefined();

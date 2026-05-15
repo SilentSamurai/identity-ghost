@@ -24,7 +24,7 @@ describe('Feature: session-confirmed-no-bypass-consent, Property 2b: session_con
         app = new SharedTestFixture();
         tokenFixture = new TokenFixture(app);
 
-        const adminToken = await tokenFixture.fetchPasswordGrantAccessToken(
+        const adminToken = await tokenFixture.fetchAccessTokenFlow(
             ADMIN_EMAIL, ADMIN_PASSWORD, 'auth.server.com',
         );
         superAccessToken = adminToken.accessToken;
@@ -59,7 +59,14 @@ describe('Feature: session-confirmed-no-bypass-consent, Property 2b: session_con
                 const thirdPartyClientId = thirdParty.client.clientId;
 
                 try {
-                    const sidCookie = await tokenFixture.loginForCookie(ADMIN_EMAIL, ADMIN_PASSWORD, thirdPartyClientId, REDIRECT_URI);
+                    const sidCookie = await tokenFixture.fetchSidCookieFlow(ADMIN_EMAIL, ADMIN_PASSWORD, {
+                        clientId: thirdPartyClientId,
+                        redirectUri: REDIRECT_URI,
+                        scope: 'openid profile email',
+                        state: 'test-state',
+                        codeChallenge: CODE_CHALLENGE,
+                        codeChallengeMethod: 'plain',
+                    });
 
                     const res = await app.getHttpServer()
                         .get('/api/oauth/authorize')
@@ -79,7 +86,7 @@ describe('Feature: session-confirmed-no-bypass-consent, Property 2b: session_con
                     expect(res.status).toBe(302);
                     const location: string = res.headers['location'];
                     const url = new URL(location, 'http://localhost');
-                    const isConsentRedirect = url.pathname === '/consent';
+                    const isConsentRedirect = url.pathname === '/authorize' && url.searchParams.get('view') === 'consent';
                     const isCodeRedirect = url.searchParams.has('code') && !url.searchParams.has('error');
 
                     expect(isConsentRedirect).toBe(true);

@@ -29,7 +29,7 @@ describe('Issue #93: domain-based client_id must not bypass redirect URI validat
         tokenFixture = new TokenFixture(app);
 
         // Get super-admin token to configure the test tenant's client
-        const superAdmin = await tokenFixture.fetchPasswordGrantAccessToken(
+        const superAdmin = await tokenFixture.fetchAccessTokenFlow(
             'admin@auth.server.com', 'admin9000', 'auth.server.com',
         );
         accessToken = superAdmin.accessToken;
@@ -55,8 +55,15 @@ describe('Issue #93: domain-based client_id must not bypass redirect URI validat
     });
 
     it('should reject an unregistered redirect_uri when client_id is a domain alias (at authorize endpoint)', async () => {
-        // Login first to get a session cookie
-        const sidCookie = await tokenFixture.loginForCookie(email, password, domain, REGISTERED_URI);
+        // Login first to get a session cookie using the registered URI
+        const sidCookie = await tokenFixture.fetchSidCookieFlow(email, password, {
+            clientId: domain,
+            redirectUri: REGISTERED_URI,
+            scope: 'openid profile email',
+            state: 'test-state',
+            codeChallenge: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq',
+            codeChallengeMethod: 'plain',
+        });
 
         // Now try to authorize with an unregistered redirect_uri
         const response = await app.getHttpServer()
@@ -80,7 +87,14 @@ describe('Issue #93: domain-based client_id must not bypass redirect URI validat
     });
 
     it('should accept a registered redirect_uri when client_id is a domain alias', async () => {
-        const sidCookie = await tokenFixture.loginForCookie(email, password, domain, REGISTERED_URI);
+        const sidCookie = await tokenFixture.fetchSidCookieFlow(email, password, {
+            clientId: domain,
+            redirectUri: REGISTERED_URI,
+            scope: 'openid profile email',
+            state: 'test-state',
+            codeChallenge: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq',
+            codeChallengeMethod: 'plain',
+        });
 
         const response = await app.getHttpServer()
             .get('/api/oauth/authorize')

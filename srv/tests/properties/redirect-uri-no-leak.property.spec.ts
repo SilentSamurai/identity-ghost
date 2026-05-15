@@ -33,7 +33,7 @@ describe('Feature: redirect-uri-validation, Property 6: Error responses never le
     beforeAll(async () => {
         app = new SharedTestFixture();
         tokenFixture = new TokenFixture(app);
-        const {accessToken} = await tokenFixture.fetchPasswordGrantAccessToken(email, password, 'auth.server.com');
+        const {accessToken} = await tokenFixture.fetchAccessTokenFlow(email, password, 'auth.server.com');
 
         clientApi = new ClientEntityClient(app, accessToken);
         const tenantClient = new TenantClient(app, accessToken);
@@ -50,7 +50,14 @@ describe('Feature: redirect-uri-validation, Property 6: Error responses never le
         testClientId = created.client.clientId;
 
         // Pre-grant consent so /authorize issues codes directly (needed for the /token test).
-        await tokenFixture.preGrantConsent(email, password, testClientId, REGISTERED_URI);
+        await tokenFixture.preGrantConsentFlow(email, password, {
+            clientId: testClientId,
+            redirectUri: REGISTERED_URI,
+            scope: 'openid profile email',
+            state: 'consent-state',
+            codeChallenge: verifier,
+            codeChallengeMethod: 'plain',
+        });
     });
 
     afterAll(async () => {

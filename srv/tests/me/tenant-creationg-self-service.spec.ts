@@ -105,7 +105,7 @@ describe('UsersController (e2e)', () => {
         it('should not login from any other tenant', async () => {
             // Test login to get access token
             try {
-                const authResponse = await tokenFixture.fetchPasswordGrantAccessToken(
+                const authResponse = await tokenFixture.fetchAccessTokenFlow(
                     testUserEmail,
                     testUserPassword,
                     "auth.server.com"
@@ -120,7 +120,7 @@ describe('UsersController (e2e)', () => {
             // Enable password grant on the self-registered tenant's default client.
             // Uses a direct search call (not findTenantBy which asserts >= 1 result)
             // so this is safe when the test runs in isolation without prior registration.
-            const superAdminToken = await tokenFixture.fetchPasswordGrantAccessToken(
+            const superAdminToken = await tokenFixture.fetchAccessTokenFlow(
                 "admin@auth.server.com", "admin9000", "auth.server.com"
             );
             const adminSearchClient = new SearchClient(app, superAdminToken.accessToken);
@@ -131,7 +131,7 @@ describe('UsersController (e2e)', () => {
             }
 
             // Test login to get access token
-            const authResponse = await tokenFixture.fetchPasswordGrantAccessToken(
+            const authResponse = await tokenFixture.fetchAccessTokenFlow(
                 testUserEmail,
                 testUserPassword,
                 tenantDomain
@@ -181,7 +181,7 @@ describe('UsersController (e2e)', () => {
 
             // Try to login with deleted account - should fail
             try {
-                await tokenFixture.fetchPasswordGrantAccessToken(
+                await tokenFixture.fetchAccessTokenFlow(
                     updatedEmail,
                     testUserPassword,
                     tenantDomain

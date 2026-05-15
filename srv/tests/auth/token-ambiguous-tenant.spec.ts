@@ -45,7 +45,7 @@ describe('Ambiguous Subscription Tenant Flow', () => {
     beforeAll(async () => {
         app = new SharedTestFixture();
         tokenFixture = new TokenFixture(app);
-        const superAdminTokenResponse = await tokenFixture.fetchPasswordGrantAccessToken(
+        const superAdminTokenResponse = await tokenFixture.fetchAccessTokenFlow(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com'
@@ -89,7 +89,7 @@ describe('Ambiguous Subscription Tenant Flow', () => {
             await adminTenantClient.subscribeToApp(subscriber2.id, createdApp.id);
 
             try {
-                await tokenFixture.fetchPasswordGrantAccessToken(testUserEmail, testUserPassword, appOwnerTenant.domain);
+                await tokenFixture.fetchAccessTokenFlow(testUserEmail, testUserPassword, appOwnerTenant.domain);
                 fail('Expected BadRequestException for ambiguous tenants');
             } catch (error) {
                 expect(error.status).toBe(400);
@@ -292,26 +292,27 @@ describe('Ambiguous Subscription Tenant Flow', () => {
             await adminTenantClient.subscribeToApp(subscriber1.id, createdApp.id);
             await adminTenantClient.subscribeToApp(subscriber2.id, createdApp.id);
 
-            // POST /login using the domain as client_id (which resolves to the tenant's default client)
-            // For third-party apps, we need to use a client that belongs to the app owner tenant
-            // The domain alias acts as a first-party client, so we need to test with a real clientId
-            // However, the login endpoint checks if client.alias === client_id to determine first-party
-            // So using the domain will skip ambiguity detection (first-party behavior)
-            
-            // For this test, we use the domain which is first-party, so no ambiguity detection
-            // The ambiguity detection only happens for third-party apps
-            const loginResponse = await app.getHttpServer()
-                .post('/api/oauth/login')
-                .send({
-                    email: testUserEmail,
-                    password: testUserPassword,
-                    client_id: appOwnerTenant.domain, // First-party - skips ambiguity
-                })
-                .set('Accept', 'application/json');
+            // First-party login (domain as client_id) skips ambiguity detection.
+            // Use initializeFlow to get CSRF context, then login via TokenFixture.
+            const params = {
+                clientId: appOwnerTenant.domain,
+                redirectUri: 'http://localhost:3000/',
+                scope: 'openid profile email',
+                state: 'test-state',
+                codeChallenge: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq',
+                codeChallengeMethod: 'plain',
+            };
+            const csrfContext = await tokenFixture.initializeFlow(params);
+            const sidCookie = await tokenFixture.login(
+                testUserEmail,
+                testUserPassword,
+                appOwnerTenant.domain,
+                csrfContext,
+            );
 
             // First-party login should succeed without ambiguity check
-            expect(loginResponse.status).toBe(201);
-            expect(loginResponse.body.success).toBe(true);
+            expect(sidCookie).toBeDefined();
+            expect(sidCookie).toContain('sid=');
         });
 
         it('POST /login with subscriber_tenant_hint creates session and returns success', async () => {
@@ -321,8 +322,6 @@ describe('Ambiguous Subscription Tenant Flow', () => {
             expect(subscriber1).toBeDefined();
 
             // Create an app and subscribe subscriber1 to it
-            // Per the new per-app OAuth client identity design, hint validation requires
-            // the client to be linked to an App with active subscriptions
             const createdApp = await appClient.createApp(
                 appOwnerTenant.id,
                 `authcode-hint-app-${uuid()}`,
@@ -338,29 +337,35 @@ describe('Ambiguous Subscription Tenant Flow', () => {
 
             await adminTenantClient.addMembers(subscriber1.id, [testUserEmail]);
 
-            // POST /login with hint using the App's clientId (App_Client)
-            // The hint is validated against subscriber tenants for this specific App
-            const loginResponse = await app.getHttpServer()
-                .post('/api/oauth/login')
-                .send({
-                    email: testUserEmail,
-                    password: testUserPassword,
-                    client_id: createdApp.clientId,
-                    subscriber_tenant_hint: subscriber1.domain,
-                })
-                .set('Accept', 'application/json');
+            // App_Clients require PKCE with S256 — use a proper code challenge
+            const codeVerifier = 'hint-test-verifier-' + uuid() + '-padding-to-make-it-long';
+            const codeChallenge = require('crypto')
+                .createHash('sha256')
+                .update(codeVerifier)
+                .digest('base64url');
 
-            expect(loginResponse.status).toBe(201);
-            expect(loginResponse.body.success).toBe(true);
-            expect(loginResponse.body.requires_tenant_selection).toBeUndefined();
+            // Use initializeFlow to get CSRF context, then login with subscriber_tenant_hint
+            const params = {
+                clientId: createdApp.clientId,
+                redirectUri: `http://localhost:${app.webhook.boundPort}`,
+                scope: 'openid profile email',
+                state: 'test-state',
+                codeChallenge,
+                codeChallengeMethod: 'S256',
+                subscriberTenantHint: subscriber1.domain,
+            };
+            const csrfContext = await tokenFixture.initializeFlow(params);
+            const sidCookie = await tokenFixture.login(
+                testUserEmail,
+                testUserPassword,
+                createdApp.clientId,
+                csrfContext,
+                subscriber1.domain,
+            );
 
             // Verify session cookie was set
-            const cookies = loginResponse.headers['set-cookie'];
-            expect(cookies).toBeDefined();
-            const sidCookie = Array.isArray(cookies)
-                ? cookies.find((c: string) => c.startsWith('sid='))
-                : cookies?.startsWith('sid=') ? cookies : undefined;
             expect(sidCookie).toBeDefined();
+            expect(sidCookie).toContain('sid=');
         });
 
         it('POST /login rejects invalid subscriber_tenant_hint', async () => {
@@ -376,6 +381,18 @@ describe('Ambiguous Subscription Tenant Flow', () => {
             // User is only member of subscriber1, not bree.local
             await adminTenantClient.addMembers(subscriber1.id, [testUserEmail]);
 
+            // Initialize flow to get CSRF context, then attempt login with invalid hint
+            const params = {
+                clientId: appOwnerTenant.domain,
+                redirectUri: 'http://localhost:3000/',
+                scope: 'openid profile email',
+                state: 'test-state',
+                codeChallenge: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq',
+                codeChallengeMethod: 'plain',
+                subscriberTenantHint: 'bree.local',
+            };
+            const csrfContext = await tokenFixture.initializeFlow(params);
+
             // POST /login with invalid hint (user is not member of bree.local)
             const loginResponse = await app.getHttpServer()
                 .post('/api/oauth/login')
@@ -383,8 +400,10 @@ describe('Ambiguous Subscription Tenant Flow', () => {
                     email: testUserEmail,
                     password: testUserPassword,
                     client_id: appOwnerTenant.domain,
-                    subscriber_tenant_hint: 'bree.local', // User is NOT a member of this tenant
+                    subscriber_tenant_hint: 'bree.local',
+                    csrf_token: csrfContext.csrfToken,
                 })
+                .set('Cookie', csrfContext.flowIdCookie)
                 .set('Accept', 'application/json');
 
             expect(loginResponse.status).toBe(400);
@@ -411,9 +430,8 @@ describe('Ambiguous Subscription Tenant Flow', () => {
             await adminTenantClient.subscribeToApp(subscriber1.id, createdApp.id);
 
             // Use the App's clientId for the OAuth flow
-            // The appUrl is already registered as a redirect URI when the app is created
             const clientId = createdApp.clientId;
-            const redirectUri = appUrl; // Use the same URL that was registered
+            const redirectUri = appUrl;
 
             const testUserEmail = `authcode-full-flow-${uuid()}@test.com`;
             const testUserPassword = 'TestPassword123!';
@@ -423,86 +441,62 @@ describe('Ambiguous Subscription Tenant Flow', () => {
 
             // Pre-grant consent for this App_Client so /authorize issues a code
             // directly instead of redirecting to the consent UI.
-            await tokenFixture.preGrantConsent(
-                testUserEmail,
-                testUserPassword,
+            // App_Clients require PKCE with S256
+            const consentVerifier = 'consent-verifier-' + uuid() + '-padding-long-enough';
+            const consentChallenge = require('crypto')
+                .createHash('sha256')
+                .update(consentVerifier)
+                .digest('base64url');
+            await tokenFixture.preGrantConsentFlow(testUserEmail, testUserPassword, {
                 clientId,
                 redirectUri,
-                'openid profile email',
-            );
+                scope: 'openid profile email',
+                state: 'consent-state',
+                codeChallenge: consentChallenge,
+                codeChallengeMethod: 'S256',
+            });
 
-            // Step 1: Login with hint using the App's clientId
-            const loginResponse = await app.getHttpServer()
-                .post('/api/oauth/login')
-                .send({
-                    email: testUserEmail,
-                    password: testUserPassword,
-                    client_id: clientId,
-                    subscriber_tenant_hint: subscriber1.domain,
-                })
-                .set('Accept', 'application/json');
-
-            expect(loginResponse.status).toBe(201);
-            expect(loginResponse.body.success).toBe(true);
-
-            // Extract session cookie
-            const cookies = loginResponse.headers['set-cookie'];
-            const sidCookie = Array.isArray(cookies)
-                ? cookies.find((c: string) => c.startsWith('sid='))
-                : cookies;
-            expect(sidCookie).toBeDefined();
-
-            // Step 2: Authorize with hint — should issue code
-            // App_Clients require PKCE with S256 method by default
+            // Step 1: Initialize flow and login with subscriber_tenant_hint
             const codeVerifier = 'test-verifier-' + uuid() + '-padding-to-make-it-long-enough';
             const codeChallenge = require('crypto')
                 .createHash('sha256')
                 .update(codeVerifier)
                 .digest('base64url');
-            
-            const authorizeResponse = await app.getHttpServer()
-                .get('/api/oauth/authorize')
-                .query({
-                    client_id: clientId,
-                    redirect_uri: redirectUri,
-                    response_type: 'code',
-                    scope: 'openid profile email',
-                    state: 'test-state',
-                    code_challenge: codeChallenge,
-                    code_challenge_method: 'S256',
-                    subscriber_tenant_hint: subscriber1.domain,
-                    session_confirmed: 'true',
-                })
-                .set('Cookie', sidCookie)
-                .redirects(0);
 
-            expect(authorizeResponse.status).toBe(302);
-            const location = authorizeResponse.headers.location;
-            expect(location).toContain(redirectUri);
-            expect(location).toContain('code=');
+            const params = {
+                clientId,
+                redirectUri,
+                scope: 'openid profile email',
+                state: 'test-state',
+                codeChallenge,
+                codeChallengeMethod: 'S256',
+                subscriberTenantHint: subscriber1.domain,
+            };
+            const csrfContext = await tokenFixture.initializeFlow(params);
+            const sidCookie = await tokenFixture.login(
+                testUserEmail,
+                testUserPassword,
+                clientId,
+                csrfContext,
+                subscriber1.domain,
+            );
 
-            // Extract auth code
-            const url = new URL(location, 'http://localhost');
-            const authCode = url.searchParams.get('code');
-            expect(authCode).toBeDefined();
+            // Step 2: Get authorization code
+            const code = await tokenFixture.getAuthorizationCode(params, sidCookie, csrfContext.flowIdCookie);
+            expect(code).toBeDefined();
 
             // Step 3: Exchange code for tokens
-            const tokenResponse = await app.getHttpServer()
-                .post('/api/oauth/token')
-                .send({
-                    grant_type: 'authorization_code',
-                    code: authCode,
-                    redirect_uri: redirectUri,
-                    client_id: clientId,
-                    code_verifier: codeVerifier,
-                })
-                .set('Accept', 'application/json');
+            const tokenResponse = await tokenFixture.exchangeAuthorizationCode(
+                code,
+                clientId,
+                codeVerifier,
+                redirectUri,
+            );
 
-            expect(tokenResponse.status).toBe(200);
-            expect(tokenResponse.body.access_token).toBeDefined();
+            expect(tokenResponse.access_token).toBeDefined();
 
             // Verify JWT claims include the subscriber tenant
-            const decodedToken = app.jwtService().decode(tokenResponse.body.access_token, {json: true}) as any;
+            const decodedToken = app.jwtService().decode(tokenResponse.access_token, {json: true}) as any;
             expect(decodedToken.tenant.domain).toBe(appOwnerTenant.domain);
             expect(decodedToken.userTenant.domain).toBe(subscriber1.domain);
         });
@@ -521,19 +515,26 @@ describe('Ambiguous Subscription Tenant Flow', () => {
             // Add user to the app owner tenant
             await adminTenantClient.addMembers(appOwnerTenant.id, [testUserEmail]);
 
-            // POST /login with domain as client_id (first-party) — should succeed without ambiguity check
-            const loginResponse = await app.getHttpServer()
-                .post('/api/oauth/login')
-                .send({
-                    email: testUserEmail,
-                    password: testUserPassword,
-                    client_id: appOwnerTenant.domain, // Using domain = first-party
-                })
-                .set('Accept', 'application/json');
+            // Use initializeFlow to get CSRF context, then login with domain as client_id (first-party)
+            const params = {
+                clientId: appOwnerTenant.domain,
+                redirectUri: 'http://localhost:3000/',
+                scope: 'openid profile email',
+                state: 'test-state',
+                codeChallenge: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq',
+                codeChallengeMethod: 'plain',
+            };
+            const csrfContext = await tokenFixture.initializeFlow(params);
+            const sidCookie = await tokenFixture.login(
+                testUserEmail,
+                testUserPassword,
+                appOwnerTenant.domain,
+                csrfContext,
+            );
 
-            expect(loginResponse.status).toBe(201);
-            expect(loginResponse.body.success).toBe(true);
-            expect(loginResponse.body.requires_tenant_selection).toBeUndefined();
+            // First-party login should succeed without ambiguity check
+            expect(sidCookie).toBeDefined();
+            expect(sidCookie).toContain('sid=');
         });
     });
 });

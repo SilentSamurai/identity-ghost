@@ -43,7 +43,7 @@ describe('PKCE Enforcement: required PKCE, voluntary PKCE, downgrade prevention,
         tokenFixture = new TokenFixture(fixture);
 
         // Get tenant-scoped token to retrieve tenant ID
-        const {jwt} = await tokenFixture.fetchPasswordGrantAccessToken(
+        const {jwt} = await tokenFixture.fetchAccessTokenFlow(
             ADMIN_EMAIL,
             ADMIN_PASSWORD,
             TENANT_DOMAIN,
@@ -51,7 +51,7 @@ describe('PKCE Enforcement: required PKCE, voluntary PKCE, downgrade prevention,
         const tenantId = jwt.tenant.id;
 
         // Get super-admin token to create clients
-        const {accessToken: superToken} = await tokenFixture.fetchPasswordGrantAccessToken(
+        const {accessToken: superToken} = await tokenFixture.fetchAccessTokenFlow(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com',
@@ -78,7 +78,14 @@ describe('PKCE Enforcement: required PKCE, voluntary PKCE, downgrade prevention,
         pkceOptionalClientId = pkceOptional.client.clientId;
 
         // Pre-grant consent for the optional PKCE client so /authorize issues codes directly
-        await tokenFixture.preGrantConsent(ADMIN_EMAIL, ADMIN_PASSWORD, pkceOptionalClientId, REDIRECT_URI);
+        await tokenFixture.preGrantConsentFlow(ADMIN_EMAIL, ADMIN_PASSWORD, {
+            clientId: pkceOptionalClientId,
+            redirectUri: REDIRECT_URI,
+            scope: 'openid profile email',
+            state: 'consent-state',
+            codeChallenge: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq',
+            codeChallengeMethod: 'plain',
+        });
     });
 
     afterAll(async () => {
@@ -144,13 +151,17 @@ describe('PKCE Enforcement: required PKCE, voluntary PKCE, downgrade prevention,
                     const codeChallenge = generateS256Challenge(verifier);
 
                     // Login → get sid cookie → authorize with S256 code_challenge → get auth code
-                    const sidCookie = await tokenFixture.loginForCookie(ADMIN_EMAIL, ADMIN_PASSWORD, pkceOptionalClientId, REDIRECT_URI);
-                    const code = await tokenFixture.authorizeForCode(sidCookie, pkceOptionalClientId, REDIRECT_URI, {
+                    const params = {
+                        clientId: pkceOptionalClientId,
+                        redirectUri: REDIRECT_URI,
                         scope,
                         state,
                         codeChallenge,
                         codeChallengeMethod: 'S256',
-                    });
+                    };
+                    const csrfContext = await tokenFixture.initializeFlow(params);
+                    const sidCookie = await tokenFixture.login(ADMIN_EMAIL, ADMIN_PASSWORD, pkceOptionalClientId, csrfContext);
+                    const code = await tokenFixture.getAuthorizationCode(params, sidCookie, csrfContext.flowIdCookie);
 
                     // Token exchange WITH correct code_verifier → should succeed
                     const tokenRes = await fixture.getHttpServer()
@@ -181,13 +192,17 @@ describe('PKCE Enforcement: required PKCE, voluntary PKCE, downgrade prevention,
                     const codeChallenge = generateS256Challenge(verifier);
 
                     // Login → authorize with S256 → get auth code
-                    const sidCookie = await tokenFixture.loginForCookie(ADMIN_EMAIL, ADMIN_PASSWORD, pkceOptionalClientId, REDIRECT_URI);
-                    const code = await tokenFixture.authorizeForCode(sidCookie, pkceOptionalClientId, REDIRECT_URI, {
+                    const params2 = {
+                        clientId: pkceOptionalClientId,
+                        redirectUri: REDIRECT_URI,
                         scope,
                         state,
                         codeChallenge,
                         codeChallengeMethod: 'S256',
-                    });
+                    };
+                    const csrfContext2 = await tokenFixture.initializeFlow(params2);
+                    const sidCookie = await tokenFixture.login(ADMIN_EMAIL, ADMIN_PASSWORD, pkceOptionalClientId, csrfContext2);
+                    const code = await tokenFixture.getAuthorizationCode(params2, sidCookie, csrfContext2.flowIdCookie);
 
                     // Token exchange with WRONG code_verifier → should fail
                     const tokenRes = await fixture.getHttpServer()

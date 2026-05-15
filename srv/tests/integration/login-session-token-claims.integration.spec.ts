@@ -32,10 +32,32 @@ describe('Login Session Token Claims', () => {
         await app.close();
     });
 
+    // Pre-grant consent once so raw authorize calls in individual tests can
+    // proceed directly to code issuance (REDIRECT_URI is external → third-party).
+    async function ensureConsent(): Promise<void> {
+        await tokenFixture.preGrantConsentFlow(EMAIL, PASSWORD, {
+            clientId: CLIENT_ID,
+            redirectUri: REDIRECT_URI,
+            scope: 'openid profile email',
+            state: 'consent-state',
+            codeChallenge: CODE_CHALLENGE,
+            codeChallengeMethod: 'plain',
+        });
+    }
+
     it('auth code grant — ID token auth_time and sid from session', async () => {
-        // Full cookie-based flow: login → authorize → token exchange
-        const tokenResult = await tokenFixture.fetchTokenWithLoginFlow(
-            EMAIL, PASSWORD, CLIENT_ID, REDIRECT_URI,
+        // Full cookie-based flow: login → authorize (with consent) → token exchange
+        const tokenResult = await tokenFixture.fetchTokenWithAuthCodeFlowAndConsent(
+            EMAIL, PASSWORD,
+            {
+                clientId: CLIENT_ID,
+                redirectUri: REDIRECT_URI,
+                scope: 'openid profile email',
+                state: 'test-state',
+                codeChallenge: CODE_CHALLENGE,
+                codeChallengeMethod: 'plain',
+            },
+            CODE_VERIFIER,
         );
         expect(tokenResult.id_token).toBeDefined();
 
@@ -158,22 +180,19 @@ describe('Login Session Token Claims', () => {
     });
 
     it('prompt=login — new session created — ID token auth_time reflects fresh session', async () => {
-        const extractSidCookie = (headers: any): string => {
-            const raw: string | string[] = headers['set-cookie'] ?? [];
-            const list = Array.isArray(raw) ? raw : [raw];
-            return list.find((c: string) => c.startsWith('sid='));
+        await ensureConsent();
+
+        const authorizeParams = {
+            clientId: CLIENT_ID,
+            redirectUri: REDIRECT_URI,
+            scope: 'openid profile email',
+            state: 'test-state',
+            codeChallenge: CODE_CHALLENGE,
+            codeChallengeMethod: 'plain',
         };
 
-        // Step 1: Login to create a session (sets sid cookie)
-        const loginRes = await app.getHttpServer()
-            .post('/api/oauth/login')
-            .send({email: EMAIL, password: PASSWORD, client_id: CLIENT_ID})
-            .set('Accept', 'application/json');
-
-        expect(loginRes.status).toBeGreaterThanOrEqual(200);
-        expect(loginRes.status).toBeLessThan(300);
-
-        const sidCookie = extractSidCookie(loginRes.headers);
+        // Step 1: Login to create an initial session via fixture (handles CSRF)
+        const sidCookie = await tokenFixture.fetchSidCookieFlow(EMAIL, PASSWORD, authorizeParams);
         expect(sidCookie).toBeDefined();
 
         const beforeLogin = Math.floor(Date.now() / 1000);
@@ -201,17 +220,15 @@ describe('Login Session Token Claims', () => {
         // Should redirect to login page, not to the redirect_uri with a code
         expect(location).not.toContain('code=');
 
-        // Step 3: Re-login to get a fresh session after prompt=login redirect
-        const reLoginRes = await app.getHttpServer()
-            .post('/api/oauth/login')
-            .send({email: EMAIL, password: PASSWORD, client_id: CLIENT_ID})
-            .set('Accept', 'application/json');
-
-        expect(reLoginRes.status).toBeGreaterThanOrEqual(200);
-        const freshSidCookie = extractSidCookie(reLoginRes.headers);
+        // Step 3: Re-login to get a fresh session (handles CSRF via fixture)
+        const freshSidCookie = await tokenFixture.fetchSidCookieFlow(EMAIL, PASSWORD, {
+            ...authorizeParams,
+            state: 'test-state-2',
+        });
         expect(freshSidCookie).toBeDefined();
 
         // Step 4: GET /authorize again with the fresh session (no prompt=login this time)
+        // Consent was pre-granted, so session_confirmed=true will issue a code directly.
         const authorize2Res = await app.getHttpServer()
             .get('/api/oauth/authorize')
             .query({
@@ -259,23 +276,21 @@ describe('Login Session Token Claims', () => {
     });
 
     it('max_age — ID token contains auth_time', async () => {
-        const extractSidCookie = (headers: any): string => {
-            const raw: string | string[] = headers['set-cookie'] ?? [];
-            const list = Array.isArray(raw) ? raw : [raw];
-            return list.find((c: string) => c.startsWith('sid='));
-        };
+        await ensureConsent();
 
-        // Login to create a session
-        const loginRes = await app.getHttpServer()
-            .post('/api/oauth/login')
-            .send({email: EMAIL, password: PASSWORD, client_id: CLIENT_ID})
-            .set('Accept', 'application/json');
-
-        expect(loginRes.status).toBeGreaterThanOrEqual(200);
-        const sidCookie = extractSidCookie(loginRes.headers);
+        // Login to create a session via fixture (handles CSRF)
+        const sidCookie = await tokenFixture.fetchSidCookieFlow(EMAIL, PASSWORD, {
+            clientId: CLIENT_ID,
+            redirectUri: REDIRECT_URI,
+            scope: 'openid profile email',
+            state: 'test-state',
+            codeChallenge: CODE_CHALLENGE,
+            codeChallengeMethod: 'plain',
+        });
         expect(sidCookie).toBeDefined();
 
         // GET /authorize with max_age=3600
+        // Consent was pre-granted, so session_confirmed=true will issue a code directly.
         const authorizeRes = await app.getHttpServer()
             .get('/api/oauth/authorize')
             .query({

@@ -31,7 +31,7 @@ describe('Property 3: Unrecognized token_type_hint is ignored', () => {
         await fc.assert(
             fc.asyncProperty(hintArb, async (hint) => {
                 // Get a fresh access token and refresh token for each iteration
-                const result = await tokenFixture.fetchPasswordGrantAccessToken(
+                const result = await tokenFixture.fetchAccessTokenFlow(
                     'admin@auth.server.com',
                     'admin9000',
                     'auth.server.com',

@@ -32,7 +32,7 @@ describe('Per-App OAuth Client Identity', () => {
         fixture = new SharedTestFixture();
         tokenFixture = new TokenFixture(fixture);
 
-        const superAdmin = await tokenFixture.fetchPasswordGrantAccessToken(
+        const superAdmin = await tokenFixture.fetchAccessTokenFlow(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com',
@@ -59,7 +59,7 @@ describe('Per-App OAuth Client Identity', () => {
             await adminClient.updateMemberRoles(tenantId, memberUserId, ['TENANT_ADMIN']);
         }
 
-        const tokenResponse = await tokenFixture.fetchPasswordGrantAccessToken(
+        const tokenResponse = await tokenFixture.fetchAccessTokenFlow(
             adminEmail, adminPassword, tenantDomain,
         );
         accessToken = tokenResponse.accessToken;

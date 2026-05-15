@@ -31,7 +31,7 @@ describe('Token Abstraction Flows', () => {
 
         // Obtain password grant tokens and create a confidential client upfront
         const tokenFixture = new TokenFixture(app);
-        const response = await tokenFixture.fetchPasswordGrantAccessToken(
+        const response = await tokenFixture.fetchAccessTokenFlow(
             "admin@auth.server.com",
             "admin9000",
             "auth.server.com"
@@ -46,7 +46,13 @@ describe('Token Abstraction Flows', () => {
         defaultClientId = creds.body.clientId;
 
         const decoded = jwtService.decode(response.accessToken) as any;
-        const confCreds = await tokenFixture.createConfidentialClient(response.accessToken, decoded.tenant.id);
+        const confCreds = await tokenFixture.createConfidentialClient(
+            response.accessToken,
+            decoded.tenant.id,
+            "confidential-client",
+            "client_credentials",
+            "openid profile email"
+        );
         clientId = confCreds.clientId;
         clientSecret = confCreds.clientSecret;
     });

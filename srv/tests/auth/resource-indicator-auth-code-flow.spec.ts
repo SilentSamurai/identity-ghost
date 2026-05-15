@@ -24,7 +24,7 @@ describe('Resource Indicator Auth Code Flow', () => {
     beforeAll(async () => {
         app = new SharedTestFixture();
         tokenFixture = new TokenFixture(app);
-        const response = await tokenFixture.fetchPasswordGrantAccessToken(
+        const response = await tokenFixture.fetchAccessTokenFlow(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com',
@@ -45,16 +45,25 @@ describe('Resource Indicator Auth Code Flow', () => {
      * Helper: pre-grant consent for a third-party client.
      */
     async function preGrantConsent(clientId: string): Promise<void> {
-        await tokenFixture.preGrantConsent('admin@auth.server.com', 'admin9000', clientId, REDIRECT_URI);
+        await tokenFixture.preGrantConsentFlow('admin@auth.server.com', 'admin9000', {
+            clientId,
+            redirectUri: REDIRECT_URI,
+            scope: 'openid profile email',
+            state: 'consent-state',
+            codeChallenge: CODE_CHALLENGE,
+            codeChallengeMethod: 'plain',
+        });
     }
 
     /**
      * Helper: login → authorize with resource → return auth code.
-     * Uses loginForCookie() + authorizeForCode() with resource param.
      */
     async function loginAndGetCodeWithResource(clientId: string, resource: string): Promise<string> {
-        const sidCookie = await tokenFixture.loginForCookie('admin@auth.server.com', 'admin9000', clientId, REDIRECT_URI);
-        return tokenFixture.authorizeForCode(sidCookie, clientId, REDIRECT_URI, {
+        return tokenFixture.fetchAuthCodeWithConsentFlow('admin@auth.server.com', 'admin9000', {
+            clientId,
+            redirectUri: REDIRECT_URI,
+            scope: 'openid profile email',
+            state: 'test-state',
             codeChallenge: CODE_CHALLENGE,
             codeChallengeMethod: 'plain',
             resource,

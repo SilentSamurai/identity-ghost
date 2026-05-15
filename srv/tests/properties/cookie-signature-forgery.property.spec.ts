@@ -21,7 +21,7 @@ describe('Feature: cookie-signature-forgery, Property 3: Cookie signature preven
         app = new SharedTestFixture();
         tokenFixture = new TokenFixture(app);
 
-        const adminToken = await tokenFixture.fetchPasswordGrantAccessToken(
+        const adminToken = await tokenFixture.fetchAccessTokenFlow(
             ADMIN_EMAIL, ADMIN_PASSWORD, 'auth.server.com',
         );
         superAccessToken = adminToken.accessToken;
@@ -108,7 +108,14 @@ describe('Feature: cookie-signature-forgery, Property 3: Cookie signature preven
     });
 
     it('expired session cookie is rejected and falls back to login UI', async () => {
-        const sidCookie = await tokenFixture.loginForCookie(ADMIN_EMAIL, ADMIN_PASSWORD, testClientId, REDIRECT_URI);
+        const sidCookie = await tokenFixture.fetchSidCookieFlow(ADMIN_EMAIL, ADMIN_PASSWORD, {
+            clientId: testClientId,
+            redirectUri: REDIRECT_URI,
+            scope: 'openid profile email',
+            state: 'test-state',
+            codeChallenge: CODE_CHALLENGE,
+            codeChallengeMethod: 'plain',
+        });
 
         const cookieValue = sidCookie.split(';')[0].split('=').slice(1).join('=');
         const decoded = decodeURIComponent(cookieValue).replace(/^s:/, '');

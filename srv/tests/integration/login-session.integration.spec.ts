@@ -35,9 +35,18 @@ describe('Login Session Creation', () => {
     });
 
     it('login creates a session — ID token contains auth_time and sid', async () => {
-        // Full cookie-based flow: login → authorize → token exchange
-        const tokenResult = await tokenFixture.fetchTokenWithLoginFlow(
-            email, password, clientId, redirectUri,
+        // Full cookie-based flow: login → authorize (with consent) → token exchange
+        const tokenResult = await tokenFixture.fetchTokenWithAuthCodeFlowAndConsent(
+            email, password,
+            {
+                clientId,
+                redirectUri,
+                scope: 'openid profile email',
+                state: 'test-state',
+                codeChallenge: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq',
+                codeChallengeMethod: 'plain',
+            },
+            'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq',
         );
         expect(tokenResult.id_token).toBeDefined();
 
@@ -99,11 +108,20 @@ describe('Login Session Creation', () => {
     });
 
     it('session is persisted before login response', async () => {
-        // Full cookie-based flow: login → authorize → token exchange.
+        // Full cookie-based flow: login → authorize (with consent) → token exchange.
         // If the session wasn't persisted before the login response, the
         // authorize step would fail to find it and would not issue a code.
-        const tokenResult = await tokenFixture.fetchTokenWithLoginFlow(
-            email, password, clientId, redirectUri,
+        const tokenResult = await tokenFixture.fetchTokenWithAuthCodeFlowAndConsent(
+            email, password,
+            {
+                clientId,
+                redirectUri,
+                scope: 'openid profile email',
+                state: 'test-state',
+                codeChallenge: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq',
+                codeChallengeMethod: 'plain',
+            },
+            'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq',
         );
         expect(tokenResult.id_token).toBeDefined();
 

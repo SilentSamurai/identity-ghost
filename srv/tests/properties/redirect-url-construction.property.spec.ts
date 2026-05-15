@@ -22,7 +22,7 @@ describe('Feature: redirect-url-construction, Property 4: Redirect URL correctly
         app = new SharedTestFixture();
         tokenFixture = new TokenFixture(app);
 
-        const adminToken = await tokenFixture.fetchPasswordGrantAccessToken(
+        const adminToken = await tokenFixture.fetchAccessTokenFlow(
             ADMIN_EMAIL, ADMIN_PASSWORD, 'auth.server.com',
         );
         superAccessToken = adminToken.accessToken;
@@ -46,12 +46,29 @@ describe('Feature: redirect-url-construction, Property 4: Redirect URL correctly
     });
 
     it('successful authorize always redirects with code and state in the URL', async () => {
+        // Pre-grant consent for the widest scope so all sub-scopes are covered
+        await tokenFixture.preGrantConsentFlow(ADMIN_EMAIL, ADMIN_PASSWORD, {
+            clientId: testClientId,
+            redirectUri: REDIRECT_URI,
+            scope: 'openid profile email',
+            state: 'consent-setup',
+            codeChallenge: CODE_CHALLENGE,
+            codeChallengeMethod: 'plain',
+        });
+
         const stateArb = fc.string({minLength: 1, maxLength: 30}).filter(s => !s.includes(' ') && !s.includes('+'));
         const scopeArb = fc.constantFrom('openid', 'openid profile', 'openid email');
 
         await fc.assert(
             fc.asyncProperty(stateArb, scopeArb, async (state, scope) => {
-                const sidCookie = await tokenFixture.loginForCookie(ADMIN_EMAIL, ADMIN_PASSWORD, testClientId, REDIRECT_URI);
+                const sidCookie = await tokenFixture.fetchSidCookieFlow(ADMIN_EMAIL, ADMIN_PASSWORD, {
+                    clientId: testClientId,
+                    redirectUri: REDIRECT_URI,
+                    scope: 'openid profile email',
+                    state: 'test-state',
+                    codeChallenge: CODE_CHALLENGE,
+                    codeChallengeMethod: 'plain',
+                });
 
                 const res = await app.getHttpServer()
                     .get('/api/oauth/authorize')
@@ -85,7 +102,15 @@ describe('Feature: redirect-url-construction, Property 4: Redirect URL correctly
     });
 
     it('redirect URL does not leak sensitive parameters', async () => {
-        const sidCookie = await tokenFixture.loginForCookie(ADMIN_EMAIL, ADMIN_PASSWORD, testClientId, REDIRECT_URI);
+        // Consent already pre-granted in the first test for this client+user
+        const sidCookie = await tokenFixture.fetchSidCookieFlow(ADMIN_EMAIL, ADMIN_PASSWORD, {
+            clientId: testClientId,
+            redirectUri: REDIRECT_URI,
+            scope: 'openid profile email',
+            state: 'test-state',
+            codeChallenge: CODE_CHALLENGE,
+            codeChallengeMethod: 'plain',
+        });
 
         const res = await app.getHttpServer()
             .get('/api/oauth/authorize')

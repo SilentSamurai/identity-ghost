@@ -35,7 +35,7 @@ describe('Feature: redirect-uri-validation, Property 3: Auth code stores redirec
     beforeAll(async () => {
         app = new SharedTestFixture();
         tokenFixture = new TokenFixture(app);
-        const {accessToken} = await tokenFixture.fetchPasswordGrantAccessToken(email, password, 'auth.server.com');
+        const {accessToken} = await tokenFixture.fetchAccessTokenFlow(email, password, 'auth.server.com');
 
         clientApi = new ClientEntityClient(app, accessToken);
         const tenantClient = new TenantClient(app, accessToken);
@@ -50,7 +50,14 @@ describe('Feature: redirect-uri-validation, Property 3: Auth code stores redirec
         testClientId = created.client.clientId;
 
         // Pre-grant consent so /authorize issues codes directly.
-        await tokenFixture.preGrantConsent(email, password, testClientId, REGISTERED_URI);
+        await tokenFixture.preGrantConsentFlow(email, password, {
+            clientId: testClientId,
+            redirectUri: REGISTERED_URI,
+            scope: 'openid profile email',
+            state: 'consent-state',
+            codeChallenge: challenge,
+            codeChallengeMethod: 'plain',
+        });
 
         // Resolve user id for direct auth-code seeding (null-redirect-uri case).
         const userRes = await app.getHttpServer().get(`/api/test-utils/users/by-email/${encodeURIComponent(email)}`);

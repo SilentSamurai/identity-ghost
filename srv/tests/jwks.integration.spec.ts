@@ -22,7 +22,7 @@ describe('JWKS endpoint', () => {
         app = new SharedTestFixture();
 
         const tokenFixture = new TokenFixture(app);
-        const response = await tokenFixture.fetchPasswordGrantAccessToken(
+        const response = await tokenFixture.fetchAccessTokenFlow(
             "admin@auth.server.com",
             "admin9000",
             "auth.server.com",

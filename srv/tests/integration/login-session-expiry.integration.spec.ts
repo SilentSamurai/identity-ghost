@@ -23,7 +23,7 @@ describe('Login Session Invalidation', () => {
         tokenFixture = new TokenFixture(app);
 
         // Get tenant credentials for refresh grants
-        const adminResult = await tokenFixture.fetchPasswordGrantAccessToken(
+        const adminResult = await tokenFixture.fetchAccessTokenFlow(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com',

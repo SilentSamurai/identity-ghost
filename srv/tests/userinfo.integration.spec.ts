@@ -26,11 +26,14 @@ describe('UserInfo Endpoint Integration', () => {
 
     /** Helper: login → authorize → auth code (cookie-based flow) with specific scope */
     async function loginForCode(opts?: { scope?: string; nonce?: string }): Promise<string> {
-        return tokenFixture.fetchAuthCode(email, password, clientId, redirectUri, {
-            scope: opts?.scope,
-            nonce: opts?.nonce,
+        return tokenFixture.fetchAuthCodeWithConsentFlow(email, password, {
+            clientId,
+            redirectUri,
+            scope: opts?.scope ?? 'openid profile email',
+            state: 'test-state',
             codeChallenge: challenge,
             codeChallengeMethod: 'plain',
+            nonce: opts?.nonce,
         });
     }
 
@@ -231,14 +234,20 @@ describe('UserInfo Endpoint Integration', () => {
     describe('client credentials token (TechnicalToken)', () => {
         it('should return 401 because UserInfo requires a user access token', async () => {
             // Get an admin access token to create a confidential client
-            const adminToken = await tokenFixture.fetchPasswordGrantAccessToken(email, password, clientId);
+            const adminToken = await tokenFixture.fetchAccessTokenFlow(email, password, clientId);
 
             // Create a confidential client for the tenant
             const decoded = app.jwtService().decode(adminToken.accessToken, {json: true}) as any;
-            const creds = await tokenFixture.createConfidentialClient(adminToken.accessToken, decoded.tenant.id);
+            const creds = await tokenFixture.createConfidentialClient(
+                adminToken.accessToken,
+                decoded.tenant.id,
+                'userinfo-cc-client',
+                'client_credentials',
+                'openid profile email',
+            );
 
             // Get a client_credentials token (TechnicalToken — no user)
-            const ccToken = await tokenFixture.fetchClientCredentialsToken(creds.clientId, creds.clientSecret);
+            const ccToken = await tokenFixture.fetchClientCredentialsTokenFlow(creds.clientId, creds.clientSecret);
 
             // UserInfo should reject it
             const res = await app.getHttpServer()

@@ -31,7 +31,14 @@ describe('single-use enforcement of authorization codes', () => {
 
     // First redemption succeeds, second redemption of the same code fails with invalid_grant.
     it('should reject a second redemption of the same auth code with invalid_grant', async () => {
-        const code = await tokenFixture.fetchAuthCode(email, password, clientId, redirectUri);
+        const code = await tokenFixture.fetchAuthCodeWithConsentFlow(email, password, {
+            clientId,
+            redirectUri,
+            scope: 'openid profile email',
+            state: 'test-state',
+            codeChallenge: verifier,
+            codeChallengeMethod: 'plain',
+        });
 
         // First exchange — should succeed
         const firstResponse = await app.getHttpServer()
@@ -65,7 +72,14 @@ describe('single-use enforcement of authorization codes', () => {
     });
 
     it('should confirm used=true and used_at are set by verifying replay rejection', async () => {
-        const code = await tokenFixture.fetchAuthCode(email, password, clientId, redirectUri);
+        const code = await tokenFixture.fetchAuthCodeWithConsentFlow(email, password, {
+            clientId,
+            redirectUri,
+            scope: 'openid profile email',
+            state: 'test-state',
+            codeChallenge: verifier,
+            codeChallengeMethod: 'plain',
+        });
 
         // Redeem the code
         const redeemResponse = await app.getHttpServer()

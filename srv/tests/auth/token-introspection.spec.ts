@@ -36,7 +36,7 @@ describe('Token Introspection Endpoint (RFC 7662)', () => {
         tokenFixture = new TokenFixture(app);
 
         // 1. Get a user access token (password grant)
-        const tokenResult = await tokenFixture.fetchPasswordGrantAccessToken(
+        const tokenResult = await tokenFixture.fetchAccessTokenFlow(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com',
@@ -55,7 +55,7 @@ describe('Token Introspection Endpoint (RFC 7662)', () => {
         clientSecret = created.clientSecret;
 
         // 3. Get a technical access token using Client entity credentials
-        const techResult = await tokenFixture.fetchClientCredentialsToken(
+        const techResult = await tokenFixture.fetchClientCredentialsTokenFlow(
             clientId,
             clientSecret,
         );

@@ -21,7 +21,7 @@ describe('Webhook Adapter End-to-End', () => {
         await fixture.webhook.clearOffboardRequests();
 
         // Get super admin token
-        const superAdminResponse = await tokenFixture.fetchPasswordGrantAccessToken(
+        const superAdminResponse = await tokenFixture.fetchAccessTokenFlow(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com'
@@ -42,7 +42,7 @@ describe('Webhook Adapter End-to-End', () => {
 
     it('should track onboard and offboard webhook requests through the adapter', async () => {
         // Get creator (shire.local) token to create and publish an app
-        const creatorTokenResponse = await tokenFixture.fetchPasswordGrantAccessToken(
+        const creatorTokenResponse = await tokenFixture.fetchAccessTokenFlow(
             'admin@shire.local',
             'admin9000',
             'shire.local'

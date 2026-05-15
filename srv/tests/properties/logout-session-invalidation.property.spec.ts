@@ -21,7 +21,7 @@ describe('Feature: logout-session-invalidation, Property 6: Logout invalidates s
         app = new SharedTestFixture();
         tokenFixture = new TokenFixture(app);
 
-        const adminToken = await tokenFixture.fetchPasswordGrantAccessToken(
+        const adminToken = await tokenFixture.fetchAccessTokenFlow(
             ADMIN_EMAIL, ADMIN_PASSWORD, 'auth.server.com',
         );
         superAccessToken = adminToken.accessToken;
@@ -56,7 +56,14 @@ describe('Feature: logout-session-invalidation, Property 6: Logout invalidates s
     }
 
     it('POST /logout invalidates the session server-side and clears the cookie', async () => {
-        const sidCookie = await tokenFixture.loginForCookie(ADMIN_EMAIL, ADMIN_PASSWORD, testClientId, REDIRECT_URI);
+        const sidCookie = await tokenFixture.fetchSidCookieFlow(ADMIN_EMAIL, ADMIN_PASSWORD, {
+            clientId: testClientId,
+            redirectUri: REDIRECT_URI,
+            scope: 'openid profile email',
+            state: 'test-state',
+            codeChallenge: CODE_CHALLENGE,
+            codeChallengeMethod: 'plain',
+        });
         const sid = extractSidValue(sidCookie);
         expect(sid).toBeTruthy();
 
@@ -92,7 +99,14 @@ describe('Feature: logout-session-invalidation, Property 6: Logout invalidates s
     });
 
     it('logout is idempotent for any already-invalidated session', async () => {
-        const sidCookie = await tokenFixture.loginForCookie(ADMIN_EMAIL, ADMIN_PASSWORD, testClientId, REDIRECT_URI);
+        const sidCookie = await tokenFixture.fetchSidCookieFlow(ADMIN_EMAIL, ADMIN_PASSWORD, {
+            clientId: testClientId,
+            redirectUri: REDIRECT_URI,
+            scope: 'openid profile email',
+            state: 'test-state',
+            codeChallenge: CODE_CHALLENGE,
+            codeChallengeMethod: 'plain',
+        });
         const sid = extractSidValue(sidCookie);
 
         await app.getHttpServer()

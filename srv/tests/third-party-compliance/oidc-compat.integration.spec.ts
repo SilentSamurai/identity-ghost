@@ -108,7 +108,7 @@ describe('OIDC Compatibility (openid-client v5)', () => {
         baseUrl = `http://127.0.0.1:${ports.app}`;
 
         // 1. Get a super admin token to find the tenant
-        const {accessToken: superAdminToken} = await tokenFixture.fetchPasswordGrantAccessToken(
+        const {accessToken: superAdminToken} = await tokenFixture.fetchAccessTokenFlow(
             superAdminEmail,
             superAdminPassword,
             superTenantDomain
@@ -124,7 +124,7 @@ describe('OIDC Compatibility (openid-client v5)', () => {
         tenantId = tenant.id;
 
         // 3. Get a tenant-scoped token to create/update clients
-        const {accessToken: tenantAccessToken} = await tokenFixture.fetchPasswordGrantAccessToken(
+        const {accessToken: tenantAccessToken} = await tokenFixture.fetchAccessTokenFlow(
             adminEmail,
             adminPassword,
             tenantDomain

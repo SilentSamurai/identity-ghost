@@ -40,7 +40,7 @@ describe('Password Grant Deprecation Integration Tests', () => {
         const tokenFixture = new TokenFixture(app);
 
         // Get super-admin access token using the default first-party client
-        const tokenResponse = await tokenFixture.fetchPasswordGrantAccessToken(
+        const tokenResponse = await tokenFixture.fetchAccessTokenFlow(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com',
@@ -132,13 +132,20 @@ describe('Password Grant Deprecation Integration Tests', () => {
     }): Promise<{ consentRequired: boolean; code?: string }> {
         const tokenFixture = new TokenFixture(app);
         const redirectUri = options.redirect_uri ?? REDIRECT_URI;
+        const params = {
+            clientId: options.client_id,
+            redirectUri,
+            scope: options.scope ?? 'openid profile email',
+            state: 'pg-test',
+            codeChallenge: CODE_CHALLENGE,
+            codeChallengeMethod: 'plain',
+        };
 
         // Step 1: POST /login establishes a session cookie.
-        const sidCookie = await tokenFixture.loginForCookie(
+        const sidCookie = await tokenFixture.fetchSidCookieFlow(
             'admin@auth.server.com',
             'admin9000',
-            options.client_id,
-            redirectUri,
+            params,
         );
 
         // Step 2: GET /authorize — this is where consent is evaluated.
@@ -161,7 +168,7 @@ describe('Password Grant Deprecation Integration Tests', () => {
         const location = res.headers['location'] as string;
         expect(location).toBeDefined();
 
-        if (location.includes('/consent?')) {
+        if (location.includes('view=consent')) {
             return {consentRequired: true};
         }
 
@@ -177,12 +184,17 @@ describe('Password Grant Deprecation Integration Tests', () => {
      */
     async function grantConsent(clientId: string, scope: string, redirectUri: string = REDIRECT_URI): Promise<void> {
         const tokenFixture = new TokenFixture(app);
-        await tokenFixture.preGrantConsent(
+        await tokenFixture.preGrantConsentFlow(
             'admin@auth.server.com',
             'admin9000',
-            clientId,
-            redirectUri,
-            scope,
+            {
+                clientId,
+                redirectUri,
+                scope,
+                state: 'consent-state',
+                codeChallenge: CODE_CHALLENGE,
+                codeChallengeMethod: 'plain',
+            },
         );
     }
 
@@ -496,25 +508,43 @@ describe('Password Grant Deprecation Integration Tests', () => {
 
     // ─── Sub-task 9.8: Test login skips consent for alias-resolved client ───────
 
-    describe('Req 8.1: Login skips consent for alias-resolved (first-party) client', () => {
-        it('should skip consent when client_id is the tenant domain (alias)', async () => {
-            // auth.server.com is the default first-party tenant domain. It has
-            // http://localhost:3000/callback registered at startup.
+    describe('Req 8.1: Default client with consent pre-granted skips consent prompt', () => {
+        it('should issue code when consent was previously granted for default client (alias)', async () => {
+            // Pre-grant consent for the default client with the external redirect URI.
+            // External redirect_uri = third-party flow, so consent is always required
+            // unless previously granted.
+            await grantConsent(testTenantDomain, 'openid profile email');
+
             const result = await loginAndCheckConsent({
-                client_id: 'auth.server.com',
-                redirect_uri: 'http://localhost:3000/callback',
+                client_id: testTenantDomain,
                 scope: 'openid profile email',
             });
 
-            // First-party client → /authorize issues code without consent prompt.
             expect(result.consentRequired).toBe(false);
             expect(result.code).toBeTruthy();
         });
 
-        it('should skip consent when using test tenant domain as client_id', async () => {
+        it('should issue code for auth.server.com default client with consent pre-granted', async () => {
+            // auth.server.com with external redirect_uri is third-party.
+            // Pre-grant consent so the authorize endpoint issues a code.
+            const tokenFixture2 = new TokenFixture(app);
+            await tokenFixture2.preGrantConsentFlow(
+                'admin@auth.server.com',
+                'admin9000',
+                {
+                    clientId: 'auth.server.com',
+                    redirectUri: 'http://localhost:3000/callback',
+                    scope: 'openid profile email',
+                    state: 'consent-state',
+                    codeChallenge: CODE_CHALLENGE,
+                    codeChallengeMethod: 'plain',
+                },
+            );
+
             const result = await loginAndCheckConsent({
-                client_id: testTenantDomain,
-                scope: 'openid profile',
+                client_id: 'auth.server.com',
+                redirect_uri: 'http://localhost:3000/callback',
+                scope: 'openid profile email',
             });
 
             expect(result.consentRequired).toBe(false);
@@ -656,9 +686,11 @@ describe('Password Grant Deprecation Integration Tests', () => {
             }
         });
 
-        it('should recognize consent when switching between clientId and alias for first-party client', async () => {
-            // For first-party clients (alias matches client_id), consent is always skipped.
-            // Probe with alias — should skip consent (first-party).
+        it('should recognize consent when switching between clientId and alias for default client', async () => {
+            // With external redirect_uri, the default client is third-party.
+            // Pre-grant consent via alias, then verify it's recognized.
+            await grantConsent(testTenantDomain, 'openid profile');
+
             const aliasProbe = await loginAndCheckConsent({
                 client_id: testTenantDomain,
                 scope: 'openid profile',
@@ -671,9 +703,14 @@ describe('Password Grant Deprecation Integration Tests', () => {
             const defaultClient = tenantClients.find((c: any) => c.alias === testTenantDomain);
             expect(defaultClient).toBeDefined();
 
-            // Note: When using UUID form, first-party status is determined by
-            // `client.alias === body.client_id`, so using the UUID is NOT first-party and
-            // would require consent. This test only verifies the alias form works.
+            // Consent granted via alias should also be recognized via UUID
+            // (both resolve to the same client record)
+            const uuidProbe = await loginAndCheckConsent({
+                client_id: defaultClient.clientId,
+                scope: 'openid profile',
+            });
+            expect(uuidProbe.consentRequired).toBe(false);
+            expect(uuidProbe.code).toBeTruthy();
         });
     });
 });

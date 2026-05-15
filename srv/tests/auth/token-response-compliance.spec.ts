@@ -28,7 +28,7 @@ describe('Token Response RFC 6749 Compliance', () => {
         tokenFixture = new TokenFixture(app);
 
         // Create a confidential client upfront for client_credentials tests
-        const tokenResult = await tokenFixture.fetchPasswordGrantAccessToken(
+        const tokenResult = await tokenFixture.fetchAccessTokenFlow(
             "admin@auth.server.com",
             "admin9000",
             "auth.server.com",
@@ -43,7 +43,13 @@ describe('Token Response RFC 6749 Compliance', () => {
         defaultClientId = creds.body.clientId;
 
         const decoded = app.jwtService().decode(tokenResult.accessToken, {json: true}) as any;
-        const confCreds = await tokenFixture.createConfidentialClient(tokenResult.accessToken, decoded.tenant.id);
+        const confCreds = await tokenFixture.createConfidentialClient(
+            tokenResult.accessToken,
+            decoded.tenant.id,
+            'compliance-cc-client',
+            'client_credentials',
+            'openid profile email',
+        );
         clientId = confCreds.clientId;
         clientSecret = confCreds.clientSecret;
     });
@@ -230,12 +236,14 @@ describe('Token Response RFC 6749 Compliance', () => {
             const redirectUri = "http://localhost:3000/callback";
 
             // Step 1: Get an auth code via the new cookie-based flow
-            const authCode = await tokenFixture.fetchAuthCode(
+            const authCode = await tokenFixture.fetchAuthCodeWithConsentFlow(
                 "admin@compliance-test.local",
                 "admin9000",
-                "compliance-test.local",
-                redirectUri,
                 {
+                    clientId: "compliance-test.local",
+                    redirectUri,
+                    scope: 'openid profile email',
+                    state: 'test-state',
                     codeChallenge: verifier,
                     codeChallengeMethod: "plain",
                 },

@@ -42,7 +42,7 @@ describe('Token Revocation & Logout Endpoints (RFC 7009)', () => {
         tokenFixture = new TokenFixture(app);
 
         // 1. Get a super-admin access token on the default tenant
-        const adminResult = await tokenFixture.fetchPasswordGrantAccessToken(
+        const adminResult = await tokenFixture.fetchAccessTokenFlow(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com',
@@ -73,7 +73,7 @@ describe('Token Revocation & Logout Endpoints (RFC 7009)', () => {
             allowedScopes: 'openid profile email',
             tokenEndpointAuthMethod: 'client_secret_post',
         });
-        const crossTokenResult = await tokenFixture.fetchClientCredentialsToken(
+        const crossTokenResult = await tokenFixture.fetchClientCredentialsTokenFlow(
             created.client.clientId,
             created.clientSecret,
         );
@@ -88,7 +88,7 @@ describe('Token Revocation & Logout Endpoints (RFC 7009)', () => {
 
     /** Get a fresh access token and refresh token for the default tenant */
     async function getFreshTokens(): Promise<{ accessToken: string; refreshToken: string }> {
-        const result = await tokenFixture.fetchPasswordGrantAccessToken(
+        const result = await tokenFixture.fetchAccessTokenFlow(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com',
@@ -102,7 +102,7 @@ describe('Token Revocation & Logout Endpoints (RFC 7009)', () => {
         tokens: string[];
         latestToken: string
     }> {
-        const result = await tokenFixture.fetchPasswordGrantAccessToken(
+        const result = await tokenFixture.fetchAccessTokenFlow(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com',

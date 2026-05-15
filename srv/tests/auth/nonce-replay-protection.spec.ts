@@ -23,8 +23,13 @@ describe('Nonce Replay Protection', () => {
 
     /** Helper: login → authorize → get auth code with optional nonce */
     async function loginForCode(opts?: { scope?: string; nonce?: string }): Promise<string> {
-        return tokenFixture.fetchAuthCode(email, password, clientId, redirectUri, {
-            scope: opts?.scope,
+        return tokenFixture.fetchAuthCodeWithConsentFlow(email, password, {
+            clientId,
+            redirectUri,
+            scope: opts?.scope ?? 'openid profile email',
+            state: 'test-state',
+            codeChallenge: verifier,
+            codeChallengeMethod: 'plain',
             nonce: opts?.nonce,
         });
     }
@@ -120,7 +125,14 @@ describe('Nonce Replay Protection', () => {
             const longNonce = 'a'.repeat(513);
 
             // Nonce is now validated at the authorize endpoint (post-redirect error)
-            const sidCookie = await tokenFixture.loginForCookie(email, password, clientId, redirectUri);
+            const sidCookie = await tokenFixture.fetchSidCookieFlow(email, password, {
+                clientId,
+                redirectUri,
+                scope: 'openid profile email',
+                state: 'test-state',
+                codeChallenge: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq',
+                codeChallengeMethod: 'plain',
+            });
             const res = await app.getHttpServer()
                 .get('/api/oauth/authorize')
                 .query({

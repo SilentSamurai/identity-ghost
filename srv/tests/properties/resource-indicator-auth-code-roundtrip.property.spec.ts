@@ -66,7 +66,7 @@ describe('Feature: resource-indicator-support, Property 3: Auth code resource ro
     beforeAll(async () => {
         app = new SharedTestFixture();
         tokenFixture = new TokenFixture(app);
-        const response = await tokenFixture.fetchPasswordGrantAccessToken(email, password, 'auth.server.com');
+        const response = await tokenFixture.fetchAccessTokenFlow(email, password, 'auth.server.com');
         clientApi = new ClientEntityClient(app, response.accessToken);
 
         const tenantClient = new TenantClient(app, response.accessToken);
@@ -92,15 +92,28 @@ describe('Feature: resource-indicator-support, Property 3: Auth code resource ro
 
                 try {
                     // Pre-grant consent so authorize can issue a code directly
-                    await tokenFixture.preGrantConsent(email, password, clientId, REDIRECT_URI);
+                    await tokenFixture.preGrantConsentFlow(email, password, {
+                        clientId,
+                        redirectUri: REDIRECT_URI,
+                        scope: 'openid profile email',
+                        state: 'consent-state',
+                        codeChallenge: CODE_CHALLENGE,
+                        codeChallengeMethod: 'plain',
+                    });
 
                     // Login → authorize with resource → get auth code
-                    const sidCookie = await tokenFixture.loginForCookie(email, password, clientId, REDIRECT_URI);
-                    const code = await tokenFixture.authorizeForCode(sidCookie, clientId, REDIRECT_URI, {
+                    const params = {
+                        clientId,
+                        redirectUri: REDIRECT_URI,
+                        scope: 'openid profile email',
+                        state: 'resource-roundtrip',
                         codeChallenge: CODE_CHALLENGE,
                         codeChallengeMethod: 'plain',
                         resource,
-                    });
+                    };
+                    const csrfContext = await tokenFixture.initializeFlow(params);
+                    const sidCookie = await tokenFixture.login(email, password, clientId, csrfContext);
+                    const code = await tokenFixture.getAuthorizationCode(params, sidCookie, csrfContext.flowIdCookie);
 
                     // Exchange the code for a token
                     const tokenResponse = await app.getHttpServer()
@@ -152,14 +165,27 @@ describe('Feature: resource-indicator-support, Property 3: Auth code resource ro
             const clientId = client.client.clientId;
 
             try {
-                await tokenFixture.preGrantConsent(email, password, clientId, REDIRECT_URI);
+                await tokenFixture.preGrantConsentFlow(email, password, {
+                    clientId,
+                    redirectUri: REDIRECT_URI,
+                    scope: 'openid profile email',
+                    state: 'consent-state',
+                    codeChallenge: CODE_CHALLENGE,
+                    codeChallengeMethod: 'plain',
+                });
 
-                const sidCookie = await tokenFixture.loginForCookie(email, password, clientId, REDIRECT_URI);
-                const code = await tokenFixture.authorizeForCode(sidCookie, clientId, REDIRECT_URI, {
+                const params = {
+                    clientId,
+                    redirectUri: REDIRECT_URI,
+                    scope: 'openid profile email',
+                    state: 'edge-case-roundtrip',
                     codeChallenge: CODE_CHALLENGE,
                     codeChallengeMethod: 'plain',
                     resource,
-                });
+                };
+                const csrfContext = await tokenFixture.initializeFlow(params);
+                const sidCookie = await tokenFixture.login(email, password, clientId, csrfContext);
+                const code = await tokenFixture.getAuthorizationCode(params, sidCookie, csrfContext.flowIdCookie);
 
                 const tokenResponse = await app.getHttpServer()
                     .post('/api/oauth/token')
@@ -182,5 +208,5 @@ describe('Feature: resource-indicator-support, Property 3: Auth code resource ro
                 });
             }
         }
-    });
+    }, 120_000);
 });

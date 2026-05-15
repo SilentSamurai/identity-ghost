@@ -10,9 +10,11 @@
  * Verifies OAuth 2.0 RFC 6749 compliant error responses.
  */
 import {SharedTestFixture} from "../shared-test.fixture";
+import {TokenFixture} from "../token.fixture";
 
 describe('e2e negative token flow', () => {
     let app: SharedTestFixture;
+    let tokenFixture: TokenFixture;
     let refreshToken = "";
     let accessToken = "";
     let clientId = "";
@@ -20,6 +22,35 @@ describe('e2e negative token flow', () => {
 
     beforeAll(async () => {
         app = new SharedTestFixture();
+        tokenFixture = new TokenFixture(app);
+
+        // Get valid credentials for use in negative tests
+        const userResponse = await tokenFixture.fetchAccessTokenFlow(
+            "admin@auth.server.com",
+            "admin9000",
+            "auth.server.com"
+        );
+        refreshToken = userResponse.refreshToken;
+        accessToken = userResponse.accessToken;
+
+        // Get the default public client's UUID for refresh grants
+        const creds = await app.getHttpServer()
+            .get('/api/tenant/my/credentials')
+            .set('Authorization', `Bearer ${accessToken}`)
+            .set('Accept', 'application/json');
+        clientId = creds.body.clientId;
+
+        // Create a confidential client for client_credentials tests
+        const decoded = app.jwtService().decode(accessToken, {json: true}) as any;
+        const confCreds = await tokenFixture.createConfidentialClient(
+            accessToken, 
+            decoded.tenant.id, 
+            "Test Confidential Client", 
+            "client_credentials", 
+            "openid profile email"
+        );
+        clientId = confCreds.clientId;
+        clientSecret = confCreds.clientSecret;
     });
 
     afterAll(async () => {
@@ -311,6 +342,4 @@ describe('e2e negative token flow', () => {
         console.log(response.body)
         expect(response.status).toEqual(400);
     });
-
 });
-

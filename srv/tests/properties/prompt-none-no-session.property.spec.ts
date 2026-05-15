@@ -22,7 +22,7 @@ describe('Feature: prompt-none-no-session, Property 7: prompt=none with no sessi
         app = new SharedTestFixture();
         tokenFixture = new TokenFixture(app);
 
-        const adminToken = await tokenFixture.fetchPasswordGrantAccessToken(
+        const adminToken = await tokenFixture.fetchAccessTokenFlow(
             ADMIN_EMAIL, ADMIN_PASSWORD, 'auth.server.com',
         );
         superAccessToken = adminToken.accessToken;
@@ -76,7 +76,24 @@ describe('Feature: prompt-none-no-session, Property 7: prompt=none with no sessi
     });
 
     it('prompt=none with valid session + consent issues a code (not an error)', async () => {
-        const sidCookie = await tokenFixture.loginForCookie(ADMIN_EMAIL, ADMIN_PASSWORD, testClientId, REDIRECT_URI);
+        // Pre-grant consent so prompt=none can issue a code
+        await tokenFixture.preGrantConsentFlow(ADMIN_EMAIL, ADMIN_PASSWORD, {
+            clientId: testClientId,
+            redirectUri: REDIRECT_URI,
+            scope: 'openid profile email',
+            state: 'consent-setup',
+            codeChallenge: CODE_CHALLENGE,
+            codeChallengeMethod: 'plain',
+        });
+
+        const sidCookie = await tokenFixture.fetchSidCookieFlow(ADMIN_EMAIL, ADMIN_PASSWORD, {
+            clientId: testClientId,
+            redirectUri: REDIRECT_URI,
+            scope: 'openid profile email',
+            state: 'test-state',
+            codeChallenge: CODE_CHALLENGE,
+            codeChallengeMethod: 'plain',
+        });
 
         const res = await app.getHttpServer()
             .get('/api/oauth/authorize')
@@ -89,6 +106,7 @@ describe('Feature: prompt-none-no-session, Property 7: prompt=none with no sessi
                 code_challenge: CODE_CHALLENGE,
                 code_challenge_method: 'plain',
                 prompt: 'none',
+                session_confirmed: 'true',
             })
             .set('Cookie', sidCookie)
             .redirects(0);
@@ -97,12 +115,8 @@ describe('Feature: prompt-none-no-session, Property 7: prompt=none with no sessi
         const location: string = res.headers['location'];
         expect(location).toBeDefined();
         const url = new URL(location, 'http://localhost');
-
-        if (url.pathname === '/authorize') {
-            expect(url.searchParams.get('error')).toBe('login_required');
-        } else {
-            expect(url.searchParams.has('error')).toBe(false);
-        }
+        expect(url.searchParams.has('error')).toBe(false);
+        expect(url.searchParams.get('code')).toBeTruthy();
     });
 
     it('prompt=none with valid session but third-party client without consent redirects to consent UI', async () => {
@@ -114,7 +128,14 @@ describe('Feature: prompt-none-no-session, Property 7: prompt=none with no sessi
         const freshClientId = freshClient.client.clientId;
 
         try {
-            const sidCookie = await tokenFixture.loginForCookie(ADMIN_EMAIL, ADMIN_PASSWORD, freshClientId, REDIRECT_URI);
+            const sidCookie = await tokenFixture.fetchSidCookieFlow(ADMIN_EMAIL, ADMIN_PASSWORD, {
+                clientId: freshClientId,
+                redirectUri: REDIRECT_URI,
+                scope: 'openid profile email',
+                state: 'test-state',
+                codeChallenge: CODE_CHALLENGE,
+                codeChallengeMethod: 'plain',
+            });
 
             const res = await app.getHttpServer()
                 .get('/api/oauth/authorize')
@@ -135,8 +156,9 @@ describe('Feature: prompt-none-no-session, Property 7: prompt=none with no sessi
             const location: string = res.headers['location'];
             const url = new URL(location, 'http://localhost');
             // For prompt=none with valid session but no consent, the server
-            // redirects to the consent UI (not an error redirect).
-            expect(url.pathname).toBe('/consent');
+            // redirects to the Angular authorize UI with view=consent.
+            expect(url.pathname).toBe('/authorize');
+            expect(url.searchParams.get('view')).toBe('consent');
         } finally {
             await clientApi.deleteClient(freshClientId).catch(() => {});
         }

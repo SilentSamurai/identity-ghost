@@ -28,7 +28,11 @@ describe('auth code expiration', () => {
      * Helper: login and return the authorization code with a specific challenge.
      */
     async function loginAndGetCode(codeChallenge: string): Promise<string> {
-        return tokenFixture.fetchAuthCode(email, password, clientId, redirectUri, {
+        return tokenFixture.fetchAuthCodeWithConsentFlow(email, password, {
+            clientId,
+            redirectUri,
+            scope: 'openid profile email',
+            state: 'test-state',
             codeChallenge,
             codeChallengeMethod: 'plain',
         });

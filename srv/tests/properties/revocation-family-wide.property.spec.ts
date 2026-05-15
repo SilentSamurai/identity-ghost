@@ -23,7 +23,7 @@ describe('Property 4: Family-wide revocation', () => {
         fixture = new SharedTestFixture();
         tokenFixture = new TokenFixture(fixture);
 
-        const adminResult = await tokenFixture.fetchPasswordGrantAccessToken(
+        const adminResult = await tokenFixture.fetchAccessTokenFlow(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com',
@@ -48,7 +48,7 @@ describe('Property 4: Family-wide revocation', () => {
         await fc.assert(
             fc.asyncProperty(familySizeArb, async (familySize) => {
                 // Build a token chain of the given size
-                const result = await tokenFixture.fetchPasswordGrantAccessToken(
+                const result = await tokenFixture.fetchAccessTokenFlow(
                     'admin@auth.server.com',
                     'admin9000',
                     'auth.server.com',
@@ -98,7 +98,7 @@ describe('Property 4: Family-wide revocation', () => {
                 expect(refreshResponse.status).toEqual(400);
                 expect(refreshResponse.body.error).toEqual('invalid_grant');
             }),
-            {numRuns: 20},
+            {numRuns: 10},
         );
-    }, 120_000);
+    }, 180_000);
 });

@@ -1,27 +1,32 @@
 import {SharedTestFixture} from "../shared-test.fixture";
-import {TokenFixture} from "../token.fixture";
-import {expect2xx} from "../api-client/client";
+import {TokenFixture, AuthorizeParams} from "../token.fixture";
 
 describe('e2e positive auth code flow', () => {
     let app: SharedTestFixture;
     let tokenFixture: TokenFixture;
     let authentication_code = "";
     let accessToken = "";
-    let clientId = "auth.server.com";
+    const clientId = "auth.server.com";
     const redirectUri = "http://localhost:3000/callback";
     const verifier = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq";
-    const challenge = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq";
+
+    const authorizeParams: AuthorizeParams = {
+        clientId,
+        redirectUri,
+        scope: 'openid profile email',
+        state: 'test-state',
+        codeChallenge: verifier,
+        codeChallengeMethod: 'plain',
+    };
 
     beforeAll(async () => {
         app = new SharedTestFixture();
         tokenFixture = new TokenFixture(app);
 
-        // Login to get an auth code via the new cookie-based flow
-        authentication_code = await tokenFixture.fetchAuthCode(
+        authentication_code = await tokenFixture.fetchAuthCodeWithConsentFlow(
             "admin@auth.server.com",
             "admin9000",
-            clientId,
-            redirectUri,
+            authorizeParams,
         );
     });
 
@@ -30,37 +35,26 @@ describe('e2e positive auth code flow', () => {
     });
 
     it(`/POST Fetch Access Token`, async () => {
-        const response = await app.getHttpServer()
-            .post('/api/oauth/token')
-            .send({
-                "grant_type": "authorization_code",
-                "code": authentication_code,
-                client_id: clientId,
-                "code_verifier": verifier,
-                "redirect_uri": redirectUri,
-            })
-            .set('Accept', 'application/json');
+        const tokens = await tokenFixture.exchangeAuthorizationCode(
+            authentication_code,
+            clientId,
+            verifier,
+            redirectUri,
+        );
 
-        console.log("Fetch Access Token:", response.body);
-        expect2xx(response);
+        expect(tokens.access_token).toBeDefined();
+        expect(tokens.expires_in).toBeDefined();
+        expect(tokens.token_type).toEqual('Bearer');
+        expect(tokens.refresh_token).toBeDefined();
 
-        expect(response.status).toEqual(200);
-        expect(response.body.access_token).toBeDefined();
-        expect(response.body.expires_in).toBeDefined();
-        expect(response.body.token_type).toEqual('Bearer');
-        expect(response.body.refresh_token).toBeDefined();
-
-        accessToken = response.body.access_token;
+        accessToken = tokens.access_token;
     });
 
-
     it(`/POST Verify auth gen code`, async () => {
-        // Get a fresh auth code since the previous one was consumed by token exchange
-        const freshCode = await tokenFixture.fetchAuthCode(
+        const freshCode = await tokenFixture.fetchAuthCodeWithConsentFlow(
             "admin@auth.server.com",
             "admin9000",
-            clientId,
-            redirectUri,
+            authorizeParams,
         );
 
         const response = await app.getHttpServer()

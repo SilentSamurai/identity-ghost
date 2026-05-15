@@ -36,7 +36,7 @@ describe('Offline Access & Refresh Token Gating Integration Tests', () => {
         const tokenFixture = new TokenFixture(app);
 
         // Get super-admin access token using the default first-party client
-        const tokenResponse = await tokenFixture.fetchPasswordGrantAccessToken(
+        const tokenResponse = await tokenFixture.fetchAccessTokenFlow(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com',
@@ -366,7 +366,13 @@ describe('Offline Access & Refresh Token Gating Integration Tests', () => {
         it('should NOT issue refresh_token for client_credentials grant regardless of scope or client config', async () => {
             // Create a confidential client for client_credentials grant
             const tokenFixture = new TokenFixture(app);
-            const credentials = await tokenFixture.createConfidentialClient(accessToken, testTenantId);
+            const credentials = await tokenFixture.createConfidentialClient(
+                accessToken,
+                testTenantId,
+                'CC Grant Client',
+                'client_credentials',
+                'openid profile email',
+            );
 
             // Request token with client_credentials grant using confidential client credentials
             const response = await clientCredentialsGrantRequest(credentials.clientId, credentials.clientSecret);

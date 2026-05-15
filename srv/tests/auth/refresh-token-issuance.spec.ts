@@ -28,7 +28,7 @@ describe('Refresh Token Issuance', () => {
         let tokenResponse: any;
 
         beforeAll(async () => {
-            tokenResponse = await tokenFixture.fetchPasswordGrantAccessToken(
+            tokenResponse = await tokenFixture.fetchAccessTokenFlow(
                 'admin@auth.server.com',
                 'admin9000',
                 'auth.server.com',
@@ -60,11 +60,17 @@ describe('Refresh Token Issuance', () => {
 
         it('returns an opaque refresh_token via code exchange', async () => {
             // Get auth code via the new cookie-based flow
-            const code = await tokenFixture.fetchAuthCode(
+            const code = await tokenFixture.fetchAuthCodeWithConsentFlow(
                 'admin@auth.server.com',
                 'admin9000',
-                clientId,
-                redirectUri,
+                {
+                    clientId,
+                    redirectUri,
+                    scope: 'openid profile email',
+                    state: 'test-state',
+                    codeChallenge: verifier,
+                    codeChallengeMethod: 'plain',
+                },
             );
 
             // Exchange code for tokens

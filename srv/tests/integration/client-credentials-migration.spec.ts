@@ -40,7 +40,7 @@ describe('Client Credentials Migration', () => {
         tokenFixture = new TokenFixture(app);
 
         // Get super admin token for setup operations
-        const superAdminResult = await tokenFixture.fetchPasswordGrantAccessToken(
+        const superAdminResult = await tokenFixture.fetchAccessTokenFlow(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com',
@@ -158,7 +158,7 @@ describe('Client Credentials Migration', () => {
     describe('authorization code grant binds refresh token to Client UUID', () => {
         it('should issue refresh token bound to Client UUID', async () => {
             // Use the dedicated tenant's default client (public, password grant enabled)
-            const tokenResult = await tokenFixture.fetchPasswordGrantAccessToken(
+            const tokenResult = await tokenFixture.fetchAccessTokenFlow(
                 ADMIN_EMAIL,
                 ADMIN_PASSWORD,
                 TENANT_DOMAIN,
@@ -179,7 +179,7 @@ describe('Client Credentials Migration', () => {
 
     describe('refresh token grant with correct client_id', () => {
         it('should succeed when client_id matches the original', async () => {
-            const tokenResult = await tokenFixture.fetchPasswordGrantAccessToken(
+            const tokenResult = await tokenFixture.fetchAccessTokenFlow(
                 ADMIN_EMAIL,
                 ADMIN_PASSWORD,
                 TENANT_DOMAIN,
@@ -206,7 +206,7 @@ describe('Client Credentials Migration', () => {
     describe('refresh token grant with mismatched client_id', () => {
         it('should return invalid_grant when client_id does not match', async () => {
             // Get a token from the dedicated tenant
-            const tokenResult = await tokenFixture.fetchPasswordGrantAccessToken(
+            const tokenResult = await tokenFixture.fetchAccessTokenFlow(
                 ADMIN_EMAIL,
                 ADMIN_PASSWORD,
                 TENANT_DOMAIN,
@@ -244,7 +244,7 @@ describe('Client Credentials Migration', () => {
     describe('public client authenticates without a secret', () => {
         it('should issue token for public client without client_secret', async () => {
             // The default client for the tenant is public
-            const tokenResult = await tokenFixture.fetchPasswordGrantAccessToken(
+            const tokenResult = await tokenFixture.fetchAccessTokenFlow(
                 ADMIN_EMAIL,
                 ADMIN_PASSWORD,
                 TENANT_DOMAIN,
@@ -337,7 +337,7 @@ describe('Client Credentials Migration', () => {
 
     describe('token client_id claim uses Client UUID format', () => {
         it('should have UUID-format client_id in user access token', async () => {
-            const tokenResult = await tokenFixture.fetchPasswordGrantAccessToken(
+            const tokenResult = await tokenFixture.fetchAccessTokenFlow(
                 ADMIN_EMAIL,
                 ADMIN_PASSWORD,
                 TENANT_DOMAIN,
@@ -357,7 +357,7 @@ describe('Client Credentials Migration', () => {
             });
 
             try {
-                const techResult = await tokenFixture.fetchClientCredentialsToken(
+                const techResult = await tokenFixture.fetchClientCredentialsTokenFlow(
                     result.client.clientId,
                     result.clientSecret,
                 );
@@ -377,7 +377,7 @@ describe('Client Credentials Migration', () => {
 
     describe('ID token aud claim uses Client entity clientId', () => {
         it('should have Client UUID in aud claim', async () => {
-            const tokenResult = await tokenFixture.fetchPasswordGrantAccessToken(
+            const tokenResult = await tokenFixture.fetchAccessTokenFlow(
                 ADMIN_EMAIL,
                 ADMIN_PASSWORD,
                 TENANT_DOMAIN,
