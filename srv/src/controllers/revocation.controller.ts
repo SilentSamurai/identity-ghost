@@ -130,7 +130,7 @@ export class RevocationController {
         res.cookie('sid', '', {
             signed: true,
             httpOnly: true,
-            secure: Environment.get('ENABLE_HTTPS') === 'true' || process.env.NODE_ENV === 'production',
+            secure: String(Environment.get('BASE_URL', '')).startsWith('https'),
             sameSite: 'lax' as const,
             path: '/api/oauth',
             maxAge: 0,
