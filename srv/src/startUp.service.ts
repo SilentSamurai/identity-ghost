@@ -188,6 +188,7 @@ export class StartUpService implements OnModuleInit {
                 {name: "Client Rotate Test Tenant", domain: "client-rotate-test.local", signUp: false},
                 {name: "Auth Code Reuse Test Tenant", domain: "auth-code-reuse-test.local", signUp: false, redirectUris: ['http://localhost:3000/callback']},
                 {name: "Per-App Client Test Tenant", domain: "per-app-client-test.local", signUp: false, redirectUris: ['http://localhost:3000/callback']},
+                {name: "Group E2E Test Tenant", domain: "group-e2e-test.local", signUp: false},
             ];
 
             // 4) Create each tenant and assign the existing user as owner
@@ -503,6 +504,13 @@ export class StartUpService implements OnModuleInit {
                 {
                     domain: "perm-test.local",
                     roles: ["CustomTestRole"],
+                    groups: [],
+                    apps: [],
+                    clients: [],
+                },
+                {
+                    domain: "group-e2e-test.local",
+                    roles: ["Editor", "Reviewer"],
                     groups: [],
                     apps: [],
                     clients: [],

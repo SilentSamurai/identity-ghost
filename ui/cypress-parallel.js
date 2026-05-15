@@ -15,14 +15,15 @@ const os = require('os');
 
 // --- Resource-aware concurrency calculation ---
 
-const TESTS_PER_CORE = 2;          // target concurrent Cypress instances per CPU core
-const MEM_PER_INSTANCE_MB = 2048;   // ~2GB per Cypress browser instance (measured)
-const RESERVED_MEM_MB = 4096;      // memory reserved for backend services (~2GB)
+const TESTS_PER_CORE = 1;          // target concurrent Cypress instances per CPU core
+const MEM_PER_INSTANCE_MB = 1024;   // ~1GB per Cypress browser instance (measured)
+const RESERVED_MEM_MB = 6144;      // memory reserved for backend services + OS headroom
+const MAX_CONCURRENCY = 6;         // hard cap — beyond this, resource contention causes flakiness
 
 const cpuBased = Math.max(1, os.cpus().length * TESTS_PER_CORE);
 const freeMem = Math.max(0, (os.freemem() / (1024 * 1024)) - RESERVED_MEM_MB);
 const memBased = Math.max(1, Math.floor(freeMem / MEM_PER_INSTANCE_MB));
-const auto = Math.min(cpuBased, memBased);
+const auto = Math.min(cpuBased, memBased, MAX_CONCURRENCY);
 
 // Use env override if set, otherwise use the auto-calculated value
 const CONCURRENCY = parseInt(process.env.CYPRESS_PARALLEL, 10) || auto;

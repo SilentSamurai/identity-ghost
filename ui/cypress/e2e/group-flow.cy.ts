@@ -4,7 +4,7 @@
  * Tests the full lifecycle of groups from the tenant overview (TN02):
  * creating a group, navigating to the group detail page (GP02),
  * assigning/removing users and roles, updating the group name,
- * and deleting the group. Logs in as a normal tenant admin (shire.local).
+ * and deleting the group. Uses a dedicated tenant (group-e2e-test.local) for isolation.
  */
 describe('Group Flow', () => {
 
@@ -13,11 +13,7 @@ describe('Group Flow', () => {
     const GROUP_NAME_UPDATED = `${GROUP_NAME}-updated`;
 
     beforeEach(() => {
-        cy.login(
-            Cypress.env('shireTenantAdminEmail'),
-            Cypress.env('shireTenantAdminPassword'),
-            Cypress.env('shireTenantAdminClientId')
-        );
+        cy.login('admin@group-e2e-test.local', 'admin9000', 'group-e2e-test.local');
     });
 
     it('should show Groups tab on tenant overview', () => {
