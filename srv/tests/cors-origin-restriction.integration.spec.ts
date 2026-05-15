@@ -26,7 +26,7 @@ describe('CORS origin restriction', () => {
         app = new SharedTestFixture();
 
         const tokenFixture = new TokenFixture(app);
-        const response = await tokenFixture.fetchAccessToken(
+        const response = await tokenFixture.fetchAccessTokenFlow(
             "admin@auth.server.com",
             "admin9000",
             "auth.server.com",
@@ -51,7 +51,13 @@ describe('CORS origin restriction', () => {
 
         // Get the tenant's confidential client credentials for client_credentials grant
         const tokenFixtureForCreds = new TokenFixture(app);
-        tenantCredentials = await tokenFixtureForCreds.createConfidentialClient(adminAccessToken, tenant.id);
+        tenantCredentials = await tokenFixtureForCreds.createConfidentialClient(
+            adminAccessToken,
+            tenant.id,
+            'cors-cc-client',
+            'client_credentials',
+            'openid profile email',
+        );
     });
 
     afterAll(async () => {
@@ -128,7 +134,7 @@ describe('CORS origin restriction', () => {
 
     it('should return Access-Control-Allow-Origin header for /api/oauth/userinfo with matching origin', async () => {
         const tokenFixture = new TokenFixture(app);
-        const tokenRes = await tokenFixture.fetchClientCredentialsToken(
+        const tokenRes = await tokenFixture.fetchClientCredentialsTokenFlow(
             tenantCredentials.clientId,
             tenantCredentials.clientSecret
         );
@@ -147,7 +153,7 @@ describe('CORS origin restriction', () => {
 
     it('should omit Access-Control-Allow-Origin header for /api/oauth/userinfo with non-matching origin', async () => {
         const tokenFixture = new TokenFixture(app);
-        const tokenRes = await tokenFixture.fetchClientCredentialsToken(
+        const tokenRes = await tokenFixture.fetchClientCredentialsTokenFlow(
             tenantCredentials.clientId,
             tenantCredentials.clientSecret
         );

@@ -129,3 +129,9 @@ tasks:
             - docker build -f standalone.dockerfile -t sd25/auth-server:latest .
             - echo "🚀 Pushing sd25/auth-server:latest"
             - docker push sd25/auth-server:latest
+
+    lxc:upgrade:
+        desc: Upgrade LXC container
+        cmds:
+            - echo "🔄 Upgrading LXC container..."
+            - pve-oci apply pve-compose.yml

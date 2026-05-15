@@ -9,11 +9,6 @@ import * as jwt from "jsonwebtoken";
 /**
  * Integration tests for ID Token Audience Validation.
  *
- * These tests verify:
- * 1. Existing aud/azp claim construction (Requirements 1, 2, 3)
- * 2. id_token_hint validation on the authorize endpoint (Requirement 5)
- * 3. Discovery document audience metadata (Requirement 6)
- *
  * Feature: id-token-audience-validation
  */
 describe('ID Token Audience Validation Integration', () => {
@@ -23,8 +18,8 @@ describe('ID Token Audience Validation Integration', () => {
     let adminAccessToken: string;
 
     const clientId = 'idtoken-aud-test.local';
+    const redirectUri = 'http://localhost:3000/callback';
     const verifier = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq';
-    const challenge = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq';
     const email = 'admin@idtoken-aud-test.local';
     const password = 'admin9000';
 
@@ -34,7 +29,7 @@ describe('ID Token Audience Validation Integration', () => {
     const REDIRECT_URI = 'https://id-token-audience-test.example.com/callback';
     const ALLOWED_RESOURCES = ['https://api.example.com'];
 
-    /** Helper: login → get auth code (handles consent for third-party clients) */
+    /** Helper: login → authorize → get auth code */
     async function loginForCode(opts?: {
         scope?: string;
         nonce?: string;
@@ -42,59 +37,49 @@ describe('ID Token Audience Validation Integration', () => {
         resource?: string;
     }): Promise<string> {
         const effectiveClientId = opts?.client_id || clientId;
-        const body: any = {
-            email,
-            password,
-            client_id: effectiveClientId,
-            code_challenge: challenge,
-            code_challenge_method: 'plain',
-        };
-        if (opts?.scope !== undefined) body.scope = opts.scope;
-        if (opts?.nonce !== undefined) body.nonce = opts.nonce;
-        if (opts?.resource !== undefined) body.resource = opts.resource;
+        const effectiveRedirectUri = opts?.client_id ? REDIRECT_URI : redirectUri;
 
-        const res = await app.getHttpServer()
-            .post('/api/oauth/login')
-            .send(body)
-            .set('Accept', 'application/json');
-
-        expect2xx(res);
-
-        // If consent is required (third-party client), approve it
-        if (res.body.requires_consent) {
-            const consentRes = await app.getHttpServer()
-                .post('/api/oauth/consent')
-                .send({
-                    email,
-                    password,
-                    client_id: effectiveClientId,
-                    code_challenge: challenge,
-                    code_challenge_method: 'plain',
-                    approved_scopes: res.body.requested_scopes,
-                    consent_action: 'approve',
-                    scope: opts?.scope,
-                    resource: opts?.resource,
-                })
-                .set('Accept', 'application/json');
-
-            expect2xx(consentRes);
-            expect(consentRes.body.authentication_code).toBeDefined();
-            return consentRes.body.authentication_code;
+        if (opts?.resource) {
+            // Use initializeFlow → login → getAuthorizationCode with resource param
+            const params = {
+                clientId: effectiveClientId,
+                redirectUri: effectiveRedirectUri,
+                scope: opts?.scope ?? 'openid profile email',
+                state: 'test-state',
+                codeChallenge: verifier,
+                codeChallengeMethod: 'plain',
+                nonce: opts?.nonce,
+                resource: opts.resource,
+            };
+            const csrfContext = await tokenFixture.initializeFlow(params);
+            const sidCookie = await tokenFixture.login(email, password, effectiveClientId, csrfContext);
+            return tokenFixture.getAuthorizationCode(params, sidCookie, csrfContext.flowIdCookie);
         }
 
-        expect(res.body.authentication_code).toBeDefined();
-        return res.body.authentication_code;
+        return tokenFixture.fetchAuthCodeWithConsentFlow(email, password, {
+            clientId: effectiveClientId,
+            redirectUri: effectiveRedirectUri,
+            scope: opts?.scope ?? 'openid profile email',
+            state: 'test-state',
+            codeChallenge: verifier,
+            codeChallengeMethod: 'plain',
+            nonce: opts?.nonce,
+        });
     }
 
     /** Helper: exchange auth code → token response */
     async function exchangeCode(code: string, client_id?: string): Promise<any> {
+        const effectiveClientId = client_id || clientId;
+        const effectiveRedirectUri = client_id ? REDIRECT_URI : redirectUri;
+
         const res = await app.getHttpServer()
             .post('/api/oauth/token')
             .send({
                 grant_type: 'authorization_code',
                 code,
                 code_verifier: verifier,
-                client_id: client_id || clientId,
+                client_id: effectiveClientId,
+                redirect_uri: effectiveRedirectUri,
             })
             .set('Accept', 'application/json');
 
@@ -135,7 +120,7 @@ describe('ID Token Audience Validation Integration', () => {
         app = new SharedTestFixture();
         tokenFixture = new TokenFixture(app);
 
-        const {accessToken} = await tokenFixture.fetchAccessToken(
+        const {accessToken} = await tokenFixture.fetchAccessTokenFlow(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com',
@@ -160,11 +145,20 @@ describe('ID Token Audience Validation Integration', () => {
             allowedResources: ALLOWED_RESOURCES,
         });
         testClientWithResources = {id: created.client.id, clientId: created.client.clientId};
+
+        // Pre-grant consent so the auth code flow works for this third-party client
+        await tokenFixture.preGrantConsentFlow(email, password, {
+            clientId: testClientWithResources.clientId,
+            redirectUri: REDIRECT_URI,
+            scope: 'openid profile email',
+            state: 'consent-state',
+            codeChallenge: verifier,
+            codeChallengeMethod: 'plain',
+        });
     });
 
     afterAll(async () => {
-        await clientApi.deleteClient(testClientWithResources.clientId).catch(() => {
-        });
+        await clientApi.deleteClient(testClientWithResources.clientId).catch(() => {});
         await app.close();
     });
 
@@ -177,11 +171,8 @@ describe('ID Token Audience Validation Integration', () => {
             expect(tokenResponse.id_token).toBeDefined();
             const idTokenPayload = jwt.decode(tokenResponse.id_token) as any;
 
-            // aud is a single-element array containing clientId
             expect(Array.isArray(idTokenPayload.aud)).toBe(true);
             expect(idTokenPayload.aud).toEqual([clientId]);
-
-            // azp equals clientId
             expect(idTokenPayload.azp).toEqual(clientId);
         });
 
@@ -192,16 +183,12 @@ describe('ID Token Audience Validation Integration', () => {
             expect(tokenResponse.id_token).toBeDefined();
             const idTokenPayload = jwt.decode(tokenResponse.id_token) as any;
 
-            // aud is a single-element array containing clientId
             expect(Array.isArray(idTokenPayload.aud)).toBe(true);
             expect(idTokenPayload.aud).toEqual([clientId]);
-
-            // azp equals clientId
             expect(idTokenPayload.azp).toEqual(clientId);
         });
 
         it('should keep ID token aud as [clientId] when resource parameter is used (Req 3.1, 3.2)', async () => {
-            // Login with resource parameter
             const code = await loginForCode({
                 scope: 'openid profile email',
                 client_id: testClientWithResources.clientId,
@@ -215,12 +202,10 @@ describe('ID Token Audience Validation Integration', () => {
             const idTokenPayload = jwt.decode(tokenResponse.id_token) as any;
             const accessTokenPayload = jwt.decode(tokenResponse.access_token) as any;
 
-            // ID token aud remains [clientId] only
             expect(Array.isArray(idTokenPayload.aud)).toBe(true);
             expect(idTokenPayload.aud).toEqual([testClientWithResources.clientId]);
             expect(idTokenPayload.azp).toEqual(testClientWithResources.clientId);
 
-            // Access token aud includes the resource
             expect(Array.isArray(accessTokenPayload.aud)).toBe(true);
             expect(accessTokenPayload.aud).toContain('https://api.example.com');
         });
@@ -232,7 +217,6 @@ describe('ID Token Audience Validation Integration', () => {
         let validIdTokenHint: string;
 
         beforeAll(async () => {
-            // Get an ID token to use as id_token_hint
             const code = await loginForCode({
                 scope: 'openid profile email',
                 client_id: testClientWithResources.clientId,
@@ -252,7 +236,6 @@ describe('ID Token Audience Validation Integration', () => {
                 id_token_hint: validIdTokenHint,
             });
 
-            // Should redirect to /authorize (login page) without error
             expect(res.status).toEqual(302);
             const location = new URL(res.headers.location, 'http://localhost');
             expect(location.pathname).toEqual('/authorize');
@@ -260,12 +243,10 @@ describe('ID Token Audience Validation Integration', () => {
         });
 
         it('should reject authorize request with id_token_hint issued for different client_id (Req 5.2)', async () => {
-            // Get an ID token issued for idtoken-aud-test.local (the default client for this test)
             const code = await loginForCode({scope: 'openid profile email'});
             const tokenResponse = await exchangeCode(code);
             const hintForDefaultClient = tokenResponse.id_token;
 
-            // Use that hint on an authorize request for testClientWithResources — different client
             const res = await authorize({
                 response_type: 'code',
                 client_id: testClientWithResources.clientId,
@@ -275,7 +256,6 @@ describe('ID Token Audience Validation Integration', () => {
                 id_token_hint: hintForDefaultClient,
             });
 
-            // Should redirect with invalid_request error
             expect(res.status).toEqual(302);
             const location = new URL(res.headers.location);
             expect(location.searchParams.get('error')).toEqual('invalid_request');
@@ -292,7 +272,6 @@ describe('ID Token Audience Validation Integration', () => {
                 id_token_hint: 'not-a-valid-jwt-token',
             });
 
-            // Should redirect with invalid_request error
             expect(res.status).toEqual(302);
             const location = new URL(res.headers.location);
             expect(location.searchParams.get('error')).toEqual('invalid_request');

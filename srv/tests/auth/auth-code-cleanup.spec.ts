@@ -1,4 +1,5 @@
 import {SharedTestFixture} from "../shared-test.fixture";
+import {TokenFixture} from "../token.fixture";
 import {expect2xx} from "../api-client/client";
 
 /**
@@ -27,133 +28,101 @@ import {expect2xx} from "../api-client/client";
  */
 describe('auth code cleanup — lifecycle state verification', () => {
     let app: SharedTestFixture;
-    const clientId = "auth-cleanup-test.local";
-    const verifier = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq";
-    const challenge = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq";
-    const email = "admin@auth-cleanup-test.local";
-    const password = "admin9000";
+    let tokenFixture: TokenFixture;
+
+    const CLIENT_ID = 'auth-cleanup-test.local';
+    const EMAIL = 'admin@auth-cleanup-test.local';
+    const PASSWORD = 'admin9000';
+    const REDIRECT_URI = 'http://localhost:3000/callback';
 
     beforeAll(async () => {
         app = new SharedTestFixture();
+        tokenFixture = new TokenFixture(app);
     });
 
     afterAll(async () => {
         await app.close();
     });
 
-    /**
-     * Helper: login and return an auth code.
-     */
-    async function loginAndGetCode(codeChallenge: string): Promise<string> {
-        const response = await app.getHttpServer()
-            .post('/api/oauth/login')
-            .send({
-                code_challenge: codeChallenge,
-                email,
-                password,
-                client_id: clientId,
-                code_challenge_method: "plain",
-            })
-            .set('Accept', 'application/json');
-        expect(response.status).toEqual(201);
-        expect(response.body.authentication_code).toBeDefined();
-        return response.body.authentication_code;
-    }
-
-    /**
-     * Helper: exchange an auth code for tokens.
-     */
+    /** Exchange an auth code for tokens. */
     async function exchangeCode(code: string, codeVerifier: string) {
         return app.getHttpServer()
             .post('/api/oauth/token')
             .send({
-                grant_type: "authorization_code",
+                grant_type: 'authorization_code',
                 code,
                 code_verifier: codeVerifier,
-                client_id: clientId,
+                client_id: CLIENT_ID,
+                redirect_uri: REDIRECT_URI,
             })
             .set('Accept', 'application/json');
     }
 
     // Requirement 7.2: Used codes are cleanup targets.
-    // After redemption, the code is marked used=true. The cron deletes rows
-    // where `used = true`. This test confirms the used state is correctly set
-    // by verifying the code is rejected on a second exchange attempt.
     it('should mark codes as used after redemption — used codes are cleanup targets', async () => {
-        const codeChallenge = "cleanup-used-code-test-ABCDEFGHIJKLMNOPQRST";
-        const code = await loginAndGetCode(codeChallenge);
+        const challenge = 'cleanup-used-code-test-ABCDEFGHIJKLMNOPQRST';
+        const code = await tokenFixture.fetchAuthCode(EMAIL, PASSWORD, CLIENT_ID, REDIRECT_URI, {
+            codeChallenge: challenge,
+        });
 
-        // First exchange succeeds — code is now used=true, used_at=NOW()
-        const firstResponse = await exchangeCode(code, codeChallenge);
+        // First exchange succeeds — code is now used=true
+        const firstResponse = await exchangeCode(code, challenge);
         expect2xx(firstResponse);
         expect(firstResponse.body.access_token).toBeDefined();
 
         // Second exchange fails — proves used=true was persisted
-        // The cron's WHERE clause `used = true` would match this code
-        const secondResponse = await exchangeCode(code, codeChallenge);
+        const secondResponse = await exchangeCode(code, challenge);
         expect(secondResponse.status).toEqual(400);
-        expect(secondResponse.body.error).toEqual("invalid_grant");
+        expect(secondResponse.body.error).toEqual('invalid_grant');
     });
 
     // Requirement 7.1, 7.2: Active codes are NOT cleanup targets.
-    // An active code (not expired, not used) should remain exchangeable.
-    // The cron only deletes codes where `expires_at < NOW() OR used = true`,
-    // so active codes must survive. This test confirms an unused, non-expired
-    // code can be successfully exchanged.
     it('should keep active codes exchangeable — active codes are not cleanup targets', async () => {
-        const codeChallenge = "cleanup-active-code-test-ABCDEFGHIJKLMNOPQR";
-        const code = await loginAndGetCode(codeChallenge);
+        const challenge = 'cleanup-active-code-test-ABCDEFGHIJKLMNOPQR';
+        const code = await tokenFixture.fetchAuthCode(EMAIL, PASSWORD, CLIENT_ID, REDIRECT_URI, {
+            codeChallenge: challenge,
+        });
 
-        // Exchange the active code — should succeed because it's neither
-        // expired (5-minute TTL) nor used
-        const response = await exchangeCode(code, codeChallenge);
+        const response = await exchangeCode(code, challenge);
         expect2xx(response);
         expect(response.body.access_token).toBeDefined();
         expect(response.body.refresh_token).toBeDefined();
     });
 
-    // Requirement 7.1: Expired codes are cleanup targets.
-    // The cron deletes codes where `expires_at < NOW()`. While we cannot
-    // fast-forward time or manipulate the database from SharedTestFixture,
-    // we verify that the expiration mechanism works: the auth-code-expiration
-    // tests (Test Group 2) confirm expired codes are rejected at exchange.
-    // Here we verify the complementary case: a freshly created code (within
-    // its 5-minute TTL) is NOT expired and can be exchanged successfully.
+    // Requirement 7.1: Freshly created code is not expired.
     it('should allow exchange of non-expired code — confirms expires_at is in the future', async () => {
-        const codeChallenge = "cleanup-not-expired-test-ABCDEFGHIJKLMNOPQR";
-        const code = await loginAndGetCode(codeChallenge);
+        const challenge = 'cleanup-not-expired-test-ABCDEFGHIJKLMNOPQR';
+        const code = await tokenFixture.fetchAuthCode(EMAIL, PASSWORD, CLIENT_ID, REDIRECT_URI, {
+            codeChallenge: challenge,
+        });
 
-        // Immediately exchange — the code was just created, so expires_at
-        // is ~5 minutes in the future. The cron's `expires_at < NOW()`
-        // condition would NOT match this code.
-        const response = await exchangeCode(code, codeChallenge);
+        const response = await exchangeCode(code, challenge);
         expect2xx(response);
         expect(response.body.access_token).toBeDefined();
     });
 
     // Requirement 7.1, 7.2: Multiple codes in different states.
-    // Creates two codes: one gets redeemed (used=true), one stays active.
-    // Verifies the used code is rejected and the active code still works.
-    // This mirrors the cleanup cron's behavior: it would delete the used
-    // code and leave the active one untouched.
     it('should distinguish used codes from active codes across multiple auth codes', async () => {
-        const usedChallenge = "cleanup-multi-used-ABCDEFGHIJKLMNOPQRSTUVWX";
-        const activeChallenge = "cleanup-multi-active-ABCDEFGHIJKLMNOPQRSTUV";
+        const usedChallenge = 'cleanup-multi-used-ABCDEFGHIJKLMNOPQRSTUVWX';
+        const activeChallenge = 'cleanup-multi-active-ABCDEFGHIJKLMNOPQRSTUV';
 
-        // Create two auth codes
-        const usedCode = await loginAndGetCode(usedChallenge);
-        const activeCode = await loginAndGetCode(activeChallenge);
+        const usedCode = await tokenFixture.fetchAuthCode(EMAIL, PASSWORD, CLIENT_ID, REDIRECT_URI, {
+            codeChallenge: usedChallenge,
+        });
+        const activeCode = await tokenFixture.fetchAuthCode(EMAIL, PASSWORD, CLIENT_ID, REDIRECT_URI, {
+            codeChallenge: activeChallenge,
+        });
 
         // Redeem the first code — marks it as used=true
         const redeemResponse = await exchangeCode(usedCode, usedChallenge);
         expect2xx(redeemResponse);
 
-        // The used code is now rejected (cleanup would delete it)
+        // Used code is now rejected (cleanup would delete it)
         const replayResponse = await exchangeCode(usedCode, usedChallenge);
         expect(replayResponse.status).toEqual(400);
-        expect(replayResponse.body.error).toEqual("invalid_grant");
+        expect(replayResponse.body.error).toEqual('invalid_grant');
 
-        // The active code is still valid (cleanup would NOT delete it)
+        // Active code is still valid (cleanup would NOT delete it)
         const activeResponse = await exchangeCode(activeCode, activeChallenge);
         expect2xx(activeResponse);
         expect(activeResponse.body.access_token).toBeDefined();

@@ -27,6 +27,7 @@ import {TN01AComponent} from './tenants/TN01A.component';
 import {TN02ASelectionComponent} from './tenants/TN02A-selection.component';
 import {TN02AComponent} from './tenants/TN02A.component';
 import {TNRL01ASelectionComponent} from './tenants/TNRL01A-selection.component';
+import {TNRL01AComponent} from './tenants/TNRL01A.component';
 import {CreateTenantComponent} from './tenants/dialogs/create-tenant.component';
 import {UpdateTenantComponent} from './tenants/dialogs/update-tenant.component';
 import {UpdateTenantAdminComponent} from './tenants/dialogs/update-tenant-admin.component';
@@ -60,6 +61,7 @@ import {AP01AComponent} from './apps/AP01A.component';
 import {CreateAppComponent} from './apps/dialogs/create-app.component';
 import {CreateAppAdminComponent} from './apps/dialogs/create-app-admin.component';
 import {UpdateAppComponent} from './apps/dialogs/update-app.component';
+import {TestWebhookAdminComponent} from './apps/dialogs/test-webhook.component';
 
 // Clients
 import {CL01AComponent} from './clients/CL01A.component';
@@ -84,6 +86,7 @@ import {KY01AComponent} from './keys/KY01A.component';
         TN02ASelectionComponent,
         TN02AComponent,
         TNRL01ASelectionComponent,
+        TNRL01AComponent,
         CreateTenantComponent,
         UpdateTenantComponent,
         UpdateTenantAdminComponent,
@@ -113,6 +116,7 @@ import {KY01AComponent} from './keys/KY01A.component';
         CreateAppComponent,
         CreateAppAdminComponent,
         UpdateAppComponent,
+        TestWebhookAdminComponent,
         // Clients
         CL01AComponent,
         CL02ASelectionComponent,

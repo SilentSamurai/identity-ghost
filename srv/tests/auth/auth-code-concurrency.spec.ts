@@ -1,4 +1,5 @@
 import {SharedTestFixture} from "../shared-test.fixture";
+import {TokenFixture} from "../token.fixture";
 import {expect2xx} from "../api-client/client";
 
 /**
@@ -12,44 +13,31 @@ import {expect2xx} from "../api-client/client";
  */
 describe('auth code concurrency safety', () => {
     let app: SharedTestFixture;
+    let tokenFixture: TokenFixture;
     const clientId = "auth.server.com";
+    const redirectUri = "http://localhost:3000/callback";
     const verifier = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq";
-    const challenge = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq";
     const email = "admin@auth.server.com";
     const password = "admin9000";
 
     beforeAll(async () => {
         app = new SharedTestFixture();
+        tokenFixture = new TokenFixture(app);
     });
 
     afterAll(async () => {
         await app.close();
     });
 
-    async function loginAndGetCode(): Promise<string> {
-        const response = await app.getHttpServer()
-            .post('/api/oauth/login')
-            .send({
-                code_challenge: challenge,
-                email,
-                password,
-                client_id: clientId,
-                code_challenge_method: "plain",
-            })
-            .set('Accept', 'application/json');
-        expect2xx(response);
-        expect(response.body.authentication_code).toBeDefined();
-        return response.body.authentication_code;
-    }
-
     it('should allow exactly one of two concurrent token exchanges to succeed', async () => {
-        const code = await loginAndGetCode();
+        const code = await tokenFixture.fetchAuthCode(email, password, clientId, redirectUri);
 
         const tokenPayload = {
             grant_type: "authorization_code",
             code,
             client_id: clientId,
             code_verifier: verifier,
+            redirect_uri: redirectUri,
         };
 
         // Fire two concurrent requests with the same auth code

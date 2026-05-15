@@ -19,7 +19,7 @@ describe('Property 1: Empty or whitespace tokens are rejected', () => {
         fixture = new SharedTestFixture();
         const tokenFixture = new TokenFixture(fixture);
 
-        const adminResult = await tokenFixture.fetchAccessToken(
+        const adminResult = await tokenFixture.fetchAccessTokenFlow(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com',

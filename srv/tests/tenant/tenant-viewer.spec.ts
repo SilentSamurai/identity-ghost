@@ -24,7 +24,7 @@ describe('e2e tenant viewer', () => {
         const uniqueDomain = `viewer-${Date.now()}.com`;
 
         // Super admin: create tenant, add member, assign TENANT_VIEWER
-        const superAdminResponse = await tokenFixture.fetchAccessToken(
+        const superAdminResponse = await tokenFixture.fetchAccessTokenFlow(
             "admin@auth.server.com", "admin9000", "auth.server.com"
         );
         const superAdmin = new AdminTenantClient(app, superAdminResponse.accessToken);
@@ -41,7 +41,7 @@ describe('e2e tenant viewer', () => {
         await superAdmin.updateMemberRoles(tenant.id, legolasId, ["TENANT_VIEWER"]);
 
         // Log in as the tenant viewer
-        const viewerResponse = await tokenFixture.fetchAccessToken(
+        const viewerResponse = await tokenFixture.fetchAccessTokenFlow(
             "legolas@mail.com", "legolas9000", uniqueDomain
         );
         viewerClient = new TenantClient(app, viewerResponse.accessToken);

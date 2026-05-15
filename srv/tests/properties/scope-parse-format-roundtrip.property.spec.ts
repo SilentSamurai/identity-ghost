@@ -13,11 +13,11 @@ import {ScopeNormalizer} from '../../src/casl/scope-normalizer';
  * Validates: Requirements 11.1, 1.1
  */
 describe('Property 2: Scope parse/format round-trip', () => {
-    // Arbitrary: a single scope token (no whitespace, valid NQSCHAR chars)
+    // Arbitrary: a single scope token (no whitespace, valid NQSCHAR chars, no comma since parse() treats it as delimiter)
     const scopeTokenArb = fc.oneof(
         fc.constantFrom('openid', 'profile', 'email', 'tenant.read', 'tenant.write'),
         fc.string({
-            unit: fc.stringMatching(/^[!#-\[\]-~]$/),
+            unit: fc.stringMatching(/^[!#$%&'()*+\-./:;<=>?@A-Z\[\]^_`a-z{|}~]$/),
             minLength: 1,
             maxLength: 20,
         }),

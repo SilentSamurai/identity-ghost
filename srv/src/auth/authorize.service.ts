@@ -7,6 +7,7 @@ import {Client} from '../entity/client.entity';
 import {ValidationSchema} from '../validation/validation.schema';
 import {ResourceIndicatorValidator} from './resource-indicator.validator';
 import {IdTokenHintValidator} from './id-token-hint.validator';
+import {AmbiguousClientIdException} from '../exceptions/ambiguous-client-id.exception';
 
 export interface AuthorizeQueryParams {
     response_type?: string;
@@ -21,6 +22,10 @@ export interface AuthorizeQueryParams {
     max_age?: number;
     resource?: string;
     id_token_hint?: string;
+    from_logout?: string;            // skip session detection after logout
+    session_confirmed?: string;      // user confirmed session via session-confirm UI
+    consent_denied?: string;        // user denied consent; backend issues error redirect
+    subscriber_tenant_hint?: string; // selected tenant for ambiguous multi-tenant users
 }
 
 export interface ValidatedAuthorizeRequest {
@@ -36,6 +41,7 @@ export interface ValidatedAuthorizeRequest {
     maxAge?: number;
     resource?: string;
     idTokenHintSub?: string;
+    subscriberTenantHint?: string;
 }
 
 @Injectable()
@@ -120,6 +126,7 @@ export class AuthorizeService {
                 maxAge: params.max_age,
                 resource: params.resource,
                 idTokenHintSub,
+                subscriberTenantHint: params.subscriber_tenant_hint,
             };
         } catch (error) {
             if (error instanceof OAuthException || error instanceof AuthorizeRedirectException) {
@@ -199,6 +206,11 @@ export class AuthorizeService {
         try {
             return await this.clientService.findByClientIdOrAlias(clientId);
         } catch (error) {
+            // Req 8.7: ambiguous client_id (matches both a UUID and an alias on different rows)
+            // must return invalid_request, not unauthorized_client
+            if (error instanceof AmbiguousClientIdException) {
+                throw OAuthException.invalidRequest('ambiguous client_id');
+            }
             if (error instanceof NotFoundException) {
                 throw OAuthException.invalidRequest('Unknown client_id');
             }

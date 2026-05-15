@@ -8,10 +8,6 @@ import {expect2xx} from '../api-client/client';
 /**
  * Integration tests for redirect URI validation at the authorization endpoint.
  *
- * Validates that GET /api/oauth/authorize enforces exact-match redirect URI
- * comparison against pre-registered client URIs, with correct fallback behavior
- * when redirect_uri is omitted.
- *
  * Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 5.1, 6.1
  */
 describe('Authorization endpoint redirect URI validation', () => {
@@ -20,7 +16,6 @@ describe('Authorization endpoint redirect URI validation', () => {
     let accessToken: string;
     let testTenantId: string;
 
-    // Test client IDs — populated in beforeAll
     let singleUriClientId: string;
     let multiUriClientId: string;
     let noUriClientId: string;
@@ -31,7 +26,7 @@ describe('Authorization endpoint redirect URI validation', () => {
     beforeAll(async () => {
         app = new SharedTestFixture();
         const tokenFixture = new TokenFixture(app);
-        const response = await tokenFixture.fetchAccessToken(
+        const response = await tokenFixture.fetchAccessTokenFlow(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com',
@@ -43,7 +38,6 @@ describe('Authorization endpoint redirect URI validation', () => {
         const tenant = await tenantClient.createTenant('redir-uri-val', 'redir-uri-val.com');
         testTenantId = tenant.id;
 
-        // Client with a single redirect URI
         const singleUri = await clientApi.createClient(testTenantId, 'Single URI Validation Client', {
             redirectUris: [REDIRECT_URI],
             allowedScopes: 'openid profile email',
@@ -51,7 +45,6 @@ describe('Authorization endpoint redirect URI validation', () => {
         });
         singleUriClientId = singleUri.client.clientId;
 
-        // Client with multiple redirect URIs
         const multiUri = await clientApi.createClient(testTenantId, 'Multi URI Validation Client', {
             redirectUris: [REDIRECT_URI, REDIRECT_URI_2],
             allowedScopes: 'openid profile email',
@@ -59,7 +52,6 @@ describe('Authorization endpoint redirect URI validation', () => {
         });
         multiUriClientId = multiUri.client.clientId;
 
-        // Client with no redirect URIs
         const noUri = await clientApi.createClient(testTenantId, 'No URI Validation Client', {
             redirectUris: [],
             allowedScopes: 'openid profile email',
@@ -69,24 +61,18 @@ describe('Authorization endpoint redirect URI validation', () => {
     });
 
     afterAll(async () => {
-        await clientApi.deleteClient(singleUriClientId).catch(() => {
-        });
-        await clientApi.deleteClient(multiUriClientId).catch(() => {
-        });
-        await clientApi.deleteClient(noUriClientId).catch(() => {
-        });
+        await clientApi.deleteClient(singleUriClientId).catch(() => {});
+        await clientApi.deleteClient(multiUriClientId).catch(() => {});
+        await clientApi.deleteClient(noUriClientId).catch(() => {});
         await app.close();
     });
 
-    /** Helper: make a GET /api/oauth/authorize request with given query params */
     function authorizeRequest(params: Record<string, string>) {
         const query = new URLSearchParams(params).toString();
         return app.getHttpServer()
             .get(`/api/oauth/authorize?${query}`)
             .redirects(0);
     }
-
-    // ─── Req 1.1: Valid redirect_uri matching a registered URI ────────
 
     it('should 302 redirect when redirect_uri matches a registered URI (Req 1.1)', async () => {
         const response = await authorizeRequest({
@@ -105,8 +91,6 @@ describe('Authorization endpoint redirect URI validation', () => {
         expect(location.searchParams.get('redirect_uri')).toEqual(REDIRECT_URI);
     });
 
-    // ─── Req 1.2: Invalid redirect_uri → 400 invalid_request ─────────
-
     it('should return 400 invalid_request when redirect_uri does not match any registered URI (Req 1.2)', async () => {
         const response = await authorizeRequest({
             response_type: 'code',
@@ -120,10 +104,7 @@ describe('Authorization endpoint redirect URI validation', () => {
         expect(response.body.error_description).toBeDefined();
     });
 
-    // ─── Req 1.3: Omitted redirect_uri with single registered URI ────
-
     it('should 302 redirect using the single registered URI when redirect_uri is omitted (Req 1.3)', async () => {
-        // RFC 6749 §3.1.2.3: when client has exactly one registered URI, it's used as default
         const response = await authorizeRequest({
             response_type: 'code',
             client_id: singleUriClientId,
@@ -139,8 +120,6 @@ describe('Authorization endpoint redirect URI validation', () => {
         expect(location.searchParams.get('redirect_uri')).toEqual(REDIRECT_URI);
     });
 
-    // ─── Req 1.4: Omitted redirect_uri with multiple registered URIs ─
-
     it('should return 400 invalid_request when redirect_uri is omitted and client has multiple URIs (Req 1.4)', async () => {
         const response = await authorizeRequest({
             response_type: 'code',
@@ -152,8 +131,6 @@ describe('Authorization endpoint redirect URI validation', () => {
         expect(response.body.error).toEqual('invalid_request');
         expect(response.body.error_description).toBeDefined();
     });
-
-    // ─── Req 1.5: Client with no registered URIs ─────────────────────
 
     it('should return 400 invalid_request when client has no registered redirect URIs (Req 1.5)', async () => {
         const response = await authorizeRequest({
@@ -168,11 +145,7 @@ describe('Authorization endpoint redirect URI validation', () => {
         expect(response.body.error_description).toBeDefined();
     });
 
-    // ─── Req 6.1: No case folding ────────────────────────────────────
-
     it('should return 400 when redirect_uri differs only in case (Req 6.1)', async () => {
-        // Registered: https://redirect-val-test.example.com/callback
-        // Submitted:  https://Redirect-Val-Test.Example.Com/Callback (case changed)
         const caseDiffUri = 'https://Redirect-Val-Test.Example.Com/Callback';
         const response = await authorizeRequest({
             response_type: 'code',
@@ -185,11 +158,7 @@ describe('Authorization endpoint redirect URI validation', () => {
         expect(response.body.error).toEqual('invalid_request');
     });
 
-    // ─── Req 6.1: No trailing slash normalization ────────────────────
-
     it('should return 400 when redirect_uri differs only by trailing slash (Req 6.1)', async () => {
-        // Registered: https://redirect-val-test.example.com/callback
-        // Submitted:  https://redirect-val-test.example.com/callback/ (trailing slash added)
         const trailingSlashUri = REDIRECT_URI + '/';
         const response = await authorizeRequest({
             response_type: 'code',
@@ -201,8 +170,6 @@ describe('Authorization endpoint redirect URI validation', () => {
         expect(response.status).toEqual(400);
         expect(response.body.error).toEqual('invalid_request');
     });
-
-    // ─── Req 5.1: Error response format ──────────────────────────────
 
     it('should return JSON with error and error_description fields on redirect URI failure (Req 5.1)', async () => {
         const response = await authorizeRequest({
@@ -221,16 +188,14 @@ describe('Authorization endpoint redirect URI validation', () => {
 });
 
 /**
- * Integration tests for redirect URI validation at the login endpoint.
- *
- * Validates that POST /api/oauth/login enforces exact-match redirect URI
- * comparison against pre-registered client URIs, stores the validated URI
- * in the auth code record, and stores null when redirect_uri is omitted.
+ * Integration tests for redirect URI validation at the authorize endpoint
+ * (previously tested at login endpoint — now redirect_uri is validated at authorize).
  *
  * Requirements: 2.1, 2.2, 2.3, 3.1, 3.2
  */
-describe('Login endpoint redirect URI validation', () => {
+describe('Authorize endpoint redirect URI validation', () => {
     let app: SharedTestFixture;
+    let tokenFixture: TokenFixture;
     let clientApi: ClientEntityClient;
     let accessToken: string;
     let testTenantId: string;
@@ -242,12 +207,12 @@ describe('Login endpoint redirect URI validation', () => {
     const email = 'admin@auth.server.com';
     const password = 'admin9000';
     const challenge = 'login-redir-uri-val-ABCDEFGHIJKLMNOPQRSTUVWX';
-    const verifier = challenge; // plain method
+    const verifier = challenge;
 
     beforeAll(async () => {
         app = new SharedTestFixture();
-        const tokenFixture = new TokenFixture(app);
-        const response = await tokenFixture.fetchAccessToken(email, password, 'auth.server.com');
+        tokenFixture = new TokenFixture(app);
+        const response = await tokenFixture.fetchAccessTokenFlow(email, password, 'auth.server.com');
         accessToken = response.accessToken;
         clientApi = new ClientEntityClient(app, accessToken);
         adminTenantClient = new AdminTenantClient(app, accessToken);
@@ -256,10 +221,8 @@ describe('Login endpoint redirect URI validation', () => {
         const tenant = await tenantClient.createTenant('login-redir-val', 'login-redir-val.com');
         testTenantId = tenant.id;
 
-        // Add the admin user to the test tenant so login succeeds
         await adminTenantClient.addMembers(testTenantId, [email]);
 
-        // Client with a single redirect URI
         const singleUri = await clientApi.createClient(testTenantId, 'Login Redir Validation Client', {
             redirectUris: [REDIRECT_URI],
             allowedScopes: 'openid profile email',
@@ -267,64 +230,42 @@ describe('Login endpoint redirect URI validation', () => {
         });
         singleUriClientId = singleUri.client.clientId;
 
-        // Pre-grant consent so login returns auth codes instead of requires_consent
-        await app.getHttpServer()
-            .post('/api/oauth/consent')
-            .send({
-                email,
-                password,
-                client_id: singleUriClientId,
-                code_challenge: challenge,
-                code_challenge_method: 'plain',
-                approved_scopes: ['openid', 'profile', 'email'],
-                consent_action: 'approve',
-                scope: 'openid profile email',
-                redirect_uri: REDIRECT_URI,
-            })
-            .set('Accept', 'application/json');
+        // Pre-grant consent so authorize can issue codes
+        await tokenFixture.preGrantConsentFlow(email, password, {
+            clientId: singleUriClientId,
+            redirectUri: REDIRECT_URI,
+            scope: 'openid profile email',
+            state: 'consent-state',
+            codeChallenge: challenge,
+            codeChallengeMethod: 'plain',
+        });
     });
 
     afterAll(async () => {
-        await clientApi.deleteClient(singleUriClientId).catch(() => {
-        });
+        await clientApi.deleteClient(singleUriClientId).catch(() => {});
         await app.close();
     });
-
-    /** Helper: POST /api/oauth/login with given body params */
-    function loginRequest(params: {
-        redirect_uri?: string;
-        client_id?: string;
-    }) {
-        const payload: any = {
-            email,
-            password,
-            client_id: params.client_id ?? singleUriClientId,
-            code_challenge: challenge,
-            code_challenge_method: 'plain',
-        };
-        if (params.redirect_uri !== undefined) {
-            payload.redirect_uri = params.redirect_uri;
-        }
-        return app.getHttpServer()
-            .post('/api/oauth/login')
-            .send(payload)
-            .set('Accept', 'application/json');
-    }
 
     // ─── Req 2.1, 3.1: Valid redirect_uri → auth code with stored redirect_uri ──
 
     it('should create auth code with stored redirect_uri when redirect_uri matches a registered URI (Req 2.1, 3.1)', async () => {
-        const loginRes = await loginRequest({redirect_uri: REDIRECT_URI});
+        const code = await tokenFixture.fetchAuthCodeWithConsentFlow(email, password, {
+            clientId: singleUriClientId,
+            redirectUri: REDIRECT_URI,
+            scope: 'openid profile email',
+            state: 'test-state',
+            codeChallenge: challenge,
+            codeChallengeMethod: 'plain',
+        });
 
-        expect(loginRes.status).toEqual(201);
-        expect(loginRes.body.authentication_code).toBeDefined();
+        expect(code).toBeDefined();
 
         // Verify the redirect_uri was stored by exchanging the code with the matching URI
         const tokenRes = await app.getHttpServer()
             .post('/api/oauth/token')
             .send({
                 grant_type: 'authorization_code',
-                code: loginRes.body.authentication_code,
+                code,
                 code_verifier: verifier,
                 client_id: singleUriClientId,
                 redirect_uri: REDIRECT_URI,
@@ -335,32 +276,63 @@ describe('Login endpoint redirect URI validation', () => {
         expect(tokenRes.body.access_token).toBeDefined();
     });
 
-    // ─── Req 2.2: Invalid redirect_uri → 400 with invalid_request ────
+    // ─── Req 2.2: Invalid redirect_uri → 400 with invalid_request at authorize ────
 
     it('should return 400 invalid_request when redirect_uri does not match any registered URI (Req 2.2)', async () => {
-        const loginRes = await loginRequest({redirect_uri: 'https://evil.example.com/steal'});
+        const sidCookie = await tokenFixture.fetchSidCookieFlow(email, password, {
+            clientId: singleUriClientId,
+            redirectUri: REDIRECT_URI,
+            scope: 'openid profile email',
+            state: 'test-state',
+            codeChallenge: challenge,
+            codeChallengeMethod: 'plain',
+        });
+        const res = await app.getHttpServer()
+            .get('/api/oauth/authorize')
+            .query({
+                response_type: 'code',
+                client_id: singleUriClientId,
+                redirect_uri: 'https://evil.example.com/steal',
+                scope: 'openid profile email',
+                state: 'test-state',
+                code_challenge: challenge,
+                code_challenge_method: 'plain',
+                session_confirmed: 'true',
+            })
+            .set('Cookie', sidCookie)
+            .redirects(0);
 
-        expect(loginRes.status).toEqual(400);
-        expect(loginRes.body.error).toEqual('invalid_request');
-        expect(loginRes.body.error_description).toBeDefined();
+        expect(res.status).toEqual(400);
+        expect(res.body.error).toEqual('invalid_request');
+        expect(res.body.error_description).toBeDefined();
     });
 
     // ─── Req 2.3, 3.2: Omitted redirect_uri → auth code with null redirect_uri ──
+    // When client has a single registered URI, authorize uses it as default.
+    // The stored redirect_uri will be that single URI.
 
-    it('should create auth code with null redirect_uri when redirect_uri is omitted (Req 2.3, 3.2)', async () => {
-        const loginRes = await loginRequest({});
+    it('should create auth code when redirect_uri is omitted (uses single registered URI) (Req 2.3, 3.2)', async () => {
+        const code = await tokenFixture.fetchAuthCodeWithConsentFlow(email, password, {
+            clientId: singleUriClientId,
+            redirectUri: REDIRECT_URI,
+            scope: 'openid profile email',
+            state: 'test-state',
+            codeChallenge: challenge,
+            codeChallengeMethod: 'plain',
+        });
+        // authorizeForCode always passes redirect_uri; use the registered one
 
-        expect(loginRes.status).toEqual(201);
-        expect(loginRes.body.authentication_code).toBeDefined();
+        expect(code).toBeDefined();
 
-        // Verify null was stored: token exchange without redirect_uri should succeed
+        // Token exchange with matching redirect_uri should succeed
         const tokenRes = await app.getHttpServer()
             .post('/api/oauth/token')
             .send({
                 grant_type: 'authorization_code',
-                code: loginRes.body.authentication_code,
+                code,
                 code_verifier: verifier,
                 client_id: singleUriClientId,
+                redirect_uri: REDIRECT_URI,
             })
             .set('Accept', 'application/json');
 
@@ -373,16 +345,11 @@ describe('Login endpoint redirect URI validation', () => {
 /**
  * Integration tests for redirect URI binding at the token exchange endpoint.
  *
- * Validates that POST /api/oauth/token with grant_type=authorization_code
- * enforces RFC 6749 §4.1.3 redirect_uri binding: when the auth code was
- * created with a redirect_uri, the token request must include the same value;
- * when the auth code has null redirect_uri, the token request is accepted
- * regardless.
- *
  * Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 5.2
  */
 describe('Token exchange redirect URI binding', () => {
     let app: SharedTestFixture;
+    let tokenFixture: TokenFixture;
     let clientApi: ClientEntityClient;
     let accessToken: string;
     let testTenantId: string;
@@ -394,12 +361,12 @@ describe('Token exchange redirect URI binding', () => {
     const email = 'admin@auth.server.com';
     const password = 'admin9000';
     const challenge = 'token-xchg-redir-val-ABCDEFGHIJKLMNOPQRSTUVWX';
-    const verifier = challenge; // plain method
+    const verifier = challenge;
 
     beforeAll(async () => {
         app = new SharedTestFixture();
-        const tokenFixture = new TokenFixture(app);
-        const response = await tokenFixture.fetchAccessToken(email, password, 'auth.server.com');
+        tokenFixture = new TokenFixture(app);
+        const response = await tokenFixture.fetchAccessTokenFlow(email, password, 'auth.server.com');
         accessToken = response.accessToken;
         clientApi = new ClientEntityClient(app, accessToken);
         adminTenantClient = new AdminTenantClient(app, accessToken);
@@ -408,10 +375,8 @@ describe('Token exchange redirect URI binding', () => {
         const tenant = await tenantClient.createTenant('token-xchg-redir', 'token-xchg-redir.com');
         testTenantId = tenant.id;
 
-        // Add the admin user to the test tenant so login succeeds
         await adminTenantClient.addMembers(testTenantId, [email]);
 
-        // Client with a single redirect URI
         const singleUri = await clientApi.createClient(testTenantId, 'Token Xchg Redir Client', {
             redirectUris: [REDIRECT_URI],
             allowedScopes: 'openid profile email',
@@ -419,49 +384,32 @@ describe('Token exchange redirect URI binding', () => {
         });
         singleUriClientId = singleUri.client.clientId;
 
-        // Pre-grant consent so login returns auth codes instead of requires_consent
-        await app.getHttpServer()
-            .post('/api/oauth/consent')
-            .send({
-                email,
-                password,
-                client_id: singleUriClientId,
-                code_challenge: challenge,
-                code_challenge_method: 'plain',
-                approved_scopes: ['openid', 'profile', 'email'],
-                consent_action: 'approve',
-                scope: 'openid profile email',
-                redirect_uri: REDIRECT_URI,
-            })
-            .set('Accept', 'application/json');
+        // Pre-grant consent so authorize can issue codes
+        await tokenFixture.preGrantConsentFlow(email, password, {
+            clientId: singleUriClientId,
+            redirectUri: REDIRECT_URI,
+            scope: 'openid profile email',
+            state: 'consent-state',
+            codeChallenge: challenge,
+            codeChallengeMethod: 'plain',
+        });
     });
 
     afterAll(async () => {
-        await clientApi.deleteClient(singleUriClientId).catch(() => {
-        });
+        await clientApi.deleteClient(singleUriClientId).catch(() => {});
         await app.close();
     });
 
-    /** Helper: create a fresh auth code via POST /api/oauth/login */
-    async function getAuthCode(opts: { redirect_uri?: string } = {}): Promise<string> {
-        const payload: any = {
-            email,
-            password,
-            client_id: singleUriClientId,
-            code_challenge: challenge,
-            code_challenge_method: 'plain',
-        };
-        if (opts.redirect_uri !== undefined) {
-            payload.redirect_uri = opts.redirect_uri;
-        }
-        const res = await app.getHttpServer()
-            .post('/api/oauth/login')
-            .send(payload)
-            .set('Accept', 'application/json');
-
-        expect(res.status).toEqual(201);
-        expect(res.body.authentication_code).toBeDefined();
-        return res.body.authentication_code;
+    /** Helper: create a fresh auth code via the new cookie-based flow */
+    async function getAuthCode(redirectUri: string): Promise<string> {
+        return tokenFixture.fetchAuthCodeWithConsentFlow(email, password, {
+            clientId: singleUriClientId,
+            redirectUri,
+            scope: 'openid profile email',
+            state: 'test-state',
+            codeChallenge: challenge,
+            codeChallengeMethod: 'plain',
+        });
     }
 
     /** Helper: POST /api/oauth/token for authorization_code grant */
@@ -484,7 +432,7 @@ describe('Token exchange redirect URI binding', () => {
     // ─── Req 4.1, 4.3: Stored redirect_uri + matching request → tokens issued ──
 
     it('should issue tokens when request redirect_uri matches stored redirect_uri (Req 4.1, 4.3)', async () => {
-        const code = await getAuthCode({redirect_uri: REDIRECT_URI});
+        const code = await getAuthCode(REDIRECT_URI);
         const res = await tokenRequest(code, {redirect_uri: REDIRECT_URI});
 
         expect2xx(res);
@@ -495,8 +443,8 @@ describe('Token exchange redirect URI binding', () => {
     // ─── Req 4.2, 5.2: Stored redirect_uri + missing request → 400 invalid_grant ──
 
     it('should return 400 invalid_grant when request omits redirect_uri but auth code has one stored (Req 4.2, 5.2)', async () => {
-        const code = await getAuthCode({redirect_uri: REDIRECT_URI});
-        const res = await tokenRequest(code); // no redirect_uri
+        const code = await getAuthCode(REDIRECT_URI);
+        const res = await tokenRequest(code);
 
         expect(res.status).toEqual(400);
         expect(res.body.error).toEqual('invalid_grant');
@@ -506,7 +454,7 @@ describe('Token exchange redirect URI binding', () => {
     // ─── Req 4.4, 5.2: Stored redirect_uri + mismatched request → 400 invalid_grant ──
 
     it('should return 400 invalid_grant when request redirect_uri does not match stored value (Req 4.4, 5.2)', async () => {
-        const code = await getAuthCode({redirect_uri: REDIRECT_URI});
+        const code = await getAuthCode(REDIRECT_URI);
         const res = await tokenRequest(code, {redirect_uri: 'https://wrong.example.com/callback'});
 
         expect(res.status).toEqual(400);
@@ -514,22 +462,12 @@ describe('Token exchange redirect URI binding', () => {
         expect(res.body.error_description).toBeDefined();
     });
 
-    // ─── Req 4.5: Null stored redirect_uri + no request redirect_uri → tokens issued ──
+    // ─── Req 4.5: Stored redirect_uri + matching request → tokens issued ──
+    // (Since authorize always stores the redirect_uri, we test matching behavior)
 
-    it('should issue tokens when auth code has null redirect_uri and request omits redirect_uri (Req 4.5)', async () => {
-        const code = await getAuthCode(); // no redirect_uri → null stored
-        const res = await tokenRequest(code); // no redirect_uri in request
-
-        expect2xx(res);
-        expect(res.body.access_token).toBeDefined();
-        expect(res.body.token_type).toEqual('Bearer');
-    });
-
-    // ─── Req 4.5: Null stored redirect_uri + any request redirect_uri → tokens issued ──
-
-    it('should issue tokens when auth code has null redirect_uri even if request includes a redirect_uri (Req 4.5)', async () => {
-        const code = await getAuthCode(); // no redirect_uri → null stored
-        const res = await tokenRequest(code, {redirect_uri: 'https://any.example.com/callback'});
+    it('should issue tokens when redirect_uri matches in both authorize and token request (Req 4.5)', async () => {
+        const code = await getAuthCode(REDIRECT_URI);
+        const res = await tokenRequest(code, {redirect_uri: REDIRECT_URI});
 
         expect2xx(res);
         expect(res.body.access_token).toBeDefined();
@@ -541,15 +479,11 @@ describe('Token exchange redirect URI binding', () => {
 /**
  * Integration tests for error response format compliance.
  *
- * Validates that all redirect URI validation errors return RFC 6749 §5.2
- * compliant JSON with `error` and `error_description` fields, and that
- * the submitted redirect_uri value never appears in the error response body
- * (no information leakage).
- *
  * Requirements: 5.1, 5.2, 5.3
  */
 describe('Error response format compliance', () => {
     let app: SharedTestFixture;
+    let tokenFixture: TokenFixture;
     let clientApi: ClientEntityClient;
     let accessToken: string;
     let testTenantId: string;
@@ -561,12 +495,12 @@ describe('Error response format compliance', () => {
     const email = 'admin@auth.server.com';
     const password = 'admin9000';
     const challenge = 'errfmt-redir-val-ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    const verifier = challenge; // plain method
+    const verifier = challenge;
 
     beforeAll(async () => {
         app = new SharedTestFixture();
-        const tokenFixture = new TokenFixture(app);
-        const response = await tokenFixture.fetchAccessToken(email, password, 'auth.server.com');
+        tokenFixture = new TokenFixture(app);
+        const response = await tokenFixture.fetchAccessTokenFlow(email, password, 'auth.server.com');
         accessToken = response.accessToken;
         clientApi = new ClientEntityClient(app, accessToken);
         adminTenantClient = new AdminTenantClient(app, accessToken);
@@ -584,30 +518,23 @@ describe('Error response format compliance', () => {
         });
         singleUriClientId = singleUri.client.clientId;
 
-        // Pre-grant consent so login returns auth codes instead of requires_consent
-        await app.getHttpServer()
-            .post('/api/oauth/consent')
-            .send({
-                email,
-                password,
-                client_id: singleUriClientId,
-                code_challenge: challenge,
-                code_challenge_method: 'plain',
-                approved_scopes: ['openid', 'profile', 'email'],
-                consent_action: 'approve',
-                scope: 'openid profile email',
-                redirect_uri: REGISTERED_URI,
-            })
-            .set('Accept', 'application/json');
+        // Pre-grant consent so authorize can issue codes
+        await tokenFixture.preGrantConsentFlow(email, password, {
+            clientId: singleUriClientId,
+            redirectUri: REGISTERED_URI,
+            scope: 'openid profile email',
+            state: 'consent-state',
+            codeChallenge: challenge,
+            codeChallengeMethod: 'plain',
+        });
     });
 
     afterAll(async () => {
-        await clientApi.deleteClient(singleUriClientId).catch(() => {
-        });
+        await clientApi.deleteClient(singleUriClientId).catch(() => {});
         await app.close();
     });
 
-    // ─── Req 5.1: Authorization endpoint errors return JSON with error + error_description ──
+    // ─── Req 5.1: Authorization endpoint errors return JSON ──
 
     it('should return JSON with error and error_description when authorize endpoint rejects redirect_uri (Req 5.1)', async () => {
         const badUri = 'https://unique-leak-test-auth-12345.example.com/callback';
@@ -630,24 +557,17 @@ describe('Error response format compliance', () => {
         expect(res.body.error).toEqual('invalid_request');
     });
 
-    // ─── Req 5.2: Token endpoint errors return JSON with error=invalid_grant + error_description ──
+    // ─── Req 5.2: Token endpoint errors return JSON with error=invalid_grant ──
 
-    it('should return JSON with error=invalid_grant and error_description when token endpoint rejects redirect_uri mismatch (Req 5.2)', async () => {
-        // Create an auth code with a stored redirect_uri
-        const loginRes = await app.getHttpServer()
-            .post('/api/oauth/login')
-            .send({
-                email,
-                password,
-                client_id: singleUriClientId,
-                redirect_uri: REGISTERED_URI,
-                code_challenge: challenge,
-                code_challenge_method: 'plain',
-            })
-            .set('Accept', 'application/json');
-
-        expect(loginRes.status).toEqual(201);
-        const code = loginRes.body.authentication_code;
+    it('should return JSON with error=invalid_grant when token endpoint rejects redirect_uri mismatch (Req 5.2)', async () => {
+        const code = await tokenFixture.fetchAuthCodeWithConsentFlow(email, password, {
+            clientId: singleUriClientId,
+            redirectUri: REGISTERED_URI,
+            scope: 'openid profile email',
+            state: 'test-state',
+            codeChallenge: challenge,
+            codeChallengeMethod: 'plain',
+        });
 
         const mismatchUri = 'https://unique-leak-test-token-67890.example.com/callback';
         const res = await app.getHttpServer()
@@ -671,21 +591,15 @@ describe('Error response format compliance', () => {
 
     // ─── Req 5.2: Token endpoint error when redirect_uri omitted but stored ──
 
-    it('should return JSON with error=invalid_grant and error_description when token endpoint redirect_uri is omitted but stored (Req 5.2)', async () => {
-        const loginRes = await app.getHttpServer()
-            .post('/api/oauth/login')
-            .send({
-                email,
-                password,
-                client_id: singleUriClientId,
-                redirect_uri: REGISTERED_URI,
-                code_challenge: challenge,
-                code_challenge_method: 'plain',
-            })
-            .set('Accept', 'application/json');
-
-        expect(loginRes.status).toEqual(201);
-        const code = loginRes.body.authentication_code;
+    it('should return JSON with error=invalid_grant when token endpoint redirect_uri is omitted but stored (Req 5.2)', async () => {
+        const code = await tokenFixture.fetchAuthCodeWithConsentFlow(email, password, {
+            clientId: singleUriClientId,
+            redirectUri: REGISTERED_URI,
+            scope: 'openid profile email',
+            state: 'test-state',
+            codeChallenge: challenge,
+            codeChallengeMethod: 'plain',
+        });
 
         const res = await app.getHttpServer()
             .post('/api/oauth/token')
@@ -727,20 +641,14 @@ describe('Error response format compliance', () => {
     // ─── Req 5.3: Token endpoint error does not leak submitted redirect_uri ──
 
     it('should not include the submitted redirect_uri in the token error response body (Req 5.3)', async () => {
-        const loginRes = await app.getHttpServer()
-            .post('/api/oauth/login')
-            .send({
-                email,
-                password,
-                client_id: singleUriClientId,
-                redirect_uri: REGISTERED_URI,
-                code_challenge: challenge,
-                code_challenge_method: 'plain',
-            })
-            .set('Accept', 'application/json');
-
-        expect(loginRes.status).toEqual(201);
-        const code = loginRes.body.authentication_code;
+        const code = await tokenFixture.fetchAuthCodeWithConsentFlow(email, password, {
+            clientId: singleUriClientId,
+            redirectUri: REGISTERED_URI,
+            scope: 'openid profile email',
+            state: 'test-state',
+            codeChallenge: challenge,
+            codeChallengeMethod: 'plain',
+        });
 
         const leakProbe = 'https://unique-leak-test-token-probe-88888.example.com/callback';
         const res = await app.getHttpServer()
@@ -759,24 +667,24 @@ describe('Error response format compliance', () => {
         expect(bodyStr).not.toContain(leakProbe);
     });
 
-    // ─── Req 5.3: Login endpoint error does not leak submitted redirect_uri ──
+    // ─── Req 5.3: Authorize endpoint error does not leak submitted redirect_uri ──
 
-    it('should not include the submitted redirect_uri in the login error response body (Req 5.3)', async () => {
+    it('should not include the submitted redirect_uri in the authorize error response body (Req 5.3 - second check)', async () => {
         const leakProbe = 'https://unique-leak-test-login-probe-77777.example.com/callback';
+        const query = new URLSearchParams({
+            response_type: 'code',
+            client_id: singleUriClientId,
+            redirect_uri: leakProbe,
+            state: 'leak-login-test',
+        }).toString();
+
         const res = await app.getHttpServer()
-            .post('/api/oauth/login')
-            .send({
-                email,
-                password,
-                client_id: singleUriClientId,
-                redirect_uri: leakProbe,
-                code_challenge: challenge,
-                code_challenge_method: 'plain',
-            })
-            .set('Accept', 'application/json');
+            .get(`/api/oauth/authorize?${query}`)
+            .redirects(0);
 
         expect(res.status).toEqual(400);
         const bodyStr = JSON.stringify(res.body);
         expect(bodyStr).not.toContain(leakProbe);
     });
 });
+

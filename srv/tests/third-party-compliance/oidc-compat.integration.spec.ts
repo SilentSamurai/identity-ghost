@@ -5,6 +5,7 @@ import {TokenFixture} from '../token.fixture';
 import {SearchClient} from '../api-client/search-client';
 import {ClientEntityClient} from '../api-client/client-entity-client';
 import {expect2xx} from "../api-client/client";
+import {confirmSession, extractCookie, extractFlowContext, extractFlowIdCookieAndCsrf, grantConsent, login} from '../fetch-utils';
 
 /**
  * OAuth 2.0 / OIDC Compatibility Tests (Ported from compat-tests/oidc-compat.test.mjs)
@@ -35,9 +36,17 @@ describe('OIDC Compatibility (openid-client v5)', () => {
     let publicClient: Client;
 
     /**
-     * Full OAuth authorize → login → get auth code flow.
-     * Hits GET /api/oauth/authorize, follows the 302, parses forwarded params,
-     * then POSTs credentials to /api/oauth/login — exactly what the Angular UI does.
+     * Orchestrates the full browser-driven OAuth flow using the fetch-utils helpers:
+     *   1. extractFlowIdAndCsrf  — GET /authorize (no session), mint flow_id + csrf_token
+     *   2. login                 — POST /login, get sid cookie
+     *   3. GET /authorize        — may hit consent or session-confirm before issuing code
+     *   3a. grantConsent         — POST /consent decision=grant, retry /authorize
+     *   3b. confirmSession       — retry /authorize with session_confirmed=true
+     *
+     * Correct order per the authorize controller:
+     *   no consent → consent UI
+     *   consent exists + not confirmed → session-confirm
+     *   consent exists + confirmed → issue code
      */
     async function authorizeAndLogin(
         oidcClient: Client,
@@ -50,7 +59,6 @@ describe('OIDC Compatibility (openid-client v5)', () => {
     ): Promise<{ code: string; state: string }> {
         const state = generators.state();
 
-        // 1. Build authorize URL via openid-client
         const authUrl = oidcClient.authorizationUrl({
             scope: opts.scope,
             code_challenge: opts.code_challenge,
@@ -59,44 +67,38 @@ describe('OIDC Compatibility (openid-client v5)', () => {
             nonce: opts.nonce,
             redirect_uri: redirectUri,
         });
+        const authUrlWithConfirm = `${authUrl}&session_confirmed=true`;
 
-        // 2. Hit /api/oauth/authorize — expect 302 to login page
-        const authorizeRes = await fetch(authUrl, {redirect: 'manual'});
+        // 1. Mint flow_id cookie and csrf_token (stable for the entire flow).
+        const {flowIdCookie, csrfToken} = await extractFlowIdCookieAndCsrf(authUrl);
+
+        // 2. POST credentials → sid cookie.
+        const sidCookie = await login(baseUrl, oidcClient.metadata.client_id!, adminEmail, adminPassword, flowIdCookie, csrfToken);
+
+        // All subsequent /authorize calls carry sid + flow_id.
+        const sessionCookies = [sidCookie, flowIdCookie].filter(Boolean).join('; ');
+
+        // 3. /authorize with session — server checks consent first, then session-confirm.
+        let authorizeRes = await fetch(authUrlWithConfirm, {redirect: 'manual', headers: {cookie: sessionCookies}});
+        let authorizeLocation = authorizeRes.headers.get('location') ?? '';
         expect(authorizeRes.status).toBe(302);
 
-        const location = authorizeRes.headers.get('location');
-        expect(location).toBeDefined();
+        // 3a. Grant consent if required, then retry /authorize.
+        const consentResult = await grantConsent(
+            baseUrl, oidcClient.metadata.client_id!, opts.scope, sessionCookies, authorizeLocation, authUrlWithConfirm,
+        );
+        authorizeLocation = consentResult.authorizeLocation;
 
-        // 3. Parse forwarded params from the redirect
-        const redirectUrl = new URL(location!, baseUrl);
-        const fwdParams = {
-            client_id: redirectUrl.searchParams.get('client_id')!,
-            scope: redirectUrl.searchParams.get('scope')!,
-            code_challenge: redirectUrl.searchParams.get('code_challenge')!,
-            code_challenge_method: redirectUrl.searchParams.get('code_challenge_method')!,
-            nonce: redirectUrl.searchParams.get('nonce') || undefined,
-        };
+        // 3b. Confirm session if required, then retry /authorize.
+        const sessionResult = await confirmSession(authUrlWithConfirm, sessionCookies, authorizeLocation);
+        authorizeLocation = sessionResult.authorizeLocation;
 
-        // 4. POST credentials to /api/oauth/login (simulating the login form)
-        const loginRes = await fetch(`${baseUrl}/api/oauth/login`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                email: adminEmail,
-                password: adminPassword,
-                client_id: fwdParams.client_id,
-                code_challenge: fwdParams.code_challenge,
-                code_challenge_method: fwdParams.code_challenge_method,
-                scope: fwdParams.scope,
-                nonce: fwdParams.nonce,
-            }),
-        });
-        expect2xx(loginRes);
+        const redirectUrl = new URL(authorizeLocation, baseUrl);
+        expect(redirectUrl.searchParams.has('error')).toBe(false);
+        const code = redirectUrl.searchParams.get('code');
+        expect(code).toBeTruthy();
 
-        const loginBody = await loginRes.json();
-        expect(loginBody.authentication_code).toBeDefined();
-
-        return {code: loginBody.authentication_code, state};
+        return {code: code!, state};
     }
 
     beforeAll(async () => {
@@ -106,7 +108,7 @@ describe('OIDC Compatibility (openid-client v5)', () => {
         baseUrl = `http://127.0.0.1:${ports.app}`;
 
         // 1. Get a super admin token to find the tenant
-        const {accessToken: superAdminToken} = await tokenFixture.fetchAccessToken(
+        const {accessToken: superAdminToken} = await tokenFixture.fetchAccessTokenFlow(
             superAdminEmail,
             superAdminPassword,
             superTenantDomain
@@ -122,7 +124,7 @@ describe('OIDC Compatibility (openid-client v5)', () => {
         tenantId = tenant.id;
 
         // 3. Get a tenant-scoped token to create/update clients
-        const {accessToken: tenantAccessToken} = await tokenFixture.fetchAccessToken(
+        const {accessToken: tenantAccessToken} = await tokenFixture.fetchAccessTokenFlow(
             adminEmail,
             adminPassword,
             tenantDomain

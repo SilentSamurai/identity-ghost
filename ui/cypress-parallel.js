@@ -5,38 +5,62 @@
  * using a worker pool. Each worker picks up the next available spec as
  * soon as it finishes the current one — no batch waiting.
  *
- * Concurrency is auto-calculated from available CPU cores and free memory,
- * reserving resources for the backend, frontend, database, and SMTP servers.
+ * Concurrency is 2 specs per CPU core, capped by available memory.
  * Override with: CYPRESS_PARALLEL=N node cypress-parallel.js
  */
-const { execSync, spawn } = require('child_process');
+const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
 
 // --- Resource-aware concurrency calculation ---
 
-const RESERVED_CORES = 4;          // cores reserved for: NestJS backend, Angular dev server, PostgreSQL, fake SMTP
-const THREADS_PER_INSTANCE = 6;    // each Cypress instance spawns a browser + Node process (~6 threads total)
-const MEM_PER_INSTANCE_MB = 2048;   // ~2GB per Cypress browser instance (measured)
-const RESERVED_MEM_MB = 4096;      // memory reserved for backend services (~2GB)
+const TESTS_PER_CORE = 1;          // target concurrent Cypress instances per CPU core
+const MEM_PER_INSTANCE_MB = 1024;   // ~1GB per Cypress browser instance (measured)
+const RESERVED_MEM_MB = 6144;      // memory reserved for backend services + OS headroom
+const MAX_CONCURRENCY = 6;         // hard cap — beyond this, resource contention causes flakiness
 
-const cpuBased = Math.max(1, Math.floor((os.cpus().length - RESERVED_CORES) / THREADS_PER_INSTANCE));
+const cpuBased = Math.max(1, os.cpus().length * TESTS_PER_CORE);
 const freeMem = Math.max(0, (os.freemem() / (1024 * 1024)) - RESERVED_MEM_MB);
 const memBased = Math.max(1, Math.floor(freeMem / MEM_PER_INSTANCE_MB));
-const auto = Math.min(cpuBased, memBased);
+const auto = Math.min(cpuBased, memBased, MAX_CONCURRENCY);
 
 // Use env override if set, otherwise use the auto-calculated value
 const CONCURRENCY = parseInt(process.env.CYPRESS_PARALLEL, 10) || auto;
 
 // --- Discover spec files ---
+// Single-spec mode: pass spec path as CLI arg or via CYPRESS_SPEC env var.
+// Usage: node cypress-parallel.js cypress/e2e/some.cy.ts
+//        CYPRESS_SPEC=cypress/e2e/some.cy.ts node cypress-parallel.js
+
+const singleSpec = process.argv[2] || process.env.CYPRESS_SPEC || null;
 
 const specDir = path.join(__dirname, 'cypress', 'e2e');
-const specs = fs.readdirSync(specDir)
-    .filter(f => f.endsWith('.cy.ts'))
-    .map(f => path.join('cypress', 'e2e', f));
+const specs = singleSpec
+    ? [singleSpec]
+    : fs.readdirSync(specDir)
+          .filter(f => f.endsWith('.cy.ts'))
+          .map(f => path.join('cypress', 'e2e', f));
 
-console.log(`Found ${specs.length} specs, running ${CONCURRENCY} at a time\n`);
+// --- Screenshot folder management ---
+// Clean screenshots once at startup, then preserve during parallel runs
+const screenshotsDir = path.join(__dirname, 'cypress', 'screenshots');
+
+function cleanScreenshotsFolder() {
+    if (fs.existsSync(screenshotsDir)) {
+        fs.rmSync(screenshotsDir, { recursive: true, force: true });
+        console.log('Cleaned screenshots folder\n');
+    }
+}
+
+// Always clean at startup, before any tests run
+cleanScreenshotsFolder();
+
+if (singleSpec) {
+    console.log(`Running single spec: ${singleSpec}\n`);
+} else {
+    console.log(`Found ${specs.length} specs, running ${CONCURRENCY} at a time\n`);
+}
 
 // --- Runner state ---
 
@@ -46,6 +70,7 @@ let failed = [];
 
 /**
  * Runs a single Cypress spec file and reports pass/fail with elapsed time.
+ * trashAssetsBeforeRuns=false prevents Cypress from deleting screenshots between specs.
  */
 function runSpec(spec, attempt) {
     const name = path.basename(spec);
@@ -53,7 +78,11 @@ function runSpec(spec, attempt) {
     console.log(`  ▶ ${label}`);
     return new Promise((resolve) => {
         const start = Date.now();
-        const child = spawn('npx', ['cypress', 'run', '--spec', spec], {
+        const child = spawn('npx', [
+            'cypress', 'run',
+            '--spec', spec,
+            '--config', 'trashAssetsBeforeRuns=false'
+        ], {
             cwd: __dirname,
             shell: true,
             stdio: ['ignore', 'pipe', 'pipe'],
@@ -77,22 +106,24 @@ function runSpec(spec, attempt) {
     });
 }
 
-const MAX_RETRIES = 2; // retry failed specs up to 2 times
+// Retries only enabled when running the full suite, not for single spec runs
+// MAX_ATTEMPTS = 1 means run once (no retry), 2 means run up to twice (1 retry)
+const MAX_ATTEMPTS = singleSpec ? 1 : 2;
 
 /**
  * Worker loop: grabs the next spec from the queue and runs it.
- * Retries transient failures up to MAX_RETRIES times.
+ * Retries transient failures (disabled for single spec runs).
  */
 function worker() {
     if (index >= specs.length) return Promise.resolve();
     const spec = specs[index++];
     return (async () => {
         let result;
-        for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
             result = await runSpec(spec, attempt);
             if (result.code === 0) break;
-            if (attempt < MAX_RETRIES) {
-                console.log(`  ↻ Retrying ${result.name} (attempt ${attempt + 1}/${MAX_RETRIES})...`);
+            if (attempt < MAX_ATTEMPTS) {
+                console.log(`  ↻ Retrying ${result.name} (attempt ${attempt + 1}/${MAX_ATTEMPTS})...`);
             }
         }
         if (result.code !== 0) {

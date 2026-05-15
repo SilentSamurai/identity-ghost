@@ -233,12 +233,20 @@ export class AppSubscriptionService {
         app: App,
         visited: Set<string>
     ): Promise<boolean> {
-        if (!app.appUrl) {
+        // Skip onboarding if disabled for this app
+        if (!app.onboardingEnabled) {
+            logger.log(`Onboarding disabled for app "${app.name}", skipping`);
+            return true;
+        }
+
+        // Use onboardingCallbackUrl if set, otherwise fall back to appUrl
+        const baseUrl = app.onboardingCallbackUrl || app.appUrl;
+        if (!baseUrl) {
             // No onboard endpoint available
             return true;
         }
 
-        const endpoint = `${app.appUrl.replace(/\/+$/, '')}/api/onboard/tenant`;
+        const endpoint = `${baseUrl.replace(/\/+$/, '')}/api/onboard/tenant`;
         logger.log(`Making request to endpoint: ${endpoint}`);
         logger.log(`Request payload:`, {tenantId: tenant.id});
         // Get technical token (use app owner's tenant)
@@ -297,12 +305,19 @@ export class AppSubscriptionService {
         app: App,
         visited: Set<string>
     ): Promise<void> {
-        // If no appUrl is set, there's nothing to call, so skip
-        if (!app.appUrl) {
+        // Skip offboarding if onboarding is disabled for this app
+        if (!app.onboardingEnabled) {
+            logger.log(`Onboarding disabled for app "${app.name}", skipping offboard`);
             return;
         }
 
-        const endpoint = `${app.appUrl.replace(/\/+$/, '')}/api/offboard/tenant`;
+        // Use onboardingCallbackUrl if set, otherwise fall back to appUrl
+        const baseUrl = app.onboardingCallbackUrl || app.appUrl;
+        if (!baseUrl) {
+            return;
+        }
+
+        const endpoint = `${baseUrl.replace(/\/+$/, '')}/api/offboard/tenant`;
         logger.log(`Making request to endpoint: ${endpoint}`);
         logger.log(`Request payload:`, {tenantId: tenant.id});
         // Get technical token (use app owner's tenant)

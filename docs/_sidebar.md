@@ -27,3 +27,8 @@
   * [App-Owned Roles](app-owned-roles.md)
   * [Multi-Tenant Onboarding](multi-tenant-onboarding.md)
   * [Database Schema](database-schema.md)
+
+* **Steering (Internal)**
+  * [Design Principles](steering/design-principles.md)
+  * [Testing Strategy](steering/testing-strategy.md)
+  * [Token Architecture](steering/token-architecture.md)

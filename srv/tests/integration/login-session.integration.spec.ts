@@ -23,6 +23,7 @@ describe('Login Session Creation', () => {
     const clientId = 'login-session-test.local';
     const email = 'admin@login-session-test.local';
     const password = 'admin9000';
+    const redirectUri = 'http://localhost:3000/callback';
 
     beforeAll(() => {
         app = new SharedTestFixture();
@@ -34,19 +35,19 @@ describe('Login Session Creation', () => {
     });
 
     it('login creates a session — ID token contains auth_time and sid', async () => {
-        // Login via auth code flow
-        const loginResult = await tokenFixture.login(
-            email,
-            password,
-            clientId,
+        // Full cookie-based flow: login → authorize (with consent) → token exchange
+        const tokenResult = await tokenFixture.fetchTokenWithAuthCodeFlowAndConsent(
+            email, password,
+            {
+                clientId,
+                redirectUri,
+                scope: 'openid profile email',
+                state: 'test-state',
+                codeChallenge: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq',
+                codeChallengeMethod: 'plain',
+            },
+            'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq',
         );
-        expect(loginResult.authentication_code).toBeDefined();
-
-        // Exchange the auth code for tokens
-        const tokenResult = await tokenFixture.exchangeCodeForToken(
-            loginResult.authentication_code,
-            clientId,
-        ) as any;
         expect(tokenResult.id_token).toBeDefined();
 
         // Decode the ID token to verify session claims
@@ -107,23 +108,21 @@ describe('Login Session Creation', () => {
     });
 
     it('session is persisted before login response', async () => {
-        // Login returns an authentication_code — this proves the session was
-        // created during login (before the response), because the auth code
-        // references the session's sid. Exchanging the code then produces an
-        // ID token with valid auth_time and sid, confirming the session record
-        // existed at the time of code exchange.
-        const loginResult = await tokenFixture.login(
-            email,
-            password,
-            clientId,
+        // Full cookie-based flow: login → authorize (with consent) → token exchange.
+        // If the session wasn't persisted before the login response, the
+        // authorize step would fail to find it and would not issue a code.
+        const tokenResult = await tokenFixture.fetchTokenWithAuthCodeFlowAndConsent(
+            email, password,
+            {
+                clientId,
+                redirectUri,
+                scope: 'openid profile email',
+                state: 'test-state',
+                codeChallenge: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq',
+                codeChallengeMethod: 'plain',
+            },
+            'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq',
         );
-        expect(loginResult.authentication_code).toBeDefined();
-
-        // Immediately exchange — if session wasn't persisted, this would fail
-        const tokenResult = await tokenFixture.exchangeCodeForToken(
-            loginResult.authentication_code,
-            clientId,
-        ) as any;
         expect(tokenResult.id_token).toBeDefined();
 
         const decoded = app.jwtService().decode(tokenResult.id_token, {json: true}) as any;

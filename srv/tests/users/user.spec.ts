@@ -26,7 +26,7 @@ describe('UsersController (e2e)', () => {
 
         // Get admin access token for authenticated requests
         tokenFixture = new TokenFixture(app);
-        const tokenResponse = await tokenFixture.fetchAccessToken(
+        const tokenResponse = await tokenFixture.fetchAccessTokenFlow(
             "admin@auth.server.com",
             "admin9000",
             "auth.server.com"
@@ -51,7 +51,7 @@ describe('UsersController (e2e)', () => {
 
         beforeAll(async () => {
             // Get admin token
-            const adminAuth = await tokenFixture.fetchAccessToken(
+            const adminAuth = await tokenFixture.fetchAccessTokenFlow(
                 "admin@auth.server.com",
                 "admin9000",
                 "auth.server.com"

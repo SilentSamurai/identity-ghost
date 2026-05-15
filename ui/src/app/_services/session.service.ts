@@ -8,7 +8,6 @@ import {PKCEService} from './pkce.service';
 
 const TOKEN_KEY = 'auth-token';
 const ID_TOKEN_KEY = 'auth-id-token';
-const AUTH_CODE_KEY = 'auth-code';
 const PERMISSIONS_KEY = 'auth-permissions';
 const REFRESH_TOKEN_KEY = 'auth-refresh-token';
 const USER_PROFILE_KEY = 'auth-user-profile';
@@ -34,14 +33,9 @@ export class SessionService {
     public clearSession(): void {
         window.sessionStorage.removeItem(TOKEN_KEY);
         window.sessionStorage.removeItem(ID_TOKEN_KEY);
-        window.sessionStorage.removeItem(AUTH_CODE_KEY);
         window.sessionStorage.removeItem(PERMISSIONS_KEY);
         window.sessionStorage.removeItem(REFRESH_TOKEN_KEY);
         window.sessionStorage.removeItem(USER_PROFILE_KEY);
-    }
-
-    public getAuthCode(): string | null {
-        return window.sessionStorage.getItem(AUTH_CODE_KEY);
     }
 
     public saveRefreshToken(token: string): void {
@@ -50,14 +44,6 @@ export class SessionService {
 
     public getRefreshToken(): string | null {
         return window.sessionStorage.getItem(REFRESH_TOKEN_KEY);
-    }
-
-    public saveAuthCode(code: string): void {
-        if (!code) {
-            throw new Error('Authorization code cannot be empty');
-        }
-        window.sessionStorage.removeItem(AUTH_CODE_KEY);
-        window.sessionStorage.setItem(AUTH_CODE_KEY, code);
     }
 
     public saveToken(token: string): void {

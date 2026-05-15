@@ -11,12 +11,11 @@ import {AdminTenantClient} from '../api-client/admin-tenant-client';
  * resolves it to the default Client entity via findByClientIdOrAlias(). If that
  * client has registered redirect URIs, validation must still be enforced.
  *
- * Before the fix, validateRedirectUriForClient() used findByClientId() which
- * threw NotFoundException for alias-based lookups, causing the catch block to
- * skip validation entirely.
+ * Redirect URI validation now happens at GET /api/oauth/authorize.
  */
 describe('Issue #93: domain-based client_id must not bypass redirect URI validation', () => {
     let app: SharedTestFixture;
+    let tokenFixture: TokenFixture;
     let clientApi: ClientEntityClient;
     let accessToken: string;
 
@@ -27,10 +26,10 @@ describe('Issue #93: domain-based client_id must not bypass redirect URI validat
 
     beforeAll(async () => {
         app = new SharedTestFixture();
-        const tokenFixture = new TokenFixture(app);
+        tokenFixture = new TokenFixture(app);
 
         // Get super-admin token to configure the test tenant's client
-        const superAdmin = await tokenFixture.fetchAccessToken(
+        const superAdmin = await tokenFixture.fetchAccessTokenFlow(
             'admin@auth.server.com', 'admin9000', 'auth.server.com',
         );
         accessToken = superAdmin.accessToken;
@@ -55,18 +54,32 @@ describe('Issue #93: domain-based client_id must not bypass redirect URI validat
         await app.close();
     });
 
-    it('should reject an unregistered redirect_uri when client_id is a domain alias', async () => {
+    it('should reject an unregistered redirect_uri when client_id is a domain alias (at authorize endpoint)', async () => {
+        // Login first to get a session cookie using the registered URI
+        const sidCookie = await tokenFixture.fetchSidCookieFlow(email, password, {
+            clientId: domain,
+            redirectUri: REGISTERED_URI,
+            scope: 'openid profile email',
+            state: 'test-state',
+            codeChallenge: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq',
+            codeChallengeMethod: 'plain',
+        });
+
+        // Now try to authorize with an unregistered redirect_uri
         const response = await app.getHttpServer()
-            .post('/api/oauth/login')
-            .send({
-                email,
-                password,
+            .get('/api/oauth/authorize')
+            .query({
+                response_type: 'code',
                 client_id: domain, // alias, not UUID
                 redirect_uri: 'https://evil.example.com/steal',
+                scope: 'openid profile email',
+                state: 'test-state',
                 code_challenge: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq',
                 code_challenge_method: 'plain',
+                session_confirmed: 'true',
             })
-            .set('Accept', 'application/json');
+            .set('Cookie', sidCookie)
+            .redirects(0);
 
         expect(response.status).toEqual(400);
         expect(response.body.error).toEqual('invalid_request');
@@ -74,19 +87,34 @@ describe('Issue #93: domain-based client_id must not bypass redirect URI validat
     });
 
     it('should accept a registered redirect_uri when client_id is a domain alias', async () => {
+        const sidCookie = await tokenFixture.fetchSidCookieFlow(email, password, {
+            clientId: domain,
+            redirectUri: REGISTERED_URI,
+            scope: 'openid profile email',
+            state: 'test-state',
+            codeChallenge: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq',
+            codeChallengeMethod: 'plain',
+        });
+
         const response = await app.getHttpServer()
-            .post('/api/oauth/login')
-            .send({
-                email,
-                password,
+            .get('/api/oauth/authorize')
+            .query({
+                response_type: 'code',
                 client_id: domain, // alias, not UUID
                 redirect_uri: REGISTERED_URI,
+                scope: 'openid profile email',
+                state: 'test-state',
                 code_challenge: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq',
                 code_challenge_method: 'plain',
+                session_confirmed: 'true',
             })
-            .set('Accept', 'application/json');
+            .set('Cookie', sidCookie)
+            .redirects(0);
 
-        expect(response.status).toEqual(201);
-        expect(response.body.authentication_code).toBeDefined();
+        expect(response.status).toEqual(302);
+        const location = new URL(response.headers.location, 'http://localhost');
+        // Should redirect to the registered URI with a code
+        const code = location.searchParams.get('code');
+        expect(code).toBeDefined();
     });
 });

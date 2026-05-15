@@ -4,6 +4,7 @@ import {IsNull, Repository} from "typeorm";
 import {LoginSession} from "../src/entity/login-session.entity";
 import {AuthCode} from "../src/entity/auth_code.entity";
 import {User} from "../src/entity/user.entity";
+import {Tenant} from "../src/entity/tenant.entity";
 
 /**
  * Test-only controller that exposes internal state manipulation endpoints.
@@ -23,6 +24,8 @@ export class TestUtilsController {
         private readonly authCodeRepo: Repository<AuthCode>,
         @InjectRepository(User)
         private readonly userRepo: Repository<User>,
+        @InjectRepository(Tenant)
+        private readonly tenantRepo: Repository<Tenant>,
     ) {
     }
 
@@ -132,6 +135,18 @@ export class TestUtilsController {
     }
 
     /**
+     * Set the skip_session_confirm flag on a tenant.
+     */
+    @Post("tenants/:id/skip-session-confirm")
+    @HttpCode(204)
+    async setSkipSessionConfirm(
+        @Param("id") id: string,
+        @Body() body: { skip: boolean },
+    ): Promise<void> {
+        await this.tenantRepo.update(id, {skipSessionConfirm: body.skip} as any);
+    }
+
+    /**
      * Create an auth code for test seeding.
      * Returns the created auth code with all fields.
      */
@@ -144,6 +159,10 @@ export class TestUtilsController {
         method: string;
         sid?: string;
         requireAuthTime?: boolean;
+        redirectUri?: string | null;
+        scope?: string | null;
+        nonce?: string | null;
+        resource?: string | null;
     }): Promise<AuthCode> {
         const code = Math.random().toString(36).substring(2, 8).toUpperCase();
         const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes from now
@@ -159,8 +178,29 @@ export class TestUtilsController {
             requireAuthTime: body.requireAuthTime || false,
             used: false,
             expiresAt,
+            redirectUri: (body.redirectUri ?? null) as any,
+            scope: (body.scope ?? null) as any,
+            nonce: (body.nonce ?? null) as any,
+            resource: body.resource ?? null,
         });
 
         return this.authCodeRepo.save(authCode);
+    }
+
+    /**
+     * Force-expire an auth code by setting its expiresAt to the past.
+     */
+    @Post("auth-codes/:code/expire")
+    @HttpCode(204)
+    async expireAuthCode(@Param("code") code: string): Promise<void> {
+        await this.authCodeRepo.update({code}, {expiresAt: new Date(Date.now() - 60_000)});
+    }
+
+    /**
+     * Look up an auth code by its code string, returning all fields.
+     */
+    @Get("auth-codes/:code")
+    async getAuthCode(@Param("code") code: string): Promise<AuthCode | null> {
+        return this.authCodeRepo.findOne({where: {code}});
     }
 }

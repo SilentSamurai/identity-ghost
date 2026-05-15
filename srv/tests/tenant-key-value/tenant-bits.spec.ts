@@ -29,7 +29,7 @@ describe('TenantBits API', () => {
         app = new SharedTestFixture();
         const tokenFixture = new TokenFixture(app);
         // Create two tenants
-        const adminResponse = await tokenFixture.fetchAccessToken(
+        const adminResponse = await tokenFixture.fetchAccessTokenFlow(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com'
@@ -43,7 +43,7 @@ describe('TenantBits API', () => {
 
         // Use client credentials for bitsClient (tenant 1)
         const tenant1Creds = await tokenFixture.createConfidentialClient(adminResponse.accessToken, tenantId);
-        const response1 = await tokenFixture.fetchClientCredentialsToken(
+        const response1 = await tokenFixture.fetchClientCredentialsTokenFlow(
             tenant1Creds.clientId,
             tenant1Creds.clientSecret
         );
@@ -52,7 +52,7 @@ describe('TenantBits API', () => {
 
         // Use client credentials for bitsClient2 (tenant 2)
         const tenant2Creds = await tokenFixture.createConfidentialClient(adminResponse.accessToken, tenantId2);
-        const response2 = await tokenFixture.fetchClientCredentialsToken(
+        const response2 = await tokenFixture.fetchClientCredentialsTokenFlow(
             tenant2Creds.clientId,
             tenant2Creds.clientSecret
         );
@@ -150,7 +150,7 @@ describe('TenantBits API', () => {
     //
     it('should reject requests with a user (password grant) token', async () => {
         const tokenFixture = new TokenFixture(app);
-        const userResponse = await tokenFixture.fetchAccessToken(
+        const userResponse = await tokenFixture.fetchAccessTokenFlow(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com'

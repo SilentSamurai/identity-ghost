@@ -146,8 +146,7 @@ export class TN01AComponent implements OnInit {
     }
 
     async refreshData() {
-        // Forces a fresh load from page 0 with no filters
-        // await this.dataSource.apply({ pageNo: 0, append: false });
+        this.dataSource.refresh();
     }
 
     async openCreateModal() {

@@ -24,7 +24,7 @@ describe('Refresh Token Client Binding', () => {
         tokenFixture = new TokenFixture(app);
 
         // Get initial tokens
-        const result = await tokenFixture.fetchAccessToken(
+        const result = await tokenFixture.fetchAccessTokenFlow(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com',
@@ -63,7 +63,7 @@ describe('Refresh Token Client Binding', () => {
 
     it('refresh with wrong client_id returns invalid_grant', async () => {
         // Get a fresh token since the previous one was consumed
-        const freshResult = await tokenFixture.fetchAccessToken(
+        const freshResult = await tokenFixture.fetchAccessTokenFlow(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com',
@@ -88,7 +88,7 @@ describe('Refresh Token Client Binding', () => {
     });
 
     it('error message does not reveal client_id mismatch details', async () => {
-        const freshResult = await tokenFixture.fetchAccessToken(
+        const freshResult = await tokenFixture.fetchAccessTokenFlow(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com',

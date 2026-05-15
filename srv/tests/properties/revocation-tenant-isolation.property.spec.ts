@@ -31,7 +31,7 @@ describe('Property 7: Tenant isolation prevents cross-tenant revocation', () => 
         fixture = new SharedTestFixture();
         tokenFixture = new TokenFixture(fixture);
 
-        const adminResult = await tokenFixture.fetchAccessToken(
+        const adminResult = await tokenFixture.fetchAccessTokenFlow(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com',
@@ -54,7 +54,7 @@ describe('Property 7: Tenant isolation prevents cross-tenant revocation', () => 
 
         // Get the cross-tenant's confidential client credentials and obtain a Bearer token
         const crossCreds = await tokenFixture.createConfidentialClient(adminResult.accessToken, crossTenant.id);
-        const crossTokenResult = await tokenFixture.fetchClientCredentialsToken(
+        const crossTokenResult = await tokenFixture.fetchClientCredentialsTokenFlow(
             crossCreds.clientId,
             crossCreds.clientSecret,
         );
@@ -72,7 +72,7 @@ describe('Property 7: Tenant isolation prevents cross-tenant revocation', () => 
         await fc.assert(
             fc.asyncProperty(iterationArb, async (_iteration) => {
                 // Get a fresh refresh token from the default tenant
-                const result = await tokenFixture.fetchAccessToken(
+                const result = await tokenFixture.fetchAccessTokenFlow(
                     'admin@auth.server.com',
                     'admin9000',
                     'auth.server.com',

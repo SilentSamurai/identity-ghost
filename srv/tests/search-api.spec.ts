@@ -21,7 +21,7 @@ describe('GenericSearchController (e2e)', () => {
 
         // Get admin access token for authenticated requests
         tokenFixture = new TokenFixture(app);
-        const tokenResponse = await tokenFixture.fetchAccessToken(
+        const tokenResponse = await tokenFixture.fetchAccessTokenFlow(
             "admin@auth.server.com",
             "admin9000",
             "auth.server.com"

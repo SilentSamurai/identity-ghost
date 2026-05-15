@@ -67,7 +67,7 @@ describe('WWW-Authenticate headers on protected endpoints (RFC 6750 §3)', () =>
 
         beforeAll(async () => {
             // 1. Get an admin access token to create a confidential client
-            const adminToken = await tokenFixture.fetchAccessToken(
+            const adminToken = await tokenFixture.fetchAccessTokenFlow(
                 'admin@auth.server.com',
                 'admin9000',
                 'auth.server.com',
@@ -78,7 +78,7 @@ describe('WWW-Authenticate headers on protected endpoints (RFC 6750 §3)', () =>
             const creds = await tokenFixture.createConfidentialClient(adminToken.accessToken, decoded.tenant.id);
 
             // 3. Get a client_credentials token (TechnicalToken — no roles, not a super admin)
-            const ccToken = await tokenFixture.fetchClientCredentialsToken(creds.clientId, creds.clientSecret);
+            const ccToken = await tokenFixture.fetchClientCredentialsTokenFlow(creds.clientId, creds.clientSecret);
             clientCredentialsAccessToken = ccToken.accessToken;
         });
 

@@ -68,7 +68,6 @@ import {query} from '../../component/model/Query';
                         <td>{{ client.createdAt | date:'medium' }}</td>
                         <td style="max-width: 100px">
                             <button
-                                *ngIf="!client.isPublic"
                                 (click)="onRotateSecret(client)"
                                 class="btn btn-sm btn-primary me-2"
                                 type="button"

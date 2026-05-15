@@ -1,32 +1,33 @@
 import {SharedTestFixture} from "../shared-test.fixture";
-import {expect2xx} from "../api-client/client";
+import {TokenFixture, AuthorizeParams} from "../token.fixture";
 
 describe('e2e positive auth code flow', () => {
     let app: SharedTestFixture;
+    let tokenFixture: TokenFixture;
     let authentication_code = "";
     let accessToken = "";
-    let clientId = "auth.server.com";
+    const clientId = "auth.server.com";
+    const redirectUri = "http://localhost:3000/callback";
     const verifier = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq";
-    const challenge = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq";
+
+    const authorizeParams: AuthorizeParams = {
+        clientId,
+        redirectUri,
+        scope: 'openid profile email',
+        state: 'test-state',
+        codeChallenge: verifier,
+        codeChallengeMethod: 'plain',
+    };
 
     beforeAll(async () => {
         app = new SharedTestFixture();
+        tokenFixture = new TokenFixture(app);
 
-        // Login to get an auth code
-        const loginResponse = await app.getHttpServer()
-            .post('/api/oauth/login')
-            .send({
-                "code_challenge": challenge,
-                "email": "admin@auth.server.com",
-                "password": "admin9000",
-                "client_id": clientId,
-                "code_challenge_method": "plain"
-            })
-            .set('Accept', 'application/json');
-
-        expect(loginResponse.status).toEqual(201);
-        expect(loginResponse.body.authentication_code).toBeDefined();
-        authentication_code = loginResponse.body.authentication_code;
+        authentication_code = await tokenFixture.fetchAuthCodeWithConsentFlow(
+            "admin@auth.server.com",
+            "admin9000",
+            authorizeParams,
+        );
     });
 
     afterAll(async () => {
@@ -34,34 +35,32 @@ describe('e2e positive auth code flow', () => {
     });
 
     it(`/POST Fetch Access Token`, async () => {
-        const response = await app.getHttpServer()
-            .post('/api/oauth/token')
-            .send({
-                "grant_type": "authorization_code",
-                "code": authentication_code,
-                client_id: clientId,
-                "code_verifier": verifier
-            })
-            .set('Accept', 'application/json');
+        const tokens = await tokenFixture.exchangeAuthorizationCode(
+            authentication_code,
+            clientId,
+            verifier,
+            redirectUri,
+        );
 
-        console.log("Fetch Access Token:", response.body);
-        expect2xx(response);
+        expect(tokens.access_token).toBeDefined();
+        expect(tokens.expires_in).toBeDefined();
+        expect(tokens.token_type).toEqual('Bearer');
+        expect(tokens.refresh_token).toBeDefined();
 
-        expect(response.status).toEqual(200);
-        expect(response.body.access_token).toBeDefined();
-        expect(response.body.expires_in).toBeDefined();
-        expect(response.body.token_type).toEqual('Bearer');
-        expect(response.body.refresh_token).toBeDefined();
-
-        accessToken = response.body.access_token;
+        accessToken = tokens.access_token;
     });
 
-
     it(`/POST Verify auth gen code`, async () => {
+        const freshCode = await tokenFixture.fetchAuthCodeWithConsentFlow(
+            "admin@auth.server.com",
+            "admin9000",
+            authorizeParams,
+        );
+
         const response = await app.getHttpServer()
             .post('/api/oauth/verify-auth-code')
             .send({
-                "auth_code": authentication_code,
+                "auth_code": freshCode,
                 "client_id": clientId,
             })
             .set('Accept', 'application/json');

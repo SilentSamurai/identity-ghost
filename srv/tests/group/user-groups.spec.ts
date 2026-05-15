@@ -21,7 +21,7 @@ describe('e2e Groups Check', () => {
     beforeAll(async () => {
         app = new SharedTestFixture();
         const tokenFixture = new TokenFixture(app);
-        const response = await tokenFixture.fetchAccessToken(
+        const response = await tokenFixture.fetchAccessTokenFlow(
             "admin@auth.server.com", "admin9000", "auth.server.com"
         );
         accessToken = response.accessToken;

@@ -72,13 +72,10 @@ describe("Forgot/Reset Password (UI)", () => {
             // Always hit verification via API request, then continue the flow in the UI
             cy.request({method: 'GET', url: verificationUrl, followRedirect: false, failOnStatusCode: false})
                 .its('status').should('eq', 302);
-            // After API verification, go to login UI to proceed
-            cy.visit('/login?client_id=shire.local');
-            cy.url().should('include', '/login');
         });
 
-        // 3) Start from Login (like other tests), navigate to Forgot Password, and submit
-        cy.visit('/login?client_id=shire.local');
+        // 3) Navigate to Forgot Password via the login page (no client_id so the form renders)
+        cy.visit('/login');
         cy.contains('a', 'Forgot Password').click();
         cy.url().should('include', '/forgot-password');
         cy.get("input#email").clear().type(email);
@@ -105,5 +102,14 @@ describe("Forgot/Reset Password (UI)", () => {
             // 6) Expect success message
             cy.get(".alert-success").should("contain.text", "Password Reset Successful");
         });
+
+        // 7) Verify the new password works by completing a full login flow
+        cy.visit('/login?client_id=shire.local');
+        cy.intercept('POST', '**/api/oauth/token*').as('oauthToken');
+        cy.get('#username', {timeout: 15000}).should('be.visible').type(email);
+        cy.get('#password').should('be.visible').type(newPassword);
+        cy.get('#login-btn').click();
+        cy.wait('@oauthToken').its('response.statusCode').should('be.oneOf', [200, 201]);
+        cy.url().should('include', '/home');
     });
 });

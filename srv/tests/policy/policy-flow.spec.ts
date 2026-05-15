@@ -26,7 +26,7 @@ describe('Policy Flow (e2e)', () => {
     it('test policy flow', async () => {
 
         const tokenFixture = new TokenFixture(app);
-        let tokenResponse = await tokenFixture.fetchAccessToken(
+        let tokenResponse = await tokenFixture.fetchAccessTokenFlow(
             "admin@shire.local",
             "admin9000",
             "shire.local"
@@ -56,7 +56,7 @@ describe('Policy Flow (e2e)', () => {
 
         const credential = await tokenFixture.createConfidentialClient(accessToken, tenant.id);
 
-        const ccTr = await tokenFixture.fetchClientCredentialsToken(
+        const ccTr = await tokenFixture.fetchClientCredentialsTokenFlow(
             credential.clientId,
             credential.clientSecret
         );

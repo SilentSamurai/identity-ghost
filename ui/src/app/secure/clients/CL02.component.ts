@@ -30,7 +30,7 @@ import {EditClientComponent} from './dialogs/edit-client.component';
                     Edit
                 </button>
                 <button
-                    *ngIf="client && !client.isPublic"
+                    *ngIf="client"
                     (click)="onRotateSecret()"
                     [disabled]="!isTenantAdmin"
                     id="ROTATE_SECRET_BTN"
@@ -56,6 +56,9 @@ import {EditClientComponent} from './dialogs/edit-client.component';
                         <app-attribute label="Client ID">
                             {{ client.clientId }}
                         </app-attribute>
+                        <app-attribute label="Alias" *ngIf="client.alias">
+                            {{ client.alias }}
+                        </app-attribute>
                         <app-attribute label="Client Type">
                             <span *ngIf="client.isPublic" class="badge bg-info">Public</span>
                             <span *ngIf="!client.isPublic" class="badge bg-secondary">Confidential</span>
@@ -71,6 +74,23 @@ import {EditClientComponent} from './dialogs/edit-client.component';
                         </app-attribute>
                     </div>
                     <div class="col-lg-6">
+                        <app-attribute label="Discovery URL">
+                            <div class="d-flex align-items-center gap-1">
+                                <code class="small text-wrap text-break">{{ getDiscoveryPath() }}</code>
+                                <button class="btn btn-sm btn-outline-secondary p-0 px-1"
+                                        type="button"
+                                        (click)="copyDiscoveryUrl()"
+                                        aria-label="Copy discovery URL">
+                                    <i class="fa fa-copy"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-secondary p-0 px-1"
+                                        type="button"
+                                        (click)="openDiscoveryUrl()"
+                                        aria-label="Open discovery URL in new tab">
+                                    <i class="fa fa-external-link"></i>
+                                </button>
+                            </div>
+                        </app-attribute>
                         <app-attribute label="Response Types">
                             {{ client.responseTypes }}
                         </app-attribute>
@@ -161,6 +181,7 @@ export class CL02Component implements OnInit {
             },
         });
         if (rotated) {
+            this.client = rotated.client;
             await this.modalService.open(SecretDisplayComponent, {
                 initData: {
                     clientSecret: rotated.clientSecret,
@@ -197,5 +218,29 @@ export class CL02Component implements OnInit {
         if (deleted) {
             await this.router.navigate(['/TN02', this.tenantId], {fragment: 'CLIENTS'});
         }
+    }
+
+    getDiscoveryPath(): string {
+        if (!this.client) return '';
+        return `/${this.client.tenant.domain}/.well-known/openid-configuration`;
+    }
+
+    getDiscoveryUrl(): string {
+        if (!this.client) return '';
+        return `${window.location.origin}/${this.client.tenant.domain}/.well-known/openid-configuration`;
+    }
+
+    async copyDiscoveryUrl() {
+        const url = this.getDiscoveryUrl();
+        try {
+            await navigator.clipboard.writeText(url);
+            this.messageService.add({severity: 'success', summary: 'Copied', detail: 'Discovery URL copied to clipboard'});
+        } catch (e) {
+            this.messageService.add({severity: 'error', summary: 'Error', detail: 'Copy not supported'});
+        }
+    }
+
+    openDiscoveryUrl() {
+        window.open(this.getDiscoveryUrl(), '_blank');
     }
 }

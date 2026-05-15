@@ -46,7 +46,8 @@ describe('GET /api/oauth/authorize', () => {
     // ─── Happy Path ──────────────────────────────────────────────────
 
     describe('happy path', () => {
-        it('redirects to login UI with all params forwarded', () => {
+        it('redirects to login UI when no session cookie is present', () => {
+            cy.clearCookies();
             cy.request({
                 method: 'GET',
                 url: API_BASE,
@@ -65,6 +66,7 @@ describe('GET /api/oauth/authorize', () => {
                 expect(location).to.exist;
 
                 const url = new URL(location, Cypress.config('baseUrl'));
+                // No session → redirect to login UI with all params preserved
                 expect(url.pathname).to.eq('/authorize');
                 expect(url.searchParams.get('client_id')).to.eq(testClientId);
                 expect(url.searchParams.get('redirect_uri')).to.eq(REDIRECT_URI);
@@ -176,7 +178,7 @@ describe('GET /api/oauth/authorize', () => {
     // ─── State Round-Trip ────────────────────────────────────────────
 
     describe('state round-trip', () => {
-        it('preserves state exactly in success redirect', () => {
+        it('preserves state exactly in login UI redirect (no session)', () => {
             const stateValue = 'complex-state_with.special/chars=123';
             cy.request({
                 method: 'GET',
@@ -191,6 +193,8 @@ describe('GET /api/oauth/authorize', () => {
             }).then((resp) => {
                 expect(resp.status).to.eq(302);
                 const url = new URL(resp.headers['location'] as string, Cypress.config('baseUrl'));
+                // No session → login UI with state preserved
+                expect(url.pathname).to.eq('/authorize');
                 expect(url.searchParams.get('state')).to.eq(stateValue);
             });
         });
@@ -199,7 +203,7 @@ describe('GET /api/oauth/authorize', () => {
     // ─── Scope Handling ──────────────────────────────────────────────
 
     describe('scope handling', () => {
-        it('uses default scopes when scope is omitted', () => {
+        it('uses default scopes when scope is omitted (no session)', () => {
             cy.request({
                 method: 'GET',
                 url: API_BASE,
@@ -213,6 +217,8 @@ describe('GET /api/oauth/authorize', () => {
             }).then((resp) => {
                 expect(resp.status).to.eq(302);
                 const url = new URL(resp.headers['location'] as string, Cypress.config('baseUrl'));
+                // No session → login UI
+                expect(url.pathname).to.eq('/authorize');
                 const scope = url.searchParams.get('scope');
                 expect(scope).to.exist;
                 expect(scope).to.contain('openid');
@@ -222,28 +228,8 @@ describe('GET /api/oauth/authorize', () => {
 
     // ─── Prompt and max_age Parameter Forwarding ─────────────────────
 
-    describe('prompt and max_age parameter forwarding', () => {
-        it('forwards prompt=none in the redirect URL', () => {
-            cy.request({
-                method: 'GET',
-                url: API_BASE,
-                qs: {
-                    response_type: 'code',
-                    client_id: testClientId,
-                    redirect_uri: REDIRECT_URI,
-                    state: 'prompt-none-test',
-                    scope: 'openid',
-                    prompt: 'none',
-                },
-                followRedirect: false,
-            }).then((resp) => {
-                expect(resp.status).to.eq(302);
-                const url = new URL(resp.headers['location'] as string, Cypress.config('baseUrl'));
-                expect(url.searchParams.get('prompt')).to.eq('none');
-            });
-        });
-
-        it('forwards prompt=login in the redirect URL', () => {
+    describe('prompt and max_age parameter handling', () => {
+        it('redirects to login UI with prompt=login', () => {
             cy.request({
                 method: 'GET',
                 url: API_BASE,
@@ -259,11 +245,35 @@ describe('GET /api/oauth/authorize', () => {
             }).then((resp) => {
                 expect(resp.status).to.eq(302);
                 const url = new URL(resp.headers['location'] as string, Cypress.config('baseUrl'));
-                expect(url.searchParams.get('prompt')).to.eq('login');
+                // prompt=login forces redirect to login UI
+                expect(url.pathname).to.eq('/authorize');
             });
         });
 
-        it('forwards space-delimited prompt="login consent" in the redirect URL', () => {
+        it('redirects with error=login_required for prompt=none with no session', () => {
+            cy.request({
+                method: 'GET',
+                url: API_BASE,
+                qs: {
+                    response_type: 'code',
+                    client_id: testClientId,
+                    redirect_uri: REDIRECT_URI,
+                    state: 'prompt-none-test',
+                    scope: 'openid',
+                    prompt: 'none',
+                },
+                followRedirect: false,
+            }).then((resp) => {
+                expect(resp.status).to.eq(302);
+                const url = new URL(resp.headers['location'] as string);
+                // prompt=none with no session → error redirect to redirect_uri
+                expect(url.origin + url.pathname).to.eq(REDIRECT_URI);
+                expect(url.searchParams.get('error')).to.eq('login_required');
+                expect(url.searchParams.get('state')).to.eq('prompt-none-test');
+            });
+        });
+
+        it('redirects with error=invalid_request for unsupported prompt value', () => {
             cy.request({
                 method: 'GET',
                 url: API_BASE,
@@ -273,17 +283,18 @@ describe('GET /api/oauth/authorize', () => {
                     redirect_uri: REDIRECT_URI,
                     state: 'prompt-multi-test',
                     scope: 'openid',
-                    prompt: 'login consent',
+                    prompt: 'select_account',
                 },
                 followRedirect: false,
             }).then((resp) => {
                 expect(resp.status).to.eq(302);
-                const url = new URL(resp.headers['location'] as string, Cypress.config('baseUrl'));
-                expect(url.searchParams.get('prompt')).to.eq('login consent');
+                const url = new URL(resp.headers['location'] as string);
+                expect(url.origin + url.pathname).to.eq(REDIRECT_URI);
+                expect(url.searchParams.get('error')).to.eq('invalid_request');
             });
         });
 
-        it('forwards max_age=300 in the redirect URL', () => {
+        it('redirects to login UI with max_age parameter (no session)', () => {
             cy.request({
                 method: 'GET',
                 url: API_BASE,
@@ -299,7 +310,8 @@ describe('GET /api/oauth/authorize', () => {
             }).then((resp) => {
                 expect(resp.status).to.eq(302);
                 const url = new URL(resp.headers['location'] as string, Cypress.config('baseUrl'));
-                expect(url.searchParams.get('max_age')).to.eq('300');
+                // No session → redirect to login UI
+                expect(url.pathname).to.eq('/authorize');
             });
         });
     });

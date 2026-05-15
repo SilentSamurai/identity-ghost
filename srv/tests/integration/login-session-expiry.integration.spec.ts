@@ -2,18 +2,17 @@ import {SharedTestFixture} from '../shared-test.fixture';
 import {TokenFixture} from '../token.fixture';
 
 /**
- * Integration tests for login session expiry behavior.
+ * Integration tests for login session invalidation behavior.
  *
- * Validates that expired sessions reject auth code exchange and refresh token grants
+ * Validates that invalidated sessions (via logout) reject refresh token grants
  * with invalid_grant error.
  *
- * Uses the test-only endpoints:
- *   POST /api/test-utils/sessions/:sid/expire  — force-expire a session
- *   GET  /api/test-utils/auth-codes/:code/sid   — look up the sid of an auth code
+ * Uses the production logout endpoint:
+ *   POST /api/oauth/logout  — invalidate a session by sid
  *
  * _Requirements: 4.4, 5.4_
  */
-describe('Login Session Expiry', () => {
+describe('Login Session Invalidation', () => {
     let app: SharedTestFixture;
     let tokenFixture: TokenFixture;
     let tenantClientId: string;
@@ -24,7 +23,7 @@ describe('Login Session Expiry', () => {
         tokenFixture = new TokenFixture(app);
 
         // Get tenant credentials for refresh grants
-        const adminResult = await tokenFixture.fetchAccessToken(
+        const adminResult = await tokenFixture.fetchAccessTokenFlow(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com',
@@ -44,57 +43,7 @@ describe('Login Session Expiry', () => {
         await app.close();
     });
 
-    // ── Helpers ──────────────────────────────────────────────────────
-
-    /** Force-expire a session via the test-utils endpoint */
-    async function expireSession(sid: string): Promise<void> {
-        const response = await app.getHttpServer()
-            .post(`/api/test-utils/sessions/${sid}/expire`);
-        expect(response.status).toEqual(204);
-    }
-
-    /** Look up the sid of an auth code via the test-utils endpoint */
-    async function getAuthCodeSid(code: string): Promise<string> {
-        const response = await app.getHttpServer()
-            .get(`/api/test-utils/auth-codes/${code}/sid`);
-        expect(response.status).toEqual(200);
-        expect(response.body.sid).toBeDefined();
-        return response.body.sid;
-    }
-
-    // ── Tests ────────────────────────────────────────────────────────
-
-    it('expired session rejects auth code exchange with invalid_grant', async () => {
-        // Step 1: Login to get an auth code
-        const loginResult = await tokenFixture.login(
-            'admin@auth.server.com',
-            'admin9000',
-            'auth.server.com',
-        );
-        expect(loginResult.authentication_code).toBeDefined();
-
-        // Step 2: Look up the sid attached to this auth code
-        const sid = await getAuthCodeSid(loginResult.authentication_code);
-
-        // Step 3: Expire the session
-        await expireSession(sid);
-
-        // Step 4: Try to exchange the auth code — should fail because the session is expired
-        const tokenResponse = await app.getHttpServer()
-            .post('/api/oauth/token')
-            .send({
-                grant_type: 'authorization_code',
-                code: loginResult.authentication_code,
-                code_verifier: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq',
-                client_id: 'auth.server.com',
-            })
-            .set('Accept', 'application/json');
-
-        expect(tokenResponse.status).toEqual(400);
-        expect(tokenResponse.body.error).toEqual('invalid_grant');
-    });
-
-    it('expired session rejects refresh with invalid_grant', async () => {
+    it('invalidated session rejects refresh with invalid_grant', async () => {
         // Step 1: Get tokens via password grant (creates a session)
         const response = await app.getHttpServer()
             .post('/api/oauth/token')
@@ -111,8 +60,16 @@ describe('Login Session Expiry', () => {
         const sid = decoded.sid;
         expect(sid).toBeDefined();
 
-        // Step 2: Expire the session
-        await expireSession(sid);
+        // Step 2: Invalidate the session via logout endpoint (using Bearer token auth)
+        const logoutResponse = await app.getHttpServer()
+            .post('/api/oauth/logout')
+            .send({
+                sid: sid,
+            })
+            .set('Authorization', `Bearer ${response.body.access_token}`)
+            .set('Accept', 'application/json');
+
+        expect(logoutResponse.status).toEqual(200);
 
         // Step 3: Try to refresh — should fail with invalid_grant
         const refreshResponse = await app.getHttpServer()

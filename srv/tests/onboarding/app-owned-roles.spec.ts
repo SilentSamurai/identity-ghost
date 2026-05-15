@@ -76,7 +76,7 @@ describe('App-Owned Roles', () => {
         tokenFixture = new TokenFixture(fixture);
 
         // 1. Authenticate as super admin
-        const superAdmin = await tokenFixture.fetchAccessToken(
+        const superAdmin = await tokenFixture.fetchAccessTokenFlow(
             superAdminEmail,
             superAdminPassword,
             'auth.server.com',
@@ -98,7 +98,7 @@ describe('App-Owned Roles', () => {
         await adminClient.updateMemberRoles(ownerTenantId, ownerUser.id, ['TENANT_ADMIN']);
 
         // 4. Authenticate as owner admin (using pre-seeded password)
-        const ownerTokenResp = await tokenFixture.fetchAccessToken(
+        const ownerTokenResp = await tokenFixture.fetchAccessTokenFlow(
             ownerAdminEmail, ownerAdminPassword, ownerDomain,
         );
         ownerAdminToken = ownerTokenResp.accessToken;
@@ -109,7 +109,7 @@ describe('App-Owned Roles', () => {
         );
         ownerConfClientId = ownerConfClient.clientId;
         ownerConfClientSecret = ownerConfClient.clientSecret;
-        const ownerCCToken = await tokenFixture.fetchClientCredentialsToken(
+        const ownerCCToken = await tokenFixture.fetchClientCredentialsTokenFlow(
             ownerConfClientId, ownerConfClientSecret,
         );
         ownerTechnicalToken = ownerCCToken.accessToken;
@@ -184,7 +184,7 @@ describe('App-Owned Roles', () => {
         // 12. Create a confidential client on the subscriber tenant for technical token
         // First, get a subscriber admin token — the onboarded user needs TENANT_ADMIN
         await adminClient.updateMemberRoles(subscriberTenantId, subscriberUserId, ['TENANT_ADMIN']);
-        const subscriberAdminTokenResp = await tokenFixture.fetchAccessToken(
+        const subscriberAdminTokenResp = await tokenFixture.fetchAccessTokenFlow(
             subscriberUserEmail,
             subscriberUserPassword,
             subscriberDomain,
@@ -194,7 +194,7 @@ describe('App-Owned Roles', () => {
         const subscriberConfClient = await tokenFixture.createConfidentialClient(
             subscriberAdminToken, subscriberTenantId, 'app-roles-sub-cc',
         );
-        const subscriberCCToken = await tokenFixture.fetchClientCredentialsToken(
+        const subscriberCCToken = await tokenFixture.fetchClientCredentialsTokenFlow(
             subscriberConfClient.clientId, subscriberConfClient.clientSecret,
         );
         subscriberTechnicalToken = subscriberCCToken.accessToken;
@@ -211,7 +211,7 @@ describe('App-Owned Roles', () => {
             // The onboarded user should have app-owned roles assigned
             // Verify by fetching a token and checking the roles claim
             // (getMemberRoles doesn't return app-owned roles due to cross-tenant nature)
-            const tokenResp = await tokenFixture.fetchAccessToken(
+            const tokenResp = await tokenFixture.fetchAccessTokenFlow(
                 subscriberUserEmail,
                 subscriberUserPassword,
                 subscriberDomain,
@@ -244,7 +244,7 @@ describe('App-Owned Roles', () => {
 
             // Verify no duplicate roles by checking the token
             // Each app-owned role should appear exactly once
-            const tokenResp = await tokenFixture.fetchAccessToken(
+            const tokenResp = await tokenFixture.fetchAccessTokenFlow(
                 subscriberUserEmail,
                 subscriberUserPassword,
                 subscriberDomain,
@@ -263,7 +263,7 @@ describe('App-Owned Roles', () => {
     describe('token role namespacing', () => {
         it('should include namespaced app-owned roles in token ({appName}:{roleName} format) (Req 7.2)', async () => {
             // Fetch an access token for the onboarded user using the subscriber domain
-            const tokenResp = await tokenFixture.fetchAccessToken(
+            const tokenResp = await tokenFixture.fetchAccessTokenFlow(
                 subscriberUserEmail,
                 subscriberUserPassword,
                 subscriberDomain,
@@ -282,7 +282,7 @@ describe('App-Owned Roles', () => {
 
         it('should include un-namespaced internal roles alongside namespaced app-owned roles (Req 7.4)', async () => {
             // The subscriber user has TENANT_ADMIN (internal) + app-owned roles
-            const tokenResp = await tokenFixture.fetchAccessToken(
+            const tokenResp = await tokenFixture.fetchAccessTokenFlow(
                 subscriberUserEmail,
                 subscriberUserPassword,
                 subscriberDomain,
@@ -344,7 +344,7 @@ describe('App-Owned Roles', () => {
             expect2xx(onboardResp);
 
             // Fetch token and verify roles from both apps
-            const tokenResp = await tokenFixture.fetchAccessToken(
+            const tokenResp = await tokenFixture.fetchAccessTokenFlow(
                 subscriberUserEmail,
                 subscriberUserPassword,
                 subscriberDomain,
@@ -370,7 +370,7 @@ describe('App-Owned Roles', () => {
     describe('/my/permissions policy resolution', () => {
         it('should return policies from owner tenant for app-owned roles (Req 3.1)', async () => {
             // Fetch access token for the subscriber user
-            const tokenResp = await tokenFixture.fetchAccessToken(
+            const tokenResp = await tokenFixture.fetchAccessTokenFlow(
                 subscriberUserEmail,
                 subscriberUserPassword,
                 subscriberDomain,
@@ -400,7 +400,7 @@ describe('App-Owned Roles', () => {
         it('should return combined policies from tenant-local + app-owned roles (Req 3.2)', async () => {
             // Create a tenant-local role with a policy in the subscriber tenant
             // First, get a subscriber admin token
-            const subscriberAdminTokenResp = await tokenFixture.fetchAccessToken(
+            const subscriberAdminTokenResp = await tokenFixture.fetchAccessTokenFlow(
                 subscriberUserEmail,
                 subscriberUserPassword,
                 subscriberDomain,
@@ -432,7 +432,7 @@ describe('App-Owned Roles', () => {
             ]);
 
             // Fetch a fresh token (now includes both app-owned and tenant-local roles)
-            const freshTokenResp = await tokenFixture.fetchAccessToken(
+            const freshTokenResp = await tokenFixture.fetchAccessTokenFlow(
                 subscriberUserEmail,
                 subscriberUserPassword,
                 subscriberDomain,
@@ -566,7 +566,7 @@ describe('App-Owned Roles', () => {
 
             // Fetch token for the onboarded user — should not fail
             // The role should no longer appear as an app-owned role (no namespace)
-            const tokenResp = await tokenFixture.fetchAccessToken(
+            const tokenResp = await tokenFixture.fetchAccessTokenFlow(
                 degradeUserEmail,
                 degradeUserPassword,
                 degradeSubDomain,
@@ -653,7 +653,7 @@ describe('App-Owned Roles', () => {
             await helper.verifyUser(unsubSubscriberUserEmail);
             await adminClient.updateMemberRoles(unsubSubscriberTenantId, unsubSubscriberUserId, ['TENANT_ADMIN']);
 
-            const subTokenResp = await tokenFixture.fetchAccessToken(
+            const subTokenResp = await tokenFixture.fetchAccessTokenFlow(
                 unsubSubscriberUserEmail,
                 unsubSubscriberUserPassword,
                 unsubSubscriberDomain,
@@ -663,7 +663,7 @@ describe('App-Owned Roles', () => {
 
         it('should remove user_roles for app-owned roles when unsubscribing (Req 1.4)', async () => {
             // Verify user has app-owned roles before unsubscribe by checking the token
-            const tokenBefore = await tokenFixture.fetchAccessToken(
+            const tokenBefore = await tokenFixture.fetchAccessTokenFlow(
                 unsubSubscriberUserEmail,
                 unsubSubscriberUserPassword,
                 unsubSubscriberDomain,
@@ -679,7 +679,7 @@ describe('App-Owned Roles', () => {
             await unsubClient.unsubscribeApp(unsubAppId, unsubSubscriberTenantId);
 
             // Verify app-owned roles are removed by checking the token
-            const tokenAfter = await tokenFixture.fetchAccessToken(
+            const tokenAfter = await tokenFixture.fetchAccessTokenFlow(
                 unsubSubscriberUserEmail,
                 unsubSubscriberUserPassword,
                 unsubSubscriberDomain,

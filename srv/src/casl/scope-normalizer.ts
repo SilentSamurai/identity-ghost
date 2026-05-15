@@ -1,10 +1,12 @@
 export class ScopeNormalizer {
-    /** Split a space-delimited scope string into a deduplicated, sorted array */
+    /** Split a space-delimited (or comma-delimited) scope string into a deduplicated, sorted array.
+     *  RFC 6749 §3.3 defines scope as space-delimited, but some clients (e.g. Portainer) send
+     *  comma-separated values. Both formats are accepted. */
     static parse(scopeString: string | null | undefined): string[] {
         if (!scopeString) {
             return [];
         }
-        return Array.from(new Set(scopeString.trim().split(/\s+/)))
+        return Array.from(new Set(scopeString.trim().split(/[\s,]+/)))
             .filter(s => s.length > 0)
             .sort();
     }

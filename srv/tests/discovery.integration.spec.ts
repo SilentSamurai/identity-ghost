@@ -2,6 +2,9 @@ import {createHash} from "crypto";
 import {SharedTestFixture} from "./shared-test.fixture";
 import {TokenFixture} from "./token.fixture";
 import {expect2xx} from "./api-client/client";
+import {HelperFixture} from "./helper.fixture";
+import {AdminTenantClient} from "./api-client/admin-tenant-client";
+import {AppClient} from "./api-client/app-client";
 
 /**
  * Integration tests for the OIDC Discovery endpoint: GET /:tenantDomain/.well-known/openid-configuration
@@ -17,12 +20,14 @@ describe('OIDC Discovery endpoint', () => {
     let tenantA: { id: string; domain: string; clientId: string };
     // Tenant B — used for tenant isolation tests
     let tenantB: { id: string; domain: string; clientId: string };
+    // App_Client alias for app-based discovery
+    let appAlias: string;
 
     beforeAll(async () => {
         app = new SharedTestFixture();
 
         const tokenFixture = new TokenFixture(app);
-        const response = await tokenFixture.fetchAccessToken(
+        const response = await tokenFixture.fetchAccessTokenFlow(
             "admin@auth.server.com",
             "admin9000",
             "auth.server.com",
@@ -48,6 +53,32 @@ describe('OIDC Discovery endpoint', () => {
             .set('Accept', 'application/json');
         expect2xx(resB);
         tenantB = {id: resB.body.id, domain: domainB, clientId: resB.body.clientId};
+
+        // Create an app under tenantA for App_Client alias discovery tests
+        const helper = new HelperFixture(app, adminAccessToken);
+        await helper.enablePasswordGrant(tenantA.id, tenantA.domain);
+
+        const adminClient = new AdminTenantClient(app, adminAccessToken);
+        const discoUserEmail = `disco-user-${Date.now()}@example.com`;
+        const membersResult = await adminClient.addMembers(tenantA.id, [discoUserEmail]);
+        const discoUserId = membersResult.members.find((m: any) => m.email === discoUserEmail).id;
+        await adminClient.updateMemberRoles(tenantA.id, discoUserId, ['TENANT_ADMIN']);
+
+        await helper.setUserPassword(discoUserId, 'discoPass123');
+        await helper.verifyUser(discoUserEmail);
+
+        const tenantTokenRes = await tokenFixture.fetchAccessTokenFlow(
+            discoUserEmail, 'discoPass123', tenantA.domain
+        );
+
+        const appClient = new AppClient(app, tenantTokenRes.accessToken);
+        const createdApp = await appClient.createApp(
+            tenantA.id,
+            `disco-app-${Date.now()}`,
+            `http://localhost:${app.webhook.boundPort}`,
+            'App for discovery alias test'
+        );
+        appAlias = createdApp.alias;
     });
 
     afterAll(async () => {
@@ -297,6 +328,28 @@ describe('OIDC Discovery endpoint', () => {
         for (const field of endpointFields) {
             expect(doc[field]).toMatch(new RegExp(`^${issuer.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`));
         }
+    });
+
+    // ─── App_Client alias resolution ───
+
+    it('should serve discovery document for App_Client alias', async () => {
+        const res = await app.getHttpServer()
+            .get(`/${appAlias}/.well-known/openid-configuration`);
+
+        expect(res.status).toEqual(200);
+        expect(res.headers['content-type']).toMatch(/application\/json/);
+
+        const doc = res.body;
+        expect(doc.issuer).toBeDefined();
+        // jwks_uri should contain the owner tenant domain, not the app alias
+        expect(doc.jwks_uri).toContain(tenantA.domain);
+        // Static fields must match OIDC spec
+        expect(doc.scopes_supported).toEqual(["openid", "profile", "email", "offline_access"]);
+        expect(doc.response_types_supported).toEqual(["code"]);
+        expect(doc.grant_types_supported).toEqual(["authorization_code", "client_credentials", "refresh_token"]);
+        expect(doc.subject_types_supported).toEqual(["public"]);
+        expect(doc.id_token_signing_alg_values_supported).toEqual(["RS256"]);
+        expect(doc.token_endpoint_auth_methods_supported).toEqual(["client_secret_basic", "client_secret_post"]);
     });
 
     // ─── Requirement 6.2: Super tenant returns valid metadata ───

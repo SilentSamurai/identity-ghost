@@ -299,6 +299,7 @@ export class AppTableComponent implements OnInit, OnDestroy {
     }
 
     refresh(): void {
+        this._dataModel.reset();
         this.fetchData(this.query.update({pageNo: 0}), false);
     }
 

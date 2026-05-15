@@ -46,33 +46,30 @@ const resourceUriArb = validAbsoluteUriArb.filter(uri => uri.length <= 2048);
  * Feature: resource-indicator-support, Property 3: Auth code resource round-trip
  *
  * For any valid resource URI string, when an authorization code is created with that
- * resource value via `AuthCodeService.createAuthToken()`, then retrieving the auth code
- * record SHALL return the exact same resource string without modification.
+ * resource value via the authorize endpoint, then retrieving the auth code record
+ * SHALL return the exact same resource string without modification.
  *
  * **Validates: Requirements 2.5, 6.2**
  */
 describe('Feature: resource-indicator-support, Property 3: Auth code resource round-trip', () => {
     let app: SharedTestFixture;
+    let tokenFixture: TokenFixture;
     let clientApi: ClientEntityClient;
-    let accessToken: string;
     let testTenantId: string;
 
     const REDIRECT_URI = 'https://resource-roundtrip-test.example.com/callback';
     const CODE_VERIFIER = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq';
     const CODE_CHALLENGE = CODE_VERIFIER; // plain method
+    const email = 'admin@auth.server.com';
+    const password = 'admin9000';
 
     beforeAll(async () => {
         app = new SharedTestFixture();
-        const tokenFixture = new TokenFixture(app);
-        const response = await tokenFixture.fetchAccessToken(
-            'admin@auth.server.com',
-            'admin9000',
-            'auth.server.com',
-        );
-        accessToken = response.accessToken;
-        clientApi = new ClientEntityClient(app, accessToken);
+        tokenFixture = new TokenFixture(app);
+        const response = await tokenFixture.fetchAccessTokenFlow(email, password, 'auth.server.com');
+        clientApi = new ClientEntityClient(app, response.accessToken);
 
-        const tenantClient = new TenantClient(app, accessToken);
+        const tenantClient = new TenantClient(app, response.accessToken);
         const tenant = await tenantClient.createTenant('res-roundtrip', 'res-roundtrip.com');
         testTenantId = tenant.id;
     });
@@ -80,27 +77,6 @@ describe('Feature: resource-indicator-support, Property 3: Auth code resource ro
     afterAll(async () => {
         await app.close();
     });
-
-    /**
-     * Helper: pre-grant consent for a third-party client so that login returns
-     * an authentication_code instead of requires_consent.
-     */
-    async function preGrantConsent(clientId: string): Promise<void> {
-        await app.getHttpServer()
-            .post('/api/oauth/consent')
-            .send({
-                email: 'admin@auth.server.com',
-                password: 'admin9000',
-                client_id: clientId,
-                code_challenge: CODE_CHALLENGE,
-                code_challenge_method: 'plain',
-                approved_scopes: ['openid', 'profile', 'email'],
-                consent_action: 'approve',
-                scope: 'openid profile email',
-                redirect_uri: REDIRECT_URI,
-            })
-            .set('Accept', 'application/json');
-    }
 
     it('auth code stores and retrieves the exact resource URI without modification', async () => {
         await fc.assert(
@@ -115,36 +91,39 @@ describe('Feature: resource-indicator-support, Property 3: Auth code resource ro
                 const clientId = client.client.clientId;
 
                 try {
-                    // Pre-grant consent so login returns auth code
-                    await preGrantConsent(clientId);
+                    // Pre-grant consent so authorize can issue a code directly
+                    await tokenFixture.preGrantConsentFlow(email, password, {
+                        clientId,
+                        redirectUri: REDIRECT_URI,
+                        scope: 'openid profile email',
+                        state: 'consent-state',
+                        codeChallenge: CODE_CHALLENGE,
+                        codeChallengeMethod: 'plain',
+                    });
 
-                    // Login with the resource parameter
-                    const loginResponse = await app.getHttpServer()
-                        .post('/api/oauth/login')
-                        .send({
-                            email: 'admin@auth.server.com',
-                            password: 'admin9000',
-                            client_id: clientId,
-                            code_challenge: CODE_CHALLENGE,
-                            code_challenge_method: 'plain',
-                            resource: resource,
-                        })
-                        .set('Accept', 'application/json');
-
-                    // Login should succeed
-                    expect(loginResponse.status).toEqual(201);
-                    expect(loginResponse.body.authentication_code).toBeDefined();
-
-                    const code = loginResponse.body.authentication_code;
+                    // Login → authorize with resource → get auth code
+                    const params = {
+                        clientId,
+                        redirectUri: REDIRECT_URI,
+                        scope: 'openid profile email',
+                        state: 'resource-roundtrip',
+                        codeChallenge: CODE_CHALLENGE,
+                        codeChallengeMethod: 'plain',
+                        resource,
+                    };
+                    const csrfContext = await tokenFixture.initializeFlow(params);
+                    const sidCookie = await tokenFixture.login(email, password, clientId, csrfContext);
+                    const code = await tokenFixture.getAuthorizationCode(params, sidCookie, csrfContext.flowIdCookie);
 
                     // Exchange the code for a token
                     const tokenResponse = await app.getHttpServer()
                         .post('/api/oauth/token')
                         .send({
                             grant_type: 'authorization_code',
-                            code: code,
+                            code,
                             code_verifier: CODE_VERIFIER,
                             client_id: clientId,
+                            redirect_uri: REDIRECT_URI,
                         })
                         .set('Accept', 'application/json');
 
@@ -164,7 +143,7 @@ describe('Feature: resource-indicator-support, Property 3: Auth code resource ro
             }),
             {numRuns: 10},
         );
-    }, 120_000);
+    }, 180_000);
 
     it('resource URI is preserved exactly (no normalization or encoding changes)', async () => {
         // Test with specific edge case URIs that might be subject to normalization
@@ -186,31 +165,36 @@ describe('Feature: resource-indicator-support, Property 3: Auth code resource ro
             const clientId = client.client.clientId;
 
             try {
-                // Pre-grant consent
-                await preGrantConsent(clientId);
+                await tokenFixture.preGrantConsentFlow(email, password, {
+                    clientId,
+                    redirectUri: REDIRECT_URI,
+                    scope: 'openid profile email',
+                    state: 'consent-state',
+                    codeChallenge: CODE_CHALLENGE,
+                    codeChallengeMethod: 'plain',
+                });
 
-                const loginResponse = await app.getHttpServer()
-                    .post('/api/oauth/login')
-                    .send({
-                        email: 'admin@auth.server.com',
-                        password: 'admin9000',
-                        client_id: clientId,
-                        code_challenge: CODE_CHALLENGE,
-                        code_challenge_method: 'plain',
-                        resource: resource,
-                    })
-                    .set('Accept', 'application/json');
-
-                expect(loginResponse.status).toEqual(201);
-                const code = loginResponse.body.authentication_code;
+                const params = {
+                    clientId,
+                    redirectUri: REDIRECT_URI,
+                    scope: 'openid profile email',
+                    state: 'edge-case-roundtrip',
+                    codeChallenge: CODE_CHALLENGE,
+                    codeChallengeMethod: 'plain',
+                    resource,
+                };
+                const csrfContext = await tokenFixture.initializeFlow(params);
+                const sidCookie = await tokenFixture.login(email, password, clientId, csrfContext);
+                const code = await tokenFixture.getAuthorizationCode(params, sidCookie, csrfContext.flowIdCookie);
 
                 const tokenResponse = await app.getHttpServer()
                     .post('/api/oauth/token')
                     .send({
                         grant_type: 'authorization_code',
-                        code: code,
+                        code,
                         code_verifier: CODE_VERIFIER,
                         client_id: clientId,
+                        redirect_uri: REDIRECT_URI,
                     })
                     .set('Accept', 'application/json');
 
@@ -224,5 +208,5 @@ describe('Feature: resource-indicator-support, Property 3: Auth code resource ro
                 });
             }
         }
-    });
+    }, 120_000);
 });

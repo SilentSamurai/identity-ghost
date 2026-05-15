@@ -102,6 +102,7 @@ const RELATIONS: Record<string, Record<string, string>> = {
     Apps: {
         owner: "owner",
         roles: "roles",
+        client: "client",
     },
     Clients: {
         tenant: "tenant",

@@ -22,27 +22,19 @@ describe('UserInfo Endpoint Integration', () => {
     const password = 'admin9000';
     const verifier = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq';
     const challenge = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq';
+    const redirectUri = 'http://localhost:3000/callback';
 
-    /** Helper: login → get auth code with specific scope (matches id-token-integration.spec.ts pattern) */
+    /** Helper: login → authorize → auth code (cookie-based flow) with specific scope */
     async function loginForCode(opts?: { scope?: string; nonce?: string }): Promise<string> {
-        const body: any = {
-            email,
-            password,
-            client_id: clientId,
-            code_challenge: challenge,
-            code_challenge_method: 'plain',
-        };
-        if (opts?.scope !== undefined) body.scope = opts.scope;
-        if (opts?.nonce !== undefined) body.nonce = opts.nonce;
-
-        const res = await app.getHttpServer()
-            .post('/api/oauth/login')
-            .send(body)
-            .set('Accept', 'application/json');
-
-        expect2xx(res);
-        expect(res.body.authentication_code).toBeDefined();
-        return res.body.authentication_code;
+        return tokenFixture.fetchAuthCodeWithConsentFlow(email, password, {
+            clientId,
+            redirectUri,
+            scope: opts?.scope ?? 'openid profile email',
+            state: 'test-state',
+            codeChallenge: challenge,
+            codeChallengeMethod: 'plain',
+            nonce: opts?.nonce,
+        });
     }
 
     /** Helper: exchange auth code → full token response */
@@ -54,6 +46,7 @@ describe('UserInfo Endpoint Integration', () => {
                 code,
                 code_verifier: verifier,
                 client_id: clientId,
+                redirect_uri: redirectUri,
             })
             .set('Accept', 'application/json');
 
@@ -241,14 +234,20 @@ describe('UserInfo Endpoint Integration', () => {
     describe('client credentials token (TechnicalToken)', () => {
         it('should return 401 because UserInfo requires a user access token', async () => {
             // Get an admin access token to create a confidential client
-            const adminToken = await tokenFixture.fetchAccessToken(email, password, clientId);
+            const adminToken = await tokenFixture.fetchAccessTokenFlow(email, password, clientId);
 
             // Create a confidential client for the tenant
             const decoded = app.jwtService().decode(adminToken.accessToken, {json: true}) as any;
-            const creds = await tokenFixture.createConfidentialClient(adminToken.accessToken, decoded.tenant.id);
+            const creds = await tokenFixture.createConfidentialClient(
+                adminToken.accessToken,
+                decoded.tenant.id,
+                'userinfo-cc-client',
+                'client_credentials',
+                'openid profile email',
+            );
 
             // Get a client_credentials token (TechnicalToken — no user)
-            const ccToken = await tokenFixture.fetchClientCredentialsToken(creds.clientId, creds.clientSecret);
+            const ccToken = await tokenFixture.fetchClientCredentialsTokenFlow(creds.clientId, creds.clientSecret);
 
             // UserInfo should reject it
             const res = await app.getHttpServer()

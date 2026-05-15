@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+    <title>Consent E2E Test App</title>
+    <link crossorigin="anonymous" href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css"
+        integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" rel="stylesheet">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #41464b;
+        }
+
+        .login-button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .login-button:hover {
+            background-color: #45a049;
+        }
+
+        .error-card {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container py-4">
+        <div class="row mb-3">
+            <div class="card">
+                <div class="card-header">Consent E2E Test App</div>
+                <div class="card-body">
+                    <!-- Populated on successful callback: shows decoded access token -->
+                    <pre><code id="decodedToken"></code></pre>
+                    <!-- Populated on successful callback: raw code and state for test assertions -->
+                    <span id="auth-code" style="display:none"></span>
+                    <span id="auth-state" style="display:none"></span>
+                </div>
+            </div>
+        </div>
+        <div class="row mb-3" id="error-row" style="display: none;">
+            <div class="card error-card">
+                <div class="card-header">OAuth Error</div>
+                <div class="card-body">
+                    <!-- Populated on error callback: error code and description for test assertions -->
+                    <p><strong>Error:</strong> <span id="error-code"></span></p>
+                    <p><strong>Description:</strong> <span id="error-description"></span></p>
+                    <span id="error-state" style="display:none"></span>
+                </div>
+            </div>
+        </div>
+        <div class="row justify-content-center">
+            <div class="col-4">
+                <button class="login-button w-100" id="login-btn">
+                    Login
+                </button>
+            </div>
+        </div>
+    </div>
+</body>
+
+<script crossorigin="anonymous" integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM"
+    src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    // OAuth Configuration
+    // Allow client_id and scope to be overridden via query params for test flexibility.
+    // Defaults to the seeded "Consent E2E Test" client on shire.local.
+    const BASE_URL = 'http://localhost:9001';
+
+    const initParams = new URLSearchParams(window.location.search);
+    const CLIENT_ID = initParams.get('client_id') || null; // resolved at runtime from DOM after login
+    const DEFAULT_SCOPE = 'openid profile email';
+    // redirect_uri can be overridden via ?redirect_uri=... query param.
+    // Defaults to this page so the callback is handled here automatically.
+    const REDIRECT_URI = initParams.get('redirect_uri') || (window.location.origin + '/consent-app.html');
+
+    /**
+     * Generate a random state value for CSRF protection.
+     */
+    function randomState() {
+        const array = new Uint8Array(32);
+        crypto.getRandomValues(array);
+        return Array.from(array, b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    /**
+     * Generate a PKCE code verifier (random 43-128 char URL-safe string).
+     */
+    function randomCodeVerifier() {
+        const array = new Uint8Array(48);
+        crypto.getRandomValues(array);
+        return btoa(String.fromCharCode(...array))
+            .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+    }
+
+    /**
+     * Derive a PKCE S256 code challenge from a verifier.
+     */
+    async function codeChallenge(verifier) {
+        const encoder = new TextEncoder();
+        const data = encoder.encode(verifier);
+        const digest = await crypto.subtle.digest('SHA-256', data);
+        return btoa(String.fromCharCode(...new Uint8Array(digest)))
+            .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+    }
+
+    /**
+     * Start the OAuth authorization code flow with PKCE.
+     * Reads client_id, scope, and optional prompt from the button's data attributes
+     * so Cypress can set them before clicking (via data-client-id / data-scope / data-prompt).
+     */
+    async function startLogin() {
+        const btn = document.getElementById('login-btn');
+        const clientId = btn.dataset.clientId;
+        const scope = btn.dataset.scope || DEFAULT_SCOPE;
+        const prompt = btn.dataset.prompt || null;
+
+        if (!clientId) {
+            document.getElementById('decodedToken').innerText =
+                'Error: client_id not set. Set data-client-id on #login-btn before clicking.';
+            return;
+        }
+
+        const verifier = randomCodeVerifier();
+        const challenge = await codeChallenge(verifier);
+        const state = randomState();
+
+        sessionStorage.setItem('pkce-code-verifier', verifier);
+        sessionStorage.setItem('oauth-state', state);
+        sessionStorage.setItem('oauth-client-id', clientId);
+        sessionStorage.setItem('oauth-scope', scope);
+
+        const params = new URLSearchParams({
+            response_type: 'code',
+            client_id: clientId,
+            redirect_uri: REDIRECT_URI,
+            state,
+            scope,
+            code_challenge: challenge,
+            code_challenge_method: 'S256',
+        });
+
+        if (prompt) {
+            params.set('prompt', prompt);
+        }
+
+        window.location.href = `${BASE_URL}/api/oauth/authorize?${params.toString()}`;
+    }
+
+    /**
+     * Handle the OAuth callback (code or error) after redirect from the auth server.
+     */
+    async function handleCallback() {
+        const params = new URLSearchParams(window.location.search);
+
+        // Error response (e.g. access_denied from Deny button)
+        if (params.has('error')) {
+            const error = params.get('error');
+            const description = params.get('error_description') || '';
+            const state = params.get('state') || '';
+
+            document.getElementById('error-row').style.display = 'block';
+            document.getElementById('error-code').innerText = error;
+            document.getElementById('error-description').innerText = description;
+            document.getElementById('error-state').innerText = state;
+
+            document.getElementById('login-btn').innerText = 'Try Again';
+            return;
+        }
+
+        if (!params.has('code')) {
+            return; // Not a callback — initial page load
+        }
+
+        const storedState = sessionStorage.getItem('oauth-state');
+        const callbackState = params.get('state');
+
+        if (!storedState || !callbackState || storedState !== callbackState) {
+            document.getElementById('decodedToken').innerText =
+                'Error: state mismatch — possible CSRF attack.';
+            return;
+        }
+
+        const code = params.get('code');
+        const clientId = sessionStorage.getItem('oauth-client-id');
+        const verifier = sessionStorage.getItem('pkce-code-verifier');
+
+        // Expose raw code and state for Cypress assertions before token exchange
+        document.getElementById('auth-code').innerText = code;
+        document.getElementById('auth-state').innerText = callbackState;
+
+        try {
+            const tokenResponse = await fetch(`${BASE_URL}/api/oauth/token`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    grant_type: 'authorization_code',
+                    code,
+                    client_id: clientId,
+                    redirect_uri: REDIRECT_URI,
+                    code_verifier: verifier,
+                }),
+            });
+
+            const tokens = await tokenResponse.json();
+
+            sessionStorage.removeItem('pkce-code-verifier');
+            sessionStorage.removeItem('oauth-state');
+            sessionStorage.removeItem('oauth-client-id');
+            sessionStorage.removeItem('oauth-scope');
+
+            if (tokens.error) {
+                document.getElementById('error-row').style.display = 'block';
+                document.getElementById('error-code').innerText = tokens.error;
+                document.getElementById('error-description').innerText =
+                    tokens.error_description || 'Token exchange failed';
+                return;
+            }
+
+            decodeToken(tokens.access_token);
+            document.getElementById('login-btn').innerText = 'Login Successful';
+            document.getElementById('login-btn').disabled = true;
+
+        } catch (err) {
+            document.getElementById('decodedToken').innerText =
+                'Error: Token exchange failed — ' + err.message;
+        }
+    }
+
+    /**
+     * Decode and display a JWT access token.
+     */
+    function decodeToken(token) {
+        if (!token) return;
+        try {
+            const parts = token.split('.');
+            const decoded = {
+                header: JSON.parse(atob(parts[0])),
+                payload: JSON.parse(atob(parts[1])),
+            };
+            document.getElementById('decodedToken').innerText =
+                JSON.stringify(decoded, null, 4);
+        } catch (e) {
+            document.getElementById('decodedToken').innerText =
+                'Error decoding token: ' + e.message;
+        }
+    }
+
+    document.getElementById('login-btn').addEventListener('click', startLogin);
+    handleCallback();
+</script>
+
+</html>

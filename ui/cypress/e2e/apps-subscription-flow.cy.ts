@@ -52,24 +52,24 @@ describe('Apps & Subscription Flow', () => {
     });
 
     // Tenant B user navigates to the external app, triggers OAuth /authorize flow,
-    // logs in, and verifies the token contains the correct user and tenant claims
+    // confirms the existing session, and verifies the token contains the correct user and tenant claims
     it("Tenant B user should be able to login to Tenant A's app", () => {
-        const TENANT_B_USER = 'admin@bree.local';
-        const TENANT_B_USER_PASSWORD = 'admin9000';
-
         cy.login(TENANT_B_ADMIN, 'admin9000', TENANT_B_DOMAIN);
         cy.userOpenTenantOverview();
 
         cy.visit(APP_URL);
 
+        cy.intercept('POST', '**/api/oauth/token*').as('authToken');
+
         cy.get('button').contains('Login').click();
 
-        cy.url().should('include', '/authorize');
-        cy.get('#username').type(TENANT_B_USER);
-        cy.get('#password').type(TENANT_B_USER_PASSWORD);
+        // The user already has a session from cy.login(), but has not yet
+        // consented to this third-party app. Flow: consent → session-confirm.
+        cy.get('app-authorize[data-view="consent"]').should('exist');
+        cy.get('button').contains('Approve').click();
 
-        cy.intercept('POST', '**/api/oauth/token*').as('authToken');
-        cy.get('#login-btn').click();
+        cy.get('app-authorize[data-view="session-confirm"]').should('exist');
+        cy.get('button').contains('Continue').click();
 
         cy.wait('@authToken').should((interception: Interception) => {
             const {response} = interception;

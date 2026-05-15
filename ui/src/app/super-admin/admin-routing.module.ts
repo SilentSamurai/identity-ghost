@@ -6,6 +6,7 @@ import {TN01AComponent} from './tenants/TN01A.component';
 import {TN02ASelectionComponent} from './tenants/TN02A-selection.component';
 import {TN02AComponent} from './tenants/TN02A.component';
 import {TNRL01ASelectionComponent} from './tenants/TNRL01A-selection.component';
+import {TNRL01AComponent} from './tenants/TNRL01A.component';
 import {RL01AComponent} from './roles/RL01A.component';
 import {RL02ASelectionComponent} from './roles/RL02A-selection.component';
 import {RL02AComponent} from './roles/RL02A.component';
@@ -31,6 +32,7 @@ const adminRoutes: Routes = [
             {path: 'TN02', component: TN02ASelectionComponent},
             {path: 'TN02/:tenantId', component: TN02AComponent},
             {path: 'TNRL01', component: TNRL01ASelectionComponent},
+            {path: 'TNRL01/:tenantId/:userId', component: TNRL01AComponent},
             {path: 'RL01', component: RL01AComponent},
             {path: 'RL02', component: RL02ASelectionComponent},
             {path: 'RL02/:tenantId/:roleId', component: RL02AComponent},

@@ -27,8 +27,11 @@ import {TypeOrmModule} from '@nestjs/typeorm';
 import {LoginSession} from '../src/entity/login-session.entity';
 import {AuthCode} from '../src/entity/auth_code.entity';
 import {User} from '../src/entity/user.entity';
+import {Tenant} from '../src/entity/tenant.entity';
 import {CorsOriginService} from '../src/services/cors-origin.service';
 import {getTestPorts, TestPorts} from './test-ports';
+import * as cookieParser from "cookie-parser";
+import * as express from "express";
 
 declare global {
     var __SHARED_TEST_APP__: INestApplication | undefined;
@@ -110,12 +113,47 @@ export default async function globalSetup(): Promise<void> {
         // 4. Compile and start the NestJS app on configured port
         //    Register TestUtilsController for test-only endpoints (session expiry, auth code lookup)
         const moduleRef = await Test.createTestingModule({
-            imports: [AppModule, TypeOrmModule.forFeature([LoginSession, AuthCode, User])],
+            imports: [AppModule, TypeOrmModule.forFeature([LoginSession, AuthCode, User, Tenant])],
             controllers: [TestUtilsController],
         }).compile();
 
         app = moduleRef.createNestApplication();
         app.useGlobalFilters(new HttpExceptionFilter());
+
+        // Cookie parser with signing secret (mirrors setup.ts)
+        // In production, COOKIE_SECRET is required. In development, fall back to a dev secret.
+        let cookieSecret = Environment.get('COOKIE_SECRET', '');
+        if (!cookieSecret) {
+            if (process.env.NODE_ENV === 'production') {
+                console.error('FATAL: COOKIE_SECRET environment variable is required in production. Refusing to start.');
+                process.exit(1);
+            }
+            cookieSecret = 'dev-cookie-secret-do-not-use-in-prod';
+            console.warn('WARNING: COOKIE_SECRET not set. Using insecure dev secret. Do NOT use in production.');
+        }
+        app.use(cookieParser(cookieSecret));
+
+        // Add HEAD / handler (mirrors setup.ts)
+        app.use('/', (req, res, next) => {
+            if (req.method === 'HEAD' && req.path === '/') {
+                return res.status(200).end();
+            }
+            next();
+        });
+
+        // JSON and URL-encoded body parsing (mirrors setup.ts)
+        app.use(
+            express.json({
+                limit: Environment.get("MAX_REQUEST_SIZE"),
+            }),
+        );
+
+        app.use(
+            express.urlencoded({
+                limit: Environment.get("MAX_REQUEST_SIZE"),
+                extended: true,
+            }),
+        );
 
         // Enable CORS with dynamic origin validation (mirrors setup.ts)
         if (Environment.get("ENABLE_CORS")) {

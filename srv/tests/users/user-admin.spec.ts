@@ -19,7 +19,7 @@ describe('e2e users', () => {
     it('User Operation all', async () => {
         // STEP 1: Fetch Access Token
         const tokenFixture = new TokenFixture(app);
-        let response = await tokenFixture.fetchAccessToken(
+        let response = await tokenFixture.fetchAccessTokenFlow(
             "admin@auth.server.com",
             "admin9000",
             "auth.server.com"

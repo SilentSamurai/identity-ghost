@@ -11,16 +11,19 @@
  * OAuthExceptionFilter for proper OAuth error formatting.
  */
 import {
+    BadRequestException,
     Body,
     ClassSerializerInterceptor,
     Controller,
     Get,
+    Header,
     HttpCode,
     Logger,
     Post,
     Query,
     Req,
     Res,
+    UnauthorizedException,
     UseFilters,
     UseInterceptors,
 } from "@nestjs/common";
@@ -40,16 +43,20 @@ import {OAuthExceptionFilter} from "../exceptions/filter/oauth-exception.filter"
 import {AuthorizeQueryParams, AuthorizeService} from "../auth/authorize.service";
 import {CryptUtil} from "../util/crypt.util";
 import {parseBasicAuthHeader} from "../util/http.util";
-import {InjectRepository} from "@nestjs/typeorm";
 import {Client} from "../entity/client.entity";
-import {Repository} from "typeorm";
 import {LoginSessionService} from "../auth/login-session.service";
 import {ConsentService} from "../auth/consent.service";
 import {ScopeResolverService} from "../casl/scope-resolver.service";
 import {ClientService} from "../services/client.service";
-import {PromptAction, PromptService} from "../auth/prompt.service";
 import {ResourceIndicatorValidator} from "../auth/resource-indicator.validator";
 import {Environment} from "../config/environment.service";
+import {RefreshTokenService} from "../auth/refresh-token.service";
+import {TenantAmbiguityService, TenantInfo} from "../auth/tenant-ambiguity.service";
+import {FirstPartyResolver} from "../auth/first-party-resolver";
+import {AppClientAuditLogger} from "../log/app-client-audit.logger";
+import {AppService} from "../services/app.service";
+import {FlowIdCookieService} from "../auth/flow-id-cookie.service";
+import {CsrfTokenService} from "../auth/csrf-token.service";
 
 const logger = new Logger("OAuthTokenController");
 
@@ -66,394 +73,527 @@ export class OAuthTokenController {
         private readonly loginSessionService: LoginSessionService,
         private readonly consentService: ConsentService,
         private readonly scopeResolverService: ScopeResolverService,
-        @InjectRepository(Client)
-        private readonly clientRepository: Repository<Client>,
         private readonly clientService: ClientService,
-        private readonly promptService: PromptService,
+        private readonly refreshTokenService: RefreshTokenService,
+        private readonly tenantAmbiguityService: TenantAmbiguityService,
+        private readonly firstPartyResolver: FirstPartyResolver,
+        private readonly appClientAuditLogger: AppClientAuditLogger,
+        private readonly appService: AppService,
+        private readonly flowIdCookieService: FlowIdCookieService,
+        private readonly csrfTokenService: CsrfTokenService,
     ) {
     }
 
+/**
+     * GET /api/oauth/authorize — OAuth 2.0 authorization endpoint.
+     *
+     * Flow chart (entry point: external app redirects user to /authorize):
+     *```mermaid
+     *   graph TD
+     *       START((External App<br/>redirects user)) --> A
+     *       A[GET /api/oauth/authorize] -->|no session / invalid / from_logout| D[302 → UI login form]
+     *       A -->|prompt=none + no session| E[302 redirect_uri?error=login_required]
+     *       A -->|session + no consent| I[302 → UI consent]
+     *       A -->|session + consent + session_confirmed=true| B[302 redirect_uri?code=...]
+     *       A -->|session + consent + no session_confirmed| C[302 → UI session-confirm]
+     *       A -->|session + consent + skipConfirm=true| B
+     *       C -->|Continue click| A
+     *       C -->|Logout click| G[POST /api/oauth/logout]
+     *       G --> D
+     *       I -->|Grant consent| H[POST /api/oauth/consent]
+     *       I -->|Deny consent| J[302 redirect_uri?error=access_denied]
+     *       H --> B
+     *       D -->|POST /api/oauth/login| F
+     *       F{login result} -->|success + first-party| B
+     *       F -->|success + third-party + no consent| I
+     *       F -->|success + third-party + consent| C
+     *       F -->|requires_tenant_selection=true| K[UI tenant-selection]
+     *       K -->|select tenant + re-POST /api/oauth/login| F
+     *       B --> END((External App<br/>receives code))
+     *```
+     */
     @Get("/authorize")
-    async authorize(@Query() query: AuthorizeQueryParams, @Res() res: Response): Promise<void> {
+    async authorize(
+        @Query() query: AuthorizeQueryParams,
+        @Req() req: ExpressRequest,
+        @Res() res: Response,
+    ): Promise<void> {
         try {
             const validated = await this.authorizeService.validateAuthorizeRequest(query);
 
-            const params = new URLSearchParams();
-            params.set('client_id', query.client_id!); // it needs to be query.client_id as client id can also be a domain or client id
-            params.set('redirect_uri', validated.redirectUri);
-            params.set('scope', validated.scope);
-            params.set('state', validated.state);
-            params.set('response_type', validated.responseType);
-            if (validated.codeChallenge) {
-                params.set('code_challenge', validated.codeChallenge);
-                params.set('code_challenge_method', validated.codeChallengeMethod);
-            }
-            if (validated.nonce) {
-                params.set('nonce', validated.nonce);
-            }
-            // Forward new OIDC parameters
-            if (validated.prompt) {
-                params.set('prompt', validated.prompt);
-            }
-            if (validated.maxAge !== undefined) {
-                params.set('max_age', String(validated.maxAge));
-            }
-            if (validated.resource) {
-                params.set('resource', validated.resource);
+            // 0. User explicitly denied consent — issue the access_denied error
+            //    redirect immediately, before any session or UI checks.
+            if (query.consent_denied === 'true') {
+                return this.redirectWithError(
+                    res,
+                    validated.redirectUri,
+                    'access_denied',
+                    'The user denied the authorization request.',
+                    validated.state,
+                );
             }
 
-            res.redirect(302, `${Environment.get('BASE_URL', '')}/authorize?${params.toString()}`);
+            // 1. Forced login: from_logout or prompt=login
+            if (query.from_logout === 'true' || validated.prompt === 'login') {
+                const flowId = this.flowIdCookieService.mintIfAbsent(req, res);
+                return this.redirectToAuthorizeUI(res, query, validated, 'login', flowId);
+            }
+
+            // 2. Unsupported prompt values
+            const supportedPrompts = ['none', 'login', 'consent', undefined];
+            if (validated.prompt && !supportedPrompts.includes(validated.prompt)) {
+                return this.redirectWithError(
+                    res, validated.redirectUri,
+                    'invalid_request',
+                    `Unsupported prompt value: ${validated.prompt}. Supported values: none, login, consent`,
+                    validated.state,
+                );
+            }
+
+            // 3. Resolve session from signed sid cookie
+            const session = await this.resolveSession(req, validated.maxAge);
+
+            // 4. No session
+            if (!session) {
+                if (validated.prompt === 'none') {
+                    return this.redirectWithError(
+                        res, validated.redirectUri, 'login_required', 'No valid session', validated.state,
+                    );
+                }
+                const flowId = this.flowIdCookieService.mintIfAbsent(req, res);
+                return this.redirectToAuthorizeUI(res, query, validated, 'login', flowId);
+            }
+
+            // 5. Session valid — resolve client and consent
+            const client = await this.clientService.findByClientIdOrAlias(query.client_id!);
+
+            // First-party = redirect_uri points to auth server itself (user stays on auth server)
+            // Third-party = redirect_uri points to external app (user authorizing external app)
+            // See FirstPartyResolver for detailed explanation
+            const isFirstParty = this.firstPartyResolver.isFirstParty(client, validated.redirectUri);
+
+            // Task 15.3: Log when authorize resolves to an App_Client
+            const linkedApp = await this.appService.findByClientId(client.id);
+            if (linkedApp) {
+                this.appClientAuditLogger.logAuthorizeResolved({
+                    appId: linkedApp.id,
+                    clientId: client.clientId,
+                    alias: client.alias || '',
+                    userId: session.userId,
+                    correlationId: '',
+                });
+            }
+
+            const resolvedScopes = this.scopeResolverService.resolveScopes(
+                validated.scope, client.allowedScopes || 'openid profile email',
+            );
+
+            let consentGranted = true;
+            if (!isFirstParty) {
+                const consentCheck = await this.consentService.checkConsent(
+                    session.userId, client.clientId, resolvedScopes,
+                );
+                consentGranted = !consentCheck.consentRequired;
+            }
+
+            const skipConfirm = client.tenant?.skipSessionConfirm === true;
+            const confirmed = query.session_confirmed === 'true';
+
+            // prompt=consent — force re-approval (session-confirm first if configured)
+            if (validated.prompt === 'consent') {
+                if (!skipConfirm && !confirmed) {
+                    const flowId = this.flowIdCookieService.mintIfAbsent(req, res);
+                    return this.redirectToAuthorizeUI(res, query, validated, 'session-confirm', flowId);
+                }
+                const flowId = this.flowIdCookieService.mintIfAbsent(req, res);
+                return this.redirectToAuthorizeUI(res, query, validated, 'consent', flowId);
+            }
+
+            // No consent → consent UI
+            if (!consentGranted) {
+                const flowId = this.flowIdCookieService.mintIfAbsent(req, res);
+                return this.redirectToAuthorizeUI(res, query, validated, 'consent', flowId);
+            }
+
+            // Consent exists → issue code or session-confirm
+            if (skipConfirm || confirmed) {
+                return this.issueCodeAndRedirect(res, session, client, query, validated);
+            }
+            const flowId = this.flowIdCookieService.mintIfAbsent(req, res);
+            return this.redirectToAuthorizeUI(res, query, validated, 'session-confirm', flowId);
+
         } catch (error) {
             if (error instanceof AuthorizeRedirectException) {
-                const params = new URLSearchParams();
-                params.set('error', error.errorCode);
-                params.set('error_description', error.errorDescription);
-                if (error.state) {
-                    params.set('state', error.state);
-                }
-                res.redirect(302, `${error.redirectUri}?${params.toString()}`);
-                return;
+                // Post-redirect OAuth error per RFC 6749 §4.1.2.1.
+                // Funnel through `redirectWithError` so `flow_id` is cleared
+                // on the same response that issues the 302 (Req 5.14, 12.6).
+                return this.redirectWithError(
+                    res,
+                    error.redirectUri,
+                    error.errorCode,
+                    error.errorDescription,
+                    error.state,
+                );
             }
+            // Pre-redirect error (unknown `client_id`, unregistered
+            // `redirect_uri`, etc.). Per Req 5.6 the error is rendered on
+            // the auth server without redirecting to External_Client, but
+            // we still clear any `flow_id` cookie carried over from a
+            // previous flow so it does not linger after the abandoned
+            // request.
+            this.flowIdCookieService.clear(res);
             throw error;
         }
+    }
+
+    /**
+     * Resolve session from signed sid cookie.
+     * Returns null if cookie is missing, signature invalid, session not found, expired, or max_age exceeded.
+     */
+    private async resolveSession(req: ExpressRequest, maxAge?: number): Promise<import('../entity/login-session.entity').LoginSession | null> {
+        const sid = (req as any).signedCookies?.sid;
+        if (!sid) return null;
+
+        const session = await this.loginSessionService.findSessionBySid(sid);
+        if (!session) return null;
+
+        // max_age check per OIDC Core §3.1.2.1
+        if (maxAge !== undefined) {
+            const elapsed = Math.floor(Date.now() / 1000) - session.authTime;
+            if (elapsed > maxAge) return null;
+        }
+        return session;
+    }
+
+    /**
+     * Issue an authorization code and redirect to the client's redirect_uri.
+     *
+     * Clears the `flow_id` cookie before the 302 so the completed flow's
+     * CSRF context is terminated on External_Client redirect (Req 5.14,
+     * 12.6). The redirect URL carries only `code` and `state` — no
+     * internal signals (`view`, `csrf_token`, `session_confirmed`,
+     * `from_logout`, `sid`, `flow_id`) appear in the query string
+     * (Req 5.4, 5.13).
+     */
+    private async issueCodeAndRedirect(
+        res: Response,
+        session: import('../entity/login-session.entity').LoginSession,
+        client: Client,
+        query: AuthorizeQueryParams,
+        validated: import('../auth/authorize.service').ValidatedAuthorizeRequest,
+    ): Promise<void> {
+        const user = await this.authUserService.findUserById(session.userId);
+        const authCode = await this.authCodeService.createAuthToken(
+            user,
+            client.tenant,
+            query.client_id!,
+            validated.codeChallenge || null,
+            validated.codeChallenge ? (validated.codeChallengeMethod || 'plain') : null,
+            validated.subscriberTenantHint,
+            validated.redirectUri,
+            validated.scope,
+            validated.nonce,
+            session.sid,
+            false,
+            validated.resource,
+        );
+        const params = new URLSearchParams();
+        params.set('code', authCode);
+        if (validated.state) params.set('state', validated.state);
+        this.flowIdCookieService.clear(res);
+        res.redirect(302, `${validated.redirectUri}?${params.toString()}`);
+    }
+
+    /**
+     * Redirect to the unified `/authorize` UI route with the requested `view`.
+     *
+     * Builds the target URL as:
+     *   `${BASE_URL}/authorize?view=<view>&csrf_token=<t>&<all OAuth params from query>`
+     *
+     * Every OAuth parameter present on the original authorize request is
+     * forwarded unchanged (Req 5.15). The internal signaling params
+     * `session_confirmed`, `from_logout`, `sid`, and `flow_id` are never
+     * forwarded onto this UI redirect (Req 5.8, 5.13).
+     *
+     * The CSRF token is computed from the caller-supplied `flowId` via
+     * `CsrfTokenService.computeFromFlowId`, which returns
+     * `HMAC-SHA256(COOKIE_SECRET, flowId)`. Callers obtain `flowId` from
+     * `FlowIdCookieService.mintIfAbsent(req, res)` immediately before
+     * calling this helper, so the same token is emitted for every UI
+     * redirect within one flow (Req 5.10, 5.11, 5.12).
+     *
+     * Requirements: 5.1, 5.2, 5.3, 5.7, 5.8, 5.9, 5.10, 5.11, 5.12, 5.15
+     */
+    private redirectToAuthorizeUI(
+        res: Response,
+        query: AuthorizeQueryParams,
+        validated: import('../auth/authorize.service').ValidatedAuthorizeRequest,
+        view: 'login' | 'consent' | 'session-confirm',
+        flowId: string = '',
+    ): void {
+        const params = new URLSearchParams();
+
+        // Non-OAuth signaling params come first for readability of the URL.
+        params.set('view', view);
+        params.set(
+            'csrf_token',
+            flowId ? this.csrfTokenService.computeFromFlowId(flowId) : '',
+        );
+
+        // OAuth parameters (Req 5.15). Prefer the validated/normalized values
+        // where available — they have already been defaulted / coerced by
+        // AuthorizeService.validateAuthorizeRequest — and fall back to the
+        // raw query for fields the validator does not echo back.
+        params.set('client_id', query.client_id!);
+        params.set('redirect_uri', validated.redirectUri);
+        params.set('response_type', validated.responseType);
+        params.set('scope', validated.scope);
+        params.set('state', validated.state);
+        if (validated.codeChallenge) {
+            params.set('code_challenge', validated.codeChallenge);
+            params.set('code_challenge_method', validated.codeChallengeMethod);
+        }
+        if (validated.nonce) params.set('nonce', validated.nonce);
+        if (validated.resource) params.set('resource', validated.resource);
+        if (validated.prompt) {
+            // Strip prompt=consent when redirecting to the consent view.
+            // Once the consent screen is shown, prompt=consent has fulfilled
+            // its purpose. Echoing it back would create an infinite loop:
+            // grant → authorize (still has prompt=consent) → consent again.
+            if (validated.prompt === 'consent' && view === 'consent') {
+                // Don't include prompt — it's satisfied by showing the view.
+            } else {
+                params.set('prompt', validated.prompt);
+            }
+        }
+        if (validated.maxAge !== undefined) params.set('max_age', String(validated.maxAge));
+        if (query.id_token_hint) params.set('id_token_hint', query.id_token_hint);
+        if (validated.subscriberTenantHint) {
+            params.set('subscriber_tenant_hint', validated.subscriberTenantHint);
+        }
+
+        // Intentionally NOT forwarded (Req 5.8, 5.13):
+        //   - session_confirmed / from_logout: one-shot internal flags, consumed by
+        //     the backend on the redirect that carried them and never echoed onwards.
+        //   - sid / flow_id: session/flow cookie values must never appear in URLs.
+
+        res.redirect(302, `${Environment.get('BASE_URL', '')}/authorize?${params.toString()}`);
+    }
+
+    /**
+     * Redirect to redirect_uri with an OAuth error (RFC 6749 §4.1.2.1).
+     *
+     * Clears the `flow_id` cookie before the 302 so the abandoned flow's
+     * CSRF context is terminated on External_Client redirect (Req 5.14,
+     * 12.6). The redirect URL carries only `error`, `error_description`,
+     * and (when present) the original `state` — no internal signals
+     * (`view`, `csrf_token`, `session_confirmed`, `from_logout`, `sid`,
+     * `flow_id`) appear in the query string (Req 5.5, 5.13).
+     */
+    private redirectWithError(
+        res: Response,
+        redirectUri: string,
+        error: string,
+        description: string,
+        state?: string,
+    ): void {
+        const params = new URLSearchParams();
+        params.set('error', error);
+        params.set('error_description', description);
+        if (state) params.set('state', state);
+        this.flowIdCookieService.clear(res);
+        res.redirect(302, `${redirectUri}?${params.toString()}`);
+    }
+
+    /**
+     * Helper to get the cookie options for the sid cookie.
+     */
+    private getSidCookieOptions(maxAge: number): Record<string, any> {
+        return {
+            signed: true,
+            httpOnly: true,
+            secure: Environment.get('ENABLE_HTTPS') === 'true' || process.env.NODE_ENV === 'production',
+            sameSite: 'lax' as const,
+            path: '/api/oauth',
+            maxAge: maxAge * 1000, // convert seconds to ms
+        };
     }
 
     @Post("/login")
     async login(
         @Req() req: ExpressRequest,
+        @Res({passthrough: true}) res: Response,
         @Body(new ValidationPipe(ValidationSchema.LoginSchema))
         body: {
             client_id: string;
             password: string;
             email: string;
-            code_challenge_method: string;
-            code_challenge: string;
+            csrf_token: string;
             subscriber_tenant_hint?: string;
-            redirect_uri?: string;
-            scope?: string;
-            nonce?: string;
-            prompt?: string;
-            max_age?: number;
-            resource?: string;
         },
-    ) {
-        const user: User = await this.authService.validate(
-            body.email,
-            body.password,
+    ): Promise<{ success: true } | { requires_tenant_selection: true; tenants: TenantInfo[] }> {
+        // Validate CSRF token against the signed `flow_id` cookie BEFORE any
+        // credential validation, session creation, or tenant lookup. On 403
+        // we do not touch the auth subsystem at all — no session is created
+        // and no tenant lists are returned (Req 8.3, 12.1, 12.2, 12.3, 12.4).
+        this.csrfTokenService.verifyOrThrow(
+            req.signedCookies?.flow_id,
+            body.csrf_token,
         );
 
-        // Resolve Client entity by clientId or alias (Requirements 3.1, 3.2, 3.3)
+        const user: User = await this.authService.validate(body.email, body.password);
+
+        // Resolve Client entity by clientId or alias
         let client: Client;
         try {
             client = await this.clientService.findByClientIdOrAlias(body.client_id);
         } catch {
             throw OAuthException.invalidClient('Unknown client_id');
         }
+
+        // Check if this is a first-party app (stored identity lookup)
+        // Note: For tenant resolution, we only check if it's the default client.
+        // Consent decisions are made in /authorize using isFirstParty() with redirect_uri.
+        const isDefaultClient = this.firstPartyResolver.isDefaultClient(client);
+
+        // For third-party apps without a hint, check for ambiguous tenants
+        if (!isDefaultClient && !body.subscriber_tenant_hint) {
+            const subscriberTenants = await this.tenantAmbiguityService.findSubscriberTenants(
+                user.id,
+                client.clientId,
+            );
+
+            if (subscriberTenants.length > 1) {
+                // Multiple tenants — user must select one
+                // Don't create session yet
+                logger.log(`User ${user.email} has ${subscriberTenants.length} subscriber tenants for client ${body.client_id} — requiring selection`);
+                return {
+                    requires_tenant_selection: true,
+                    tenants: subscriberTenants,
+                };
+            }
+        }
+
+        // If hint provided, validate it
+        if (body.subscriber_tenant_hint) {
+            const isValidHint = await this.tenantAmbiguityService.validateHint(
+                user.id,
+                client.clientId,
+                body.subscriber_tenant_hint,
+            );
+            if (!isValidHint) {
+                throw OAuthException.invalidRequest('Invalid subscriber_tenant_hint');
+            }
+        }
+
         const tenant = client.tenant;
 
-        // Determine first-party status: when the caller used the alias (domain) as client_id,
-        // it is a first-party login and consent should be skipped (Requirements 8.1, 8.2)
-        const isFirstParty = client.alias === body.client_id;
+        // Create a new login session
+        const session = await this.loginSessionService.createSession(user.id, tenant.id);
 
-        // PKCE S256 enforcement and downgrade prevention
-        if (client.requirePkce && body.code_challenge_method === 'plain') {
-            throw OAuthException.invalidRequest('S256 code_challenge_method is required for this client');
-        }
-        if (client.pkceMethodUsed === 'S256' && body.code_challenge_method === 'plain') {
-            throw OAuthException.invalidRequest('PKCE downgrade not allowed: this client has previously used S256');
-        }
-
-        // Validate redirect_uri against registered URIs before proceeding
-        await this.authorizeService.validateRedirectUriForClient(body.client_id, body.redirect_uri);
-
-        const result = await this.tokenIssuanceService.resolveLoginAccess(
-            user, tenant, body.subscriber_tenant_hint,
+        // Compute cookie max-age from configured session duration
+        const durationSeconds = parseInt(
+            Environment.get('LOGIN_SESSION_DURATION_SECONDS', '1296000'),
+            10,
         );
 
-        if (!result.granted) {
-            return {
-                requires_tenant_selection: true,
-                tenants: result.ambiguousTenants,
-            };
-        }
+        // Set signed sid cookie
+        res.cookie('sid', session.sid, this.getSidCookieOptions(durationSeconds));
 
-        // Parse prompt parameter and evaluate prompt/max_age requirements
-        const promptValues = this.promptService.parsePrompt(body.prompt);
-        this.promptService.validatePrompt(promptValues);
-
-        // Find existing session for prompt/max_age evaluation
-        const existingSession = await this.loginSessionService.findValidSession(user.id, tenant.id);
-
-        // Resolve scopes for consent check
-        const clientAllowedScopes = client.allowedScopes || 'openid profile email';
-        const resolvedScopes = this.scopeResolverService.resolveScopes(
-            body.scope,
-            clientAllowedScopes,
-        );
-
-        // Check consent state for prompt evaluation
-        let consentGranted = true;
-        if (!isFirstParty) {
-            const consentCheck = await this.consentService.checkConsent(
-                user.id,
-                client.clientId,
-                resolvedScopes,
-            );
-            consentGranted = !consentCheck.consentRequired;
-        }
-
-        // Evaluate prompt/max_age to determine action
-        const evaluation = this.promptService.evaluate({
-            promptValues,
-            maxAge: body.max_age,
-            session: existingSession,
-            consentGranted,
-        });
-
-        // Handle FORCE_LOGIN: invalidate all existing sessions before creating a new one
-        if (evaluation.action === PromptAction.FORCE_LOGIN) {
-            await this.loginSessionService.invalidateAllSessions(user.id, tenant.id);
-        }
-
-        // Handle FORCE_CONSENT: always return requires_consent regardless of existing consent
-        if (evaluation.action === PromptAction.FORCE_CONSENT) {
-            return {
-                requires_consent: true,
-                requested_scopes: resolvedScopes,
-                client_name: client.name || client.clientId,
-            };
-        }
-
-        // Consent check: only for third-party clients (non-first-party)
-        // First-party (alias-resolved) logins skip consent (Requirements 8.1, 8.2)
-        if (!isFirstParty && consentGranted === false) {
-            const consentCheck = await this.consentService.checkConsent(
-                user.id,
-                client.clientId,
-                resolvedScopes,
-            );
-
-            return {
-                requires_consent: true,
-                requested_scopes: consentCheck.requestedScopes,
-                client_name: client.name || client.clientId,
-            };
-        }
-
-        // Create session (new session if FORCE_LOGIN, otherwise may reuse existing)
-        const session = evaluation.action === PromptAction.FORCE_LOGIN
-            ? await this.loginSessionService.createSession(user.id, tenant.id)
-            : existingSession || await this.loginSessionService.createSession(user.id, tenant.id);
-
-        const auth_code = await this.authCodeService.createAuthToken(
-            user,
-            tenant,
-            body.client_id,
-            body.code_challenge,
-            body.code_challenge_method,
-            result.resolvedHint,
-            body.redirect_uri,
-            body.scope,
-            body.nonce,
-            session.sid,
-            evaluation.requireAuthTime,
-            body.resource,
-        );
-
-        // Update pkceMethodUsed if client used S256 for the first time
-        if (body.code_challenge_method === 'S256' && client.pkceMethodUsed !== 'S256') {
-            client.pkceMethodUsed = 'S256';
-            await this.clientRepository.save(client);
-        }
-
-        return {
-            authentication_code: auth_code,
-        };
+        // Return success — frontend constructs the redirect URL from OAuth params it already has
+        return {success: true};
     }
 
     @Post("/consent")
     async consent(
-        @Body(new ValidationPipe(ValidationSchema.ConsentSchema))
+        @Req() req: ExpressRequest,
+        @Body()
         body: {
-            email: string;
-            password: string;
             client_id: string;
-            code_challenge: string;
-            code_challenge_method: string;
-            approved_scopes: string[];
-            consent_action: 'approve' | 'deny';
-            redirect_uri?: string;
             scope?: string;
-            nonce?: string;
-            subscriber_tenant_hint?: string;
-            prompt?: string;
-            resource?: string;
+            csrf_token: string;
+            decision: 'grant' | 'deny';
         },
-    ): Promise<any> {
-        // Re-authenticate the user
-        const user: User = await this.authService.validate(
-            body.email,
-            body.password,
+    ): Promise<{success: true}> {
+        // 1. Validate CSRF token against the signed `flow_id` cookie BEFORE any
+        // consent record write. On 403 no session lookup or consent write occurs
+        // (Req 6.3, 6.4, 12.1, 12.2, 12.3, 12.4).
+        this.csrfTokenService.verifyOrThrow(
+            req.signedCookies?.flow_id,
+            body.csrf_token,
         );
 
-        // Handle deny action
-        if (body.consent_action === 'deny') {
-            return {
-                error: 'access_denied',
-                error_description: 'The resource owner denied the request',
-            };
+        // 2. Validate session from signed cookie
+        const sid = (req as any).signedCookies?.sid;
+        if (!sid) {
+            throw new UnauthorizedException('No session');
+        }
+        const session = await this.loginSessionService.findSessionBySid(sid);
+        if (!session) {
+            throw new UnauthorizedException('Session expired');
         }
 
-        // Handle approve action
-        if (body.consent_action === 'approve') {
-            // Resolve Client entity by clientId or alias (Requirements 10.1, 10.2)
-            let client: Client;
-            try {
-                client = await this.clientService.findByClientIdOrAlias(body.client_id);
-            } catch {
-                throw OAuthException.invalidClient('Unknown client_id');
-            }
-
-            // Validate approved_scopes against client.allowedScopes
-            const clientAllowedScopes = client.allowedScopes || 'openid profile email';
-            const resolvedScopes = this.scopeResolverService.resolveScopes(
-                body.approved_scopes.join(' '),
-                clientAllowedScopes,
-            );
-
-            // Grant consent using client.clientId (UUID), not body.client_id (Requirements 10.1, 10.2)
-            await this.consentService.grantConsent(
-                user.id,
-                client.clientId,
-                resolvedScopes,
-            );
-
-            // Resolve tenant from the client entity
-            const tenant = client.tenant;
-
-            // Determine requireAuthTime: true when prompt contains 'login' (Requirement 7.2)
-            const promptValues = this.promptService.parsePrompt(body.prompt);
-            const requireAuthTime = promptValues.includes('login');
-
-            // Create session
-            const session = await this.loginSessionService.createSession(user.id, tenant.id);
-
-            // Create auth code
-            const auth_code = await this.authCodeService.createAuthToken(
-                user,
-                tenant,
-                body.client_id,
-                body.code_challenge,
-                body.code_challenge_method,
-                body.subscriber_tenant_hint,
-                body.redirect_uri,
-                body.scope,
-                body.nonce,
-                session.sid,
-                requireAuthTime,
-                body.resource,
-            );
-
-            return {
-                authentication_code: auth_code,
-            };
-        }
-
-        throw OAuthException.invalidRequest('Invalid consent_action');
-    }
-
-    @Post("/silent-auth")
-    async silentAuth(
-        @Body(new ValidationPipe(ValidationSchema.SilentAuthSchema))
-        body: {
-            client_id: string;
-            user_id: string;
-            tenant_id: string;
-            code_challenge: string;
-            code_challenge_method: string;
-            redirect_uri?: string;
-            scope?: string;
-            nonce?: string;
-            max_age?: number;
-            resource?: string;
-        },
-    ): Promise<{ authentication_code: string } | { error: string; error_description: string }> {
-        // Resolve Client entity by clientId or alias
+        // 3. Validate client exists
         let client: Client;
         try {
             client = await this.clientService.findByClientIdOrAlias(body.client_id);
         } catch {
-            return {
-                error: 'invalid_client',
-                error_description: 'Unknown client_id',
-            };
-        }
-        const tenant = client.tenant;
-
-        // Find valid session for the user+tenant
-        const session = await this.loginSessionService.findValidSession(body.user_id, tenant.id);
-
-        // Resolve scopes for consent check
-        const clientAllowedScopes = client.allowedScopes || 'openid profile email';
-        const resolvedScopes = this.scopeResolverService.resolveScopes(
-            body.scope,
-            clientAllowedScopes,
-        );
-
-        // Check consent state
-        const consentCheck = await this.consentService.checkConsent(
-            body.user_id,
-            client.clientId,
-            resolvedScopes,
-        );
-        const consentGranted = !consentCheck.consentRequired;
-
-        // Evaluate prompt=none with gathered context
-        const evaluation = this.promptService.evaluate({
-            promptValues: ['none'],
-            maxAge: body.max_age,
-            session,
-            consentGranted,
-        });
-
-        // If evaluation returns an error, return it as JSON
-        if (evaluation.error) {
-            return {
-                error: evaluation.error,
-                error_description: evaluation.errorDescription || '',
-            };
+            throw new BadRequestException('Unknown client_id');
         }
 
-        // If evaluation returns ISSUE_CODE, create auth code using existing session's sid
-        if (evaluation.action === PromptAction.ISSUE_CODE && session) {
-            // Get user entity for auth code creation
-            const user = await this.authUserService.findUserById(body.user_id);
-
-            const auth_code = await this.authCodeService.createAuthToken(
-                user,
-                tenant,
-                body.client_id,
-                body.code_challenge,
-                body.code_challenge_method,
-                undefined, // subscriberTenantHint
-                body.redirect_uri,
-                body.scope,
-                body.nonce,
-                session.sid,
-                evaluation.requireAuthTime,
-                body.resource,
+        // 4. Record consent decision (grant or deny)
+        // For deny, we don't record anything - frontend will redirect with error
+        if (body.decision === 'grant') {
+            const resolvedScopes = this.scopeResolverService.resolveScopes(
+                body.scope || '', client.allowedScopes || 'openid profile email',
             );
-
-            return {
-                authentication_code: auth_code,
-            };
+            await this.consentService.grantConsent(session.userId, client.clientId, resolvedScopes);
         }
 
-        // This should not happen with prompt=none, but handle gracefully
-        return {
-            error: 'interaction_required',
-            error_description: 'An unexpected error occurred during silent authentication',
-        };
+        // Return success — frontend handles the redirect to authorize or client
+        return {success: true};
+    }
+
+    /**
+     * GET /session-info — Cookie-authenticated session info.
+     * Returns the email of the currently authenticated user.
+     */
+    @Get("/session-info")
+    @Header('Cache-Control', 'no-store')
+    async sessionInfo(
+        @Req() req: ExpressRequest,
+    ): Promise<{ email: string }> {
+        const sid = (req as any).signedCookies?.sid;
+        if (!sid) {
+            throw new UnauthorizedException('No session');
+        }
+
+        const session = await this.loginSessionService.findSessionBySid(sid);
+        if (!session) {
+            throw new UnauthorizedException('Session expired');
+        }
+
+        const user = await this.authUserService.findUserById(session.userId);
+        return {email: user.email};
+    }
+
+    /**
+     * GET /logout — RP-Initiated Logout entry point (per OpenID Connect RP-Initiated Logout §2).
+     * Validates post_logout_redirect_uri if provided and redirects to the UI logout page.
+     */
+    @Get("/logout")
+    async rpInitiatedLogout(
+        @Query() query: { post_logout_redirect_uri?: string; state?: string; id_token_hint?: string },
+        @Res() res: Response,
+    ): Promise<void> {
+        const params = new URLSearchParams();
+        if (query.post_logout_redirect_uri) {
+            params.set('post_logout_redirect_uri', query.post_logout_redirect_uri);
+        }
+        if (query.state) {
+            params.set('state', query.state);
+        }
+        res.redirect(302, `${Environment.get('BASE_URL', '')}/logout?${params.toString()}`);
     }
 
     @HttpCode(200)
@@ -546,10 +686,15 @@ export class OAuthTokenController {
             }
         }
 
-        // Validate PKCE
-        const generatedChallenge = CryptUtil.generateCodeChallenge(body.code_verifier, authCode.method);
-        if (generatedChallenge !== authCode.codeChallenge) {
-            throw OAuthException.invalidGrant("The authorization code is invalid or the code verifier does not match");
+        // Validate PKCE: only when the authorization code was issued with a code_challenge
+        if (authCode.codeChallenge) {
+            if (!body.code_verifier) {
+                throw OAuthException.invalidGrant("code_verifier is required when code_challenge was provided in the authorization request");
+            }
+            const generatedChallenge = CryptUtil.generateCodeChallenge(body.code_verifier, authCode.method);
+            if (generatedChallenge !== authCode.codeChallenge) {
+                throw OAuthException.invalidGrant("The authorization code is invalid or the code verifier does not match");
+            }
         }
 
         // Resolve user and tenant from the auth code record

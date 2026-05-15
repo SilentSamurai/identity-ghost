@@ -17,3 +17,7 @@
 
 // When a command from ./commands is ready to use, import with `import './commands'` syntax
 import './commands';
+
+// Unified OAuth Authorization UI — exports visitAuthorize, interceptAll,
+// assertNoCredentialLeak helpers consumed by ui/cypress/e2e/unified-authorize/*.
+import './unified-authorize';

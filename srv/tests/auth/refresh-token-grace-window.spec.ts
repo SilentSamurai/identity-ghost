@@ -41,7 +41,7 @@ describe('Refresh Token Grace Window', () => {
 
     /** Helper: get fresh tokens and tenant credentials */
     async function getFreshTokensAndCreds() {
-        const result = await tokenFixture.fetchAccessToken(
+        const result = await tokenFixture.fetchAccessTokenFlow(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com',

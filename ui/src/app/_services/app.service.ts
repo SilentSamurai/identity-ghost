@@ -24,23 +24,27 @@ export class AppService {
         };
     }
 
-    async createApp(tenantId: string, name: string, appUrl: string, description: string) {
+    async createApp(tenantId: string, name: string, appUrl: string, description: string, onboardingEnabled?: boolean, onboardingCallbackUrl?: string) {
         return lastValueFrom(
             this.http.post(`${API_URL}/apps/create`, {
                 tenantId,
                 name,
                 appUrl,
-                description
+                description,
+                onboardingEnabled,
+                onboardingCallbackUrl
             })
         );
     }
 
-    async updateApp(id: string, name: string, appUrl: string, description: string) {
+    async updateApp(id: string, name: string, appUrl: string, description: string, onboardingEnabled?: boolean, onboardingCallbackUrl?: string | null) {
         return lastValueFrom(
             this.http.patch(`${API_URL}/apps/${id}`, {
                 name,
                 appUrl,
-                description
+                description,
+                onboardingEnabled,
+                onboardingCallbackUrl
             })
         );
     }
@@ -68,7 +72,7 @@ export class AppService {
 
     createDataModel() {
         return new RestApiModel(this.http, `/api/search/Apps`, ['id'], query({
-            expand: ['owner']
+            expand: ['owner', 'client']
         }));
     }
 
@@ -76,5 +80,15 @@ export class AppService {
         return lastValueFrom(
             this.http.patch(`${API_URL}/apps/${appId}/publish`, {}, this.getHttpOptions())
         );
+    }
+
+    async testWebhook(appId: string) {
+        return lastValueFrom(
+            this.http.post(`${API_URL}/apps/${appId}/test-webhook`, {}, this.getHttpOptions())
+        ) as Promise<{
+            onboardingEnabled: boolean;
+            onboard: { url: string; status: number | null; latencyMs: number; ok: boolean; error?: string; bodyValid: boolean; body?: any } | null;
+            offboard: { url: string; status: number | null; latencyMs: number; ok: boolean; error?: string; bodyValid: boolean; body?: any } | null;
+        }>;
     }
 }

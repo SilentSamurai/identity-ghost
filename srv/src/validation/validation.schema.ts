@@ -180,23 +180,11 @@ const LoginSchema = yup.object().shape({
         .matches(PASSWORD_REGEXP, PASSWORD_MESSAGE)
         .max(128),
     client_id: yup.string().required("client_id is required"),
-    code_challenge_method: yup
-        .string()
-        .required()
-        .matches(/^(plain|S256|OWH32)$/, "method is required")
-        .default("plain"),
-    code_challenge: yup.string().required("code_challenge is required"),
-    subscriber_tenant_hint: yup.string().optional().nullable(),
-    redirect_uri: yup.string().optional(),
-    scope: yup.string().optional(),
-    nonce: yup.string().optional().max(512),
-    prompt: yup.string().optional(),
-    max_age: yup
-        .number()
-        .optional()
-        .integer("max_age must be an integer")
-        .min(0, "max_age must be a non-negative integer"),
-    resource: yup.string().optional(),
+    // CSRF token bound to the signed `flow_id` cookie. Verified by
+    // `CsrfTokenService.verifyOrThrow` in `OAuthTokenController.login`
+    // before any credential validation (Req 8.3, 12.1–12.4).
+    csrf_token: yup.string().required("csrf_token is required"),
+    subscriber_tenant_hint: yup.string().optional().max(256),
 });
 
 const PasswordGrantSchema = yup.object().shape({
@@ -250,7 +238,7 @@ const CodeGrantSchema = yup.object().shape({
         }),
     code: yup.string().required("code is required"),
     code_verifier: yup.string()
-        .required("code_verifier is required")
+        .optional()
         .min(43, "code_verifier must be at least 43 characters")
         .max(128, "code_verifier must be at most 128 characters")
         .matches(/^[A-Za-z0-9\-._~]+$/, "code_verifier contains invalid characters"),
@@ -308,11 +296,11 @@ const ConsentSchema = yup.object().shape({
         .matches(PASSWORD_REGEXP, PASSWORD_MESSAGE)
         .max(128),
     client_id: yup.string().required("client_id is required"),
-    code_challenge: yup.string().required("code_challenge is required"),
+    code_challenge: yup.string().optional(),
     code_challenge_method: yup
         .string()
-        .required()
-        .matches(/^(plain|S256|OWH32)$/, "method is required"),
+        .optional()
+        .matches(/^(plain|S256|OWH32)$/, "method must be plain, S256, or OWH32"),
     approved_scopes: yup
         .array()
         .of(yup.string())
@@ -329,26 +317,6 @@ const ConsentSchema = yup.object().shape({
     resource: yup.string().optional(),
 });
 
-const SilentAuthSchema = yup.object().shape({
-    client_id: yup.string().required("client_id is required"),
-    user_id: yup.string().required("user_id is required"),
-    tenant_id: yup.string().required("tenant_id is required"),
-    code_challenge: yup.string().required("code_challenge is required"),
-    code_challenge_method: yup
-        .string()
-        .required()
-        .matches(/^(plain|S256|OWH32)$/, "method is required"),
-    redirect_uri: yup.string().optional(),
-    scope: yup.string().optional(),
-    nonce: yup.string().optional().max(512),
-    max_age: yup
-        .number()
-        .optional()
-        .integer("max_age must be an integer")
-        .min(0, "max_age must be a non-negative integer"),
-    resource: yup.string().optional(),
-});
-
 const AuthorizeSchema = yup.object().shape({
     // RFC 6749 §4.1.2.1: missing or unsupported response_type → unsupported_response_type.
     // required() catches missing values, oneOf() catches wrong values.
@@ -359,7 +327,8 @@ const AuthorizeSchema = yup.object().shape({
         .oneOf(["code"], "The response_type parameter must be \"code\""),
     client_id: yup
         .string()
-        .required("client_id is required"),
+        .required("client_id is required")
+        .min(1, "client_id must not be empty"),
     redirect_uri: yup
         .string()
         .optional(),
@@ -437,6 +406,5 @@ export const ValidationSchema = {
     UpdateGroupSchema,
     VerifyAuthCodeSchema,
     ConsentSchema,
-    SilentAuthSchema,
     AuthorizeSchema,
 };

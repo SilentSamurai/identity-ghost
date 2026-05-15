@@ -68,7 +68,7 @@ describe('Onboard Customer Endpoint', () => {
         tokenFixture = new TokenFixture(fixture);
 
         // 1. Authenticate as super admin
-        const superAdmin = await tokenFixture.fetchAccessToken(
+        const superAdmin = await tokenFixture.fetchAccessTokenFlow(
             superAdminEmail,
             superAdminPassword,
             'auth.server.com',
@@ -99,29 +99,29 @@ describe('Onboard Customer Endpoint', () => {
         await adminClient.updateMemberRoles(nonOwnerTenantId, nonOwnerUserId, ['TENANT_ADMIN']);
 
         // 5. Authenticate as tenant admins
-        const ownerTokenResp = await tokenFixture.fetchAccessToken(
+        const ownerTokenResp = await tokenFixture.fetchAccessTokenFlow(
             ownerAdminEmail, ownerAdminPassword, ownerDomain,
         );
         ownerAdminToken = ownerTokenResp.accessToken;
 
-        const nonOwnerTokenResp = await tokenFixture.fetchAccessToken(
+        const nonOwnerTokenResp = await tokenFixture.fetchAccessTokenFlow(
             nonOwnerAdminEmail, nonOwnerAdminPassword, nonOwnerDomain,
         );
         nonOwnerAdminToken = nonOwnerTokenResp.accessToken;
 
         // 6. Create confidential clients for client_credentials tokens
         const ownerConfClient = await tokenFixture.createConfidentialClient(
-            ownerAdminToken, ownerTenantId, 'onboard-owner-cc',
+            ownerAdminToken, ownerTenantId, 'onboard-owner-cc', 'client_credentials', 'openid profile email',
         );
-        const ownerCCToken = await tokenFixture.fetchClientCredentialsToken(
+        const ownerCCToken = await tokenFixture.fetchClientCredentialsTokenFlow(
             ownerConfClient.clientId, ownerConfClient.clientSecret,
         );
         ownerTechnicalToken = ownerCCToken.accessToken;
 
         const nonOwnerConfClient = await tokenFixture.createConfidentialClient(
-            nonOwnerAdminToken, nonOwnerTenantId, 'onboard-nonowner-cc',
+            nonOwnerAdminToken, nonOwnerTenantId, 'onboard-nonowner-cc', 'client_credentials', 'openid profile email',
         );
-        const nonOwnerCCToken = await tokenFixture.fetchClientCredentialsToken(
+        const nonOwnerCCToken = await tokenFixture.fetchClientCredentialsTokenFlow(
             nonOwnerConfClient.clientId, nonOwnerConfClient.clientSecret,
         );
         nonOwnerTechnicalToken = nonOwnerCCToken.accessToken;
@@ -281,7 +281,7 @@ describe('Onboard Customer Endpoint', () => {
         it('should create subscription for existing unsubscribed tenant (Req 4.6)', async () => {
             // Create a tenant that exists but is NOT subscribed to this app
             // We do this by creating a tenant via the super admin API directly
-            const superAdmin = await tokenFixture.fetchAccessToken(
+            const superAdmin = await tokenFixture.fetchAccessTokenFlow(
                 superAdminEmail, superAdminPassword, 'auth.server.com',
             );
             const superAdminTenantClient = new TenantClient(fixture, superAdmin.accessToken);

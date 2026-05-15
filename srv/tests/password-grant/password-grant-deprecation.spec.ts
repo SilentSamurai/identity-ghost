@@ -40,7 +40,7 @@ describe('Password Grant Deprecation Integration Tests', () => {
         const tokenFixture = new TokenFixture(app);
 
         // Get super-admin access token using the default first-party client
-        const tokenResponse = await tokenFixture.fetchAccessToken(
+        const tokenResponse = await tokenFixture.fetchAccessTokenFlow(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com',
@@ -63,6 +63,16 @@ describe('Password Grant Deprecation Integration Tests', () => {
 
         // Enable password grant on the default client for the test tenant
         await helper.enablePasswordGrant(testTenantId, testTenantDomain);
+
+        // Register the test redirect URI on the test tenant's default client so the
+        // cookie-based /authorize flow (used to probe consent behavior) can run against it.
+        const tenantClients = await adminTenantApi.getTenantClients(testTenantId);
+        const defaultClient = tenantClients.find((c: any) => c.alias === testTenantDomain);
+        if (defaultClient) {
+            await clientApi.updateClient(defaultClient.clientId, {
+                redirectUris: [REDIRECT_URI],
+            });
+        }
     }, 60_000);
 
     afterAll(async () => {
@@ -110,47 +120,82 @@ describe('Password Grant Deprecation Integration Tests', () => {
     }
 
     /**
-     * Send a login request to the login endpoint.
+     * Drive the new cookie-based auth-code flow and determine whether consent was required.
+     * Returns:
+     *   { consentRequired: true }          if /authorize redirected to the consent UI
+     *   { consentRequired: false, code }   if /authorize issued a code to redirect_uri
      */
-    function loginRequest(body: {
+    async function loginAndCheckConsent(options: {
         client_id: string;
-        email?: string;
-        password?: string;
+        redirect_uri?: string;
         scope?: string;
-    }) {
-        return app.getHttpServer()
-            .post('/api/oauth/login')
-            .send({
-                email: 'admin@auth.server.com',
-                password: 'admin9000',
+    }): Promise<{ consentRequired: boolean; code?: string }> {
+        const tokenFixture = new TokenFixture(app);
+        const redirectUri = options.redirect_uri ?? REDIRECT_URI;
+        const params = {
+            clientId: options.client_id,
+            redirectUri,
+            scope: options.scope ?? 'openid profile email',
+            state: 'pg-test',
+            codeChallenge: CODE_CHALLENGE,
+            codeChallengeMethod: 'plain',
+        };
+
+        // Step 1: POST /login establishes a session cookie.
+        const sidCookie = await tokenFixture.fetchSidCookieFlow(
+            'admin@auth.server.com',
+            'admin9000',
+            params,
+        );
+
+        // Step 2: GET /authorize — this is where consent is evaluated.
+        const res = await app.getHttpServer()
+            .get('/api/oauth/authorize')
+            .query({
+                response_type: 'code',
+                client_id: options.client_id,
+                redirect_uri: redirectUri,
+                scope: options.scope ?? 'openid profile email',
+                state: 'pg-test',
                 code_challenge: CODE_CHALLENGE,
                 code_challenge_method: 'plain',
-                redirect_uri: REDIRECT_URI,
-                ...body,
+                session_confirmed: 'true',
             })
-            .set('Accept', 'application/json');
+            .set('Cookie', sidCookie)
+            .redirects(0);
+
+        expect(res.status).toEqual(302);
+        const location = res.headers['location'] as string;
+        expect(location).toBeDefined();
+
+        if (location.includes('view=consent')) {
+            return {consentRequired: true};
+        }
+
+        const url = new URL(location, 'http://localhost');
+        expect(url.searchParams.has('error')).toBe(false);
+        const code = url.searchParams.get('code');
+        expect(code).toBeTruthy();
+        return {consentRequired: false, code: code!};
     }
 
     /**
-     * Send a consent request to the consent endpoint.
+     * Pre-grant consent via the CSRF-protected consent endpoint.
      */
-    function consentRequest(body: {
-        client_id: string;
-        approved_scopes: string[];
-        consent_action: 'approve' | 'deny';
-        scope?: string;
-    }) {
-        return app.getHttpServer()
-            .post('/api/oauth/consent')
-            .send({
-                email: 'admin@auth.server.com',
-                password: 'admin9000',
-                code_challenge: CODE_CHALLENGE,
-                code_challenge_method: 'plain',
-                redirect_uri: REDIRECT_URI,
-                ...body,
-            })
-            .set('Accept', 'application/json');
+    async function grantConsent(clientId: string, scope: string, redirectUri: string = REDIRECT_URI): Promise<void> {
+        const tokenFixture = new TokenFixture(app);
+        await tokenFixture.preGrantConsentFlow(
+            'admin@auth.server.com',
+            'admin9000',
+            {
+                clientId,
+                redirectUri,
+                scope,
+                state: 'consent-state',
+                codeChallenge: CODE_CHALLENGE,
+                codeChallengeMethod: 'plain',
+            },
+        );
     }
 
     // ─── Sub-task 9.2: Test allowed client succeeds via clientId ───────────────
@@ -463,29 +508,47 @@ describe('Password Grant Deprecation Integration Tests', () => {
 
     // ─── Sub-task 9.8: Test login skips consent for alias-resolved client ───────
 
-    describe('Req 8.1: Login skips consent for alias-resolved (first-party) client', () => {
-        it('should skip consent when client_id is the tenant domain (alias)', async () => {
-            // auth.server.com is the default first-party tenant domain
-            const response = await loginRequest({
-                client_id: 'auth.server.com',
+    describe('Req 8.1: Default client with consent pre-granted skips consent prompt', () => {
+        it('should issue code when consent was previously granted for default client (alias)', async () => {
+            // Pre-grant consent for the default client with the external redirect URI.
+            // External redirect_uri = third-party flow, so consent is always required
+            // unless previously granted.
+            await grantConsent(testTenantDomain, 'openid profile email');
+
+            const result = await loginAndCheckConsent({
+                client_id: testTenantDomain,
                 scope: 'openid profile email',
             });
 
-            expect(response.status).toEqual(201);
-            // Should return an auth code directly — no consent required
-            expect(response.body.authentication_code).toBeDefined();
-            expect(response.body.requires_consent).toBeUndefined();
+            expect(result.consentRequired).toBe(false);
+            expect(result.code).toBeTruthy();
         });
 
-        it('should skip consent when using test tenant domain as client_id', async () => {
-            const response = await loginRequest({
-                client_id: testTenantDomain,
-                scope: 'openid profile',
+        it('should issue code for auth.server.com default client with consent pre-granted', async () => {
+            // auth.server.com with external redirect_uri is third-party.
+            // Pre-grant consent so the authorize endpoint issues a code.
+            const tokenFixture2 = new TokenFixture(app);
+            await tokenFixture2.preGrantConsentFlow(
+                'admin@auth.server.com',
+                'admin9000',
+                {
+                    clientId: 'auth.server.com',
+                    redirectUri: 'http://localhost:3000/callback',
+                    scope: 'openid profile email',
+                    state: 'consent-state',
+                    codeChallenge: CODE_CHALLENGE,
+                    codeChallengeMethod: 'plain',
+                },
+            );
+
+            const result = await loginAndCheckConsent({
+                client_id: 'auth.server.com',
+                redirect_uri: 'http://localhost:3000/callback',
+                scope: 'openid profile email',
             });
 
-            expect(response.status).toEqual(201);
-            expect(response.body.authentication_code).toBeDefined();
-            expect(response.body.requires_consent).toBeUndefined();
+            expect(result.consentRequired).toBe(false);
+            expect(result.code).toBeTruthy();
         });
 
         it('should require consent for third-party (non-alias) client', async () => {
@@ -498,15 +561,14 @@ describe('Password Grant Deprecation Integration Tests', () => {
             const clientId = client.client.clientId;
 
             try {
-                const response = await loginRequest({
+                const result = await loginAndCheckConsent({
                     client_id: clientId,
                     scope: 'openid profile',
                 });
 
-                expect(response.status).toEqual(201);
-                // Should require consent for third-party client
-                expect(response.body.requires_consent).toBe(true);
-                expect(response.body.authentication_code).toBeUndefined();
+                // Third-party client with no consent record → /authorize redirects to consent UI.
+                expect(result.consentRequired).toBe(true);
+                expect(result.code).toBeUndefined();
             } finally {
                 await clientApi.deleteClient(clientId).catch(() => {
                 });
@@ -601,60 +663,54 @@ describe('Password Grant Deprecation Integration Tests', () => {
             const clientId = client.client.clientId;
 
             try {
-                // Step 1: Login with UUID - should require consent
-                const firstLogin = await loginRequest({
+                // Step 1: Probe with UUID - should require consent (no record yet)
+                const firstProbe = await loginAndCheckConsent({
                     client_id: clientId,
                     scope: 'openid profile',
                 });
-                expect(firstLogin.body.requires_consent).toBe(true);
+                expect(firstProbe.consentRequired).toBe(true);
 
-                // Step 2: Grant consent using the UUID clientId
-                const consentResponse = await consentRequest({
-                    client_id: clientId,
-                    approved_scopes: ['openid', 'profile'],
-                    consent_action: 'approve',
-                    scope: 'openid profile',
-                });
-                expect(consentResponse.status).toEqual(201);
-                expect(consentResponse.body.authentication_code).toBeDefined();
+                // Step 2: Grant consent for the UUID clientId (CSRF-protected flow)
+                await grantConsent(clientId, 'openid profile');
 
-                // Step 3: Login again with the same UUID - should skip consent
-                const secondLogin = await loginRequest({
+                // Step 3: Probe again with the same UUID - should skip consent and issue a code
+                const secondProbe = await loginAndCheckConsent({
                     client_id: clientId,
                     scope: 'openid profile',
                 });
-                expect(secondLogin.status).toEqual(201);
-                expect(secondLogin.body.authentication_code).toBeDefined();
-                expect(secondLogin.body.requires_consent).toBeUndefined();
+                expect(secondProbe.consentRequired).toBe(false);
+                expect(secondProbe.code).toBeTruthy();
             } finally {
                 await clientApi.deleteClient(clientId).catch(() => {
                 });
             }
         });
 
-        it('should recognize consent when switching between clientId and alias for first-party client', async () => {
-            // For first-party clients (alias matches domain), consent is always skipped
-            // This test verifies that both alias and UUID forms work for first-party
+        it('should recognize consent when switching between clientId and alias for default client', async () => {
+            // With external redirect_uri, the default client is third-party.
+            // Pre-grant consent via alias, then verify it's recognized.
+            await grantConsent(testTenantDomain, 'openid profile');
 
-            // Login with alias - should skip consent (first-party)
-            const aliasLogin = await loginRequest({
+            const aliasProbe = await loginAndCheckConsent({
                 client_id: testTenantDomain,
                 scope: 'openid profile',
             });
-            expect(aliasLogin.body.authentication_code).toBeDefined();
-            expect(aliasLogin.body.requires_consent).toBeUndefined();
+            expect(aliasProbe.consentRequired).toBe(false);
+            expect(aliasProbe.code).toBeTruthy();
 
             // Get the default client's UUID
             const tenantClients = await adminTenantApi.getTenantClients(testTenantId);
             const defaultClient = tenantClients.find((c: any) => c.alias === testTenantDomain);
             expect(defaultClient).toBeDefined();
 
-            // Note: When using UUID form, the client_id is the UUID, not the alias.
-            // Per Req 8.1: "first-party status is determined by client.alias === body.client_id"
-            // So using UUID is NOT first-party and will require consent.
-            // However, the default client has no redirect URIs registered, so login will fail
-            // with invalid_request for redirect_uri validation.
-            // This is expected behavior - the test verifies that alias form works for first-party.
+            // Consent granted via alias should also be recognized via UUID
+            // (both resolve to the same client record)
+            const uuidProbe = await loginAndCheckConsent({
+                client_id: defaultClient.clientId,
+                scope: 'openid profile',
+            });
+            expect(uuidProbe.consentRequired).toBe(false);
+            expect(uuidProbe.code).toBeTruthy();
         });
     });
 });

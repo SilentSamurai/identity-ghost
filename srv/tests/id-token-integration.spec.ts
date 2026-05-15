@@ -21,27 +21,19 @@ describe('ID Token Generation Integration', () => {
     const challenge = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq';
     const email = 'admin@idtoken-test.local';
     const password = 'admin9000';
+    const redirectUri = 'http://localhost:3000/callback';
 
-    /** Helper: login → get auth code */
+    /** Helper: login → authorize → auth code (cookie-based flow) */
     async function loginForCode(opts?: { scope?: string; nonce?: string }): Promise<string> {
-        const body: any = {
-            email,
-            password,
-            client_id: clientId,
-            code_challenge: challenge,
-            code_challenge_method: 'plain',
-        };
-        if (opts?.scope !== undefined) body.scope = opts.scope;
-        if (opts?.nonce !== undefined) body.nonce = opts.nonce;
-
-        const res = await app.getHttpServer()
-            .post('/api/oauth/login')
-            .send(body)
-            .set('Accept', 'application/json');
-
-        expect2xx(res);
-        expect(res.body.authentication_code).toBeDefined();
-        return res.body.authentication_code;
+        return tokenFixture.fetchAuthCodeWithConsentFlow(email, password, {
+            clientId,
+            redirectUri,
+            scope: opts?.scope ?? 'openid profile email',
+            state: 'test-state',
+            codeChallenge: challenge,
+            codeChallengeMethod: 'plain',
+            nonce: opts?.nonce,
+        });
     }
 
     /** Helper: exchange auth code → token response */
@@ -53,6 +45,7 @@ describe('ID Token Generation Integration', () => {
                 code,
                 code_verifier: verifier,
                 client_id: clientId,
+                redirect_uri: redirectUri,
             })
             .set('Accept', 'application/json');
 
@@ -238,7 +231,7 @@ describe('ID Token Generation Integration', () => {
             expect(initialPayload.nonce).toEqual(testNonce);
 
             // Step 2: Get client credentials for refresh (need client_id + client_secret)
-            const adminToken = await tokenFixture.fetchAccessToken(email, password, clientId);
+            const adminToken = await tokenFixture.fetchAccessTokenFlow(email, password, clientId);
             const credsRes = await app.getHttpServer()
                 .get('/api/tenant/my/credentials')
                 .set('Authorization', `Bearer ${adminToken.accessToken}`);
@@ -272,31 +265,71 @@ describe('ID Token Generation Integration', () => {
     // Uses isolated user (prompt-test.local) to avoid invalidating sessions for other concurrent tests.
 
     describe('8.7 auth_time with prompt=login and max_age', () => {
-        it('should include auth_time in ID token when prompt=login is used', async () => {
-            // Login with prompt=login
-            const loginRes = await app.getHttpServer()
-                .post('/api/oauth/login')
-                .send({
-                    email: 'admin@prompt-test.local',
-                    password: 'admin9000',
-                    client_id: 'prompt-test.local',
+        const promptClientId = 'prompt-test.local';
+        const promptEmail = 'admin@prompt-test.local';
+        const promptRedirectUri = 'http://localhost:3000/callback';
+
+        /**
+         * Simulates the UI flow when prompt=login is used:
+         *   1. Login → get sid cookie.
+         *   2. GET /authorize with prompt=login → server redirects back to the login UI
+         *      (it never issues a code when prompt=login is set).
+         *   3. Re-authenticate to get a fresh session.
+         *   4. GET /authorize again without prompt=login → server issues the code.
+         */
+        async function authCodeWithPromptLogin(): Promise<string> {
+            const promptParams = {
+                clientId: promptClientId,
+                redirectUri: promptRedirectUri,
+                scope: 'openid profile email',
+                state: 'test-state',
+                codeChallenge: challenge,
+                codeChallengeMethod: 'plain',
+            };
+            const initialCookie = await tokenFixture.fetchSidCookieFlow(promptEmail, password, promptParams);
+
+            const bounceRes = await app.getHttpServer()
+                .get('/api/oauth/authorize')
+                .query({
+                    response_type: 'code',
+                    client_id: promptClientId,
+                    redirect_uri: promptRedirectUri,
+                    scope: 'openid profile email',
+                    state: 'test-state',
                     code_challenge: challenge,
                     code_challenge_method: 'plain',
-                    scope: 'openid profile email',
+                    session_confirmed: 'true',
                     prompt: 'login',
                 })
-                .set('Accept', 'application/json');
+                .set('Cookie', initialCookie)
+                .redirects(0);
 
-            expect2xx(loginRes);
-            expect(loginRes.body.authentication_code).toBeDefined();
+            // prompt=login always redirects to the login UI, not the redirect_uri
+            expect(bounceRes.status).toEqual(302);
+            expect(bounceRes.headers['location']).not.toContain('code=');
+
+            // Re-authenticate and authorize without prompt=login
+            return tokenFixture.fetchAuthCodeWithConsentFlow(promptEmail, password, {
+                clientId: promptClientId,
+                redirectUri: promptRedirectUri,
+                scope: 'openid profile email',
+                state: 'test-state',
+                codeChallenge: challenge,
+                codeChallengeMethod: 'plain',
+            });
+        }
+
+        it('should include auth_time in ID token when prompt=login is used', async () => {
+            const code = await authCodeWithPromptLogin();
 
             const tokenRes = await app.getHttpServer()
                 .post('/api/oauth/token')
                 .send({
                     grant_type: 'authorization_code',
-                    code: loginRes.body.authentication_code,
+                    code,
                     code_verifier: verifier,
-                    client_id: 'prompt-test.local',
+                    client_id: promptClientId,
+                    redirect_uri: promptRedirectUri,
                 })
                 .set('Accept', 'application/json');
 
@@ -315,30 +348,26 @@ describe('ID Token Generation Integration', () => {
         });
 
         it('should include auth_time in ID token when max_age is used', async () => {
-            // Login with max_age=3600
-            const loginRes = await app.getHttpServer()
-                .post('/api/oauth/login')
-                .send({
-                    email: 'admin@prompt-test.local',
-                    password: 'admin9000',
-                    client_id: 'prompt-test.local',
-                    code_challenge: challenge,
-                    code_challenge_method: 'plain',
+            const code = await tokenFixture.fetchAuthCodeWithConsentFlow(
+                promptEmail, password, {
+                    clientId: promptClientId,
+                    redirectUri: promptRedirectUri,
                     scope: 'openid profile email',
-                    max_age: 3600,
-                })
-                .set('Accept', 'application/json');
-
-            expect2xx(loginRes);
-            expect(loginRes.body.authentication_code).toBeDefined();
+                    state: 'test-state',
+                    codeChallenge: challenge,
+                    codeChallengeMethod: 'plain',
+                    maxAge: 3600,
+                },
+            );
 
             const tokenRes = await app.getHttpServer()
                 .post('/api/oauth/token')
                 .send({
                     grant_type: 'authorization_code',
-                    code: loginRes.body.authentication_code,
+                    code,
                     code_verifier: verifier,
-                    client_id: 'prompt-test.local',
+                    client_id: promptClientId,
+                    redirect_uri: promptRedirectUri,
                 })
                 .set('Accept', 'application/json');
 

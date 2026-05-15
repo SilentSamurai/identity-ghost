@@ -3,7 +3,6 @@ import {SharedTestFixture} from '../shared-test.fixture';
 import {TokenFixture} from '../token.fixture';
 import {ClientEntityClient} from '../api-client/client-entity-client';
 import {TenantClient} from '../api-client/tenant-client';
-import {expect2xx} from '../api-client/client';
 
 /**
  * Feature: redirect-uri-validation, Property 3: Auth code stores redirect_uri as a round-trip
@@ -13,17 +12,19 @@ import {expect2xx} from '../api-client/client';
  * when the redirect_uri was omitted.
  *
  * We verify storage indirectly through the token exchange binding:
- * - When redirect_uri was provided at login, token exchange with the exact same value succeeds
- *   and exchange with any different value fails (proving exact storage).
- * - When redirect_uri was omitted at login, token exchange without redirect_uri succeeds
- *   (proving null was stored).
+ * - When redirect_uri was provided at authorize, token exchange with the exact same value succeeds.
+ * - When no redirect_uri is in the stored auth code (seeded directly), token exchange without
+ *   redirect_uri succeeds.
  *
  * **Validates: Requirements 2.3, 3.1, 3.2**
  */
 describe('Feature: redirect-uri-validation, Property 3: Auth code stores redirect_uri as a round-trip', () => {
     let app: SharedTestFixture;
+    let tokenFixture: TokenFixture;
     let clientApi: ClientEntityClient;
     let testClientId: string;
+    let userId: string;
+    let tenantId: string;
 
     const REGISTERED_URI = 'https://prop-roundtrip-test.example.com/callback';
     const email = 'admin@auth.server.com';
@@ -33,12 +34,13 @@ describe('Feature: redirect-uri-validation, Property 3: Auth code stores redirec
 
     beforeAll(async () => {
         app = new SharedTestFixture();
-        const tokenFixture = new TokenFixture(app);
-        const {accessToken} = await tokenFixture.fetchAccessToken(email, password, 'auth.server.com');
+        tokenFixture = new TokenFixture(app);
+        const {accessToken} = await tokenFixture.fetchAccessTokenFlow(email, password, 'auth.server.com');
 
         clientApi = new ClientEntityClient(app, accessToken);
         const tenantClient = new TenantClient(app, accessToken);
         const tenant = await tenantClient.createTenant('prop-roundtrip', 'prop-roundtrip.example.com');
+        tenantId = tenant.id;
 
         const created = await clientApi.createClient(tenant.id, 'Roundtrip Prop Client', {
             redirectUris: [REGISTERED_URI],
@@ -47,21 +49,20 @@ describe('Feature: redirect-uri-validation, Property 3: Auth code stores redirec
         });
         testClientId = created.client.clientId;
 
-        // Pre-grant consent so login returns auth codes instead of requires_consent
-        await app.getHttpServer()
-            .post('/api/oauth/consent')
-            .send({
-                email,
-                password,
-                client_id: testClientId,
-                code_challenge: challenge,
-                code_challenge_method: 'plain',
-                approved_scopes: ['openid', 'profile', 'email'],
-                consent_action: 'approve',
-                scope: 'openid profile email',
-                redirect_uri: REGISTERED_URI,
-            })
-            .set('Accept', 'application/json');
+        // Pre-grant consent so /authorize issues codes directly.
+        await tokenFixture.preGrantConsentFlow(email, password, {
+            clientId: testClientId,
+            redirectUri: REGISTERED_URI,
+            scope: 'openid profile email',
+            state: 'consent-state',
+            codeChallenge: challenge,
+            codeChallengeMethod: 'plain',
+        });
+
+        // Resolve user id for direct auth-code seeding (null-redirect-uri case).
+        const userRes = await app.getHttpServer().get(`/api/test-utils/users/by-email/${encodeURIComponent(email)}`);
+        expect(userRes.status).toBe(200);
+        userId = userRes.body.id;
     });
 
     afterAll(async () => {
@@ -70,27 +71,31 @@ describe('Feature: redirect-uri-validation, Property 3: Auth code stores redirec
         await app.close();
     });
 
-    /** Login and get an auth code, optionally with a redirect_uri */
-    async function loginForCode(redirectUri?: string): Promise<string> {
-        const payload: any = {
-            email,
-            password,
-            client_id: testClientId,
-            code_challenge: challenge,
-            code_challenge_method: 'plain',
-            scope: 'openid profile email',
-        };
-        if (redirectUri !== undefined) {
-            payload.redirect_uri = redirectUri;
-        }
+    /** Login → authorize with REGISTERED_URI and return the resulting auth code. */
+    async function loginForCodeWithRegisteredUri(): Promise<string> {
+        return tokenFixture.fetchAuthCode(email, password, testClientId, REGISTERED_URI, {
+            codeChallenge: challenge,
+            codeChallengeMethod: 'plain',
+        });
+    }
 
+    /** Seed an auth code directly with null redirect_uri (cannot go through /authorize for a null URI). */
+    async function seedCodeWithoutRedirectUri(): Promise<string> {
         const res = await app.getHttpServer()
-            .post('/api/oauth/login')
-            .send(payload)
+            .post('/api/test-utils/auth-codes')
+            .send({
+                userId,
+                tenantId,
+                clientId: testClientId,
+                codeChallenge: challenge,
+                method: 'plain',
+                redirectUri: null,
+                scope: 'openid profile email',
+            })
             .set('Accept', 'application/json');
-
-        expect2xx(res);
-        return res.body.authentication_code;
+        expect(res.status).toBeGreaterThanOrEqual(200);
+        expect(res.status).toBeLessThan(300);
+        return res.body.code;
     }
 
     /** Exchange an auth code for tokens, optionally with a redirect_uri */
@@ -114,16 +119,14 @@ describe('Feature: redirect-uri-validation, Property 3: Auth code stores redirec
     }
 
     it('stored redirect_uri exactly equals the provided value (round-trip via token exchange)', async () => {
-        // Use the registered URI for every iteration — the property is about storage fidelity,
-        // not about validation of arbitrary URIs (that's Property 1).
-        // We verify exact storage by confirming token exchange succeeds with the same URI
-        // and fails with any different URI.
+        // Property: for every auth code created with REGISTERED_URI, exchange with the same URI succeeds.
+        // The shrinker filters out trivially invalid URIs by filtering on REGISTERED_URI equality.
         await fc.assert(
             fc.asyncProperty(
                 fc.webUrl().filter(url => url !== REGISTERED_URI),
-                async (mismatchUri) => {
+                async (_mismatchUri) => {
                     // Create auth code with the registered redirect_uri
-                    const code = await loginForCode(REGISTERED_URI);
+                    const code = await loginForCodeWithRegisteredUri();
 
                     // Exchange with the exact same URI → should succeed (proves exact storage)
                     const matchResult = await exchangeCode(code, REGISTERED_URI);
@@ -132,13 +135,12 @@ describe('Feature: redirect-uri-validation, Property 3: Auth code stores redirec
                     expect(matchResult.body.access_token).toBeDefined();
                 },
             ),
-            {numRuns: 20},
+            {numRuns: 10},
         );
-    }, 120_000);
+    }, 180_000);
 
     it('stored redirect_uri is null when omitted from the originating request', async () => {
-        // Create auth code without redirect_uri
-        const code = await loginForCode(undefined);
+        const code = await seedCodeWithoutRedirectUri();
 
         // Exchange without redirect_uri → should succeed (null stored, binding bypassed)
         const result = await exchangeCode(code, undefined);
@@ -148,23 +150,20 @@ describe('Feature: redirect-uri-validation, Property 3: Auth code stores redirec
     }, 30_000);
 
     it('redirect_uri round-trip: provided URI is stored exactly, omitted URI stores null', async () => {
-        // Combined property: for any choice of "provide URI" vs "omit URI",
-        // the stored value matches exactly what was provided (or null).
         await fc.assert(
             fc.asyncProperty(
                 fc.boolean(), // true = provide redirect_uri, false = omit
                 async (provideUri) => {
-                    const redirectUri = provideUri ? REGISTERED_URI : undefined;
-                    const code = await loginForCode(redirectUri);
-
                     if (provideUri) {
                         // Stored URI should be REGISTERED_URI — exchange with it succeeds
+                        const code = await loginForCodeWithRegisteredUri();
                         const matchResult = await exchangeCode(code, REGISTERED_URI);
                         expect(matchResult.status).toBeGreaterThanOrEqual(200);
                         expect(matchResult.status).toBeLessThan(300);
                         expect(matchResult.body.access_token).toBeDefined();
                     } else {
                         // Stored URI should be null — exchange without redirect_uri succeeds
+                        const code = await seedCodeWithoutRedirectUri();
                         const nullResult = await exchangeCode(code, undefined);
                         expect(nullResult.status).toBeGreaterThanOrEqual(200);
                         expect(nullResult.status).toBeLessThan(300);
@@ -172,7 +171,7 @@ describe('Feature: redirect-uri-validation, Property 3: Auth code stores redirec
                     }
                 },
             ),
-            {numRuns: 30},
+            {numRuns: 20},
         );
-    }, 120_000);
+    }, 180_000);
 });

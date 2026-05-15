@@ -12,6 +12,12 @@ import {StaticSource} from '../../component/model/StaticSource';
 import {AppService} from '../../_services/app.service';
 import {CreateAppComponent} from '../apps/dialogs/create-app.component';
 import {ModalService} from '../../component/dialogs/modal.service';
+import {TestWebhookAdminComponent} from '../apps/dialogs/test-webhook.component';
+import {ClientService} from '../../_services/client.service';
+import {CreateClientAdminComponent} from '../clients/dialogs/create-client-admin.component';
+import {SecretDisplayAdminComponent} from '../clients/dialogs/secret-display-admin.component';
+import {GroupService} from '../../_services/group.service';
+import {CreateGroupComponent} from '../group/dialogs/create-group.component';
 
 @Component({
     selector: 'app-TN02A',
@@ -78,6 +84,7 @@ import {ModalService} from '../../component/dialogs/modal.service';
                         <app-table title="Member List" [dataSource]="memberDataModel">
                             <app-table-col label="Name" name="name"></app-table-col>
                             <app-table-col label="Email" name="email"></app-table-col>
+                            <app-table-col label="Assigned Roles" name="roles"></app-table-col>
                             <app-table-col label="Actions" name="actions"></app-table-col>
                             <app-table-actions>
                                 <button
@@ -91,6 +98,11 @@ import {ModalService} from '../../component/dialogs/modal.service';
                             <ng-template let-user #table_body>
                                 <td>{{ user.name }}</td>
                                 <td>{{ user.email }}</td>
+                                <td>
+                                    <a
+                                        [routerLink]="['/admin/TNRL01', tenant_id, user.id]"
+                                    >View Role Assignments</a>
+                                </td>
                                 <td>
                                     <button
                                         (click)="removeMember(user)"
@@ -177,6 +189,127 @@ import {ModalService} from '../../component/dialogs/modal.service';
                                     >
                                         <i class="fa fa-solid fa-trash"></i>
                                     </button>
+                                    <button
+                                        *ngIf="app.onboardingEnabled"
+                                        (click)="onTestWebhook(app)"
+                                        class="btn btn-sm btn-outline-info ms-1"
+                                        type="button"
+                                        title="Test onboarding webhook"
+                                        aria-label="Test webhook"
+                                    >
+                                        <i class="fa fa-solid fa-plug"></i>
+                                    </button>
+                                </td>
+                            </ng-template>
+                        </app-table>
+                    </app-section-content>
+                </app-op-section>
+            </app-op-tab>
+            <app-op-tab name="Subscriptions">
+                <app-op-section name="Subscriptions">
+                    <app-section-content>
+                        <app-table title="Subscribed Apps" [dataSource]="subscribedAppsDataModel">
+                            <app-table-col label="Name" name="name"></app-table-col>
+                            <app-table-col label="Description" name="description"></app-table-col>
+                            <app-table-col label="Status" name="status"></app-table-col>
+                            <app-table-col label="Message" name="message"></app-table-col>
+                            <app-table-col label="Subscribed At" name="subscribedAt"></app-table-col>
+                            <app-table-col label="Actions" name="actions"></app-table-col>
+                            <ng-template let-subscription #table_body>
+                                <td>{{ subscription.app.name }}</td>
+                                <td>{{ subscription.app.description }}</td>
+                                <td>{{ subscription.status }}</td>
+                                <td>{{ subscription.message }}</td>
+                                <td>{{ subscription.subscribedAt | date }}</td>
+                                <td>
+                                    <button
+                                        (click)="onViewApp(subscription)"
+                                        class="btn btn-sm btn-primary me-2"
+                                        type="button"
+                                    >
+                                        View App
+                                    </button>
+                                </td>
+                            </ng-template>
+                        </app-table>
+                    </app-section-content>
+                </app-op-section>
+            </app-op-tab>
+            <app-op-tab name="Clients">
+                <app-op-section name="Clients" id="CLIENTS_SECTION_NAV">
+                    <app-section-content>
+                        <app-table title="Clients" [dataSource]="clientsDataModel">
+                            <app-table-col label="Name" name="name"></app-table-col>
+                            <app-table-col label="Client ID" name="clientId"></app-table-col>
+                            <app-table-col label="Client Type" name="isPublic"></app-table-col>
+                            <app-table-col label="Grant Types" name="grantTypes"></app-table-col>
+                            <app-table-col label="Actions" name="actions"></app-table-col>
+                            <app-table-actions>
+                                <button
+                                    (click)="onCreateClient()"
+                                    id="CREATE_CLIENT_BTN"
+                                    class="btn btn-primary btn-sm"
+                                >
+                                    Create
+                                </button>
+                            </app-table-actions>
+                            <ng-template let-client #table_body>
+                                <td>
+                                    <a
+                                        [routerLink]="['/admin/CL02/', client.clientId]"
+                                    >{{ client.name }}</a>
+                                </td>
+                                <td>{{ client.clientId }}</td>
+                                <td>
+                                    <span *ngIf="client.isPublic" class="badge bg-info">Public</span>
+                                    <span *ngIf="!client.isPublic" class="badge bg-secondary">Confidential</span>
+                                </td>
+                                <td>{{ client.grantTypes }}</td>
+                                <td>
+                                    <button
+                                        (click)="onDeleteClient(client)"
+                                        class="btn btn-sm"
+                                        type="button"
+                                        aria-label="Delete client"
+                                    >
+                                        <i class="fa fa-solid fa-trash"></i>
+                                    </button>
+                                </td>
+                            </ng-template>
+                        </app-table>
+                    </app-section-content>
+                </app-op-section>
+            </app-op-tab>
+            <app-op-tab name="Groups">
+                <app-op-section name="Groups" id="GROUPS_SECTION_NAV">
+                    <app-section-content>
+                        <app-table title="Group List" [dataSource]="groupsDataModel">
+                            <app-table-col label="Name" name="name"></app-table-col>
+                            <app-table-col label="Actions" name="actions"></app-table-col>
+                            <app-table-actions>
+                                <button
+                                    (click)="onCreateGroup()"
+                                    id="CREATE_GROUP_BTN"
+                                    class="btn btn-primary btn-sm"
+                                >
+                                    Create
+                                </button>
+                            </app-table-actions>
+                            <ng-template let-group #table_body>
+                                <td>
+                                    <a
+                                        [routerLink]="['/admin/GP02/', group.id]"
+                                    >{{ group.name }}</a>
+                                </td>
+                                <td>
+                                    <button
+                                        (click)="onDeleteGroup(group)"
+                                        class="btn btn-sm"
+                                        type="button"
+                                        aria-label="Delete group"
+                                    >
+                                        <i class="fa fa-solid fa-trash"></i>
+                                    </button>
                                 </td>
                             </ng-template>
                         </app-table>
@@ -258,6 +391,9 @@ export class TN02AComponent implements OnInit {
     memberDataModel: StaticSource<any>;
     rolesDataModel: StaticSource<any>;
     createdAppsDataModel: StaticSource<any>;
+    subscribedAppsDataModel: StaticSource<any>;
+    clientsDataModel: StaticSource<any>;
+    groupsDataModel: StaticSource<any>;
     keysDataModel: StaticSource<any>;
     keyMetadata: { maxActiveKeys: number; tokenExpirationSeconds: number } = {
         maxActiveKeys: 3,
@@ -275,10 +411,15 @@ export class TN02AComponent implements OnInit {
         private authDefaultService: AuthDefaultService,
         private modalService: ModalService,
         private appService: AppService,
+        private clientService: ClientService,
+        private groupService: GroupService,
     ) {
         this.memberDataModel = new StaticSource(['id']);
         this.rolesDataModel = new StaticSource(['id']);
         this.createdAppsDataModel = new StaticSource(['id']);
+        this.subscribedAppsDataModel = new StaticSource(['id']);
+        this.clientsDataModel = new StaticSource(['id']);
+        this.groupsDataModel = new StaticSource(['id']);
         this.keysDataModel = new StaticSource(['id']);
     }
 
@@ -295,10 +436,16 @@ export class TN02AComponent implements OnInit {
             const members = await this.adminTenantService.getMembers(this.tenant_id);
             const roles = await this.adminTenantService.getTenantRoles(this.tenant_id);
             const createdApps = await this.adminTenantService.getCreatedApps(this.tenant_id);
+            const subscriptions = await this.adminTenantService.getSubscriptions(this.tenant_id);
+            const clients: any = await this.adminTenantService.getClients(this.tenant_id);
+            const groups = await this.adminTenantService.getGroups(this.tenant_id);
 
             this.memberDataModel.setData(Array.isArray(members) ? members : []);
             this.rolesDataModel.setData(Array.isArray(roles) ? roles : []);
             this.createdAppsDataModel.setData(Array.isArray(createdApps) ? createdApps : []);
+            this.subscribedAppsDataModel.setData(Array.isArray(subscriptions) ? subscriptions : []);
+            this.clientsDataModel.setData(Array.isArray(clients) ? clients : []);
+            this.groupsDataModel.setData(Array.isArray(groups) ? groups : []);
 
             await this.loadKeys();
 
@@ -473,6 +620,80 @@ export class TN02AComponent implements OnInit {
                     return true;
                 } catch (e) {
                     this.messageService.add({severity: 'error', summary: 'Error', detail: 'App Deletion Failed'});
+                }
+                return null;
+            },
+        });
+        if (deleted) {
+            await this.loadData();
+        }
+    }
+
+    async onTestWebhook(app: any) {
+        await this.modalService.open(TestWebhookAdminComponent, {initData: {app}});
+    }
+
+    onViewApp(subscription: any) {
+        window.open(subscription.app.appUrl, '_blank');
+    }
+
+    async onCreateClient() {
+        const result = await this.modalService.open<{ client: any; clientSecret: string | null }>(CreateClientAdminComponent, {
+            initData: {tenantId: this.tenant_id}
+        });
+        if (result.is_ok()) {
+            const data = result.data;
+            if (data?.clientSecret) {
+                await this.modalService.open(SecretDisplayAdminComponent, {
+                    initData: {clientSecret: data.clientSecret}
+                });
+            }
+            await this.loadData();
+        }
+    }
+
+    async onDeleteClient(client: any) {
+        const deleted = await this.confirmationService.confirm({
+            message: `Are you sure you want to delete <b>${client.name}</b>?`,
+            header: 'Confirmation',
+            icon: 'pi pi-info-circle',
+            accept: async () => {
+                try {
+                    await this.clientService.deleteClient(client.clientId);
+                    this.messageService.add({severity: 'success', summary: 'Success', detail: 'Client Deleted'});
+                    return true;
+                } catch (e) {
+                    this.messageService.add({severity: 'error', summary: 'Error', detail: 'Client Deletion Failed'});
+                }
+                return null;
+            },
+        });
+        if (deleted) {
+            await this.loadData();
+        }
+    }
+
+    async onCreateGroup() {
+        const result = await this.modalService.open(CreateGroupComponent, {
+            initData: {tenantId: this.tenant_id}
+        });
+        if (result.is_ok()) {
+            await this.loadData();
+        }
+    }
+
+    async onDeleteGroup(group: any) {
+        const deleted = await this.confirmationService.confirm({
+            message: `Are you sure you want to delete group <b>${group.name}</b>?`,
+            header: 'Confirmation',
+            icon: 'pi pi-info-circle',
+            accept: async () => {
+                try {
+                    await this.groupService.deleteGroup(group.id);
+                    this.messageService.add({severity: 'success', summary: 'Success', detail: 'Group Deleted'});
+                    return true;
+                } catch (e) {
+                    this.messageService.add({severity: 'error', summary: 'Error', detail: 'Group Deletion Failed'});
                 }
                 return null;
             },

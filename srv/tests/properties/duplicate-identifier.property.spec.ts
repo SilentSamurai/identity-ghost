@@ -22,7 +22,7 @@ describe('Property 6: Duplicate identifier constraint enforcement', () => {
     beforeAll(async () => {
         fixture = new SharedTestFixture();
         const tokenFixture = new TokenFixture(fixture);
-        const response = await tokenFixture.fetchAccessToken(
+        const response = await tokenFixture.fetchAccessTokenFlow(
             'admin@auth.server.com',
             'admin9000',
             'auth.server.com',
