@@ -59,7 +59,7 @@ export class AuthorizeRedirectBuilder {
      * `extras` is the ONLY path by which `session_confirmed=true` or
      * `from_logout=true` can end up on a redirect URL:
      *   - `session_confirmed` is set by the session-confirm "Continue"
-     *     handler (Req 7.8).
+     *     handler and the consent "Grant" handler (Req 7.8, 4.4).
      *   - `from_logout` is set by the session-confirm "Log out" handler
      *     immediately after a successful `POST /api/oauth/logout`
      *     (Req 7.5).
@@ -95,5 +95,32 @@ export class AuthorizeRedirectBuilder {
         }
 
         return '/api/oauth/authorize?' + qs.toString();
+    }
+
+    /**
+     * Build the redirect URL for an OAuth error response sent to the
+     * External_Client's `redirect_uri` (Req 4.4, 6.5).
+     *
+     * Per RFC 6749 §4.1.2.1, error responses include `error`,
+     * `error_description` (optional), and `state` (if the client provided
+     * one). The client's `redirect_uri` is taken verbatim from the stored
+     * `OAuthParameters`.
+     *
+     * This is the ONLY redirect in the UI that goes directly to the
+     * External_Client rather than bouncing through `/api/oauth/authorize`
+     * (P7 — no OAuth params on non-backend redirects, with the exception
+     * of this error redirect which is an OAuth-mandated direct client
+     * redirect).
+     */
+    toErrorRedirect(params: OAuthParameters, error: string, errorDescription?: string): string {
+        const qs = new URLSearchParams();
+        qs.set('error', error);
+        if (errorDescription) {
+            qs.set('error_description', errorDescription);
+        }
+        if (params.state) {
+            qs.set('state', params.state);
+        }
+        return params.redirect_uri + '?' + qs.toString();
     }
 }

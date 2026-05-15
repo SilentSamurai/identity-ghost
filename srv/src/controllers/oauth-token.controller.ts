@@ -84,6 +84,34 @@ export class OAuthTokenController {
     ) {
     }
 
+/**
+     * GET /api/oauth/authorize — OAuth 2.0 authorization endpoint.
+     *
+     * Flow chart (entry point: external app redirects user to /authorize):
+     *```mermaid
+     *   graph TD
+     *       START((External App<br/>redirects user)) --> A
+     *       A[GET /api/oauth/authorize] -->|no session / invalid / from_logout| D[302 → UI login form]
+     *       A -->|prompt=none + no session| E[302 redirect_uri?error=login_required]
+     *       A -->|session + no consent| I[302 → UI consent]
+     *       A -->|session + consent + session_confirmed=true| B[302 redirect_uri?code=...]
+     *       A -->|session + consent + no session_confirmed| C[302 → UI session-confirm]
+     *       A -->|session + consent + skipConfirm=true| B
+     *       C -->|Continue click| A
+     *       C -->|Logout click| G[POST /api/oauth/logout]
+     *       G --> D
+     *       I -->|Grant consent| H[POST /api/oauth/consent]
+     *       I -->|Deny consent| J[302 redirect_uri?error=access_denied]
+     *       H --> B
+     *       D -->|POST /api/oauth/login| F
+     *       F{login result} -->|success + first-party| B
+     *       F -->|success + third-party + no consent| I
+     *       F -->|success + third-party + consent| C
+     *       F -->|requires_tenant_selection=true| K[UI tenant-selection]
+     *       K -->|select tenant + re-POST /api/oauth/login| F
+     *       B --> END((External App<br/>receives code))
+     *```
+     */
     @Get("/authorize")
     async authorize(
         @Query() query: AuthorizeQueryParams,

@@ -1,23 +1,29 @@
 import {SharedTestFixture} from "../shared-test.fixture";
 import {TokenFixture} from "../token.fixture";
 import {JwtService} from "@nestjs/jwt";
+import {expect2xx} from "../api-client/client";
 
 const OIDC_SCOPES = ['email', 'openid', 'profile'];
 const ROLE_NAMES = ['SUPER_ADMIN', 'TENANT_ADMIN', 'TENANT_VIEWER'];
+const UUID_V4_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 /**
- * Integration tests for the OAuth token abstraction layer after the scope-role separation.
+ * Integration tests for JWT token compliance — scope-role separation and RFC 9068 claims.
  *
  * Verifies that all grant types produce tokens with:
- * - `scopes`: OIDC values only (openid, profile, email)
+ * - `scope`: OIDC values only (openid, profile, email) as space-delimited string
  * - `roles`: internal role names only (SUPER_ADMIN, TENANT_ADMIN, TENANT_VIEWER)
  * - No mixing between the two fields
+ * - All required claims present (iss, sub, aud, exp, iat, nbf, jti, scope, client_id, tenant_id, grant_type)
+ * - Correct claim formats (sub=UUID, aud=array, jti=UUID, nbf=iat)
+ * - No profile data in JWT (email, name, userId, userTenant removed per RFC 9068)
  *
- * Validates: Requirements 5.1, 5.2, 9.1, 9.2
+ * Validates: Requirements 5.1, 5.2, 9.1, 9.2, RFC 9068
  */
-describe('Token Abstraction Flows', () => {
+describe('Token JWT Compliance', () => {
     let app: SharedTestFixture;
     let jwtService: JwtService;
+    let tokenFixture: TokenFixture;
     let passwordGrantResponse: any;
     // Default public client UUID — for refresh grants (matches the client that issued the token)
     let defaultClientId: string;
@@ -28,9 +34,9 @@ describe('Token Abstraction Flows', () => {
     beforeAll(async () => {
         app = new SharedTestFixture();
         jwtService = new JwtService({});
+        tokenFixture = new TokenFixture(app);
 
         // Obtain password grant tokens and create a confidential client upfront
-        const tokenFixture = new TokenFixture(app);
         const response = await tokenFixture.fetchAccessTokenFlow(
             "admin@auth.server.com",
             "admin9000",
@@ -61,22 +67,56 @@ describe('Token Abstraction Flows', () => {
         await app.close();
     });
 
-    describe('Password Grant Flow', () => {
-        it('should have standard claims in access token', () => {
+    // ── Password Grant — Required Claims (RFC 9068) ─────────────────
+
+    describe('Password Grant — Required Claims', () => {
+        it('should include all 11 required claims in a password grant token', () => {
             const decoded: any = jwtService.decode(passwordGrantResponse.accessToken);
-            // sub is now user UUID, not email
-            expect(decoded.sub).toBeDefined();
-            expect(decoded.sub).not.toContain('@');
-            expect(decoded.tenant).toBeDefined();
-            expect(decoded.tenant.domain).toEqual("auth.server.com");
-            expect(decoded.grant_type).toEqual("password");
-            // Profile data removed from JWT (RFC 9068 compliance)
-            expect(decoded.email).toBeUndefined();
-            expect(decoded.name).toBeUndefined();
-            expect(decoded.userId).toBeUndefined();
-            expect(decoded.userTenant).toBeUndefined();
+            const requiredClaims = ['iss', 'sub', 'aud', 'exp', 'iat', 'nbf', 'jti', 'scope', 'client_id', 'tenant_id', 'grant_type'];
+            for (const claim of requiredClaims) {
+                expect(decoded[claim]).toBeDefined();
+            }
         });
 
+        it('should set sub to user UUID (not email)', () => {
+            const decoded: any = jwtService.decode(passwordGrantResponse.accessToken);
+            expect(decoded.sub).toMatch(UUID_V4_REGEX);
+            expect(decoded.sub).not.toContain('@');
+        });
+
+        it('should set aud as an array', () => {
+            const decoded: any = jwtService.decode(passwordGrantResponse.accessToken);
+            expect(Array.isArray(decoded.aud)).toBe(true);
+            expect(decoded.aud.length).toBeGreaterThanOrEqual(1);
+        });
+
+        it('should set jti as UUID v4 format', () => {
+            const decoded: any = jwtService.decode(passwordGrantResponse.accessToken);
+            expect(decoded.jti).toMatch(UUID_V4_REGEX);
+        });
+
+        it('should set nbf equal to iat', () => {
+            const decoded: any = jwtService.decode(passwordGrantResponse.accessToken);
+            expect(decoded.nbf).toEqual(decoded.iat);
+        });
+
+        it('should set grant_type to password', () => {
+            const decoded: any = jwtService.decode(passwordGrantResponse.accessToken);
+            expect(decoded.grant_type).toEqual('password');
+        });
+
+        it('should include tenant object with id, name, and domain', () => {
+            const decoded: any = jwtService.decode(passwordGrantResponse.accessToken);
+            expect(decoded.tenant).toBeDefined();
+            expect(decoded.tenant.id).toBeDefined();
+            expect(decoded.tenant.name).toBeDefined();
+            expect(decoded.tenant.domain).toEqual("auth.server.com");
+        });
+    });
+
+    // ── Password Grant — Scope/Role Separation ──────────────────────
+
+    describe('Password Grant — Scope/Role Separation', () => {
         it('should have scope field as space-delimited OIDC string', () => {
             const decoded: any = jwtService.decode(passwordGrantResponse.accessToken);
             expect(decoded.scope).toBeDefined();
@@ -114,14 +154,23 @@ describe('Token Abstraction Flows', () => {
             }
         });
 
+        it('should not include email, name, userId, or userTenant in the JWT payload', () => {
+            const decoded: any = jwtService.decode(passwordGrantResponse.accessToken);
+            expect(decoded.email).toBeUndefined();
+            expect(decoded.name).toBeUndefined();
+            expect(decoded.userId).toBeUndefined();
+            expect(decoded.userTenant).toBeUndefined();
+        });
+
         it('should have an opaque refresh token (not a JWT)', () => {
-            // Refresh tokens are now opaque strings, not JWTs
             const decoded: any = jwtService.decode(passwordGrantResponse.refreshToken);
             expect(decoded).toBeNull();
         });
     });
 
-    describe('Client Credentials Grant Flow', () => {
+    // ── Client Credentials Grant ────────────────────────────────────
+
+    describe('Client Credentials Grant', () => {
         it('should obtain technical token with OIDC scopes and no roles', async () => {
             const response = await app.getHttpServer()
                 .post('/api/oauth/token')
@@ -154,10 +203,10 @@ describe('Token Abstraction Flows', () => {
         });
     });
 
-    describe('Refresh Token Grant Flow', () => {
-        it('should obtain new tokens via refresh token grant', async () => {
-            // Use the default public client (same client that issued the refresh token).
-            // Public clients don't need a secret per RFC 6749 §6.
+    // ── Refresh Token Grant ─────────────────────────────────────────
+
+    describe('Refresh Token Grant', () => {
+        it('should obtain new tokens with proper scope/role separation', async () => {
             const response = await app.getHttpServer()
                 .post('/api/oauth/token')
                 .send({
@@ -193,6 +242,8 @@ describe('Token Abstraction Flows', () => {
             }
         });
     });
+
+    // ── Token Verification Endpoint ─────────────────────────────────
 
     describe('Token Verification Endpoint', () => {
         it('should verify a valid access token', async () => {

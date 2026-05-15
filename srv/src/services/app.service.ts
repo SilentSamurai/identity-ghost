@@ -81,15 +81,19 @@ export class AppService {
 
         const actorId = permission.authContext?.SECURITY_CONTEXT?.sub || 'unknown';
 
-        return this.dataSource.transaction(async (manager) => {
-            const appClient = await this.clientService.createAppClient(manager, {
-                tenant,
-                alias,
-                name,
-                appUrl,
-            });
+        // Create client and app as individual atomic operations to avoid
+        // "cannot start a transaction within a transaction" on SQLite.
+        // If app creation fails after client is saved, delete the orphaned client.
+        const appClient = await this.clientService.createAppClient(this.dataSource.manager, {
+            tenant,
+            alias,
+            name,
+            appUrl,
+        });
 
-            const app = manager.create(App, {
+        let saved: App;
+        try {
+            const app = this.appRepository.create({
                 name,
                 description,
                 appUrl,
@@ -100,21 +104,15 @@ export class AppService {
                 onboardingCallbackUrl: onboardingCallbackUrl || undefined,
             });
 
-            return manager.save(app);
-        }).then((saved) => {
-            // Audit log fires AFTER transaction commits (task 15.2)
-            this.appClientAuditLogger.logCreated({
-                appId: saved.id,
-                appName: saved.name,
-                ownerTenantId: tenant.id,
-                clientId: saved.client?.clientId || '',
-                alias: saved.client?.alias || alias,
-                actorId,
-                correlationId: '',
-            });
-            return saved;
-        }).catch((error) => {
-            // Log creation failure (task 15.3)
+            saved = await this.appRepository.save(app);
+        } catch (error) {
+            // Compensating action: remove client orphaned by failed app creation
+            try {
+                await this.clientService.deleteAppClient(this.dataSource.manager, appClient.id);
+            } catch (cleanupError) {
+                this.logger.warn(`Failed to clean up orphaned client ${appClient.id}: ${cleanupError}`);
+            }
+
             const reason = error instanceof ConflictException ? 'duplicate_alias'
                 : error instanceof BadRequestException ? 'validation_failed'
                 : 'persistence_error';
@@ -126,7 +124,20 @@ export class AppService {
                 correlationId: '',
             });
             throw error;
+        }
+
+        // Audit log fires after successful persistence (task 15.2)
+        this.appClientAuditLogger.logCreated({
+            appId: saved.id,
+            appName: saved.name,
+            ownerTenantId: tenant.id,
+            clientId: saved.client?.clientId || '',
+            alias: saved.client?.alias || alias,
+            actorId,
+            correlationId: '',
         });
+
+        return saved;
     }
 
     async getAppById(appId: string): Promise<App> {
@@ -173,13 +184,16 @@ export class AppService {
             throw new Error('Cannot delete app with subscriptions');
         }
 
-        await this.dataSource.transaction(async (manager) => {
-            const appToDelete = await manager.findOneOrFail(App, {where: {id: app.id}});
-            await manager.remove(appToDelete);
-            if (app.client) {
-                await this.clientService.deleteAppClient(manager, app.client.id);
+        // Delete app and client as individual atomic operations to avoid
+        // "cannot start a transaction within a transaction" on SQLite.
+        await this.appRepository.remove(app);
+        if (app.client) {
+            try {
+                await this.clientService.deleteAppClient(this.dataSource.manager, app.client.id);
+            } catch (cleanupError) {
+                this.logger.warn(`Failed to delete orphaned client ${app.client.id} after app deletion: ${cleanupError}`);
             }
-        });
+        }
     }
 
     async updateApp(permission: Permission, appId: string, name: string, appUrl: string, description?: string, onboardingEnabled?: boolean, onboardingCallbackUrl?: string | null): Promise<App> {
@@ -209,28 +223,28 @@ export class AppService {
             return this.appRepository.save(app);
         }
 
-        return this.dataSource.transaction(async (manager) => {
-            if (nameChanged) {
-                await this.clientService.updateAppClientName(manager, app.client.id, name);
-            }
-            if (appUrlChanged) {
-                await this.clientService.replaceSeededRedirectUri(manager, app.client.id, app.appUrl, appUrl);
-            }
+        // Update client and app as individual atomic operations to avoid
+        // "cannot start a transaction within a transaction" on SQLite.
+        if (nameChanged) {
+            await this.clientService.updateAppClientName(this.dataSource.manager, app.client.id, name);
+        }
+        if (appUrlChanged) {
+            await this.clientService.replaceSeededRedirectUri(this.dataSource.manager, app.client.id, app.appUrl, appUrl);
+        }
 
-            app.name = name;
-            app.appUrl = appUrl;
-            if (description !== undefined) {
-                app.description = description;
-            }
-            if (onboardingEnabled !== undefined) {
-                app.onboardingEnabled = onboardingEnabled;
-            }
-            if (onboardingCallbackUrl !== undefined) {
-                app.onboardingCallbackUrl = onboardingCallbackUrl || undefined;
-            }
+        app.name = name;
+        app.appUrl = appUrl;
+        if (description !== undefined) {
+            app.description = description;
+        }
+        if (onboardingEnabled !== undefined) {
+            app.onboardingEnabled = onboardingEnabled;
+        }
+        if (onboardingCallbackUrl !== undefined) {
+            app.onboardingCallbackUrl = onboardingCallbackUrl || undefined;
+        }
 
-            return manager.save(app);
-        });
+        return this.appRepository.save(app);
     }
 
     async publishApp(permission: Permission, appId: string): Promise<App> {

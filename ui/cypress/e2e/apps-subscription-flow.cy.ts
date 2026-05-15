@@ -63,9 +63,12 @@ describe('Apps & Subscription Flow', () => {
 
         cy.get('button').contains('Login').click();
 
-        // The user already has a session from cy.login(), so the authorize endpoint
-        // redirects to /session-confirm instead of /authorize (login page).
-        cy.url().should('include', '/session-confirm');
+        // The user already has a session from cy.login(), but has not yet
+        // consented to this third-party app. Flow: consent → session-confirm.
+        cy.get('app-authorize[data-view="consent"]').should('exist');
+        cy.get('button').contains('Approve').click();
+
+        cy.get('app-authorize[data-view="session-confirm"]').should('exist');
         cy.get('button').contains('Continue').click();
 
         cy.wait('@authToken').should((interception: Interception) => {

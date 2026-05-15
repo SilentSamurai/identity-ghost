@@ -633,8 +633,9 @@ describe('Feature: oidc-prompt-max-age, Property 8: auth_time claim inclusion wh
         app = new SharedTestFixture();
         tokenFixture = new TokenFixture(app);
 
-        // Pre-grant consent so /authorize issues codes directly.
-        // External redirect_uri = third-party, so consent is always required unless pre-granted.
+        // The redirect_uri matches BASE_URL origin, so this is a first-party flow
+        // and consent is automatically skipped. The preGrantConsentFlow call below
+        // is a no-op safety net (it returns early when consent isn't required).
         await tokenFixture.preGrantConsentFlow(ADMIN_EMAIL, ADMIN_PASSWORD, {
             clientId: CLIENT_ID,
             redirectUri: REDIRECT_URI,

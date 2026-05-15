@@ -86,7 +86,7 @@ describe('Consent Screen Flow', () => {
         cy.get('#password').should('be.visible').type(TEST_USER.password);
         cy.get('#login-btn').click();
 
-        cy.url().should('include', '/consent');
+        cy.get('app-authorize[data-view="consent"]').should('exist');
     }
 
     // ─── Consent Screen Display ───────────────────────────────────────
@@ -158,7 +158,7 @@ describe('Consent Screen Flow', () => {
             cy.contains('button', 'Approve').click();
 
             // After consent, flow goes to session-confirm before redirecting to external app
-            cy.url({timeout: 10000}).should('include', '/session-confirm');
+            cy.get('app-authorize[data-view="session-confirm"]', {timeout: 10000}).should('exist');
             cy.contains('button', 'Continue').should('be.visible').click();
 
             // Backend redirects to consent-app.html?code=... — the external app loads
@@ -239,7 +239,7 @@ describe('Consent Screen Flow', () => {
             cy.get('#password').should('be.visible').type(TEST_USER.password);
             cy.get('#login-btn').click();
 
-            cy.url().should('include', '/consent');
+            cy.get('app-authorize[data-view="consent"]').should('exist');
         }
 
         it('prompt=consent forces consent screen even when consent was previously granted', () => {
@@ -248,7 +248,7 @@ describe('Consent Screen Flow', () => {
             cy.contains('button', 'Approve').click();
 
             // After consent, flow goes to session-confirm before redirecting to external app
-            cy.url({timeout: 10000}).should('include', '/session-confirm');
+            cy.get('app-authorize[data-view="session-confirm"]', {timeout: 10000}).should('exist');
             cy.contains('button', 'Continue').should('be.visible').click();
 
             cy.origin('http://localhost:3000', () => {
