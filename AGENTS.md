@@ -8,8 +8,8 @@
 - `compat-tests/` — OIDC conformance tests
 - `specs/` — feature plans and specs
 - `docs/` — docsify documentation site
+- `docs/steering/` — design principles, testing strategy, token architecture (read before making changes)
 - `helm/` — Kubernetes Helm charts
-- `.kiro/steering/` — design principles, testing strategy, token architecture (read before making changes)
 - `standalone.dockerfile` — bundles backend + UI into single image
 
 ## Env config
@@ -59,3 +59,18 @@ Testing uses `srv/envs/.env.testing` with in-memory SQLite.
 - UI sections (admin vs user) must be completely independent — no shared components, dialogs, or API services. Duplicate rather than cross-import.
 - Dialogs are plain components; data passed via `ModalService.open(Component, { initData })`. Results via `activeModal.close(data)` / `.dismiss()`.
 - List pages use `DataSource` / `RestApiModel` backed by `POST /api/search/{Entity}` with `{ pageNo, pageSize, where, orderBy, expand }`.
+
+## Steering Docs
+
+Read these before making changes to the corresponding systems:
+
+| File | Covers |
+|------|--------|
+| [`docs/steering/design-principles.md`](docs/steering/design-principles.md) | OAuth/OIDC RFC compliance rules, safety-first practices, separation of concerns, UI conventions (tenant context, dialogs, data loading, CASL authorization, admin/user isolation) |
+| [`docs/steering/testing-strategy.md`](docs/steering/testing-strategy.md) | Integration-only testing mandate, test isolation rules (one tenant per suite), how to seed tenants, Cypress E2E approach |
+| [`docs/steering/token-architecture.md`](docs/steering/token-architecture.md) | Scope/role separation in JWTs, token field definitions, key services (ScopeResolver, CaslAbilityFactory, SecurityService), default scopes |
+
+<!-- SPECKIT START -->
+For additional context about technologies to be used, project structure,
+shell commands, and other important information, read the current plan
+<!-- SPECKIT END -->

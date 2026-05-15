@@ -2,14 +2,14 @@
   "version": "0.8.5.dev0",
   "integration_state_schema": 1,
   "installed_integrations": [
-    "kiro-cli"
+    "opencode"
   ],
   "integration_settings": {
-    "kiro-cli": {
+    "opencode": {
       "script": "ps",
       "invoke_separator": "."
     }
   },
-  "integration": "kiro-cli",
-  "default_integration": "kiro-cli"
+  "integration": "opencode",
+  "default_integration": "opencode"
 }
