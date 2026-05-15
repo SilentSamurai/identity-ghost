@@ -95,10 +95,10 @@ export interface ParseOAuthParametersResult {
 /**
  * Parse OAuth parameters, `view`, and `csrf_token` from the URL query string.
  *
- * Exactly the keys declared on `OAuthParameters` are copied across. One-shot
- * flags (`session_confirmed`, `from_logout`) and any other non-OAuth query
- * keys are ignored so they can never make it into `Component_State`
- * (Property 8, Req 7.9).
+ * Exactly the keys declared on `OAuthParameters` are copied across.
+ * One-shot flags (`session_confirmed`, `from_logout`, `consent_denied`) and
+ * any other non-OAuth query keys are ignored so they can never make it into
+ * `Component_State` (Property 8, Req 7.9).
  *
  * Validation order:
  *   1. `error=legacy_route` short-circuits to `{ error: 'legacy_route' }` so

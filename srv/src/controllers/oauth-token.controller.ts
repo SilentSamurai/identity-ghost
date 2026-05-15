@@ -121,6 +121,18 @@ export class OAuthTokenController {
         try {
             const validated = await this.authorizeService.validateAuthorizeRequest(query);
 
+            // 0. User explicitly denied consent — issue the access_denied error
+            //    redirect immediately, before any session or UI checks.
+            if (query.consent_denied === 'true') {
+                return this.redirectWithError(
+                    res,
+                    validated.redirectUri,
+                    'access_denied',
+                    'The user denied the authorization request.',
+                    validated.state,
+                );
+            }
+
             // 1. Forced login: from_logout or prompt=login
             if (query.from_logout === 'true' || validated.prompt === 'login') {
                 const flowId = this.flowIdCookieService.mintIfAbsent(req, res);
@@ -343,7 +355,17 @@ export class OAuthTokenController {
         }
         if (validated.nonce) params.set('nonce', validated.nonce);
         if (validated.resource) params.set('resource', validated.resource);
-        if (validated.prompt) params.set('prompt', validated.prompt);
+        if (validated.prompt) {
+            // Strip prompt=consent when redirecting to the consent view.
+            // Once the consent screen is shown, prompt=consent has fulfilled
+            // its purpose. Echoing it back would create an infinite loop:
+            // grant → authorize (still has prompt=consent) → consent again.
+            if (validated.prompt === 'consent' && view === 'consent') {
+                // Don't include prompt — it's satisfied by showing the view.
+            } else {
+                params.set('prompt', validated.prompt);
+            }
+        }
         if (validated.maxAge !== undefined) params.set('max_age', String(validated.maxAge));
         if (query.id_token_hint) params.set('id_token_hint', query.id_token_hint);
         if (validated.subscriberTenantHint) {

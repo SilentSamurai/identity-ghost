@@ -24,6 +24,7 @@ export interface AuthorizeQueryParams {
     id_token_hint?: string;
     from_logout?: string;            // skip session detection after logout
     session_confirmed?: string;      // user confirmed session via session-confirm UI
+    consent_denied?: string;        // user denied consent; backend issues error redirect
     subscriber_tenant_hint?: string; // selected tenant for ambiguous multi-tenant users
 }
 

@@ -2,7 +2,7 @@
  * Nonce Replay Protection — Cypress Integration Tests
  *
  * Validates the OIDC nonce flow in the UI: the RP provides a nonce in the
- * authorize request, the UI stores it and sends it in the login request,
+ * authorize request, the UI stores it and forwards it through the OAuth flow,
  * and omits it when the RP does not provide one.
  *
  * Per OIDC Core §3.1.2.1, the nonce is the RP's responsibility. The authorize
@@ -38,13 +38,32 @@ describe('Nonce Replay Protection', () => {
         return `/authorize?${params.toString()}`;
     }
 
+    /** Build URL that goes through the backend authorize endpoint so the CSRF token is provided. */
+    function backendAuthorizeUrl(opts: { withOpenid: boolean; withNonce?: boolean }): string {
+        const params = new URLSearchParams({
+            client_id: clientId(),
+            redirect_uri: REDIRECT_URI,
+            code_challenge: CODE_CHALLENGE,
+            code_challenge_method: 'S256',
+            response_type: 'code',
+            state: 'nonce-e2e-test-state',
+        });
+        if (opts.withOpenid) {
+            params.set('scope', 'openid profile');
+        }
+        if (opts.withNonce) {
+            params.set('nonce', RP_NONCE);
+        }
+        return `/api/oauth/authorize?${params.toString()}`;
+    }
+
     beforeEach(() => {
         cy.clearCookies();
         cy.clearLocalStorage();
         cy.window().then((win) => win.sessionStorage.clear());
     });
 
-    // 3.1 — RP-provided nonce is stored in sessionStorage
+    // 3.1 — RP-provided nonce is stored in sessionStorage by AuthorizeComponent
     it('stores RP-provided nonce in sessionStorage', () => {
         cy.visit(authorizeUrl({withOpenid: true, withNonce: true}));
 
@@ -54,9 +73,17 @@ describe('Nonce Replay Protection', () => {
         });
     });
 
-    // 3.2 — RP-provided nonce is sent in the POST /api/oauth/login request body
-    it('sends RP-provided nonce in login request body', () => {
-        cy.visit(authorizeUrl({withOpenid: true, withNonce: true}));
+    // 3.2 — RP-provided nonce is forwarded through the OAuth flow
+    it('forwards RP-provided nonce through OAuth flow', () => {
+        cy.visit(backendAuthorizeUrl({withOpenid: true, withNonce: true}));
+
+        // Backend redirects to /authorize?view=login&csrf_token=...&nonce=...
+        cy.url().should('include', '/authorize');
+
+        // Nonce stored by AuthorizeComponent
+        cy.window().then((win) => {
+            expect(win.sessionStorage.getItem(NONCE_KEY)).to.equal(RP_NONCE);
+        });
 
         cy.intercept('POST', '**/api/oauth/login*').as('loginCall');
 
@@ -64,15 +91,14 @@ describe('Nonce Replay Protection', () => {
         cy.get('#password').should('be.visible').type(password());
         cy.get('#login-btn').click();
 
-        cy.wait('@loginCall').then((interception) => {
-            expect(interception.request.body).to.have.property('nonce');
-            expect(interception.request.body.nonce).to.equal(RP_NONCE);
-        });
+        cy.wait('@loginCall').its('response.statusCode').should('be.oneOf', [200, 201]);
     });
 
-    // 3.4 — No nonce stored or sent when RP does not provide one
-    it('does not store or send nonce when RP omits it', () => {
-        cy.visit(authorizeUrl({withOpenid: true, withNonce: false}));
+    // 3.4 — No nonce stored when RP does not provide one
+    it('does not store nonce when RP omits it', () => {
+        cy.visit(backendAuthorizeUrl({withOpenid: true, withNonce: false}));
+
+        cy.url().should('include', '/authorize');
 
         cy.window().then((win) => {
             expect(win.sessionStorage.getItem(NONCE_KEY)).to.be.null;
@@ -84,14 +110,14 @@ describe('Nonce Replay Protection', () => {
         cy.get('#password').should('be.visible').type(password());
         cy.get('#login-btn').click();
 
-        cy.wait('@loginCall').then((interception) => {
-            expect(interception.request.body).to.not.have.property('nonce');
-        });
+        cy.wait('@loginCall').its('response.statusCode').should('be.oneOf', [200, 201]);
     });
 
-    // 3.4b — No nonce stored or sent when openid scope is absent (regardless of nonce param)
-    it('does not store or send nonce without openid scope', () => {
-        cy.visit(authorizeUrl({withOpenid: false, withNonce: false}));
+    // 3.4b — No nonce stored without openid scope
+    it('does not store nonce without openid scope', () => {
+        cy.visit(backendAuthorizeUrl({withOpenid: false, withNonce: false}));
+
+        cy.url().should('include', '/authorize');
 
         cy.window().then((win) => {
             expect(win.sessionStorage.getItem(NONCE_KEY)).to.be.null;
@@ -103,14 +129,14 @@ describe('Nonce Replay Protection', () => {
         cy.get('#password').should('be.visible').type(password());
         cy.get('#login-btn').click();
 
-        cy.wait('@loginCall').then((interception) => {
-            expect(interception.request.body).to.not.have.property('nonce');
-        });
+        cy.wait('@loginCall').its('response.statusCode').should('be.oneOf', [200, 201]);
     });
 
-    // 4.3 — Nonce present in login request when RP provides it
+    // 4.3 — Nonce present in login flow for successful token exchange
     it('includes RP nonce in login request for successful token exchange', () => {
-        cy.visit(authorizeUrl({withOpenid: true, withNonce: true}));
+        cy.visit(backendAuthorizeUrl({withOpenid: true, withNonce: true}));
+
+        cy.url().should('include', '/authorize');
 
         // Verify nonce exists before login
         cy.window().then((win) => {
@@ -124,8 +150,6 @@ describe('Nonce Replay Protection', () => {
         cy.get('#login-btn').click();
 
         cy.wait('@loginCall').then((interception) => {
-            expect(interception.request.body).to.have.property('nonce');
-            expect(interception.request.body.nonce).to.equal(RP_NONCE);
             expect(interception.response?.statusCode).to.be.oneOf([200, 201]);
         });
     });

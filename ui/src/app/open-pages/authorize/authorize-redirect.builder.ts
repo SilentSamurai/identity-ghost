@@ -36,8 +36,9 @@ import { OAuthParameters } from './authorize.types';
  * the property altogether is the way to say "do not include this flag".
  */
 export type AuthorizeRedirectExtras =
-    | { session_confirmed: true; from_logout?: never }
-    | { session_confirmed?: never; from_logout: true };
+    | { session_confirmed: true; from_logout?: never; consent_denied?: never }
+    | { session_confirmed?: never; from_logout: true; consent_denied?: never }
+    | { session_confirmed?: never; from_logout?: never; consent_denied: true };
 
 /**
  * Single place that constructs the URL for a redirect back to
@@ -56,32 +57,40 @@ export class AuthorizeRedirectBuilder {
      * query string is identical across repeated calls with the same input
      * — a property the Cypress tests rely on for byte-exact assertions.
      *
-     * `extras` is the ONLY path by which `session_confirmed=true` or
-     * `from_logout=true` can end up on a redirect URL:
+     * `extras` is the ONLY path by which `session_confirmed=true`,
+     * `from_logout=true`, or `consent_denied=true` can end up on a redirect URL:
      *   - `session_confirmed` is set by the session-confirm "Continue"
-     *     handler and the consent "Grant" handler (Req 7.8, 4.4).
+     *     handler (Req 7.8).
      *   - `from_logout` is set by the session-confirm "Log out" handler
      *     immediately after a successful `POST /api/oauth/logout`
      *     (Req 7.5).
-     * Neither flag is ever read from `Component_State`, the URL, or any
-     * other source (P8, Req 7.7, 7.9).
+     *   - `consent_denied` is set by the consent "Deny" handler so the
+     *     backend can redirect with `error=access_denied` (Req 4.4, 6.5).
+     * None of these flags are ever read from `Component_State`, the URL, or
+     * any other source (P8, Req 7.7, 7.9).
      *
-     * Passing both flags is a programmer error. TypeScript already forbids
-     * it via `AuthorizeRedirectExtras`, and at runtime we additionally
-     * throw to catch callers reaching the builder through untyped code.
+     * Passing more than one flag is a programmer error. TypeScript already
+     * forbids it via `AuthorizeRedirectExtras`, and at runtime we
+     * additionally throw to catch callers reaching the builder through
+     * untyped code.
      */
     toAuthorizeEndpoint(params: OAuthParameters, extras?: AuthorizeRedirectExtras): string {
         const wantsSessionConfirmed = extras?.session_confirmed === true;
         const wantsFromLogout = extras?.from_logout === true;
+        const wantsConsentDenied = extras?.consent_denied === true;
 
         // Runtime guard for callers that bypass the structural type — the
-        // two flags mark mutually exclusive "reason I'm bouncing through
-        // /authorize right now" signals, so setting both would have no
-        // coherent meaning for the backend to consume.
-        if (wantsSessionConfirmed && wantsFromLogout) {
+        // three flags mark mutually exclusive "reason I'm bouncing through
+        // /authorize right now" signals, so setting more than one would
+        // have no coherent meaning for the backend to consume.
+        if (
+            (wantsSessionConfirmed && wantsFromLogout) ||
+            (wantsSessionConfirmed && wantsConsentDenied) ||
+            (wantsFromLogout && wantsConsentDenied)
+        ) {
             throw new Error(
-                'AuthorizeRedirectBuilder: only one of `session_confirmed` or `from_logout` ' +
-                    'may be set per redirect.',
+                'AuthorizeRedirectBuilder: only one of `session_confirmed`, `from_logout`, ' +
+                    'or `consent_denied` may be set per redirect.',
             );
         }
 
@@ -93,34 +102,10 @@ export class AuthorizeRedirectBuilder {
         if (wantsFromLogout) {
             qs.set('from_logout', 'true');
         }
+        if (wantsConsentDenied) {
+            qs.set('consent_denied', 'true');
+        }
 
         return '/api/oauth/authorize?' + qs.toString();
-    }
-
-    /**
-     * Build the redirect URL for an OAuth error response sent to the
-     * External_Client's `redirect_uri` (Req 4.4, 6.5).
-     *
-     * Per RFC 6749 §4.1.2.1, error responses include `error`,
-     * `error_description` (optional), and `state` (if the client provided
-     * one). The client's `redirect_uri` is taken verbatim from the stored
-     * `OAuthParameters`.
-     *
-     * This is the ONLY redirect in the UI that goes directly to the
-     * External_Client rather than bouncing through `/api/oauth/authorize`
-     * (P7 — no OAuth params on non-backend redirects, with the exception
-     * of this error redirect which is an OAuth-mandated direct client
-     * redirect).
-     */
-    toErrorRedirect(params: OAuthParameters, error: string, errorDescription?: string): string {
-        const qs = new URLSearchParams();
-        qs.set('error', error);
-        if (errorDescription) {
-            qs.set('error_description', errorDescription);
-        }
-        if (params.state) {
-            qs.set('state', params.state);
-        }
-        return params.redirect_uri + '?' + qs.toString();
     }
 }

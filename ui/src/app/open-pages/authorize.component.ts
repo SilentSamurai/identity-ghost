@@ -27,6 +27,7 @@ import { AuthorizeRedirectBuilder } from './authorize/authorize-redirect.builder
 import { MissingCsrfTokenError, RequestTimeoutError, AuthorizeApi } from './authorize/authorize.api';
 import { parseOAuthParametersFromUrl } from './authorize/oauth-params.util';
 import { OAuthParameters, TenantInfo, ViewKind } from './authorize/authorize.types';
+import { NonceService } from '../_services/nonce.service';
 
 /**
  * Maps an `OAuthParseError` discriminant to the human-readable message shown
@@ -274,6 +275,7 @@ export class AuthorizeComponent implements OnInit, OnDestroy {
         private readonly route: ActivatedRoute,
         private readonly api: AuthorizeApi,
         private readonly redirectBuilder: AuthorizeRedirectBuilder,
+        private readonly nonceService: NonceService,
     ) {}
 
     // -----------------------------------------------------------------------
@@ -316,6 +318,12 @@ export class AuthorizeComponent implements OnInit, OnDestroy {
         // Successful parse — store immutable copies (P1)
         this.oauthParams = Object.freeze({ ...result.params! });
         this.csrfToken = result.csrfToken;
+
+        // Store RP-provided nonce in sessionStorage so OAuthCallbackComponent
+        // can validate it against the ID token later (OIDC Core §3.1.2.1).
+        if (this.oauthParams.nonce) {
+            this.nonceService.store(this.oauthParams.nonce);
+        }
 
         const view = result.view as ViewKind;
         this.viewKind = view;
@@ -765,9 +773,10 @@ export class AuthorizeComponent implements OnInit, OnDestroy {
      * Handler for `ConsentViewComponent.deny`.
      *
      * Identical flow to `onConsentGrant` but posts `decision: 'deny'` and
-     * tracks `inflight.consentDeny`. On success the backend redirects to
-     * External_Client with `error=access_denied` — the UI does not need to
-     * distinguish grant from deny for the redirect (Req 4.4, 6.5).
+     * tracks `inflight.consentDeny`. On success the UI bounces back to
+     * `GET /api/oauth/authorize` with the one-shot `consent_denied=true`
+     * flag so the backend can redirect with `error=access_denied`
+     * (Req 4.4, 6.5).
      */
     onConsentDeny(): void {
         this.submitConsent('deny');
@@ -841,7 +850,10 @@ export class AuthorizeComponent implements OnInit, OnDestroy {
                     // endpoint with the preserved OAuth params. The backend
                     // decides whether to issue the code or the access_denied
                     // error redirect to External_Client.
-                    window.location.href = this.redirectBuilder.toAuthorizeEndpoint(oauthParams);
+                    const extras = decision === 'deny'
+                        ? { consent_denied: true as const }
+                        : undefined;
+                    window.location.href = this.redirectBuilder.toAuthorizeEndpoint(oauthParams, extras);
                 },
                 error: (err: unknown) => {
                     // Re-enable the button regardless of error type (P9, Req 11.7).

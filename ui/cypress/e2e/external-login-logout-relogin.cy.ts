@@ -7,6 +7,15 @@
  * The critical assertion: the `state` parameter must flow back to the external app
  * on re-login so that CSRF validation succeeds. Previously, the state was lost when
  * the session-confirm page was shown on re-login (existing session detected).
+ *
+ * Key behaviors:
+ *  - Consent is DB-backed: once granted, it persists across tests. After the first
+ *    test in the suite grants consent, subsequent tests skip the consent screen.
+ *  - After a fresh login, the frontend sends session_confirmed=true, so the backend
+ *    issues the code directly (no session-confirm). The redirect may happen so fast
+ *    that no authorize UI is visible — the browser goes straight to the external app.
+ *  - Session-confirm only appears when an existing session (sid cookie) hits
+ *    /api/oauth/authorize without session_confirmed=true.
  */
 describe('External Login → Logout → Re-Login', () => {
     const email = () => Cypress.env('shireTenantAdminEmail');
@@ -14,8 +23,67 @@ describe('External Login → Logout → Re-Login', () => {
     const clientId = () => Cypress.env('shireTenantAdminClientId');
 
     beforeEach(() => {
+        cy.clearAllCookies();
+        cy.clearAllLocalStorage();
+        cy.window().then((win) => win.sessionStorage.clear());
         cy.visit('/');
     });
+
+    /**
+     * After submitting the login form, wait for the flow to complete.
+     *
+     * Three outcomes are possible:
+     *  1. Consent view appears (first time for this user/client) → click Approve → redirect
+     *  2. Direct redirect to the external app (consent already granted + session_confirmed=true)
+     *  3. Session-confirm should NOT appear after a fresh login because the frontend
+     *     sends session_confirmed=true, which the backend uses to bypass it.
+     *
+     * In all cases we end up on the external app with an auth code.
+     */
+    function loginAndWaitForExternalApp() {
+        cy.get('#login-btn').click();
+
+        // Wait for navigation away from the login form, then check what we landed on.
+        // After login the frontend redirects to /api/oauth/authorize?session_confirmed=true.
+        //   • If consent is already granted: backend 302 → external app directly.
+        //   • If consent needed: backend 302 → /authorize?view=consent
+        cy.url({timeout: 15000}).should('not.include', 'view=login');
+
+        cy.url().then((url) => {
+            if (url.includes('/authorize')) {
+                // We're on an authorize view — handle consent if that's what we see.
+                cy.get('app-authorize').invoke('attr', 'data-view').then((view) => {
+                    if (view === 'consent') {
+                        cy.contains('button', 'Approve').should('be.visible').click();
+                    }
+                    // No session-confirm after fresh login (session_confirmed=true).
+                    // After Approve, the backend may issue code directly or show
+                    // session-confirm — handle the latter defensively.
+                    cy.url({timeout: 10000}).should('include', 'localhost:3000');
+                    cy.url().then((redirectUrl) => {
+                        // If we're still on /authorize, check for session-confirm
+                        if (redirectUrl.includes('/authorize')) {
+                            cy.get('app-authorize').invoke('attr', 'data-view').then((v) => {
+                                if (v === 'session-confirm') {
+                                    cy.contains('button', 'Continue').should('be.visible').click();
+                                }
+                            });
+                        }
+                    });
+                });
+            }
+            // If URL already includes localhost:3000, consent was already granted —
+            // the browser went straight to the external app. Nothing more to do.
+        });
+
+        cy.url({timeout: 10000}).should('include', 'localhost:3000');
+        cy.url().should('include', '?code');
+        // Wait for the external app to finish its token exchange before
+        // navigating away. Without this, Cypress can trigger a visit while
+        // the external app's JS is still processing the callback, causing
+        // "Cannot read properties of null (reading 'postMessage')" errors.
+        cy.get('#decodedToken', {timeout: 10000}).should('not.be.empty');
+    }
 
     /**
      * Helper: complete the auth flow from whatever page we land on.
@@ -23,23 +91,19 @@ describe('External Login → Logout → Re-Login', () => {
      * then clicks Continue.
      */
     function completeReloginFlow() {
-        // After the first login, the authorize page will find the old auth code
-        // and navigate to session-confirm. Wait for that navigation to complete.
-        cy.url({timeout: 10000}).should('include', '/session-confirm');
+        cy.get('app-authorize[data-view="session-confirm"]', {timeout: 10000}).should('exist');
         cy.contains('button', 'Continue').should('be.visible').click();
     }
 
     it('should preserve state parameter on re-login after logout', () => {
         // ─── First Login ───────────────────────────────────────────────────
+        cy.visit("/");
         cy.visit('http://localhost:3000/');
-
-        cy.intercept('POST', '**/api/oauth/token*').as('tokenCall');
 
         cy.get('#login-btn').click();
 
         cy.url().should('include', '/authorize');
 
-        // Capture the first state value
         let firstState: string;
         cy.url().then((url) => {
             const urlObj = new URL(url);
@@ -49,19 +113,11 @@ describe('External Login → Logout → Re-Login', () => {
 
         cy.get('#username').should('be.visible').type(email());
         cy.get('#password').should('be.visible').type(password());
-        cy.get('#login-btn').click();
 
-        // Wait for token exchange to complete
-        cy.wait('@tokenCall').then((interception) => {
-            expect(interception.response?.statusCode).to.be.oneOf([200, 201]);
-        });
+        loginAndWaitForExternalApp();
 
-        // Verify first login succeeded
-        cy.url().should('include', '?code');
-        cy.get('#decodedToken').should('not.be.empty');
         cy.get('#login-btn').should('contain', 'Logout');
 
-        // Verify state was present in the callback URL
         cy.url().then((url) => {
             const urlObj = new URL(url);
             const callbackState = urlObj.searchParams.get('state');
@@ -76,19 +132,14 @@ describe('External Login → Logout → Re-Login', () => {
         // ─── Second Login ──────────────────────────────────────────────────
         cy.visit('http://localhost:3000/');
 
-        cy.intercept('POST', '**/api/oauth/token*').as('tokenCall2');
-
         cy.get('#login-btn').click();
 
-        // The authorize page will find the old auth code and navigate to session-confirm
+        // The authorize page will find the sid cookie and show session-confirm
         completeReloginFlow();
 
-        // After clicking Continue, the session-confirm page redirects back to the external app
-        // with the auth code and state. The token exchange may fail (stale code) but
-        // the critical assertion is that state is present in the callback URL.
+        // After clicking Continue, redirected back to the external app
         cy.url({timeout: 10000}).should('include', 'localhost:3000');
 
-        // Critical assertion: state must be present in the callback URL
         cy.url().then((url) => {
             const urlObj = new URL(url);
             const callbackState = urlObj.searchParams.get('state');
@@ -101,20 +152,16 @@ describe('External Login → Logout → Re-Login', () => {
         const REDIRECT_URI = 'http://localhost:3000/';
         const testState = 'relogin-state-test-value';
 
-        // ─── First: create a session by logging in directly ────────────────
+        // ─── First: create a session by logging in ────────────────────────
+        cy.visit("/");
         cy.visit('http://localhost:3000/');
-        cy.intercept('POST', '**/api/oauth/token*').as('tokenCall');
         cy.get('#login-btn').click();
         cy.url().should('include', '/authorize');
         cy.get('#username').should('be.visible').type(email());
         cy.get('#password').should('be.visible').type(password());
-        cy.get('#login-btn').click();
-        cy.wait('@tokenCall');
-        cy.get('#decodedToken').should('not.be.empty');
+        loginAndWaitForExternalApp();
 
         // ─── Now simulate a new authorize request with a known state ───────
-        // Must hit /api/oauth/authorize (not the Angular /authorize UI) so the
-        // backend can detect the sid cookie and redirect to /session-confirm
         const params = new URLSearchParams({
             client_id: clientId(),
             redirect_uri: REDIRECT_URI,
@@ -127,11 +174,9 @@ describe('External Login → Logout → Re-Login', () => {
 
         cy.visit(`/api/oauth/authorize?${params.toString()}`);
 
-        // Wait for navigation to session-confirm (sid cookie found by backend)
-        cy.url({timeout: 10000}).should('include', '/session-confirm');
+        cy.get('app-authorize[data-view="session-confirm"]', {timeout: 10000}).should('exist');
         cy.contains('button', 'Continue').should('be.visible').click();
 
-        // Verify redirect includes the state parameter
         cy.url({timeout: 10000}).should('include', `state=${testState}`);
         cy.url().should('include', 'code=');
     });
@@ -142,18 +187,15 @@ describe('External Login → Logout → Re-Login', () => {
         const testState = 'stale-code-state-test';
 
         // ─── First login to establish a session ───────────────────────────
+        cy.visit("/");
         cy.visit('http://localhost:3000/');
-        cy.intercept('POST', '**/api/oauth/token*').as('tokenCall');
         cy.get('#login-btn').click();
         cy.url().should('include', '/authorize');
         cy.get('#username').should('be.visible').type(email());
         cy.get('#password').should('be.visible').type(password());
-        cy.get('#login-btn').click();
-        cy.wait('@tokenCall');
-        cy.get('#decodedToken').should('not.be.empty');
+        loginAndWaitForExternalApp();
 
         // ─── Now visit /api/oauth/authorize directly with a new state ──────
-        // Must hit the backend endpoint so it detects the sid cookie
         const params = new URLSearchParams({
             client_id: clientId(),
             redirect_uri: REDIRECT_URI,
@@ -166,11 +208,9 @@ describe('External Login → Logout → Re-Login', () => {
 
         cy.visit(`/api/oauth/authorize?${params.toString()}`);
 
-        // Wait for navigation to session-confirm
-        cy.url({timeout: 10000}).should('include', '/session-confirm');
+        cy.get('app-authorize[data-view="session-confirm"]', {timeout: 10000}).should('exist');
         cy.contains('button', 'Continue').should('be.visible').click();
 
-        // Critical: state must be present in the redirect
         cy.url({timeout: 10000}).should('include', `state=${testState}`);
     });
 
@@ -179,15 +219,13 @@ describe('External Login → Logout → Re-Login', () => {
         const REDIRECT_URI = 'http://localhost:3000/';
 
         // ─── First login to establish a session ────────────────────────────
+        cy.visit("/");
         cy.visit('http://localhost:3000/');
-        cy.intercept('POST', '**/api/oauth/token*').as('tokenCall');
         cy.get('#login-btn').click();
         cy.url().should('include', '/authorize');
         cy.get('#username').should('be.visible').type(email());
         cy.get('#password').should('be.visible').type(password());
-        cy.get('#login-btn').click();
-        cy.wait('@tokenCall');
-        cy.get('#decodedToken').should('not.be.empty');
+        loginAndWaitForExternalApp();
 
         // ─── Use cy.request with session_confirmed=true ────────────────────
         const state = 'bypass-test-' + Date.now();
@@ -210,7 +248,6 @@ describe('External Login → Logout → Re-Login', () => {
             }).then((resp) => {
                 expect(resp.status).to.eq(302);
                 const location = resp.headers['location'] as string;
-                // Should redirect directly to client with code, bypassing session-confirm
                 expect(location).to.include(REDIRECT_URI);
                 expect(location).to.include('code=');
                 expect(location).to.include(`state=${state}`);
@@ -223,18 +260,15 @@ describe('External Login → Logout → Re-Login', () => {
         const REDIRECT_URI = 'http://localhost:3000/';
 
         // ─── First login to establish a session ────────────────────────────
+        cy.visit("/");
         cy.visit('http://localhost:3000/');
-        cy.intercept('POST', '**/api/oauth/token*').as('tokenCall');
         cy.get('#login-btn').click();
         cy.url().should('include', '/authorize');
         cy.get('#username').should('be.visible').type(email());
         cy.get('#password').should('be.visible').type(password());
-        cy.get('#login-btn').click();
-        cy.wait('@tokenCall');
-        cy.get('#decodedToken').should('not.be.empty');
+        loginAndWaitForExternalApp();
 
         // ─── Trigger session-confirm via /api/oauth/authorize ──────────────
-        // Must hit the backend endpoint so it detects the sid cookie
         const params = new URLSearchParams({
             client_id: clientId(),
             redirect_uri: REDIRECT_URI,
@@ -245,14 +279,13 @@ describe('External Login → Logout → Re-Login', () => {
             scope: 'openid profile email',
         });
         cy.visit(`/api/oauth/authorize?${params.toString()}`);
-        cy.url({timeout: 10000}).should('include', '/session-confirm');
+        cy.get('app-authorize[data-view="session-confirm"]', {timeout: 10000}).should('exist');
         cy.getCookie('sid').should('exist');
 
         // ─── Click Logout ──────────────────────────────────────────────────
         cy.contains('button', 'Logout').should('be.visible').click();
 
-        // Should clear the cookie and redirect back to the login form
-        cy.url({timeout: 10000}).should('include', '/authorize');
+        cy.get('app-authorize[data-view="login"]', {timeout: 10000}).should('exist');
         cy.get('#username').should('be.visible');
         cy.get('#password').should('be.visible');
         cy.getCookie('sid').should('not.exist');

@@ -55,8 +55,9 @@ describe('Consent Screen Flow', () => {
     });
 
     beforeEach(() => {
-        cy.clearCookies();
-        cy.clearLocalStorage();
+        cy.clearAllCookies();
+        cy.clearAllLocalStorage();
+        cy.window().then((win) => win.sessionStorage.clear());
     });
 
     /**
@@ -227,6 +228,7 @@ describe('Consent Screen Flow', () => {
          * screen even when the user has previously granted consent.
          */
         function startAuthorizeFlowWithPrompt(scopes: string[]) {
+            cy.visit("/");
             cy.visit(EXTERNAL_APP_URL);
 
             cy.get('#login-btn')

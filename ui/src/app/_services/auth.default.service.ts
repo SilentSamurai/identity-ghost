@@ -38,16 +38,21 @@ export class AuthDefaultService {
         const oauthClientAlias = window.sessionStorage.getItem('oauth-client-id');
         const refreshToken = this.sessionService.getRefreshToken();
 
-        // Single call to POST /api/oauth/logout:
-        //   - revokes the refresh token family
-        //   - invalidates the server-side login session (sid)
-        //   - clears the sid cookie via Set-Cookie in the response
-        // withCredentials is set on the request so the sid cookie is sent.
-        // Fire-and-forget — local cleanup proceeds regardless of server errors.
-        try {
-            await this.authService.logout(refreshToken || '');
-        } catch {
-            // proceed with local cleanup
+        // Only call the logout API if we have a refresh token to revoke.
+        // If the token was already cleared or never set, skip the server call
+        // but still proceed with local cleanup and redirect.
+        if (refreshToken) {
+            // POST /api/oauth/logout:
+            //   - revokes the refresh token family
+            //   - invalidates the server-side login session (sid)
+            //   - clears the sid cookie via Set-Cookie in the response
+            // withCredentials is set on the request so the sid cookie is sent.
+            // Fire-and-forget — local cleanup proceeds regardless of server errors.
+            try {
+                await this.authService.logout(refreshToken);
+            } catch {
+                // proceed with local cleanup
+            }
         }
 
         this.sessionService.clearSession();

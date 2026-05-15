@@ -5,44 +5,65 @@
  * The user clicks "Login" on the external app, gets redirected to /authorize,
  * enters credentials, and is redirected back with an authorization code.
  * Verifies the decoded token contains the correct user email and tenant domain.
+ *
+ * Consent is DB-backed and persists across test runs. On the first run for this
+ * user/client, the consent screen appears. On subsequent runs, consent is already
+ * granted and the redirect to the external app happens immediately after login.
  */
 describe('External Login', () => {
     beforeEach(() => {
-        cy.visit('/')
-    })
+        cy.clearAllCookies();
+        cy.clearAllLocalStorage();
+        cy.window().then((win) => win.sessionStorage.clear());
+        cy.visit('/');
+    });
 
-    // Clicks login on the external app, authenticates via /authorize, and verifies
-    // the redirect back to the external app with a valid code and decoded token
     it('External Login', () => {
-
         cy.visit('http://localhost:3000/');
 
         cy.get('#login-btn').click();
-
-        cy.intercept('POST', '**/api/oauth/token*').as('authToken');
 
         cy.url().should('include', '/authorize');
 
         cy.get('#username').type(Cypress.env('shireTenantAdminEmail'));
         cy.get('#password').type(Cypress.env('shireTenantAdminPassword'));
 
-        // cy.intercept('POST', '**/api/oauth/login*').as('authCode')
-        // cy.intercept('POST', '**/api/oauth/token*').as('authToken')
-
         cy.get('#login-btn').click();
 
-        cy.wait('@authToken').should(({request, response}) => {
-            expect(response, 'response').to.exist;
-            expect(response!.statusCode).to.be.oneOf([201, 200]);
-            // expect(response && response.body).to.include('authentication_code')
+        // After login, the frontend redirects with session_confirmed=true.
+        // If consent is not yet granted: consent view appears → click Approve → redirect.
+        // If consent already granted: redirect directly to external app (no UI screens).
+        // No session-confirm after fresh login (frontend sends session_confirmed=true).
+        cy.url({timeout: 15000}).should('not.include', 'view=login');
+
+        cy.url().then((url) => {
+            if (url.includes('/authorize')) {
+                cy.get('app-authorize').invoke('attr', 'data-view').then((view) => {
+                    if (view === 'consent') {
+                        cy.contains('button', 'Approve').should('be.visible').click();
+                        // After Approve, wait for redirect — may go directly to
+                        // external app or show session-confirm.
+                        cy.url({timeout: 10000}).should('include', 'localhost:3000');
+                        cy.url().then((redirectUrl) => {
+                            if (redirectUrl.includes('/authorize')) {
+                                cy.get('app-authorize').invoke('attr', 'data-view').then((v) => {
+                                    if (v === 'session-confirm') {
+                                        cy.contains('button', 'Continue').should('be.visible').click();
+                                    }
+                                });
+                            }
+                        });
+                    }
+                });
+            }
         });
 
-        // cy.origin("http://localhost:3000/", () => {})
-
+        // Redirected back to external app with authorization code
+        cy.url({timeout: 10000}).should('include', 'localhost:3000');
         cy.url().should('include', '?code');
 
-        cy.get('#decodedToken').should('contain', Cypress.env('shireTenantAdminClientId'));
-
-
-    })
-})
+        // External app exchanges code for token automatically via handleCallback()
+        cy.get('#decodedToken', {timeout: 10000})
+            .should('contain', Cypress.env('shireTenantAdminClientId'));
+    });
+});

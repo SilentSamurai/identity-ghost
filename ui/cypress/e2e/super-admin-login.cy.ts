@@ -3,7 +3,7 @@
  *
  * Tests that super-admin users can access /admin after logging in
  * through the regular /login page, and that unauthorized users
- * are rejected with 403.
+ * are rejected with 400.
  */
 describe('Super Admin — Admin Access', () => {
 
@@ -36,14 +36,14 @@ describe('Super Admin — Admin Access', () => {
         cy.get('#username').type(Cypress.env('adminTenantUserEmail'));
         cy.get('#password').type(Cypress.env('adminTenantUserPassword'));
 
-        cy.intercept('POST', '**/api/oauth/login*').as('login');
+        cy.intercept('POST', '**/api/oauth/token*').as('authCode');
 
         cy.get('#login-btn').click();
 
-        cy.wait('@login').should(({response}) => {
+        cy.wait('@authCode').should(({response}) => {
             expect(response).to.exist;
-            // User not in auth.server.com tenant — expect 403
-            expect(response!.statusCode).to.be.oneOf([403]);
+            // User not in auth.server.com tenant — expect 400
+            expect(response!.statusCode).to.be.oneOf([400]);
         });
     });
 });

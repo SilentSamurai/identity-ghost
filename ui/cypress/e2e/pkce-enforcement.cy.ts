@@ -38,8 +38,19 @@ describe('PKCE Enforcement', () => {
         cy.get('#password').type(PKCE_E2E_PASSWORD);
         cy.get('#login-btn').click();
 
+        // Wait for the page to move past login view
+        cy.url({timeout: 15000}).should('not.include', '/authorize?view=login');
+
+        // If consent view appeared (first time for this client), approve it
+        cy.url().then((url) => {
+            if (url.includes('view=consent')) {
+                cy.get('[data-view="consent"]').should('be.visible');
+                cy.contains('button', 'Approve').should('not.be.disabled').click();
+            }
+        });
+
         // Wait for token exchange to complete (no code_verifier sent)
-        cy.wait('@authToken').should(({response}) => {
+        cy.wait('@authToken', {timeout: 15000}).should(({response}) => {
             expect(response).to.exist;
             expect(response!.statusCode).to.eq(200);
             expect(response!.body.access_token).to.exist;
