@@ -10,7 +10,7 @@
  * state-changing POST in that flow, without requiring any DB storage.
  *
  * Cookie options mirror `sid` (same path `/api/oauth`, same SameSite,
- * same HttpOnly, same signed, same `secure` gating on `ENABLE_HTTPS`).
+ * same HttpOnly, same signed, same `secure` gating on `BASE_URL` scheme).
  *
  * Requirements: 5.10, 5.11, 5.14, 12.6
  */
@@ -69,9 +69,7 @@ export class FlowIdCookieService {
         return {
             signed: true,
             httpOnly: true,
-            secure: this.env.get("ENABLE_HTTPS") === "true"
-                || this.env.get("ENABLE_HTTPS") === true
-                || process.env.NODE_ENV === "production",
+            secure: String(this.env.get("BASE_URL", "")).startsWith("https"),
             sameSite: "lax" as const,
             path: FlowIdCookieService.COOKIE_PATH,
             maxAge: maxAgeMs,

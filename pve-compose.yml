@@ -22,6 +22,8 @@ containers:
     purge_on_upgrade: false
     environment:
       ENV: "production"
+      COOKIE_SECRET: "changeme"
+      BASE_URL: "http://auth-server.myc"
       # PORT: "8080"
       # DATABASE_TYPE: "postgres"
       # DATABASE_HOST: "db"

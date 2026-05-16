@@ -412,7 +412,7 @@ export class OAuthTokenController {
         return {
             signed: true,
             httpOnly: true,
-            secure: Environment.get('ENABLE_HTTPS') === 'true' || process.env.NODE_ENV === 'production',
+            secure: String(Environment.get('BASE_URL', '')).startsWith('https'),
             sameSite: 'lax' as const,
             path: '/api/oauth',
             maxAge: maxAge * 1000, // convert seconds to ms
